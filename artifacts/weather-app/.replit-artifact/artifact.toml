@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Weather App"
+description = "A polished weather dashboard for checking current conditions, hourly trends, and the week ahead for any location."
+version = "1.0.0"
+id = "artifacts/weather-app"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20578
+
+[services.development]
+run = "pnpm --filter @workspace/weather-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/weather-app", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/weather-app/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20578"
+BASE_PATH = "/"

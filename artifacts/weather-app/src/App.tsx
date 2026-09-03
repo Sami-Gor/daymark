@@ -1,0 +1,486 @@
+import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  AlertTriangle,
+  CalendarDays,
+  Cloud,
+  CloudFog,
+  CloudLightning,
+  CloudRain,
+  CloudSun,
+  Droplets,
+  Eye,
+  Gauge,
+  LocateFixed,
+  MapPin,
+  Moon,
+  Navigation,
+  Search,
+  Snowflake,
+  Sun,
+  Sunrise,
+  Sunset,
+  Thermometer,
+  Umbrella,
+  Wind,
+  type LucideIcon,
+} from 'lucide-react';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import NotFound from '@/pages/not-found';
+import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+
+const queryClient = new QueryClient();
+const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 };
+const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
+const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
+
+type Unit = 'celsius' | 'fahrenheit';
+type Place = { name: string; country?: string; admin1?: string; latitude: number; longitude: number };
+type WeatherPayload = {
+  latitude?: number;
+  longitude?: number;
+  timezone?: string;
+  current?: {
+    time?: string;
+    temperature_2m?: number;
+    relative_humidity_2m?: number;
+    apparent_temperature?: number;
+    is_day?: number;
+    precipitation?: number;
+    rain?: number;
+    weather_code?: number;
+    wind_speed_10m?: number;
+    wind_direction_10m?: number;
+  };
+  hourly?: {
+    time?: string[];
+    temperature_2m?: number[];
+    precipitation_probability?: number[];
+    weather_code?: number[];
+    wind_speed_10m?: number[];
+  };
+  daily?: {
+    time?: string[];
+    weather_code?: number[];
+    temperature_2m_max?: number[];
+    temperature_2m_min?: number[];
+    precipitation_probability_max?: number[];
+    wind_speed_10m_max?: number[];
+    sunrise?: string[];
+    sunset?: string[];
+  };
+};
+type GeocodingPayload = { results?: Place[] };
+
+async function getJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Weather service returned ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
+async function fetchWeather(place: Place): Promise<WeatherPayload> {
+  const params = new URLSearchParams({
+    latitude: String(place.latitude),
+    longitude: String(place.longitude),
+    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m',
+    hourly: 'temperature_2m,precipitation_probability,weather_code,wind_speed_10m',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset',
+    forecast_days: '7',
+    timezone: 'auto',
+  });
+  return getJson<WeatherPayload>(`${FORECAST_URL}?${params.toString()}`);
+}
+
+function weatherCopy(code = 0): string {
+  if (code === 0) return 'Clear sky';
+  if ([1, 2].includes(code)) return 'Mostly clear';
+  if (code === 3) return 'Overcast';
+  if ([45, 48].includes(code)) return 'Misty';
+  if ([51, 53, 55, 56, 57].includes(code)) return 'Light drizzle';
+  if ([61, 63, 65, 66, 67].includes(code)) return 'Rain';
+  if ([71, 73, 75, 77].includes(code)) return 'Snow';
+  if ([80, 81, 82].includes(code)) return 'Rain showers';
+  if ([85, 86].includes(code)) return 'Snow showers';
+  if ([95, 96, 99].includes(code)) return 'Thunderstorms';
+  return 'Changeable';
+}
+
+function weatherIcon(code = 0, isDay = true): LucideIcon {
+  if (!isDay && code < 3) return Moon;
+  if (code === 0) return Sun;
+  if ([1, 2].includes(code)) return CloudSun;
+  if (code === 3) return Cloud;
+  if ([45, 48].includes(code)) return CloudFog;
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return CloudRain;
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return Snowflake;
+  if ([95, 96, 99].includes(code)) return CloudLightning;
+  return Cloud;
+}
+
+function displayTemp(value: number | undefined, unit: Unit): string {
+  if (value === undefined || Number.isNaN(value)) return '—';
+  const converted = unit === 'fahrenheit' ? (value * 9) / 5 + 32 : value;
+  return `${Math.round(converted)}°`;
+}
+
+function displayWind(value: number | undefined, unit: Unit): string {
+  if (value === undefined || Number.isNaN(value)) return '—';
+  const converted = unit === 'fahrenheit' ? value * 0.621371 : value;
+  return `${Math.round(converted)} ${unit === 'fahrenheit' ? 'mph' : 'km/h'}`;
+}
+
+function localDate(value?: string): Date | null {
+  if (!value) return null;
+  const datePart = value.slice(0, 10);
+  const date = new Date(`${datePart}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function shortDay(value?: string, index = 0): string {
+  if (index === 0) return 'Today';
+  if (index === 1) return 'Tomorrow';
+  const date = localDate(value);
+  return date ? date.toLocaleDateString([], { weekday: 'short' }) : 'Day';
+}
+
+function dateLabel(value?: string): string {
+  const date = localDate(value);
+  return date ? date.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—';
+}
+
+function timeLabel(value?: string): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value.slice(11, 16) : date.toLocaleTimeString([], { hour: 'numeric' });
+}
+
+function compass(degrees?: number): string {
+  if (degrees === undefined || Number.isNaN(degrees)) return '—';
+  return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(degrees / 45) % 8];
+}
+
+function formatPlace(place: Place): string {
+  return [place.name, place.admin1 && place.admin1 !== place.name ? place.admin1 : '', place.country].filter(Boolean).join(', ');
+}
+
+function LoadingState() {
+  return (
+    <main aria-label="Loading weather" className="loading-layout">
+      <div className="skeleton" style={{ width: 115, height: 13 }} />
+      <div className="skeleton" style={{ width: 'min(70vw, 620px)', height: 90, marginTop: 24 }} />
+      <div className="skeleton" style={{ width: 155, height: 14, marginTop: 14 }} />
+      <div className="skeleton" style={{ width: 240, height: 104, marginTop: 44 }} />
+      <div className="loading-panels">
+        <div className="skeleton" style={{ height: 170 }} />
+        <div className="skeleton" style={{ height: 300 }} />
+      </div>
+    </main>
+  );
+}
+
+function WeatherError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="error-panel" role="alert" data-testid="status-weather-error">
+      <AlertTriangle size={25} strokeWidth={1.7} />
+      <h2>That forecast went cloudy.</h2>
+      <p>{message} Check your connection and give the sky another look.</p>
+      <button className="retry-button" onClick={onRetry} data-testid="button-retry-weather">Try again</button>
+    </div>
+  );
+}
+
+function HourlyOutlook({ weather, unit }: { weather: WeatherPayload; unit: Unit }) {
+  const hourly = weather.hourly ?? {};
+  const times = hourly.time ?? [];
+  const currentTime = weather.current?.time ? Date.parse(weather.current.time) : Date.now();
+  const start = Math.max(0, times.findIndex((time) => Date.parse(time) >= currentTime));
+  const indexes = Array.from({ length: Math.min(12, times.length - start) }, (_, index) => start + index);
+  return (
+    <section aria-labelledby="hourly-title">
+      <div className="section-heading">
+        <h2 className="section-title" id="hourly-title">The next few hours</h2>
+        <span className="section-meta">hour by hour</span>
+      </div>
+      <div className="panel hourly-scroll" data-testid="list-hourly-forecast">
+        {indexes.length ? indexes.map((index, itemIndex) => {
+          const code = hourly.weather_code?.[index] ?? 0;
+          const Icon = weatherIcon(code, true);
+          return (
+            <div className={`hour-card${itemIndex === 0 ? ' active' : ''}`} key={`${times[index]}-${index}`} data-testid={`card-hour-${index}`}>
+              <span className="hour-time">{itemIndex === 0 ? 'Now' : timeLabel(times[index])}</span>
+              <Icon size={21} className="condition-icon" strokeWidth={1.7} />
+              <span className="hour-temp">{displayTemp(hourly.temperature_2m?.[index], unit)}</span>
+              <span className="hour-rain"><Droplets size={10} />{hourly.precipitation_probability?.[index] ?? 0}%</span>
+            </div>
+          );
+        }) : <p style={{ padding: 22, color: 'hsl(var(--muted-foreground))', fontSize: 13 }}>Hourly detail is unavailable right now.</p>}
+      </div>
+    </section>
+  );
+}
+
+function DailyForecast({ weather, unit }: { weather: WeatherPayload; unit: Unit }) {
+  const daily = weather.daily ?? {};
+  const days = daily.time ?? [];
+  return (
+    <section aria-labelledby="daily-title">
+      <div className="section-heading">
+        <h2 className="section-title" id="daily-title">A look ahead</h2>
+        <span className="section-meta">7 days</span>
+      </div>
+      <div className="panel forecast-panel" data-testid="list-daily-forecast">
+        {days.length ? days.slice(0, 7).map((day, index) => {
+          const Icon = weatherIcon(daily.weather_code?.[index] ?? 0, true);
+          return (
+            <div className="day-row" key={day} data-testid={`row-forecast-${index}`}>
+              <div className="day-name">{shortDay(day, index)}<span className="day-date">{dateLabel(day)}</span></div>
+              <Icon className="day-icon" size={21} strokeWidth={1.7} />
+              <div className="temps"><span className="high">{displayTemp(daily.temperature_2m_max?.[index], unit)}</span><span className="low">{displayTemp(daily.temperature_2m_min?.[index], unit)}</span></div>
+              <div className="rain-chance">{daily.precipitation_probability_max?.[index] ?? 0}% rain</div>
+            </div>
+          );
+        }) : <p style={{ padding: 22, color: 'hsl(var(--muted-foreground))', fontSize: 13 }}>The extended outlook is unavailable right now.</p>}
+      </div>
+    </section>
+  );
+}
+
+function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit }) {
+  const current = weather.current ?? {};
+  const daily = weather.daily ?? {};
+  const detailItems: { icon: LucideIcon; label: string; value: string; sub?: string }[] = [
+    { icon: Thermometer, label: 'Feels like', value: displayTemp(current.apparent_temperature, unit), sub: 'on your skin' },
+    { icon: Droplets, label: 'Humidity', value: current.relative_humidity_2m !== undefined ? `${current.relative_humidity_2m}%` : '—', sub: 'relative humidity' },
+    { icon: Wind, label: 'Wind', value: displayWind(current.wind_speed_10m, unit), sub: `${compass(current.wind_direction_10m)} direction` },
+    { icon: Umbrella, label: 'Rain now', value: current.precipitation !== undefined ? `${current.precipitation} mm` : '—', sub: 'at this moment' },
+    { icon: Eye, label: 'Visibility', value: 'Good', sub: 'a clear horizon' },
+    { icon: Gauge, label: 'Day ahead', value: `${daily.precipitation_probability_max?.[0] ?? 0}%`, sub: 'chance of rain' },
+  ];
+  return (
+    <section className="details-wide" aria-labelledby="details-title">
+      <div className="section-heading">
+        <h2 className="section-title" id="details-title">The useful bits</h2>
+        <span className="section-meta">at a glance</span>
+      </div>
+      <div className="panel details-panel" data-testid="panel-weather-details">
+        <div className="detail-grid">
+          {detailItems.map(({ icon: Icon, label, value, sub }) => (
+            <div className="detail" key={label} data-testid={`detail-${label.toLowerCase().replaceAll(' ', '-')}`}>
+              <Icon className="detail-icon" size={17} strokeWidth={1.7} />
+              <div className="detail-label">{label}</div>
+              <div className="detail-value">{value}</div>
+              <div className="detail-sub">{sub}</div>
+            </div>
+          ))}
+        </div>
+        <div className="panel sun-panel">
+          <div className="sun-item">
+            <Sunrise size={20} strokeWidth={1.6} />
+            <div><div className="sun-label">Sunrise</div><div className="sun-value">{timeLabel(daily.sunrise?.[0])}</div></div>
+          </div>
+          <div className="sun-item">
+            <Sunset size={20} strokeWidth={1.6} />
+            <div><div className="sun-label">Sunset</div><div className="sun-value">{timeLabel(daily.sunset?.[0])}</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Home() {
+  const [place, setPlace] = useState<Place>(LONDON);
+  const [weather, setWeather] = useState<WeatherPayload | null>(null);
+  const [unit, setUnit] = useState<Unit>('celsius');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Place[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const requestId = useRef(0);
+
+  const loadWeather = useCallback(async (nextPlace: Place) => {
+    const id = ++requestId.current;
+    setIsLoading(true);
+    setError('');
+    try {
+      const result = await fetchWeather(nextPlace);
+      if (id !== requestId.current) return;
+      setPlace(nextPlace);
+      setWeather(result);
+    } catch (err) {
+      if (id === requestId.current) setError(err instanceof Error ? err.message : 'We could not reach the weather service.');
+    } finally {
+      if (id === requestId.current) setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadWeather(LONDON); }, [loadWeather]);
+
+  const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const term = query.trim();
+    if (!term) return;
+    setIsSearching(true);
+    setResults([]);
+    try {
+      const params = new URLSearchParams({ name: term, count: '5', language: 'en', format: 'json' });
+      const data = await getJson<GeocodingPayload>(`${GEOCODING_URL}?${params.toString()}`);
+      const found = data.results ?? [];
+      setResults(found);
+      if (found.length === 1) {
+        setQuery('');
+        setResults([]);
+        void loadWeather(found[0]);
+      }
+    } catch {
+      setResults([]);
+      setError('We could not search for that place. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const usePlace = (nextPlace: Place) => {
+    setQuery('');
+    setResults([]);
+    void loadWeather(nextPlace);
+  };
+
+  const findMe = () => {
+    if (!navigator.geolocation) {
+      setError('Location services are not available in this browser.');
+      return;
+    }
+    setIsLocating(true);
+    setError('');
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      try {
+        const reverseParams = new URLSearchParams({ latitude: String(coords.latitude), longitude: String(coords.longitude), count: '1', language: 'en', format: 'json' });
+        const reverse = await getJson<GeocodingPayload>(`${GEOCODING_URL}?${reverseParams.toString()}`);
+        const found = reverse.results?.[0];
+        usePlace(found ?? { name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
+      } catch {
+        usePlace({ name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
+      } finally {
+        setIsLocating(false);
+      }
+    }, () => {
+      setIsLocating(false);
+      setError('We could not access your location. You can search for a city instead.');
+    });
+  };
+
+  const current = weather?.current ?? {};
+  const currentCode = current.weather_code ?? 0;
+  const CurrentIcon = weatherIcon(currentCode, current.is_day !== 0);
+  const updatedLabel = useMemo(() => {
+    if (!current.time) return 'Forecast ready';
+    return `Updated ${timeLabel(current.time)}`;
+  }, [current.time]);
+  const dayGreeting = current.is_day === 0 ? 'A clear night' : weatherCopy(currentCode);
+  const summary = current.precipitation && current.precipitation > 0
+    ? 'Keep a light layer close — the sky may change its mind.'
+    : current.temperature_2m !== undefined && current.temperature_2m < 10
+      ? 'A crisp start. You will be glad of an extra layer today.'
+      : 'A good day to step outside and see where it takes you.';
+
+  return (
+    <div className="weather-app">
+      <div className="app-shell">
+        <header className="topbar">
+          <div className="brand" aria-label="Daymark weather">
+            <div className="brand-mark"><CloudSun size={21} strokeWidth={1.8} /></div>
+            <div><div className="brand-name">daymark</div><div className="brand-note">weather, simply</div></div>
+          </div>
+          <div className="top-actions">
+            <div className="unit-switch" aria-label="Temperature unit">
+              <button className={`unit-button${unit === 'celsius' ? ' active' : ''}`} onClick={() => setUnit('celsius')} aria-pressed={unit === 'celsius'} data-testid="button-unit-celsius">°C</button>
+              <button className={`unit-button${unit === 'fahrenheit' ? ' active' : ''}`} onClick={() => setUnit('fahrenheit')} aria-pressed={unit === 'fahrenheit'} data-testid="button-unit-fahrenheit">°F</button>
+            </div>
+            <button className="icon-button" onClick={findMe} aria-label="Use my location" title="Use my location" data-testid="button-use-location">
+              <LocateFixed size={17} className={isLocating ? 'animate-pulse' : ''} />
+            </button>
+          </div>
+        </header>
+
+        <div className="search-wrap">
+          <form className="search-form" onSubmit={handleSearch} role="search">
+            <Search size={16} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search another city" aria-label="Search another city" data-testid="input-search-city" />
+            <button className="search-submit" type="submit" aria-label="Search" data-testid="button-search-city"><Search size={15} /></button>
+          </form>
+          {isSearching && <div className="search-results" aria-live="polite"><div style={{ padding: 12, color: 'hsl(var(--muted-foreground))', fontSize: 12 }}>Looking around…</div></div>}
+          {!isSearching && results.length > 0 && (
+            <div className="search-results" role="listbox" data-testid="list-search-results">
+              {results.map((result) => <button className="search-result" key={`${result.latitude}-${result.longitude}`} onClick={() => usePlace(result)} data-testid={`result-city-${result.name.toLowerCase().replaceAll(' ', '-')}`}>
+                <MapPin size={15} />
+                <div><strong>{result.name}</strong><span>{formatPlace(result)}</span></div>
+              </button>)}
+            </div>
+          )}
+        </div>
+
+        {isLoading && <LoadingState />}
+        {!isLoading && error && <WeatherError message={error} onRetry={() => void loadWeather(place)} />}
+        {!isLoading && !error && weather && (
+          <main>
+            <section className="hero-grid" aria-labelledby="place-title">
+              <div>
+                <div className="eyebrow"><span className="eyebrow-dot" />{dayGreeting}</div>
+                <h1 className="place-title" id="place-title" data-testid="text-current-city">{place.name}</h1>
+                <div className="date-line" data-testid="text-current-date">{localDate(current.time)?.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }) ?? 'Today'}</div>
+                <div className="condition-line" data-testid="text-current-condition"><CurrentIcon className="condition-icon" size={26} strokeWidth={1.6} />{weatherCopy(currentCode)}<span style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 400 }}>·</span><span style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 400 }}>{summary}</span></div>
+                <button className="local-button" onClick={findMe} data-testid="button-refresh-location"><Navigation size={13} />{isLocating ? 'Finding you…' : 'Use my location'}</button>
+              </div>
+              <div className="temp-block">
+                <div className="current-temp" data-testid="text-current-temperature">{displayTemp(current.temperature_2m, unit)}<sup>{unit === 'celsius' ? 'C' : 'F'}</sup></div>
+                <div className="feels">Feels like<strong>{displayTemp(current.apparent_temperature, unit)}</strong>{updatedLabel}</div>
+              </div>
+            </section>
+            <div className="content-grid">
+              <HourlyOutlook weather={weather} unit={unit} />
+              <DailyForecast weather={weather} unit={unit} />
+              <WeatherDetails weather={weather} unit={unit} />
+            </div>
+          </main>
+        )}
+        <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> Forecasts by Open-Meteo</span><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a></footer>
+      </div>
+    </div>
+  );
+}
+
+function Router() {
+  return (
+    <RoutedErrorBoundary>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route component={NotFound} />
+      </Switch>
+    </RoutedErrorBoundary>
+  );
+}
+
+function RoutedErrorBoundary({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <Router />
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
