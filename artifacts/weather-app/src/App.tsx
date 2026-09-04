@@ -9,7 +9,6 @@ import {
   CloudRain,
   CloudSun,
   Droplets,
-  Eye,
   Gauge,
   LocateFixed,
   Moon,
@@ -20,7 +19,6 @@ import {
   Sunset,
   Thermometer,
   Umbrella,
-  Wind,
   type LucideIcon,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -383,11 +381,8 @@ function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit
   const detailItems: { icon: LucideIcon; label: string; value: string; sub?: string }[] = [
     { icon: Thermometer, label: 'Feels like', value: displayTemp(current.apparent_temperature, unit), sub: 'on your skin' },
     { icon: Droplets, label: 'Humidity', value: current.relative_humidity_2m !== undefined ? `${current.relative_humidity_2m}%` : '—', sub: 'relative humidity' },
-    { icon: Wind, label: 'Wind', value: displayWind(current.wind_speed_10m, unit), sub: `${compass(current.wind_direction_10m)} direction` },
     { icon: Umbrella, label: 'Rain now', value: current.precipitation !== undefined ? `${current.precipitation} mm` : '—', sub: 'at this moment' },
-    { icon: Eye, label: 'Visibility', value: 'Good', sub: 'a clear horizon' },
     { icon: Gauge, label: 'Day ahead', value: `${daily.precipitation_probability_max?.[0] ?? 0}%`, sub: 'chance of rain' },
-    { icon: Sun, label: 'UV index', value: uvValue(current.uv_index), sub: uvLevel(current.uv_index).label },
   ];
   return (
     <section className="details-wide" aria-labelledby="details-title">
