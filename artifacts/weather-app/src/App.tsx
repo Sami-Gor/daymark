@@ -227,6 +227,37 @@ function uvValue(value: number | undefined): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function uvColor(value: number | undefined): string {
+  const level = uvLevel(value);
+  if (level.className === 'uv-unavailable') return '#9aaab3';
+  if (level.className === 'uv-low') return '#3fb98a';
+  if (level.className === 'uv-moderate') return '#e8b93f';
+  if (level.className === 'uv-high') return '#e8763f';
+  return '#d9483f';
+}
+
+type ChartPoint = { x: number; y: number };
+
+function smoothChartPath(points: ChartPoint[]): string {
+  if (!points.length) return '';
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  return points.reduce((path, point, index) => {
+    if (index === 0) return `M ${point.x} ${point.y}`;
+    const previous = points[index - 1];
+    const beforePrevious = points[index - 2] ?? previous;
+    const next = points[index + 1] ?? point;
+    const controlOne = {
+      x: previous.x + (point.x - beforePrevious.x) / 6,
+      y: previous.y + (point.y - beforePrevious.y) / 6,
+    };
+    const controlTwo = {
+      x: point.x - (next.x - previous.x) / 6,
+      y: point.y - (next.y - previous.y) / 6,
+    };
+    return `${path} C ${controlOne.x} ${controlOne.y}, ${controlTwo.x} ${controlTwo.y}, ${point.x} ${point.y}`;
+  }, '');
+}
+
 function LoadingState() {
   return (
     <main aria-label="Loading weather" className="loading-layout">
@@ -333,6 +364,29 @@ function UVForecast({ weather }: { weather: WeatherPayload }) {
     if (Date.parse(time) < currentTime || value === undefined || (best && value <= best.value)) return best;
     return { value, time };
   }, null);
+  const gaugeValue = Math.max(0, Math.min(11, currentUv ?? 0));
+  const gaugeAngle = Math.PI - (gaugeValue / 11) * Math.PI;
+  const needleX = 150 + Math.cos(gaugeAngle) * 105;
+  const needleY = 132 - Math.sin(gaugeAngle) * 105;
+  const chartWidth = 900;
+  const chartBaseline = 202;
+  const chartTop = 30;
+  const chartMax = Math.max(3, ...hourIndexes.map((index) => hourly.uv_index?.[index] ?? 0), 11);
+  const chartPoints = hourIndexes.map((index, itemIndex) => {
+    const value = hourly.uv_index?.[index] ?? 0;
+    const x = hourIndexes.length === 1 ? chartWidth / 2 : 18 + (itemIndex / (hourIndexes.length - 1)) * (chartWidth - 36);
+    const y = chartBaseline - (value / chartMax) * (chartBaseline - chartTop);
+    return { x, y };
+  });
+  const chartLine = smoothChartPath(chartPoints);
+  const chartArea = chartLine && chartPoints.length
+    ? `${chartLine} L ${chartPoints[chartPoints.length - 1].x} ${chartBaseline} L ${chartPoints[0].x} ${chartBaseline} Z`
+    : '';
+  const chartPeakIndex = hourIndexes.reduce((best, index, itemIndex) => {
+    const value = hourly.uv_index?.[index] ?? 0;
+    const bestValue = hourly.uv_index?.[hourIndexes[best]] ?? 0;
+    return value > bestValue ? itemIndex : best;
+  }, 0);
 
   return (
     <section className="uv-wide" aria-labelledby="uv-title">
@@ -342,11 +396,20 @@ function UVForecast({ weather }: { weather: WeatherPayload }) {
       </div>
       <div className="panel uv-panel" data-testid="panel-uv-forecast">
         <div className="uv-summary">
-          <div className={`uv-score ${currentLevel.className}`}>
-            <Sun size={18} strokeWidth={1.7} />
-            <div>
-              <span className="uv-kicker">Current UV index</span>
+          <div className="uv-gauge" aria-label={`Current UV index ${uvValue(currentUv)}`}>
+            <svg viewBox="0 0 300 166" role="img">
+              <title>Current UV index: {uvValue(currentUv)}</title>
+              <path className="uv-gauge-track" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" />
+              <path className="uv-gauge-segment gauge-low" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" strokeDasharray="100 300" strokeDashoffset="0" />
+              <path className="uv-gauge-segment gauge-moderate" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" strokeDasharray="100 300" strokeDashoffset="-100" />
+              <path className="uv-gauge-segment gauge-high" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" strokeDasharray="100 300" strokeDashoffset="-200" />
+              <path className="uv-gauge-segment gauge-extreme" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" strokeDasharray="100 300" strokeDashoffset="-300" />
+              <line className="uv-needle" x1="150" y1="132" x2={needleX} y2={needleY} />
+              <circle className="uv-needle-dot" cx="150" cy="132" r="7" />
+            </svg>
+            <div className={`uv-gauge-value ${currentLevel.className}`}>
               <strong data-testid="text-current-uv">{uvValue(currentUv)}</strong>
+              <span>Current UV index</span>
             </div>
           </div>
           <div className="uv-summary-copy">
@@ -363,40 +426,59 @@ function UVForecast({ weather }: { weather: WeatherPayload }) {
         <div className="uv-timeline-wrap">
           <div className="uv-subheading"><span>Today by hour</span><span>index</span></div>
           {hourIndexes.length ? (
-            <div className="uv-timeline" data-testid="list-hourly-uv">
-              {hourIndexes.map((index, itemIndex) => {
-                const value = hourly.uv_index?.[index];
-                const level = uvLevel(value);
-                const height = `${Math.max(5, Math.min(100, ((value ?? 0) / 11) * 100))}%`;
-                return (
-                  <div className="uv-hour" key={`${hourlyTimes[index]}-${index}`} data-testid={`uv-hour-${index}`}>
-                    <div className={`uv-bar ${level.className}`} style={{ height }} title={`${uvValue(value)} — ${level.label}`} />
-                    <span className="uv-hour-value">{uvValue(value)}</span>
-                    <span className="uv-hour-label">{itemIndex === 0 ? 'Now' : timeLabel(hourlyTimes[index])}</span>
-                  </div>
-                );
-              })}
+            <div className="uv-chart" data-testid="list-hourly-uv">
+              <svg viewBox={`0 0 ${chartWidth} 242`} role="img" aria-label="Hourly UV index forecast">
+                <title>Hourly UV index forecast</title>
+                <defs>
+                  <linearGradient id="uv-chart-fill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#3fb98a" stopOpacity=".32" />
+                    <stop offset="42%" stopColor="#e8b93f" stopOpacity=".2" />
+                    <stop offset="78%" stopColor="#e8763f" stopOpacity=".12" />
+                    <stop offset="100%" stopColor="#3fb98a" stopOpacity=".04" />
+                  </linearGradient>
+                </defs>
+                {[0, 1, 2].map((line) => (
+                  <line className="uv-chart-gridline" key={line} x1="0" x2={chartWidth} y1={chartTop + line * 58} y2={chartTop + line * 58} />
+                ))}
+                {chartArea && <path className="uv-chart-area" d={chartArea} />}
+                {chartLine && <path className="uv-chart-line" d={chartLine} />}
+                {chartPoints.map((point, itemIndex) => {
+                  const index = hourIndexes[itemIndex];
+                  const value = hourly.uv_index?.[index];
+                  return (
+                    <g key={`${hourlyTimes[index]}-${index}`} data-testid={`uv-hour-${index}`}>
+                      <circle className="uv-chart-dot" cx={point.x} cy={point.y} r={itemIndex === chartPeakIndex ? 5 : 3.5} fill={uvColor(value)} />
+                      {itemIndex === chartPeakIndex && <text className="uv-chart-peak-label" x={point.x} y={point.y - 13} textAnchor="middle">{uvValue(value)}</text>}
+                      <text className="uv-chart-value" x={point.x} y="220" textAnchor="middle">{uvValue(value)}</text>
+                      <text className="uv-chart-hour-label" x={point.x} y="239" textAnchor="middle">{itemIndex === 0 ? 'Now' : timeLabel(hourlyTimes[index])}</text>
+                    </g>
+                  );
+                })}
+              </svg>
             </div>
           ) : (
             <p className="uv-empty">Hourly UV detail is unavailable right now.</p>
           )}
         </div>
 
-        <div className="uv-days" data-testid="list-daily-uv">
-          {(daily.time ?? []).slice(0, 7).map((day, index) => {
-            const value = daily.uv_index_max?.[index];
-            const level = uvLevel(value);
-            return (
-              <div className="uv-day" key={day} data-testid={`row-uv-${index}`}>
-                <span className="uv-day-name">{shortDay(day, index)}</span>
-                <div className="uv-day-meter">
-                  <div className={`uv-day-fill ${level.className}`} style={{ width: `${Math.max(2, Math.min(100, ((value ?? 0) / 11) * 100))}%` }} />
+        <div className="uv-days-wrap">
+          <div className="uv-subheading"><span>7-day outlook</span><span>peak index</span></div>
+          <div className="uv-days" data-testid="list-daily-uv">
+            {(daily.time ?? []).slice(0, 7).map((day, index) => {
+              const value = daily.uv_index_max?.[index];
+              const level = uvLevel(value);
+              return (
+                <div className="uv-day" key={day} data-testid={`row-uv-${index}`}>
+                  <span className="uv-day-name">{shortDay(day, index)}</span>
+                  <span className={`uv-day-score ${level.className}`}>{uvValue(value)}</span>
+                  <div className="uv-day-meter">
+                    <div className={`uv-day-fill ${level.className}`} style={{ height: `${Math.max(4, Math.min(100, ((value ?? 0) / 11) * 100))}%` }} />
+                  </div>
+                  <span className="uv-day-level">{level.label}</span>
                 </div>
-                <span className={`uv-day-score ${level.className}`}>{uvValue(value)}</span>
-                <span className="uv-day-level">{level.label}</span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
         <div className="uv-legend">
           <span><i className="legend-low" />Low</span>

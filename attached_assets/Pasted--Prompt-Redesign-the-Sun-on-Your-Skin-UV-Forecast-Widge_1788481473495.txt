@@ -1,0 +1,44 @@
+# Prompt: Redesign the "Sun on Your Skin" UV Forecast Widget
+
+Redesign my existing UV Index forecast widget to be more visually engaging while keeping all the same data. Do not change the data source or props — only change the presentation layer (HTML/CSS/JS or the component markup, whichever the codebase uses).
+
+## Current design (to replace)
+- A card titled "Sun on your skin" with a "UV FORECAST" label.
+- A "Current UV Index" block showing a plain number (0) with a "LOW" pill and a message.
+- A "Today's peak" block showing a plain number and time.
+- An hourly forecast row showing 10 small rounded pill/bar shapes with numeric labels underneath each hour (Now, 10AM...6PM).
+- A 7-day forecast row showing thin horizontal progress bars with a number above and a "LOW/MODERATE/HIGH" label below each day.
+- A color legend at the bottom (green/yellow/orange/red dots for Low/Moderate/High/Very High+).
+
+## Required redesign
+
+1. **Current UV Index — replace the plain number with a semi-circular gauge/dial.**
+   - Arc goes from 0 to 11+ across four color bands: green (0–2.9 Low), yellow (3–5.9 Moderate), orange (6–7.9 High), red (8+ Very High+).
+   - A needle or arc-fill points to the current value.
+   - Keep the big number and "LOW" status pill next to or below the gauge, plus the short advisory message.
+
+2. **Hourly forecast — replace the disconnected pills with a smooth line/area chart.**
+   - X-axis: hours (Now, 10AM, 11AM...6PM).
+   - Y-axis: UV value, hidden or minimal.
+   - Line should be smoothly curved (not jagged), with a soft gradient fill beneath it matching the UV color scale.
+   - Mark the peak point with a highlighted dot and its value labeled directly above it.
+   - Each data point's dot color should reflect its UV band (green/yellow/orange/red).
+
+3. **7-day forecast — replace thin horizontal bars with vertical mini bar/column chart.**
+   - Each day gets a short vertical bar whose height is proportional to that day's peak UV value, colored by band.
+   - Value number sits above each bar, day name above that, band label (Low/Moderate) below the bar.
+   - Keep it in a single horizontal scrollable row for 7 days.
+
+4. **Legend** — keep the four-color dot legend at the bottom, unchanged in content, just restyle to match the new card design (rounded card, consistent padding).
+
+5. **Visual style guidelines**
+   - Keep the existing soft pastel background (#eef4f7-ish) and white rounded cards.
+   - Use consistent color tokens across gauge, chart, and bar chart: Low = green (#3fb98a), Moderate = yellow/amber (#e8b93f), High = orange (#e8763f), Very High+ = red (#d9483f).
+   - Keep typography weight/style consistent with the current design (bold numbers, muted gray labels).
+   - Make it responsive — gauge and charts should scale down cleanly on mobile widths.
+
+## Implementation notes
+- If using a charting library, prefer a lightweight option already compatible with the stack (e.g., Chart.js with the `chartjs-gauge` or `chartjs-chart-gauge` plugin for the dial, and Chart.js's built-in line/bar chart types for the other two sections — avoids pulling in a heavy dependency).
+- If no charting library is currently used, implement the gauge with SVG/CSS conic-gradient and the charts with lightweight SVG paths rather than adding a large dependency, unless I confirm a library is fine to add.
+- Preserve all existing data bindings/props/state — this is a presentation-only refactor.
+- Output the updated component/file(s) in full, ready to drop in.
