@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -12,10 +12,8 @@ import {
   Eye,
   Gauge,
   LocateFixed,
-  MapPin,
   Moon,
   Navigation,
-  Search,
   Snowflake,
   Sun,
   Sunrise,
@@ -165,10 +163,6 @@ function timeLabel(value?: string): string {
 function compass(degrees?: number): string {
   if (degrees === undefined || Number.isNaN(degrees)) return '—';
   return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(degrees / 45) % 8];
-}
-
-function formatPlace(place: Place): string {
-  return [place.name, place.admin1 && place.admin1 !== place.name ? place.admin1 : '', place.country].filter(Boolean).join(', ');
 }
 
 type UvLevel = {
@@ -433,9 +427,6 @@ function Home() {
   const [unit, setUnit] = useState<Unit>('celsius');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Place[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const requestId = useRef(0);
 
@@ -455,43 +446,16 @@ function Home() {
     }
   }, []);
 
-  useEffect(() => { void loadWeather(LONDON); }, [loadWeather]);
-
-  const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const term = query.trim();
-    if (!term) return;
-    setIsSearching(true);
-    setResults([]);
-    try {
-      const params = new URLSearchParams({ name: term, count: '5', language: 'en', format: 'json' });
-      const data = await getJson<GeocodingPayload>(`${GEOCODING_URL}?${params.toString()}`);
-      const found = data.results ?? [];
-      setResults(found);
-      if (found.length === 1) {
-        setQuery('');
-        setResults([]);
-        void loadWeather(found[0]);
-      }
-    } catch {
-      setResults([]);
-      setError('We could not search for that place. Please try again.');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const usePlace = (nextPlace: Place) => {
-    setQuery('');
-    setResults([]);
-    void loadWeather(nextPlace);
-  };
-
-  const findMe = () => {
+  const findMe = useCallback((useFallback = false) => {
     if (!navigator.geolocation) {
-      setError('Location services are not available in this browser.');
+      if (useFallback) {
+        void loadWeather(LONDON);
+      } else {
+        setError('Location services are not available in this browser.');
+      }
       return;
     }
+    if (useFallback) void loadWeather(LONDON);
     setIsLocating(true);
     setError('');
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
@@ -499,17 +463,25 @@ function Home() {
         const reverseParams = new URLSearchParams({ latitude: String(coords.latitude), longitude: String(coords.longitude), count: '1', language: 'en', format: 'json' });
         const reverse = await getJson<GeocodingPayload>(`${GEOCODING_URL}?${reverseParams.toString()}`);
         const found = reverse.results?.[0];
-        usePlace(found ?? { name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
+        await loadWeather(found ?? { name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
       } catch {
-        usePlace({ name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
+        await loadWeather({ name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
       } finally {
         setIsLocating(false);
       }
     }, () => {
       setIsLocating(false);
-      setError('We could not access your location. You can search for a city instead.');
+      if (!useFallback) {
+        setError('We could not access your location. Please allow location access and try again.');
+      }
+    }, {
+      enableHighAccuracy: false,
+      maximumAge: 300000,
+      timeout: 5000,
     });
-  };
+  }, [loadWeather]);
+
+  useEffect(() => { findMe(true); }, [findMe]);
 
   const current = weather?.current ?? {};
   const currentCode = current.weather_code ?? 0;
@@ -538,28 +510,11 @@ function Home() {
               <button className={`unit-button${unit === 'celsius' ? ' active' : ''}`} onClick={() => setUnit('celsius')} aria-pressed={unit === 'celsius'} data-testid="button-unit-celsius">°C</button>
               <button className={`unit-button${unit === 'fahrenheit' ? ' active' : ''}`} onClick={() => setUnit('fahrenheit')} aria-pressed={unit === 'fahrenheit'} data-testid="button-unit-fahrenheit">°F</button>
             </div>
-            <button className="icon-button" onClick={findMe} aria-label="Use my location" title="Use my location" data-testid="button-use-location">
+            <button className="icon-button" onClick={() => findMe()} aria-label="Use my location" title="Use my location" data-testid="button-use-location">
               <LocateFixed size={17} className={isLocating ? 'animate-pulse' : ''} />
             </button>
           </div>
         </header>
-
-        <div className="search-wrap">
-          <form className="search-form" onSubmit={handleSearch} role="search">
-            <Search size={16} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search another city" aria-label="Search another city" data-testid="input-search-city" />
-            <button className="search-submit" type="submit" aria-label="Search" data-testid="button-search-city"><Search size={15} /></button>
-          </form>
-          {isSearching && <div className="search-results" aria-live="polite"><div style={{ padding: 12, color: 'hsl(var(--muted-foreground))', fontSize: 12 }}>Looking around…</div></div>}
-          {!isSearching && results.length > 0 && (
-            <div className="search-results" role="listbox" data-testid="list-search-results">
-              {results.map((result) => <button className="search-result" key={`${result.latitude}-${result.longitude}`} onClick={() => usePlace(result)} data-testid={`result-city-${result.name.toLowerCase().replaceAll(' ', '-')}`}>
-                <MapPin size={15} />
-                <div><strong>{result.name}</strong><span>{formatPlace(result)}</span></div>
-              </button>)}
-            </div>
-          )}
-        </div>
 
         {isLoading && <LoadingState />}
         {!isLoading && error && <WeatherError message={error} onRetry={() => void loadWeather(place)} />}
@@ -571,7 +526,7 @@ function Home() {
                 <h1 className="place-title" id="place-title" data-testid="text-current-city">{place.name}</h1>
                 <div className="date-line" data-testid="text-current-date">{localDate(current.time)?.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }) ?? 'Today'}</div>
                 <div className="condition-line" data-testid="text-current-condition"><CurrentIcon className="condition-icon" size={26} strokeWidth={1.6} />{weatherCopy(currentCode)}<span style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 400 }}>·</span><span style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 400 }}>{summary}</span></div>
-                <button className="local-button" onClick={findMe} data-testid="button-refresh-location"><Navigation size={13} />{isLocating ? 'Finding you…' : 'Use my location'}</button>
+                <button className="local-button" onClick={() => findMe()} data-testid="button-refresh-location"><Navigation size={13} />{isLocating ? 'Finding you…' : 'Use my location'}</button>
               </div>
               <div className="temp-block">
                 <div className="current-temp" data-testid="text-current-temperature">{displayTemp(current.temperature_2m, unit)}<sup>{unit === 'celsius' ? 'C' : 'F'}</sup></div>
