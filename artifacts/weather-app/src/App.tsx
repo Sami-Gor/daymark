@@ -678,9 +678,9 @@ function Home() {
             <div className="content-grid">
               <HourlyOutlook weather={weather} unit={unit} />
               <DailyForecast weather={weather} unit={unit} />
-                <UVForecast weather={weather} />
-                <AirQualityForecast weather={weather} />
               <WeatherDetails weather={weather} unit={unit} />
+              <UVForecast weather={weather} />
+              <AirQualityForecast weather={weather} />
             </div>
           </main>
         )}
