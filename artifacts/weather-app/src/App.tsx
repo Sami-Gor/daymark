@@ -53,6 +53,8 @@ type WeatherPayload = {
     weather_code?: number;
     wind_speed_10m?: number;
     wind_direction_10m?: number;
+    uv_index?: number;
+    uv_index_clear_sky?: number;
   };
   hourly?: {
     time?: string[];
@@ -60,6 +62,8 @@ type WeatherPayload = {
     precipitation_probability?: number[];
     weather_code?: number[];
     wind_speed_10m?: number[];
+    uv_index?: number[];
+    uv_index_clear_sky?: number[];
   };
   daily?: {
     time?: string[];
@@ -70,6 +74,8 @@ type WeatherPayload = {
     wind_speed_10m_max?: number[];
     sunrise?: string[];
     sunset?: string[];
+    uv_index_max?: number[];
+    uv_index_clear_sky_max?: number[];
   };
 };
 type GeocodingPayload = { results?: Place[] };
@@ -84,9 +90,9 @@ async function fetchWeather(place: Place): Promise<WeatherPayload> {
   const params = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m',
-    hourly: 'temperature_2m,precipitation_probability,weather_code,wind_speed_10m',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset',
+    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m,uv_index,uv_index_clear_sky',
+    hourly: 'temperature_2m,precipitation_probability,weather_code,wind_speed_10m,uv_index,uv_index_clear_sky',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset,uv_index_max,uv_index_clear_sky_max',
     forecast_days: '7',
     timezone: 'auto',
   });
@@ -163,6 +169,36 @@ function compass(degrees?: number): string {
 
 function formatPlace(place: Place): string {
   return [place.name, place.admin1 && place.admin1 !== place.name ? place.admin1 : '', place.country].filter(Boolean).join(', ');
+}
+
+type UvLevel = {
+  label: string;
+  guidance: string;
+  className: string;
+};
+
+function uvLevel(value: number | undefined): UvLevel {
+  if (value === undefined || Number.isNaN(value)) {
+    return { label: 'Unavailable', guidance: 'UV detail is unavailable right now.', className: 'uv-unavailable' };
+  }
+  if (value < 3) {
+    return { label: 'Low', guidance: 'Enjoy the daylight. Protection is usually not needed.', className: 'uv-low' };
+  }
+  if (value < 6) {
+    return { label: 'Moderate', guidance: 'Consider shade, a hat, and sunscreen around midday.', className: 'uv-moderate' };
+  }
+  if (value < 8) {
+    return { label: 'High', guidance: 'Protection is essential. Seek shade and cover up.', className: 'uv-high' };
+  }
+  if (value < 11) {
+    return { label: 'Very high', guidance: 'Avoid midday sun where possible and protect exposed skin.', className: 'uv-very-high' };
+  }
+  return { label: 'Extreme', guidance: 'Avoid being outside in direct sun. Protection is essential.', className: 'uv-extreme' };
+}
+
+function uvValue(value: number | undefined): string {
+  if (value === undefined || Number.isNaN(value)) return '—';
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function LoadingState() {
@@ -247,6 +283,106 @@ function DailyForecast({ weather, unit }: { weather: WeatherPayload; unit: Unit 
   );
 }
 
+function UVForecast({ weather }: { weather: WeatherPayload }) {
+  const current = weather.current ?? {};
+  const hourly = weather.hourly ?? {};
+  const daily = weather.daily ?? {};
+  const hourlyTimes = hourly.time ?? [];
+  const currentTime = current.time ? Date.parse(current.time) : Date.now();
+  const firstDaylightIndex = hourlyTimes.findIndex((time, index) => (
+    Date.parse(time) >= currentTime && (hourly.uv_index?.[index] ?? 0) > 0
+  ));
+  const fallbackStart = Math.max(0, hourlyTimes.findIndex((time) => Date.parse(time) >= currentTime));
+  const daylightStart = firstDaylightIndex >= 0 ? firstDaylightIndex : fallbackStart;
+  const hourIndexes = Array.from(
+    { length: Math.min(10, Math.max(0, hourlyTimes.length - daylightStart)) },
+    (_, index) => daylightStart + index,
+  );
+  const currentUv = current.uv_index;
+  const currentLevel = uvLevel(currentUv);
+  const peakUv = daily.uv_index_max?.[0];
+  const peakLevel = uvLevel(peakUv);
+  const peakHour = hourlyTimes.reduce<{ value: number; time?: string } | null>((best, time, index) => {
+    const value = hourly.uv_index?.[index];
+    if (Date.parse(time) < currentTime || value === undefined || (best && value <= best.value)) return best;
+    return { value, time };
+  }, null);
+
+  return (
+    <section className="uv-wide" aria-labelledby="uv-title">
+      <div className="section-heading">
+        <h2 className="section-title" id="uv-title">Sun on your skin</h2>
+        <span className="section-meta">UV forecast</span>
+      </div>
+      <div className="panel uv-panel" data-testid="panel-uv-forecast">
+        <div className="uv-summary">
+          <div className={`uv-score ${currentLevel.className}`}>
+            <Sun size={18} strokeWidth={1.7} />
+            <div>
+              <span className="uv-kicker">Current UV index</span>
+              <strong data-testid="text-current-uv">{uvValue(currentUv)}</strong>
+            </div>
+          </div>
+          <div className="uv-summary-copy">
+            <div className={`uv-badge ${currentLevel.className}`}>{currentLevel.label}</div>
+            <p>{currentLevel.guidance}</p>
+          </div>
+          <div className="uv-peak">
+            <span>Today’s peak</span>
+            <strong>{uvValue(peakUv)} <em>{peakLevel.label}</em></strong>
+            {peakHour?.time && <small>around {timeLabel(peakHour.time)}</small>}
+          </div>
+        </div>
+
+        <div className="uv-timeline-wrap">
+          <div className="uv-subheading"><span>Today by hour</span><span>index</span></div>
+          {hourIndexes.length ? (
+            <div className="uv-timeline" data-testid="list-hourly-uv">
+              {hourIndexes.map((index, itemIndex) => {
+                const value = hourly.uv_index?.[index];
+                const level = uvLevel(value);
+                const height = `${Math.max(5, Math.min(100, ((value ?? 0) / 11) * 100))}%`;
+                return (
+                  <div className="uv-hour" key={`${hourlyTimes[index]}-${index}`} data-testid={`uv-hour-${index}`}>
+                    <div className={`uv-bar ${level.className}`} style={{ height }} title={`${uvValue(value)} — ${level.label}`} />
+                    <span className="uv-hour-value">{uvValue(value)}</span>
+                    <span className="uv-hour-label">{itemIndex === 0 ? 'Now' : timeLabel(hourlyTimes[index])}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="uv-empty">Hourly UV detail is unavailable right now.</p>
+          )}
+        </div>
+
+        <div className="uv-days" data-testid="list-daily-uv">
+          {(daily.time ?? []).slice(0, 7).map((day, index) => {
+            const value = daily.uv_index_max?.[index];
+            const level = uvLevel(value);
+            return (
+              <div className="uv-day" key={day} data-testid={`row-uv-${index}`}>
+                <span className="uv-day-name">{shortDay(day, index)}</span>
+                <div className="uv-day-meter">
+                  <div className={`uv-day-fill ${level.className}`} style={{ width: `${Math.max(2, Math.min(100, ((value ?? 0) / 11) * 100))}%` }} />
+                </div>
+                <span className={`uv-day-score ${level.className}`}>{uvValue(value)}</span>
+                <span className="uv-day-level">{level.label}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="uv-legend">
+          <span><i className="legend-low" />Low</span>
+          <span><i className="legend-moderate" />Moderate</span>
+          <span><i className="legend-high" />High</span>
+          <span><i className="legend-extreme" />Very high+</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit }) {
   const current = weather.current ?? {};
   const daily = weather.daily ?? {};
@@ -257,6 +393,7 @@ function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit
     { icon: Umbrella, label: 'Rain now', value: current.precipitation !== undefined ? `${current.precipitation} mm` : '—', sub: 'at this moment' },
     { icon: Eye, label: 'Visibility', value: 'Good', sub: 'a clear horizon' },
     { icon: Gauge, label: 'Day ahead', value: `${daily.precipitation_probability_max?.[0] ?? 0}%`, sub: 'chance of rain' },
+    { icon: Sun, label: 'UV index', value: uvValue(current.uv_index), sub: uvLevel(current.uv_index).label },
   ];
   return (
     <section className="details-wide" aria-labelledby="details-title">
@@ -444,6 +581,7 @@ function Home() {
             <div className="content-grid">
               <HourlyOutlook weather={weather} unit={unit} />
               <DailyForecast weather={weather} unit={unit} />
+                <UVForecast weather={weather} />
               <WeatherDetails weather={weather} unit={unit} />
             </div>
           </main>
