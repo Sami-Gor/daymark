@@ -258,10 +258,10 @@ function DailyForecast({ weather, unit }: { weather: WeatherPayload; unit: Unit 
     <section aria-labelledby="daily-title">
       <div className="section-heading">
         <h2 className="section-title" id="daily-title">A look ahead</h2>
-        <span className="section-meta">7 days</span>
+        <span className="section-meta">3 days</span>
       </div>
       <div className="panel forecast-panel" data-testid="list-daily-forecast">
-        {days.length ? days.slice(0, 7).map((day, index) => {
+        {days.length ? days.slice(0, 3).map((day, index) => {
           const Icon = weatherIcon(daily.weather_code?.[index] ?? 0, true);
           return (
             <div className="day-row" key={day} data-testid={`row-forecast-${index}`}>
