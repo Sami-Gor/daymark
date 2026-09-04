@@ -19,7 +19,6 @@ import {
   Sunset,
   Thermometer,
   Umbrella,
-  Wind,
   type LucideIcon,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -524,20 +523,63 @@ function pollutionValue(value: number | undefined): string {
   return value < 10 ? value.toFixed(1) : Math.round(value).toString();
 }
 
+function airColor(value: number | undefined): string {
+  if (value === undefined || Number.isNaN(value)) return '#9aaab3';
+  if (value <= 50) return '#3fb98a';
+  if (value <= 100) return '#e8b93f';
+  if (value <= 150) return '#e8763f';
+  if (value <= 200) return '#d9483f';
+  if (value <= 300) return '#8e4fd9';
+  return '#7a1f1f';
+}
+
+function airGaugeProgress(value: number | undefined): number {
+  if (value === undefined || Number.isNaN(value)) return 0;
+  if (value <= 50) return (value / 50) * 1;
+  if (value <= 100) return 1 + ((value - 50) / 50) * 1;
+  if (value <= 150) return 2 + ((value - 100) / 50) * 1;
+  if (value <= 200) return 3 + ((value - 150) / 50) * 1;
+  if (value <= 300) return 4 + ((value - 200) / 100) * 1;
+  return 6;
+}
+
+function airContext(value: number | undefined): string {
+  if (value === undefined || Number.isNaN(value)) return 'Air-quality context is unavailable right now.';
+  if (value <= 50) return 'Roughly equivalent to a normal day with light traffic nearby — no meaningful health risk today.';
+  if (value <= 100) return 'A typical moderate day — most people can continue normal outdoor activities.';
+  if (value <= 150) return 'Sensitive people may notice symptoms during longer periods of outdoor exertion.';
+  if (value <= 200) return 'Outdoor activity may feel uncomfortable; consider shorter exposure and cleaner indoor air.';
+  if (value <= 300) return 'Pollution is high enough that everyone should reduce prolonged outdoor exertion.';
+  return 'Conditions are hazardous; avoid outdoor exposure and follow local health guidance.';
+}
+
+function pollutantMeterColor(value: number | undefined, threshold: number): string {
+  if (value === undefined || Number.isNaN(value)) return '#9aaab3';
+  const ratio = value / threshold;
+  if (ratio <= .7) return '#3fb98a';
+  if (ratio <= 1) return '#e8b93f';
+  return '#e8763f';
+}
+
 function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
   const airQuality = weather.airQuality;
   const current = airQuality?.current ?? {};
-  const hourly = airQuality?.hourly ?? {};
-  const times = hourly.time ?? [];
-  const currentTime = weather.current?.time ? Date.parse(weather.current.time) : Date.now();
-  const start = Math.max(0, times.findIndex((time) => Date.parse(time) >= currentTime));
-  const indexes = Array.from({ length: Math.min(12, Math.max(0, times.length - start)) }, (_, index) => start + index);
   const level = airLevel(current.us_aqi);
   const stats = [
-    { label: 'PM2.5', value: pollutionValue(current.pm2_5), unit: 'μg/m³', sub: 'fine particles' },
-    { label: 'PM10', value: pollutionValue(current.pm10), unit: 'μg/m³', sub: 'coarse particles' },
-    { label: 'NO₂', value: pollutionValue(current.nitrogen_dioxide), unit: 'μg/m³', sub: 'nitrogen dioxide' },
-    { label: 'O₃', value: pollutionValue(current.ozone), unit: 'μg/m³', sub: 'ground-level ozone' },
+    { label: 'PM2.5', value: current.pm2_5, unit: 'μg/m³', sub: 'fine particles', threshold: 5 },
+    { label: 'PM10', value: current.pm10, unit: 'μg/m³', sub: 'coarse particles', threshold: 45 },
+    { label: 'NO₂', value: current.nitrogen_dioxide, unit: 'μg/m³', sub: 'nitrogen dioxide', threshold: 25 },
+    { label: 'O₃', value: current.ozone, unit: 'μg/m³', sub: 'ground-level ozone', threshold: 100 },
+  ];
+  const gaugeProgress = airGaugeProgress(current.us_aqi);
+  const gaugeAngle = Math.PI - (gaugeProgress / 6) * Math.PI;
+  const needleX = 150 + Math.cos(gaugeAngle) * 105;
+  const needleY = 132 - Math.sin(gaugeAngle) * 105;
+  const currentPosition = Math.min(100, Math.max(0, ((current.us_aqi ?? 0) / 150) * 100));
+  const comparisonMarkers = [
+    { className: 'air-marker-current', label: 'Your air', value: current.us_aqi, position: currentPosition, color: airColor(current.us_aqi) },
+    { className: 'air-marker-who', label: 'WHO 24h guideline', value: 50, position: 33.33, color: '#e8b93f' },
+    { className: 'air-marker-city', label: 'Typical city day', value: 100, position: 66.67, color: '#e8763f' },
   ];
 
   return (
@@ -550,11 +592,22 @@ function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
         {airQuality ? (
           <>
             <div className="air-summary">
-              <div className={`air-score ${level.className}`}>
-                <Wind size={18} strokeWidth={1.7} />
-                <div>
-                  <span className="air-kicker">Current US AQI</span>
+              <div className="air-gauge" aria-label={`Current US AQI ${pollutionValue(current.us_aqi)}`}>
+                <svg viewBox="0 0 300 166" role="img">
+                  <title>Current US AQI: {pollutionValue(current.us_aqi)}</title>
+                  <path className="air-gauge-track" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" />
+                  <path className="air-gauge-segment air-gauge-good" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" />
+                  <path className="air-gauge-segment air-gauge-moderate" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-100" />
+                  <path className="air-gauge-segment air-gauge-sensitive" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-200" />
+                  <path className="air-gauge-segment air-gauge-unhealthy" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-300" />
+                  <path className="air-gauge-segment air-gauge-very-unhealthy" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-400" />
+                  <path className="air-gauge-segment air-gauge-hazardous" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-500" />
+                  <line className="air-needle" x1="150" y1="132" x2={needleX} y2={needleY} />
+                  <circle className="air-needle-dot" cx="150" cy="132" r="7" />
+                </svg>
+                <div className="air-gauge-value" style={{ color: airColor(current.us_aqi) }}>
                   <strong data-testid="text-current-aqi">{pollutionValue(current.us_aqi)}</strong>
+                  <span>Current US AQI</span>
                 </div>
               </div>
               <div className="air-summary-copy">
@@ -571,30 +624,35 @@ function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
               {stats.map((stat) => (
                 <div className="air-stat" key={stat.label}>
                   <span className="air-stat-label">{stat.label}</span>
-                  <strong>{stat.value}<em>{stat.unit}</em></strong>
+                  <strong>{pollutionValue(stat.value)}<em>{stat.unit}</em></strong>
                   <small>{stat.sub}</small>
+                  <div className="air-stat-meter" aria-label={`${stat.label} relative to guideline`}>
+                    <div style={{ width: `${Math.min(100, ((stat.value ?? 0) / stat.threshold) * 100)}%`, background: pollutantMeterColor(stat.value, stat.threshold) }} />
+                  </div>
                 </div>
               ))}
             </div>
-            {indexes.length ? (
-              <div className="air-hourly-wrap">
-                <div className="air-subheading"><span>Next 12 hours</span><span>US AQI</span></div>
-                <div className="air-hourly" data-testid="list-hourly-aqi">
-                  {indexes.map((index, itemIndex) => {
-                    const value = hourly.us_aqi?.[index];
-                    const hourLevel = airLevel(value);
-                    const height = `${Math.max(5, Math.min(100, ((value ?? 0) / 200) * 100))}%`;
-                    return (
-                      <div className="air-hour" key={`${times[index]}-${index}`} data-testid={`aqi-hour-${index}`}>
-                        <div className={`air-bar ${hourLevel.className}`} style={{ height }} title={`${pollutionValue(value)} — ${hourLevel.label}`} />
-                        <span>{pollutionValue(value)}</span>
-                        <small>{itemIndex === 0 ? 'Now' : timeLabel(times[index])}</small>
-                      </div>
-                    );
-                  })}
-                </div>
+            <div className="air-context" data-testid="air-context">
+              <div className="air-context-heading">
+                <span>Compared to</span>
+                <span>Context</span>
               </div>
-            ) : null}
+              <div className="air-scale-wrap">
+                <div className="air-scale" aria-label="AQI comparison scale from 0 to 150">
+                  <div className="air-scale-segment air-scale-good" />
+                  <div className="air-scale-segment air-scale-moderate" />
+                  <div className="air-scale-segment air-scale-sensitive" />
+                  {comparisonMarkers.map((marker) => (
+                    <div className={`air-marker ${marker.className}`} key={marker.label} style={{ left: `${marker.position}%` }}>
+                      <span className="air-marker-label">{marker.label}<strong>{pollutionValue(marker.value)}</strong></span>
+                      <i style={{ background: marker.color }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="air-scale-axis"><span>0</span><span>150</span></div>
+              </div>
+              <div className="air-context-copy">{airContext(current.us_aqi)}</div>
+            </div>
           </>
         ) : (
           <p className="air-empty">Air-quality detail is unavailable right now. Weather data is still up to date.</p>

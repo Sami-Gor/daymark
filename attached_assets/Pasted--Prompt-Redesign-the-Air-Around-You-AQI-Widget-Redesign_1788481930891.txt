@@ -1,0 +1,44 @@
+# Prompt: Redesign the "Air Around You" AQI Widget
+
+Redesign my existing Air Quality Index (AQI) widget to be more visually engaging while keeping all the same data (except the "Next 12 hours" section — see point 3, which replaces it with a comparison view). Do not change the underlying data source or props otherwise — only change the presentation layer (HTML/CSS/JS or the component markup, whichever the codebase uses).
+
+## Current design (to replace)
+- A card titled "Air around you" with a "POLLUTION STATS" label.
+- A "Current US AQI" block showing a plain number (22) with a "GOOD" pill and a message.
+- A "What's measured" block showing "Particles + gases" with a subtext.
+- A row of four sub-metric cards (PM2.5, PM10, NO2, O3) each with a raw number + unit and a short description.
+- A "Next 12 hours" row showing 12 small rounded pill/bar shapes with numeric AQI labels underneath each hour.
+
+## Required redesign
+
+1. **Current AQI — replace the plain number with a semi-circular gauge/dial.**
+   - Arc spans the standard US AQI bands: green 0–50 (Good), yellow 51–100 (Moderate), orange 101–150 (Unhealthy for Sensitive Groups), red 151–200 (Unhealthy), purple 201–300 (Very Unhealthy), maroon 301+ (Hazardous).
+   - A needle or arc-fill points to the current value (compress/scale the arc sensibly since most everyday readings sit under 150).
+   - Keep the big number and "GOOD" status pill next to or below the gauge, plus the short advisory message.
+
+2. **Pollutant breakdown (PM2.5, PM10, NO2, O3) — replace flat number cards with mini horizontal or radial meters.**
+   - Each pollutant gets a small horizontal bar or semi-circular mini-gauge showing its value relative to a safe threshold (e.g., WHO/EPA guideline levels), not just a bare number.
+   - Color the bar/meter green→yellow→orange based on how close it is to the threshold for that specific pollutant (thresholds differ per pollutant, so don't reuse one universal scale).
+   - Keep the value + unit (µg/m³) and label (fine particles, coarse particles, nitrogen dioxide, ground-level ozone) alongside each meter.
+   - Arrange as a responsive 2x2 or 4-across grid depending on screen width.
+
+3. **Replace "Next 12 hours" with a "Compared To" context section.**
+   - Remove the hourly pill-forecast row entirely.
+   - Add a horizontal reference scale (color-graded 0–150 using the same AQI band colors) with markers plotted at: the current reading, the WHO 24-hour PM2.5/AQI guideline equivalent, and a "typical city day" average (~100).
+   - Highlight the current value's marker distinctly (larger dot, bold label) so it's immediately clear where "you" sit relative to the benchmarks.
+   - Below the scale, add a short plain-language sentence translating the number into a relatable real-world equivalent (e.g., "roughly equivalent to a normal day with light traffic nearby — no meaningful health risk today"). Generate this sentence dynamically based on the AQI band (Good/Moderate/Unhealthy/etc.), don't hardcode it.
+   - Keep the section inside the same card style, with a header label like "COMPARED TO" and a small right-aligned subtitle like "CONTEXT".
+
+4. **"What's measured" block** — keep as a small info tag ("Particles + gases", "Updated with your local forecast") but restyle to sit cleanly beside or above the gauge rather than as a disconnected text block on the far right.
+
+5. **Visual style guidelines**
+   - Keep the existing soft pastel background (#eef4f7-ish) and white rounded cards.
+   - Use consistent AQI color tokens across the gauge, pollutant meters, and comparison scale: Good = green (#3fb98a), Moderate = yellow/amber (#e8b93f), Unhealthy for Sensitive Groups = orange (#e8763f), Unhealthy = red (#d9483f), Very Unhealthy = purple (#8e4fd9), Hazardous = maroon (#7a1f1f).
+   - Keep typography weight/style consistent with the current design (bold numbers, muted gray labels).
+   - Make it responsive — gauge, pollutant meters, and comparison scale should scale down cleanly on mobile widths, with the pollutant grid collapsing to 2x2 or a single column on small screens, and the comparison scale's benchmark labels stacking vertically if needed to avoid overlap.
+
+## Implementation notes
+- If using a charting library, prefer a lightweight option already compatible with the stack (e.g., Chart.js with a gauge plugin for the dial). The comparison scale can be built as a simple styled div/SVG track with absolutely-positioned marker dots — no charting library needed for that part.
+- If no charting library is currently used, implement the gauge and pollutant meters with SVG/CSS conic-gradient rather than adding a large dependency, unless I confirm a library is fine to add.
+- Preserve all existing data bindings/props/state for AQI and pollutant values. For the comparison section, add a small helper function that maps AQI value → band → advisory sentence, so the copy updates automatically as conditions change.
+- Output the updated component/file(s) in full, ready to drop in.
