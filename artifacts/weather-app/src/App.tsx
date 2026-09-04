@@ -19,6 +19,7 @@ import {
   Sunset,
   Thermometer,
   Umbrella,
+  Wind,
   type LucideIcon,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -73,8 +74,27 @@ type WeatherPayload = {
     uv_index_max?: number[];
     uv_index_clear_sky_max?: number[];
   };
+  airQuality?: AirQualityPayload;
 };
 type GeocodingPayload = { results?: Place[] };
+type AirQualityPayload = {
+  current?: {
+    time?: string;
+    us_aqi?: number;
+    pm10?: number;
+    pm2_5?: number;
+    nitrogen_dioxide?: number;
+    ozone?: number;
+    sulphur_dioxide?: number;
+    carbon_monoxide?: number;
+  };
+  hourly?: {
+    time?: string[];
+    us_aqi?: number[];
+    pm10?: number[];
+    pm2_5?: number[];
+  };
+};
 
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -83,7 +103,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 async function fetchWeather(place: Place): Promise<WeatherPayload> {
-  const params = new URLSearchParams({
+  const weatherParams = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
     current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m,uv_index,uv_index_clear_sky',
@@ -92,7 +112,21 @@ async function fetchWeather(place: Place): Promise<WeatherPayload> {
     forecast_days: '7',
     timezone: 'auto',
   });
-  return getJson<WeatherPayload>(`${FORECAST_URL}?${params.toString()}`);
+  const weather = await getJson<WeatherPayload>(`${FORECAST_URL}?${weatherParams.toString()}`);
+  const airQualityParams = new URLSearchParams({
+    latitude: String(place.latitude),
+    longitude: String(place.longitude),
+    current: 'us_aqi,pm10,pm2_5,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide',
+    hourly: 'us_aqi,pm10,pm2_5',
+    forecast_days: '3',
+    timezone: 'auto',
+  });
+  try {
+    const airQuality = await getJson<AirQualityPayload>(`https://air-quality-api.open-meteo.com/v1/air-quality?${airQualityParams.toString()}`);
+    return { ...weather, airQuality };
+  } catch {
+    return weather;
+  }
 }
 
 function weatherCopy(code = 0): string {
@@ -375,6 +409,119 @@ function UVForecast({ weather }: { weather: WeatherPayload }) {
   );
 }
 
+type AirLevel = {
+  label: string;
+  guidance: string;
+  className: string;
+};
+
+function airLevel(value: number | undefined): AirLevel {
+  if (value === undefined || Number.isNaN(value)) {
+    return { label: 'Unavailable', guidance: 'Air-quality detail is unavailable right now.', className: 'air-unavailable' };
+  }
+  if (value <= 50) {
+    return { label: 'Good', guidance: 'Air quality is considered satisfactory for most people.', className: 'air-good' };
+  }
+  if (value <= 100) {
+    return { label: 'Moderate', guidance: 'Sensitive people may want to keep an eye on symptoms.', className: 'air-moderate' };
+  }
+  if (value <= 150) {
+    return { label: 'Sensitive groups', guidance: 'Sensitive groups should consider reducing prolonged outdoor exertion.', className: 'air-sensitive' };
+  }
+  if (value <= 200) {
+    return { label: 'Unhealthy', guidance: 'Consider shorter outdoor activity, especially if you are sensitive to pollution.', className: 'air-unhealthy' };
+  }
+  if (value <= 300) {
+    return { label: 'Very unhealthy', guidance: 'Reduce outdoor activity and keep an eye on local health guidance.', className: 'air-very-unhealthy' };
+  }
+  return { label: 'Hazardous', guidance: 'Avoid outdoor activity where possible and follow local health guidance.', className: 'air-hazardous' };
+}
+
+function pollutionValue(value: number | undefined): string {
+  if (value === undefined || Number.isNaN(value)) return '—';
+  return value < 10 ? value.toFixed(1) : Math.round(value).toString();
+}
+
+function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
+  const airQuality = weather.airQuality;
+  const current = airQuality?.current ?? {};
+  const hourly = airQuality?.hourly ?? {};
+  const times = hourly.time ?? [];
+  const currentTime = weather.current?.time ? Date.parse(weather.current.time) : Date.now();
+  const start = Math.max(0, times.findIndex((time) => Date.parse(time) >= currentTime));
+  const indexes = Array.from({ length: Math.min(12, Math.max(0, times.length - start)) }, (_, index) => start + index);
+  const level = airLevel(current.us_aqi);
+  const stats = [
+    { label: 'PM2.5', value: pollutionValue(current.pm2_5), unit: 'μg/m³', sub: 'fine particles' },
+    { label: 'PM10', value: pollutionValue(current.pm10), unit: 'μg/m³', sub: 'coarse particles' },
+    { label: 'NO₂', value: pollutionValue(current.nitrogen_dioxide), unit: 'μg/m³', sub: 'nitrogen dioxide' },
+    { label: 'O₃', value: pollutionValue(current.ozone), unit: 'μg/m³', sub: 'ground-level ozone' },
+  ];
+
+  return (
+    <section className="air-wide" aria-labelledby="air-title">
+      <div className="section-heading">
+        <h2 className="section-title" id="air-title">Air around you</h2>
+        <span className="section-meta">pollution stats</span>
+      </div>
+      <div className="panel air-panel" data-testid="panel-air-quality">
+        {airQuality ? (
+          <>
+            <div className="air-summary">
+              <div className={`air-score ${level.className}`}>
+                <Wind size={18} strokeWidth={1.7} />
+                <div>
+                  <span className="air-kicker">Current US AQI</span>
+                  <strong data-testid="text-current-aqi">{pollutionValue(current.us_aqi)}</strong>
+                </div>
+              </div>
+              <div className="air-summary-copy">
+                <div className={`air-badge ${level.className}`}>{level.label}</div>
+                <p>{level.guidance}</p>
+              </div>
+              <div className="air-note">
+                <span>What’s measured</span>
+                <strong>Particles + gases</strong>
+                <small>Updated with your local forecast</small>
+              </div>
+            </div>
+            <div className="air-stats" data-testid="list-pollution-stats">
+              {stats.map((stat) => (
+                <div className="air-stat" key={stat.label}>
+                  <span className="air-stat-label">{stat.label}</span>
+                  <strong>{stat.value}<em>{stat.unit}</em></strong>
+                  <small>{stat.sub}</small>
+                </div>
+              ))}
+            </div>
+            {indexes.length ? (
+              <div className="air-hourly-wrap">
+                <div className="air-subheading"><span>Next 12 hours</span><span>US AQI</span></div>
+                <div className="air-hourly" data-testid="list-hourly-aqi">
+                  {indexes.map((index, itemIndex) => {
+                    const value = hourly.us_aqi?.[index];
+                    const hourLevel = airLevel(value);
+                    const height = `${Math.max(5, Math.min(100, ((value ?? 0) / 200) * 100))}%`;
+                    return (
+                      <div className="air-hour" key={`${times[index]}-${index}`} data-testid={`aqi-hour-${index}`}>
+                        <div className={`air-bar ${hourLevel.className}`} style={{ height }} title={`${pollutionValue(value)} — ${hourLevel.label}`} />
+                        <span>{pollutionValue(value)}</span>
+                        <small>{itemIndex === 0 ? 'Now' : timeLabel(times[index])}</small>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="air-empty">Air-quality detail is unavailable right now. Weather data is still up to date.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit }) {
   const current = weather.current ?? {};
   const daily = weather.daily ?? {};
@@ -532,6 +679,7 @@ function Home() {
               <HourlyOutlook weather={weather} unit={unit} />
               <DailyForecast weather={weather} unit={unit} />
                 <UVForecast weather={weather} />
+                <AirQualityForecast weather={weather} />
               <WeatherDetails weather={weather} unit={unit} />
             </div>
           </main>
