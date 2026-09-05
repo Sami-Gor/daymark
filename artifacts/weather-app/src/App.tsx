@@ -2,6 +2,8 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   CalendarDays,
   Cloud,
   CloudFog,
@@ -9,7 +11,9 @@ import {
   CloudRain,
   CloudSun,
   Droplets,
+  Glasses,
   Gauge,
+  Info,
   LocateFixed,
   Moon,
   Navigation,
@@ -46,6 +50,7 @@ type WeatherPayload = {
     is_day?: number;
     precipitation?: number;
     rain?: number;
+    cloud_cover?: number;
     weather_code?: number;
     wind_speed_10m?: number;
     wind_direction_10m?: number;
@@ -76,6 +81,14 @@ type WeatherPayload = {
   airQuality?: AirQualityPayload;
 };
 type GeocodingPayload = { results?: Place[] };
+type MicroClimatePayload = {
+  latitude?: number;
+  longitude?: number;
+  current?: {
+    temperature_2m?: number;
+    precipitation?: number;
+  };
+};
 type AirQualityPayload = {
   current?: {
     time?: string;
@@ -94,6 +107,8 @@ type AirQualityPayload = {
     pm2_5?: number[];
   };
 };
+const microClimateCache = new Map<string, { fetchedAt: number; payload: MicroClimatePayload | null }>();
+const MICRO_CLIMATE_CACHE_MS = 15 * 60 * 1000;
 
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -105,7 +120,7 @@ async function fetchWeather(place: Place): Promise<WeatherPayload> {
   const weatherParams = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m,uv_index,uv_index_clear_sky',
+    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,cloud_cover,weather_code,wind_speed_10m,wind_direction_10m,uv_index,uv_index_clear_sky',
     hourly: 'temperature_2m,precipitation_probability,weather_code,wind_speed_10m,uv_index,uv_index_clear_sky',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset,uv_index_max,uv_index_clear_sky_max',
     forecast_days: '7',
@@ -126,6 +141,29 @@ async function fetchWeather(place: Place): Promise<WeatherPayload> {
   } catch {
     return weather;
   }
+}
+
+async function fetchMicroClimate(place: Place): Promise<MicroClimatePayload | null> {
+  const cacheKey = `${place.latitude.toFixed(3)},${place.longitude.toFixed(3)}`;
+  const cached = microClimateCache.get(cacheKey);
+  if (cached && Date.now() - cached.fetchedAt < MICRO_CLIMATE_CACHE_MS) return cached.payload;
+
+  const params = new URLSearchParams({
+    latitude: String(place.latitude),
+    longitude: String(place.longitude),
+    current: 'temperature_2m,precipitation',
+    forecast_days: '1',
+    models: 'ukmo_seamless',
+    timezone: 'auto',
+  });
+  let payload: MicroClimatePayload | null = null;
+  try {
+    payload = await getJson<MicroClimatePayload>(`${FORECAST_URL}?${params.toString()}`);
+  } catch {
+    payload = null;
+  }
+  microClimateCache.set(cacheKey, { fetchedAt: Date.now(), payload });
+  return payload;
 }
 
 function weatherCopy(code = 0): string {
@@ -154,16 +192,83 @@ function weatherIcon(code = 0, isDay = true): LucideIcon {
   return Cloud;
 }
 
+type WeatherAdvice = { answer: 'Yes' | 'No'; reason: string };
+
+function getUmbrellaAdvice(precipProbability: number | undefined, precipTimeWindow?: string): WeatherAdvice {
+  if (precipProbability === undefined || Number.isNaN(precipProbability)) {
+    return { answer: 'No', reason: 'Rain forecast unavailable' };
+  }
+  if (precipProbability >= 40) {
+    return {
+      answer: 'Yes',
+      reason: precipTimeWindow ? `${Math.round(precipProbability)}% chance around ${precipTimeWindow}` : `${Math.round(precipProbability)}% chance of rain`,
+    };
+  }
+  return {
+    answer: 'No',
+    reason: precipProbability > 0 ? `${Math.round(precipProbability)}% chance of rain` : 'Rain unlikely today',
+  };
+}
+
+function getSunglassesAdvice(uvIndex: number | undefined, cloudCover: number | undefined): WeatherAdvice {
+  const hasUv = uvIndex !== undefined && !Number.isNaN(uvIndex);
+  const hasCloud = cloudCover !== undefined && !Number.isNaN(cloudCover);
+  if (!hasUv || !hasCloud) {
+    return { answer: 'No', reason: 'Brightness forecast unavailable' };
+  }
+  if (uvIndex >= 3 && cloudCover < 60) {
+    return { answer: 'Yes', reason: `UV index ${uvValue(uvIndex)}, mostly clear` };
+  }
+  if (cloudCover >= 60) {
+    return { answer: 'No', reason: 'Overcast, low brightness' };
+  }
+  return { answer: 'No', reason: `UV index ${uvValue(uvIndex)}, low today` };
+}
+
 function displayTemp(value: number | undefined, unit: Unit): string {
   if (value === undefined || Number.isNaN(value)) return '—';
   const converted = unit === 'fahrenheit' ? (value * 9) / 5 + 32 : value;
   return `${Math.round(converted)}°`;
 }
 
+function calculateDewPointCelsius(temperatureC: number | undefined, humidity: number | undefined): number | undefined {
+  if (temperatureC === undefined || humidity === undefined || Number.isNaN(temperatureC) || Number.isNaN(humidity)) return undefined;
+  const b = 17.62;
+  const c = 243.12;
+  const relativeHumidity = Math.min(100, Math.max(0.1, humidity));
+  const gamma = (b * temperatureC) / (c + temperatureC) + Math.log(relativeHumidity / 100);
+  return (c * gamma) / (b - gamma);
+}
+
+function dewPointComfort(dewPointC: number | undefined): { label: string; className: string } {
+  if (dewPointC === undefined || Number.isNaN(dewPointC)) return { label: 'Unavailable', className: 'dew-unavailable' };
+  if (dewPointC < 10) return { label: 'Dry', className: 'dew-dry' };
+  if (dewPointC < 16) return { label: 'Comfortable', className: 'dew-comfortable' };
+  if (dewPointC < 18) return { label: 'Noticeable', className: 'dew-noticeable' };
+  if (dewPointC < 21) return { label: 'Humid', className: 'dew-humid' };
+  return { label: 'Oppressive', className: 'dew-oppressive' };
+}
+
 function displayWind(value: number | undefined, unit: Unit): string {
   if (value === undefined || Number.isNaN(value)) return '—';
   const converted = unit === 'fahrenheit' ? value * 0.621371 : value;
   return `${Math.round(converted)} ${unit === 'fahrenheit' ? 'mph' : 'km/h'}`;
+}
+
+function distanceKm(latitude1: number, longitude1: number, latitude2: number, longitude2: number): number {
+  const earthRadiusKm = 6371;
+  const radians = (value: number) => (value * Math.PI) / 180;
+  const latitudeDelta = radians(latitude2 - latitude1);
+  const longitudeDelta = radians(longitude2 - longitude1);
+  const a = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(latitude1)) * Math.cos(radians(latitude2)) * Math.sin(longitudeDelta / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function signedDelta(value: number | undefined, unit: string, decimals = 1): string {
+  if (value === undefined || Number.isNaN(value)) return '—';
+  const rounded = Math.abs(value) < 0.05 ? 0 : value;
+  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(decimals)}${unit}`;
 }
 
 function localDate(value?: string): Date | null {
@@ -233,28 +338,6 @@ function uvColor(value: number | undefined): string {
   if (level.className === 'uv-moderate') return '#e8b93f';
   if (level.className === 'uv-high') return '#e8763f';
   return '#d9483f';
-}
-
-type ChartPoint = { x: number; y: number };
-
-function smoothChartPath(points: ChartPoint[]): string {
-  if (!points.length) return '';
-  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-  return points.reduce((path, point, index) => {
-    if (index === 0) return `M ${point.x} ${point.y}`;
-    const previous = points[index - 1];
-    const beforePrevious = points[index - 2] ?? previous;
-    const next = points[index + 1] ?? point;
-    const controlOne = {
-      x: previous.x + (point.x - beforePrevious.x) / 6,
-      y: previous.y + (point.y - beforePrevious.y) / 6,
-    };
-    const controlTwo = {
-      x: point.x - (next.x - previous.x) / 6,
-      y: point.y - (next.y - previous.y) / 6,
-    };
-    return `${path} C ${controlOne.x} ${controlOne.y}, ${controlTwo.x} ${controlTwo.y}, ${point.x} ${point.y}`;
-  }, '');
 }
 
 function LoadingState() {
@@ -363,29 +446,6 @@ function UVForecast({ weather }: { weather: WeatherPayload }) {
     if (Date.parse(time) < currentTime || value === undefined || (best && value <= best.value)) return best;
     return { value, time };
   }, null);
-  const gaugeValue = Math.max(0, Math.min(11, currentUv ?? 0));
-  const gaugeAngle = Math.PI - (gaugeValue / 11) * Math.PI;
-  const needleX = 150 + Math.cos(gaugeAngle) * 105;
-  const needleY = 132 - Math.sin(gaugeAngle) * 105;
-  const chartWidth = 900;
-  const chartBaseline = 202;
-  const chartTop = 30;
-  const chartMax = Math.max(3, ...hourIndexes.map((index) => hourly.uv_index?.[index] ?? 0), 11);
-  const chartPoints = hourIndexes.map((index, itemIndex) => {
-    const value = hourly.uv_index?.[index] ?? 0;
-    const x = hourIndexes.length === 1 ? chartWidth / 2 : 18 + (itemIndex / (hourIndexes.length - 1)) * (chartWidth - 36);
-    const y = chartBaseline - (value / chartMax) * (chartBaseline - chartTop);
-    return { x, y };
-  });
-  const chartLine = smoothChartPath(chartPoints);
-  const chartArea = chartLine && chartPoints.length
-    ? `${chartLine} L ${chartPoints[chartPoints.length - 1].x} ${chartBaseline} L ${chartPoints[0].x} ${chartBaseline} Z`
-    : '';
-  const chartPeakIndex = hourIndexes.reduce((best, index, itemIndex) => {
-    const value = hourly.uv_index?.[index] ?? 0;
-    const bestValue = hourly.uv_index?.[hourIndexes[best]] ?? 0;
-    return value > bestValue ? itemIndex : best;
-  }, 0);
 
   return (
     <section className="uv-wide" aria-labelledby="uv-title">
@@ -394,66 +454,49 @@ function UVForecast({ weather }: { weather: WeatherPayload }) {
         <span className="section-meta">UV forecast</span>
       </div>
       <div className="panel uv-panel" data-testid="panel-uv-forecast">
-        <div className="uv-summary">
-          <div className="uv-gauge" aria-label={`Current UV index ${uvValue(currentUv)}`}>
-            <svg viewBox="0 0 300 166" role="img">
-              <title>Current UV index: {uvValue(currentUv)}</title>
-              <path className="uv-gauge-track" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" />
-              <path className="uv-gauge-segment gauge-low" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" strokeDasharray="100 300" strokeDashoffset="0" />
-              <path className="uv-gauge-segment gauge-moderate" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" strokeDasharray="100 300" strokeDashoffset="-100" />
-              <path className="uv-gauge-segment gauge-high" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" strokeDasharray="100 300" strokeDashoffset="-200" />
-              <path className="uv-gauge-segment gauge-extreme" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="400" strokeDasharray="100 300" strokeDashoffset="-300" />
-              <line className="uv-needle" x1="150" y1="132" x2={needleX} y2={needleY} />
-              <circle className="uv-needle-dot" cx="150" cy="132" r="7" />
-            </svg>
-            <div className={`uv-gauge-value ${currentLevel.className}`}>
-              <strong data-testid="text-current-uv">{uvValue(currentUv)}</strong>
-              <span>Current UV index</span>
+        <div className="uv-compact-summary">
+          <div className="uv-score-block" aria-label={`Current UV index ${uvValue(currentUv)}`}>
+            <span className="uv-kicker">Current UV index</span>
+            <div className="uv-score-line">
+              <strong className={currentLevel.className} data-testid="text-current-uv">{uvValue(currentUv)}</strong>
+              <div className={`uv-badge ${currentLevel.className}`}>{currentLevel.label}</div>
             </div>
           </div>
           <div className="uv-summary-copy">
-            <div className={`uv-badge ${currentLevel.className}`}>{currentLevel.label}</div>
             <p>{currentLevel.guidance}</p>
+            <small>Protection advice updates with the daylight.</small>
           </div>
           <div className="uv-peak">
             <span>Today’s peak</span>
             <strong>{uvValue(peakUv)} <em>{peakLevel.label}</em></strong>
             {peakHour?.time && <small>around {timeLabel(peakHour.time)}</small>}
           </div>
+          <div className="uv-range" aria-label="UV index protection range from 0 to 11 plus">
+            <div className="uv-range-heading"><span>Protection range</span><span>0—11+</span></div>
+            <div className="uv-scale">
+              <div className="uv-scale-segment uv-scale-low" />
+              <div className="uv-scale-segment uv-scale-moderate" />
+              <div className="uv-scale-segment uv-scale-high" />
+              <div className="uv-scale-segment uv-scale-extreme" />
+              <i className="uv-scale-marker" style={{ left: `${Math.min(100, Math.max(0, ((currentUv ?? 0) / 11) * 100))}%`, background: uvColor(currentUv) }} />
+            </div>
+            <div className="uv-range-labels"><span>Low</span><span>Moderate</span><span>High</span><span>Very high+</span></div>
+          </div>
         </div>
 
         <div className="uv-timeline-wrap">
           <div className="uv-subheading"><span>Today by hour</span><span>index</span></div>
           {hourIndexes.length ? (
-            <div className="uv-chart" data-testid="list-hourly-uv">
-              <svg viewBox={`0 0 ${chartWidth} 242`} role="img" aria-label="Hourly UV index forecast">
-                <title>Hourly UV index forecast</title>
-                <defs>
-                  <linearGradient id="uv-chart-fill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#3fb98a" stopOpacity=".32" />
-                    <stop offset="42%" stopColor="#e8b93f" stopOpacity=".2" />
-                    <stop offset="78%" stopColor="#e8763f" stopOpacity=".12" />
-                    <stop offset="100%" stopColor="#3fb98a" stopOpacity=".04" />
-                  </linearGradient>
-                </defs>
-                {[0, 1, 2].map((line) => (
-                  <line className="uv-chart-gridline" key={line} x1="0" x2={chartWidth} y1={chartTop + line * 58} y2={chartTop + line * 58} />
-                ))}
-                {chartArea && <path className="uv-chart-area" d={chartArea} />}
-                {chartLine && <path className="uv-chart-line" d={chartLine} />}
-                {chartPoints.map((point, itemIndex) => {
-                  const index = hourIndexes[itemIndex];
-                  const value = hourly.uv_index?.[index];
-                  return (
-                    <g key={`${hourlyTimes[index]}-${index}`} data-testid={`uv-hour-${index}`}>
-                      <circle className="uv-chart-dot" cx={point.x} cy={point.y} r={itemIndex === chartPeakIndex ? 5 : 3.5} fill={uvColor(value)} />
-                      {itemIndex === chartPeakIndex && <text className="uv-chart-peak-label" x={point.x} y={point.y - 13} textAnchor="middle">{uvValue(value)}</text>}
-                      <text className="uv-chart-value" x={point.x} y="220" textAnchor="middle">{uvValue(value)}</text>
-                      <text className="uv-chart-hour-label" x={point.x} y="239" textAnchor="middle">{itemIndex === 0 ? 'Now' : timeLabel(hourlyTimes[index])}</text>
-                    </g>
-                  );
-                })}
-              </svg>
+            <div className="uv-hour-strip" data-testid="list-hourly-uv" aria-label="Hourly UV index forecast">
+              {hourIndexes.map((index, itemIndex) => {
+                const value = hourly.uv_index?.[index];
+                return (
+                  <div className={`uv-hour${itemIndex === 0 ? ' uv-hour-current' : ''}`} key={`${hourlyTimes[index]}-${index}`} data-testid={`uv-hour-${index}`}>
+                    <span>{itemIndex === 0 ? 'Now' : timeLabel(hourlyTimes[index])}</span>
+                    <strong style={{ color: uvColor(value) }}>{uvValue(value)}</strong>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="uv-empty">Hourly UV detail is unavailable right now.</p>
@@ -533,16 +576,6 @@ function airColor(value: number | undefined): string {
   return '#7a1f1f';
 }
 
-function airGaugeProgress(value: number | undefined): number {
-  if (value === undefined || Number.isNaN(value)) return 0;
-  if (value <= 50) return (value / 50) * 1;
-  if (value <= 100) return 1 + ((value - 50) / 50) * 1;
-  if (value <= 150) return 2 + ((value - 100) / 50) * 1;
-  if (value <= 200) return 3 + ((value - 150) / 50) * 1;
-  if (value <= 300) return 4 + ((value - 200) / 100) * 1;
-  return 6;
-}
-
 function airContext(value: number | undefined): string {
   if (value === undefined || Number.isNaN(value)) return 'Air-quality context is unavailable right now.';
   if (value <= 50) return 'Roughly equivalent to a normal day with light traffic nearby — no meaningful health risk today.';
@@ -571,10 +604,6 @@ function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
     { label: 'NO₂', value: current.nitrogen_dioxide, unit: 'μg/m³', sub: 'nitrogen dioxide', threshold: 25 },
     { label: 'O₃', value: current.ozone, unit: 'μg/m³', sub: 'ground-level ozone', threshold: 100 },
   ];
-  const gaugeProgress = airGaugeProgress(current.us_aqi);
-  const gaugeAngle = Math.PI - (gaugeProgress / 6) * Math.PI;
-  const needleX = 150 + Math.cos(gaugeAngle) * 105;
-  const needleY = 132 - Math.sin(gaugeAngle) * 105;
   const currentPosition = Math.min(100, Math.max(0, ((current.us_aqi ?? 0) / 150) * 100));
   const comparisonMarkers = [
     { className: 'air-marker-current', label: 'Your air', value: current.us_aqi, position: currentPosition, color: airColor(current.us_aqi) },
@@ -586,38 +615,36 @@ function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
     <section className="air-wide" aria-labelledby="air-title">
       <div className="section-heading">
         <h2 className="section-title" id="air-title">Air around you</h2>
-        <span className="section-meta">pollution stats</span>
+          <span className="section-meta">live AQI</span>
       </div>
       <div className="panel air-panel" data-testid="panel-air-quality">
         {airQuality ? (
           <>
-            <div className="air-summary">
-              <div className="air-gauge" aria-label={`Current US AQI ${pollutionValue(current.us_aqi)}`}>
-                <svg viewBox="0 0 300 166" role="img">
-                  <title>Current US AQI: {pollutionValue(current.us_aqi)}</title>
-                  <path className="air-gauge-track" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" />
-                  <path className="air-gauge-segment air-gauge-good" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" />
-                  <path className="air-gauge-segment air-gauge-moderate" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-100" />
-                  <path className="air-gauge-segment air-gauge-sensitive" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-200" />
-                  <path className="air-gauge-segment air-gauge-unhealthy" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-300" />
-                  <path className="air-gauge-segment air-gauge-very-unhealthy" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-400" />
-                  <path className="air-gauge-segment air-gauge-hazardous" d="M 24 132 A 126 126 0 0 1 276 132" pathLength="600" strokeDasharray="100 500" strokeDashoffset="-500" />
-                  <line className="air-needle" x1="150" y1="132" x2={needleX} y2={needleY} />
-                  <circle className="air-needle-dot" cx="150" cy="132" r="7" />
-                </svg>
-                <div className="air-gauge-value" style={{ color: airColor(current.us_aqi) }}>
-                  <strong data-testid="text-current-aqi">{pollutionValue(current.us_aqi)}</strong>
-                  <span>Current US AQI</span>
+            <div className="air-compact-summary">
+              <div className="air-score-block" aria-label={`Current US AQI ${pollutionValue(current.us_aqi)}`}>
+                <span className="air-kicker">Current US AQI</span>
+                <div className="air-score-line">
+                  <strong data-testid="text-current-aqi" style={{ color: airColor(current.us_aqi) }}>{pollutionValue(current.us_aqi)}</strong>
+                  <div className={`air-badge ${level.className}`}>{level.label}</div>
                 </div>
               </div>
               <div className="air-summary-copy">
-                <div className={`air-badge ${level.className}`}>{level.label}</div>
                 <p>{level.guidance}</p>
-              </div>
-              <div className="air-note">
-                <span>What’s measured</span>
-                <strong>Particles + gases</strong>
                 <small>Updated with your local forecast</small>
+              </div>
+              <div className="air-range" aria-label="AQI comparison range from 0 to 150">
+                <div className="air-range-heading"><span>Quality range</span><span>0—150</span></div>
+                <div className="air-scale">
+                  <div className="air-scale-segment air-scale-good" />
+                  <div className="air-scale-segment air-scale-moderate" />
+                  <div className="air-scale-segment air-scale-sensitive" />
+                  {comparisonMarkers.map((marker) => (
+                    <div className={`air-marker ${marker.className}`} key={marker.label} style={{ left: `${marker.position}%` }} aria-label={`${marker.label}: ${pollutionValue(marker.value)}`}>
+                      <i style={{ background: marker.color }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="air-range-labels"><span>Good</span><span>Moderate</span><span>Unhealthy</span></div>
               </div>
             </div>
             <div className="air-stats" data-testid="list-pollution-stats">
@@ -633,25 +660,8 @@ function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
               ))}
             </div>
             <div className="air-context" data-testid="air-context">
-              <div className="air-context-heading">
-                <span>Compared to</span>
-                <span>Context</span>
-              </div>
-              <div className="air-scale-wrap">
-                <div className="air-scale" aria-label="AQI comparison scale from 0 to 150">
-                  <div className="air-scale-segment air-scale-good" />
-                  <div className="air-scale-segment air-scale-moderate" />
-                  <div className="air-scale-segment air-scale-sensitive" />
-                  {comparisonMarkers.map((marker) => (
-                    <div className={`air-marker ${marker.className}`} key={marker.label} style={{ left: `${marker.position}%` }}>
-                      <span className="air-marker-label">{marker.label}<strong>{pollutionValue(marker.value)}</strong></span>
-                      <i style={{ background: marker.color }} />
-                    </div>
-                  ))}
-                </div>
-                <div className="air-scale-axis"><span>0</span><span>150</span></div>
-              </div>
-              <div className="air-context-copy">{airContext(current.us_aqi)}</div>
+              <div><span className="air-context-kicker">In plain English</span><p>{airContext(current.us_aqi)}</p></div>
+              <span className="air-context-source">Particles + gases · local forecast</span>
             </div>
           </>
         ) : (
@@ -665,9 +675,11 @@ function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
 function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit }) {
   const current = weather.current ?? {};
   const daily = weather.daily ?? {};
-  const detailItems: { icon: LucideIcon; label: string; value: string; sub?: string }[] = [
+  const dewPoint = calculateDewPointCelsius(current.temperature_2m, current.relative_humidity_2m);
+  const dewComfort = dewPointComfort(dewPoint);
+  const detailItems: { icon: LucideIcon; label: string; value: string; sub?: string; dewPoint?: { value: string; comfort: { label: string; className: string } } }[] = [
     { icon: Thermometer, label: 'Feels like', value: displayTemp(current.apparent_temperature, unit), sub: 'on your skin' },
-    { icon: Droplets, label: 'Humidity', value: current.relative_humidity_2m !== undefined ? `${current.relative_humidity_2m}%` : '—', sub: 'relative humidity' },
+    { icon: Droplets, label: 'Humidity', value: current.relative_humidity_2m !== undefined ? `${current.relative_humidity_2m}%` : '—', sub: 'relative humidity', dewPoint: { value: displayTemp(dewPoint, unit), comfort: dewComfort } },
     { icon: Umbrella, label: 'Rain now', value: current.precipitation !== undefined ? `${current.precipitation} mm` : '—', sub: 'at this moment' },
     { icon: Gauge, label: 'Day ahead', value: `${daily.precipitation_probability_max?.[0] ?? 0}%`, sub: 'chance of rain' },
   ];
@@ -679,12 +691,21 @@ function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit
       </div>
       <div className="panel details-panel" data-testid="panel-weather-details">
         <div className="detail-grid">
-          {detailItems.map(({ icon: Icon, label, value, sub }) => (
+          {detailItems.map(({ icon: Icon, label, value, sub, dewPoint: humidityDewPoint }) => (
             <div className="detail" key={label} data-testid={`detail-${label.toLowerCase().replaceAll(' ', '-')}`}>
               <Icon className="detail-icon" size={17} strokeWidth={1.7} />
               <div className="detail-label">{label}</div>
               <div className="detail-value">{value}</div>
               <div className="detail-sub">{sub}</div>
+              {humidityDewPoint ? (
+                <div className="dew-point" data-testid="detail-dew-point">
+                  <span className="dew-point-label">
+                    <span className="dew-point-info" title="Dew point measures how humid the air actually feels — more reliable than relative humidity alone." aria-label="About dew point"><Info size={11} strokeWidth={1.8} /></span>
+                    Dew point <strong>{humidityDewPoint.value}</strong>
+                  </span>
+                  <span className={`dew-pill ${humidityDewPoint.comfort.className}`}>{humidityDewPoint.comfort.label}</span>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -698,6 +719,114 @@ function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit
             <div><div className="sun-label">Sunset</div><div className="sun-value">{timeLabel(daily.sunset?.[0])}</div></div>
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function MicroClimateForecast({ weather, place, unit }: { weather: WeatherPayload; place: Place; unit: Unit }) {
+  const [model, setModel] = useState<MicroClimatePayload | null>(null);
+  const [modelStatus, setModelStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+
+  useEffect(() => {
+    let active = true;
+    setModelStatus('loading');
+    void fetchMicroClimate(place).then((result) => {
+      if (!active) return;
+      setModel(result);
+      setModelStatus(result ? 'ready' : 'unavailable');
+    });
+    return () => {
+      active = false;
+    };
+  }, [place.latitude, place.longitude]);
+
+  const regionalTemperature = weather.current?.temperature_2m;
+  const regionalRainfall = weather.current?.precipitation;
+  const modelTemperature = model?.current?.temperature_2m;
+  const modelRainfall = model?.current?.precipitation;
+  const temperatureDeltaC = regionalTemperature !== undefined && modelTemperature !== undefined
+    ? modelTemperature - regionalTemperature
+    : undefined;
+  const temperatureDelta = temperatureDeltaC === undefined
+    ? undefined
+    : unit === 'fahrenheit' ? temperatureDeltaC * 9 / 5 : temperatureDeltaC;
+  const rainfallDelta = regionalRainfall !== undefined && modelRainfall !== undefined
+    ? modelRainfall - regionalRainfall
+    : undefined;
+  const modelDistance = model?.latitude !== undefined && model.longitude !== undefined
+    ? `UKV model grid: ${distanceKm(place.latitude, place.longitude, model.latitude, model.longitude).toFixed(1)} km away`
+    : 'UKV model grid: unavailable';
+  const modelValue = modelStatus === 'loading' ? 'Checking UKV…' : modelStatus === 'ready' ? 'Model grid' : 'Regional only';
+
+  const rows = [
+    {
+      label: 'Temperature',
+      icon: Thermometer,
+      regional: displayTemp(regionalTemperature, unit),
+      nearby: modelStatus === 'loading' ? 'Checking…' : modelTemperature === undefined ? 'Regional only' : displayTemp(modelTemperature, unit),
+      delta: temperatureDelta,
+      deltaText: signedDelta(temperatureDelta, unit === 'fahrenheit' ? '°F grid' : '°C grid'),
+      notable: temperatureDelta !== undefined && Math.abs(temperatureDelta) >= (unit === 'fahrenheit' ? 1.8 : 1),
+      distance: modelDistance,
+    },
+    {
+      label: 'Rainfall now',
+      icon: Droplets,
+      regional: regionalRainfall === undefined ? '—' : `${regionalRainfall.toFixed(1)} mm`,
+      nearby: modelStatus === 'loading' ? 'Checking…' : modelRainfall === undefined ? 'Regional only' : `${modelRainfall.toFixed(1)} mm`,
+      delta: rainfallDelta,
+      deltaText: signedDelta(rainfallDelta, ' mm grid'),
+      notable: rainfallDelta !== undefined && Math.abs(rainfallDelta) >= .2,
+      distance: modelDistance,
+    },
+    {
+      label: 'Air quality',
+      icon: Gauge,
+      regional: `${pollutionValue(weather.airQuality?.current?.us_aqi)} US AQI`,
+      nearby: 'No nearby sensor',
+      delta: undefined,
+      deltaText: 'Regional only',
+      notable: false,
+      distance: 'Nearest air sensor: unavailable',
+    },
+  ];
+
+  return (
+    <section className="micro-wide" aria-labelledby="micro-title">
+      <div className="section-heading">
+        <h2 className="section-title" id="micro-title">Your Micro-Climate</h2>
+        <span className="section-meta">vs. regional forecast</span>
+      </div>
+      <div className="panel micro-panel" data-testid="panel-micro-climate">
+        <div className="micro-intro">
+          <span>LOCAL VARIANCE CHECK</span>
+          <p>One nearby model grid point can feel different from the broader city forecast. This is a comparison, not block-level precision.</p>
+          <strong>{modelValue}</strong>
+        </div>
+        <div className="micro-rows">
+          {rows.map(({ label, icon: Icon, regional, nearby, delta, deltaText, notable, distance }) => {
+            const DeltaIcon = delta === undefined ? null : delta >= 0 ? ArrowUp : ArrowDown;
+            return (
+              <div className={`micro-row${delta === undefined ? ' micro-row-unavailable' : ''}`} key={label}>
+                <div className="micro-metric">
+                  <Icon size={17} strokeWidth={1.7} />
+                  <strong>{label}</strong>
+                </div>
+                <div className="micro-value-group">
+                  <span><small>Regional</small><b>{regional}</b></span>
+                  <span><small>{label === 'Air quality' ? 'Nearby sensor' : 'Nearby model'}</small><b>{nearby}</b></span>
+                </div>
+                <div className={`micro-delta${notable ? ' micro-delta-amber' : ''}${delta === undefined ? ' micro-delta-muted' : ''}`}>
+                  {DeltaIcon ? <DeltaIcon size={13} strokeWidth={2} /> : null}
+                  <span>{deltaText}</span>
+                </div>
+                <small className="micro-distance">{distance}</small>
+              </div>
+            );
+          })}
+        </div>
+        <p className="micro-fallback">No nearby micro-sensor data available for air quality — showing regional forecast only.</p>
       </div>
     </section>
   );
@@ -767,17 +896,26 @@ function Home() {
 
   const current = weather?.current ?? {};
   const currentCode = current.weather_code ?? 0;
-  const CurrentIcon = weatherIcon(currentCode, current.is_day !== 0);
   const updatedLabel = useMemo(() => {
     if (!current.time) return 'Forecast ready';
     return `Updated ${timeLabel(current.time)}`;
   }, [current.time]);
-  const dayGreeting = current.is_day === 0 ? 'A clear night' : weatherCopy(currentCode);
-  const summary = current.precipitation && current.precipitation > 0
-    ? 'Keep a light layer close — the sky may change its mind.'
-    : current.temperature_2m !== undefined && current.temperature_2m < 10
-      ? 'A crisp start. You will be glad of an extra layer today.'
-      : 'A good day to step outside and see where it takes you.';
+  const hourlyTimes = weather?.hourly?.time ?? [];
+  const hourlyStart = hourlyTimes.length
+    ? Math.max(0, hourlyTimes.findIndex((time) => Date.parse(time) >= (current.time ? Date.parse(current.time) : Date.now())))
+    : 0;
+  const upcomingIndexes = hourlyTimes.length
+    ? Array.from({ length: Math.min(6, hourlyTimes.length - hourlyStart) }, (_, index) => hourlyStart + index)
+    : [];
+  const upcomingPrecipitation = upcomingIndexes
+    .map((index) => weather?.hourly?.precipitation_probability?.[index])
+    .filter((value): value is number => value !== undefined && !Number.isNaN(value));
+  const peakPrecipitation = upcomingPrecipitation.length
+    ? Math.max(...upcomingPrecipitation)
+    : weather?.daily?.precipitation_probability_max?.[0];
+  const peakPrecipitationIndex = upcomingIndexes.find((index) => weather?.hourly?.precipitation_probability?.[index] === peakPrecipitation);
+  const umbrellaAdvice = getUmbrellaAdvice(peakPrecipitation, peakPrecipitationIndex === undefined ? undefined : timeLabel(hourlyTimes[peakPrecipitationIndex]));
+  const sunglassesAdvice = getSunglassesAdvice(current.uv_index, current.cloud_cover);
 
   return (
     <div className="weather-app">
@@ -803,22 +941,35 @@ function Home() {
         {!isLoading && !error && weather && (
           <main>
             <section className="hero-grid" aria-labelledby="place-title">
-              <div>
-                <div className="eyebrow"><span className="eyebrow-dot" />{dayGreeting}</div>
+              <div className="hero-location">
                 <h1 className="place-title" id="place-title" data-testid="text-current-city">{place.name}</h1>
                 <div className="date-line" data-testid="text-current-date">{localDate(current.time)?.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }) ?? 'Today'}</div>
-                <div className="condition-line" data-testid="text-current-condition"><CurrentIcon className="condition-icon" size={26} strokeWidth={1.6} />{weatherCopy(currentCode)}<span style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 400 }}>·</span><span style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 400 }}>{summary}</span></div>
+                <div className="advice-grid">
+                  <article className={`advice-card advice-${umbrellaAdvice.answer.toLowerCase()}`} data-testid="card-umbrella-advice">
+                    <Umbrella className="advice-icon" size={19} strokeWidth={1.7} />
+                    <span className="advice-label">Umbrella?</span>
+                    <strong data-testid="text-umbrella-advice">{umbrellaAdvice.answer}</strong>
+                    <small>{umbrellaAdvice.reason}</small>
+                  </article>
+                  <article className={`advice-card advice-${sunglassesAdvice.answer.toLowerCase()}`} data-testid="card-sunglasses-advice">
+                    <Glasses className="advice-icon" size={19} strokeWidth={1.7} />
+                    <span className="advice-label">Sunglasses?</span>
+                    <strong data-testid="text-sunglasses-advice">{sunglassesAdvice.answer}</strong>
+                    <small>{sunglassesAdvice.reason}</small>
+                  </article>
+                </div>
                 <button className="local-button" onClick={() => findMe()} data-testid="button-refresh-location"><Navigation size={13} />{isLocating ? 'Finding you…' : 'Use my location'}</button>
               </div>
               <div className="temp-block">
                 <div className="current-temp" data-testid="text-current-temperature">{displayTemp(current.temperature_2m, unit)}<sup>{unit === 'celsius' ? 'C' : 'F'}</sup></div>
-                <div className="feels">Feels like<strong>{displayTemp(current.apparent_temperature, unit)}</strong>{updatedLabel}</div>
+                <div className="feels">Feels like<strong>{displayTemp(current.apparent_temperature, unit)}</strong><span className="temperature-condition">{weatherCopy(currentCode)}</span>{updatedLabel}</div>
               </div>
             </section>
             <div className="content-grid">
               <HourlyOutlook weather={weather} unit={unit} />
               <DailyForecast weather={weather} unit={unit} />
               <WeatherDetails weather={weather} unit={unit} />
+                <MicroClimateForecast weather={weather} place={place} unit={unit} />
               <UVForecast weather={weather} />
               <AirQualityForecast weather={weather} />
             </div>

@@ -1,0 +1,38 @@
+# Prompt: Add a Micro-Climate / Hyperlocal Variance Widget
+
+Add a new card to my weather app called "Your Micro-Climate" (or similar) that shows how conditions at the user's exact location may differ from the broader city/regional forecast already shown elsewhere in the app. This is a new, additive feature — do not modify existing cards.
+
+## Concept
+Standard weather APIs give one forecast per city or a coarse grid cell (often several km wide). This feature shows the user that hyperlocal conditions — especially temperature, rainfall, and air quality — can vary meaningfully within that grid cell (e.g., due to urban heat islands, elevation, proximity to green space, or nearby pollution sources like roads), and surfaces a comparison rather than pretending block-level precision is exact.
+
+## Data sources to use (pick based on stack/budget)
+- **Tomorrow.io Weather API** — offers hyperlocal, high-resolution forecasts down to street/block level in supported regions; good primary source for temperature/precipitation variance.
+- **UK Met Office DataHub / Met Office UKV model via Open-Meteo** — UKV model resolution is 2km (vs global 10km), notably finer for UK locations specifically; good fallback/comparison layer since we're UK-based.
+- **PurpleAir API** — community-run sensor network (35,000+ sensors globally) giving real, nearby-sensor air quality readings rather than modeled estimates; free tier available (1M points/month), requires a free API key from develop.purpleair.com. Use this to compare "nearest real sensor" PM2.5 against the modeled AQI already shown in the existing AQI card.
+- If none of the above are feasible immediately, fall back to comparing two different existing weather providers' forecasts for the same coordinates as a lightweight proxy for "model uncertainty" (e.g., OpenWeather vs Open-Meteo).
+
+## Required UI
+
+1. **Header:** "Your Micro-Climate" title, right-aligned subtitle "vs. regional forecast".
+
+2. **Comparison rows** (one per available metric — temperature, rainfall chance, air quality):
+   - Left side: the value from the app's existing/primary forecast source (already displayed elsewhere).
+   - Right side: the value from the hyperlocal/nearby-sensor source.
+   - A small delta indicator (e.g., "+1.2°C nearby" or "PM2.5 6 higher at nearest sensor") with an up/down arrow icon, colored neutral gray if the difference is small/insignificant, amber if notably different.
+   - If no nearby hyperlocal sensor/data is available for that location, show a clear fallback message: "No nearby micro-sensor data available — showing regional forecast only" rather than a fake comparison.
+
+3. **Nearest-sensor distance label**: show how far away the comparison data point is from (e.g., "Nearest air sensor: 0.4 mi away") so the user understands the comparison's reliability — don't present hyperlocal data as if it were exactly at their location.
+
+4. **Optional mini-map inset**: a small static or lightweight interactive map pin showing the user's location and the nearest sensor/grid point used for comparison, if a mapping library is already in the stack. Skip this if it would require adding a new heavy mapping dependency.
+
+## Visual style guidelines
+- Match the existing app's soft pastel card style (rounded corners, white card, muted gray secondary text, bold key numbers).
+- Use the same green/amber/orange delta-severity coloring already established in the AQI and dew-point comparison work, applied here to "how much does hyperlocal data diverge from the regional forecast."
+- Keep each comparison row compact — icon + two values + delta, on one line, stacking on narrow screens.
+
+## Implementation notes
+- Cache/debounce hyperlocal API calls — these are typically rate-limited (e.g., PurpleAir free tier) — do not call on every render; fetch once per location per session/refresh interval (e.g., every 10–15 minutes).
+- Handle sparse coverage gracefully: PurpleAir sensor density varies a lot by area, so always check for a nearby sensor within a reasonable radius (e.g., 5 miles) before showing a comparison, and fall back to the "no data available" state otherwise.
+- Store API keys in environment variables, never hardcoded in the component.
+- Keep this as a self-contained new component so it can be toggled on/off from the layout without touching existing cards.
+- Output the new component/file(s) in full, ready to drop in, plus one line showing how to import/place it in the existing layout, and note which environment variables (e.g., `PURPLEAIR_API_KEY`, `TOMORROW_API_KEY`) need to be added to the project's `.env`.

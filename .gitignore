@@ -37,6 +37,11 @@ yarn-error.log
 testem.log
 /typings
 
+# environment
+.env
+.env.*
+!.env.example
+
 # System Files
 .DS_Store
 Thumbs.db
@@ -47,3 +52,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# ZCode session state
+.zcode/

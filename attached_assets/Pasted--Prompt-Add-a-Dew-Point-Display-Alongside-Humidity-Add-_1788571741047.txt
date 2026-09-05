@@ -1,0 +1,37 @@
+# Prompt: Add a Dew Point Display Alongside Humidity
+
+Add a dew point metric to my existing weather widget/card, displayed next to or near the current humidity reading. This is a small additive change — do not restructure or redesign the rest of the card.
+
+## Background (for context, not to display verbatim)
+Dew point is the temperature at which air becomes saturated with moisture and dew forms. Unlike relative humidity (which varies with temperature), dew point is a more reliable indicator of how muggy or comfortable the air actually feels:
+- Below 10°C (50°F): dry, comfortable
+- 10–16°C (50–60°F): comfortable
+- 16–18°C (60–65°F): slightly humid, noticeable
+- 18–21°C (65–70°F): humid, uncomfortable for some
+- 21°C+ (70°F+): very humid, oppressive
+
+## Required UI changes
+
+1. **Add a "Dew Point" value** next to or directly below the existing humidity percentage, styled consistently with other secondary metrics already in the card (same font weight/size as other sub-values like wind speed or pressure, if present).
+
+2. **Add a short comfort-level label** next to the dew point value, derived from the ranges above (e.g., "Comfortable", "Humid", "Oppressive") — style this as a small colored tag/pill matching the existing pill style used elsewhere in the app (e.g., the "GOOD" / "LOW" pills on the AQI/UV cards), colored on a green→yellow→orange scale based on comfort level.
+
+3. **Optional tooltip/info icon**: add a small (i) icon next to "Dew Point" that shows a one-line explanation on hover/tap: "Dew point measures how humid the air actually feels — more reliable than relative humidity alone."
+
+## Calculation
+If the API doesn't provide dew point directly, calculate it client-side from temperature and relative humidity using the Magnus formula:
+
+```
+b = 17.62, c = 243.12
+gamma = (b * T) / (c + T) + ln(RH / 100)
+dew_point = (c * gamma) / (b - gamma)
+```
+where T is temperature in °C and RH is relative humidity in %. Round to the nearest whole degree for display. Support both °C and °F depending on the app's existing unit setting.
+
+## Visual style guidelines
+- Match existing card typography and spacing exactly — this should look like it was always part of the design, not bolted on.
+- Use the same color tokens already used for comfort/severity tags elsewhere in the app (green = comfortable, amber = humid/noticeable, orange = uncomfortable, red = oppressive) for the comfort-level pill.
+- Keep it compact — a single line or small stat block, not a new full card section.
+
+## Implementation notes
+- Prefer calculating dew point client-side with the Magnus formula above if not already provided by the API response, rather than requesting a new endpoint.

@@ -1,0 +1,44 @@
+# Prompt: Simplify Daymark Hero Section + Replace Condition Text with Umbrella/Sunglasses Answers
+
+Simplify the hero/header section of my weather app ("daymark"). It currently has too many competing visual elements. Reduce visual noise and replace the "Mostly clear" condition description with two direct, decision-oriented answers: "Do I need an umbrella today?" and "Do I need sunglasses today?"
+
+## Current design (to replace)
+- Logo + "daymark" wordmark + "WEATHER, SIMPLY" tagline, top left.
+- °C/°F toggle + locate icon, top right.
+- Small "A CLEAR NIGHT" status tag.
+- Very large decorative headline "Your location" (placeholder city name) in serif font.
+- Date text below it.
+- A moon icon + "Mostly clear" bold text + a descriptive sentence ("A good day to step outside and see where it takes you.").
+- "Use my location" pill button.
+- Large temperature (20°), "Feels like 19°", "Updated 1 AM" on the right side.
+
+## Required changes
+
+1. **Reduce the location headline's visual weight.** The city/location name (currently oversized decorative serif text) should be no larger than roughly 40–50% of its current size — it's identifying information, not the primary content of the screen. Keep the date next to or below it, small and muted.
+
+2. **Remove the descriptive condition sentence entirely** (e.g., "A good day to step outside and see where it takes you.") — this is flavor text that doesn't help the user decide anything. Also remove the standalone "Mostly clear" label and the "A CLEAR NIGHT" status tag as separate elements — condition data will now live inside the two answer cards below, plus a small secondary text label near the temperature (e.g., "Mostly clear" as one small muted line next to "Feels like 19°").
+
+3. **Add two prominent answer cards** below the headline, replacing the removed condition text block:
+   - **Card 1 — "Umbrella?"** Answer: "Yes" or "No" in large bold text, colored using a simple two-state palette (green/no-rain = safe color, orange/rain = alert color). Below the answer, one short reason line (e.g., "Rain unlikely today" or "40% chance around 3 PM").
+   - **Card 2 — "Sunglasses?"** Answer: "Yes" or "No" in large bold text, same color logic based on UV index and/or cloud cover (e.g., orange/yellow = yes needed on bright/high-UV days, green/gray = no on overcast or low-UV days). Below the answer, one short reason line (e.g., "Bright & clear" or "Overcast today").
+   - Each card includes a small icon (umbrella icon, sunglasses icon) matching the app's existing icon style.
+   - Cards sit side by side on desktop, stacked on mobile, styled as soft rounded cards consistent with the app's existing pastel palette.
+
+4. **Determine the umbrella answer** from precipitation probability data already available (or newly fetched): answer "Yes" if probability of precipitation in the next several hours exceeds a threshold (e.g., 40%), otherwise "No". Show the reason line reflecting the actual data (percentage and/or expected time window).
+
+5. **Determine the sunglasses answer** from UV index and cloud cover: answer "Yes" if UV index is 3+ (Moderate or higher) AND cloud cover is below a threshold (e.g., under 60%), otherwise "No". Show a reason line reflecting the actual condition (e.g., "UV index 5, mostly clear" or "Overcast, low UV").
+
+6. **Keep unchanged:** the logo/wordmark, unit toggle, locate icon, the main temperature number, and "Feels like" value — these are core, well-scoped elements and should stay roughly where they are, just visually rebalanced now that the headline and condition-text blocks are smaller.
+
+7. **Move "Use my location"** to a lower-priority visual position (e.g., small text link or secondary-style button below the answer cards) since it's a one-time setup action, not daily information.
+
+## Visual style guidelines
+- Keep the existing soft pastel gradient background and card-based aesthetic.
+- Use the app's existing accent blue for temperature and neutral UI elements; introduce a clear two-color system (calm green/blue = "No action needed", warm orange/amber = "Yes, take action") for the umbrella/sunglasses answers specifically, so the eye can scan for "do I need to do something today" in under a second.
+- Typography: keep serif display font for the temperature number if that's already the case; use a clean sans-serif for the answer cards' "Yes"/"No" text so they read as clear, modern UI rather than decorative.
+- Ensure the two answer cards are the most visually prominent element after the temperature — they should be scannable in under 2 seconds on page load.
+
+## Implementation notes
+- Add small pure helper functions: `getUmbrellaAdvice(precipProbability, precipTimeWindow)` and `getSunglassesAdvice(uvIndex, cloudCover)` that return `{ answer: 'Yes'|'No', reason: string }`, so logic is testable and reusable.
+- Preserve all existing data fetching/props; only add the two derived advice calculations if the underlying data (precip probability, UV index, cloud cover) is already available in the app's state. If any of these three fields aren't currently fetched, flag which additional API field needs to be added.
+- Output the updated component file(s) in full, ready to drop in.

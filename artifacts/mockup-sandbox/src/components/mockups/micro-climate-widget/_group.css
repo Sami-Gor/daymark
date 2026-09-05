@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+.micro-mockup {
+  --micro-bg: #eef4f7;
+  --micro-fg: #243141;
+  --micro-muted: #72818b;
+  --micro-border: #d7e1e5;
+  --micro-primary: #277b9b;
+  min-width: 320px;
+  min-height: 100vh;
+  padding: 24px clamp(16px, 4vw, 54px) 36px;
+  color: var(--micro-fg);
+  background:
+    radial-gradient(circle at 84% 5%, rgba(247, 214, 93, .25), transparent 22rem),
+    radial-gradient(circle at 0% 75%, rgba(39, 123, 155, .11), transparent 25rem),
+    var(--micro-bg);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.micro-mockup *, .micro-mockup *::before, .micro-mockup *::after { box-sizing: border-box; }
+.micro-mockup h2, .micro-mockup p { margin: 0; }
+.micro-mockup .micro-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 0 2px 12px; }
+.micro-mockup .micro-heading h2 { font-family: 'Fraunces', Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: -.035em; }
+.micro-mockup .micro-meta, .micro-mockup .micro-kicker, .micro-mockup .micro-distance, .micro-mockup .micro-value small { color: var(--micro-muted); font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+.micro-mockup .micro-panel { border: 1px solid var(--micro-border); border-radius: 20px; background: rgba(255, 255, 255, .78); box-shadow: 0 12px 35px rgba(53, 84, 100, .06); }
+.micro-mockup .micro-intro { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(250px, 1.3fr) auto; gap: 18px; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--micro-border); }
+.micro-mockup .micro-intro p { color: var(--micro-muted); font-size: 11px; line-height: 1.45; }
+.micro-mockup .micro-intro strong { justify-self: end; color: var(--micro-primary); font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+.micro-mockup .micro-rows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 15px 20px 0; }
+.micro-mockup .micro-row { min-width: 0; padding: 14px; border: 1px solid var(--micro-border); border-radius: 15px; background: rgba(255, 255, 255, .72); }
+.micro-mockup .micro-row-unavailable { background: rgba(225, 235, 239, .35); }
+.micro-mockup .micro-metric { display: flex; align-items: center; gap: 7px; color: var(--micro-primary); }
+.micro-mockup .micro-metric strong { color: var(--micro-fg); font-size: 11px; }
+.micro-mockup .micro-value-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px; }
+.micro-mockup .micro-value { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.micro-mockup .micro-value b { overflow: hidden; color: var(--micro-fg); font-family: 'Fraunces', Georgia, serif; font-size: 18px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.micro-mockup .micro-delta { display: inline-flex; align-items: center; gap: 3px; margin-top: 13px; color: var(--micro-primary); font-family: 'DM Mono', monospace; font-size: 9px; }
+.micro-mockup .micro-delta-amber { color: #a77818; }
+.micro-mockup .micro-delta-muted { color: var(--micro-muted); }
+.micro-mockup .micro-distance { display: block; margin-top: 9px; font-size: 8px; }
+.micro-mockup .micro-fallback { margin: 14px 20px 18px; padding: 10px 12px; border-radius: 9px; color: var(--micro-muted); background: #eaf0f1; font-size: 10px; line-height: 1.4; }
+@media (max-width: 760px) {
+  .micro-mockup { padding: 16px 12px 24px; }
+  .micro-mockup .micro-intro { display: block; padding: 15px; }
+  .micro-mockup .micro-intro strong { margin-top: 8px; }
+  .micro-mockup .micro-intro p { margin-top: 9px; }
+  .micro-mockup .micro-rows { grid-template-columns: 1fr; padding-right: 15px; padding-left: 15px; }
+  .micro-mockup .micro-fallback { margin-right: 15px; margin-left: 15px; }
+}
