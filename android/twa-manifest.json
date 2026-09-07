@@ -1,0 +1,44 @@
+{
+  "packageId": "io.github.sami_gor.daymark",
+  "host": "localhost:8090",
+  "name": "Daymark",
+  "launcherName": "Daymark",
+  "display": "standalone",
+  "themeColor": "#e7f2f7",
+  "themeColorDark": "#e7f2f7",
+  "backgroundColor": "#e7f2f7",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "http://localhost:8090/icons/icon-512.png",
+  "maskableIconUrl": "http://localhost:8090/icons/icon-maskable-512.png",
+  "webManifestUrl": "http://localhost:8090/manifest.webmanifest",
+  "splashScreenFadeOutDuration": 250,
+  "signingKey": {
+    "path": "./android.keystore",
+    "create": false
+  },
+  "appVersionName": "1.0.0",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "http://localhost:8090/",
+  "minSdkVersion": 23,
+  "orientation": "default",
+  "fingerprints": [
+    {
+      "name": "android",
+      "value": "3A:50:70:37:9D:DF:AF:54:42:30:0D:37:86:37:66:04:CB:DF:7F:A8:85:DC:FB:3C:D4:86:AA:35:26:5F:31:64"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

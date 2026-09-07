@@ -75,3 +75,11 @@ signing.properties
 
 # ZCode session state
 .zcode/
+
+# Android build state (keystores already covered above)
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/*.apk
+android/*.aab
