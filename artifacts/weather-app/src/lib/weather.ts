@@ -9,89 +9,173 @@ import {
   Sun,
   type LucideIcon,
 } from 'lucide-react';
+import { z } from 'zod';
 
-const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
+const AIR_QUALITY_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 export type Unit = 'celsius' | 'fahrenheit';
 export type Place = { name: string; country?: string; admin1?: string; latitude: number; longitude: number };
-export type WeatherPayload = {
-  latitude?: number;
-  longitude?: number;
-  timezone?: string;
-  current?: {
-    time?: string;
-    temperature_2m?: number;
-    relative_humidity_2m?: number;
-    apparent_temperature?: number;
-    is_day?: number;
-    precipitation?: number;
-    rain?: number;
-    cloud_cover?: number;
-    weather_code?: number;
-    wind_speed_10m?: number;
-    wind_direction_10m?: number;
-    uv_index?: number;
-    uv_index_clear_sky?: number;
-  };
-  hourly?: {
-    time?: string[];
-    temperature_2m?: number[];
-    precipitation_probability?: number[];
-    weather_code?: number[];
-    wind_speed_10m?: number[];
-    uv_index?: number[];
-    uv_index_clear_sky?: number[];
-  };
-  daily?: {
-    time?: string[];
-    weather_code?: number[];
-    temperature_2m_max?: number[];
-    temperature_2m_min?: number[];
-    precipitation_probability_max?: number[];
-    wind_speed_10m_max?: number[];
-    sunrise?: string[];
-    sunset?: string[];
-    uv_index_max?: number[];
-    uv_index_clear_sky_max?: number[];
-  };
-  airQuality?: AirQualityPayload;
-};
-type GeocodingPayload = { results?: Place[] };
-type MicroClimatePayload = {
-  latitude?: number;
-  longitude?: number;
-  current?: {
-    temperature_2m?: number;
-    precipitation?: number;
-  };
-};
-export type AirQualityPayload = {
-  current?: {
-    time?: string;
-    us_aqi?: number;
-    pm10?: number;
-    pm2_5?: number;
-    nitrogen_dioxide?: number;
-    ozone?: number;
-    sulphur_dioxide?: number;
-    carbon_monoxide?: number;
-  };
-  hourly?: {
-    time?: string[];
-    us_aqi?: number[];
-    pm10?: number[];
-    pm2_5?: number[];
-  };
-};
+
+/*
+ * Open-Meteo responses are untrusted third-party data, so every response is
+ * validated here at the network boundary (DAYMARK-SEC-003). Schemas accept
+ * everything the UI needs, tolerate legitimately missing or null values
+ * (Open-Meteo emits nulls e.g. for night-time UV), and pass unknown fields
+ * through instead of rejecting them.
+ */
+const nullableNumber = z.number().nullable().optional();
+const numberArray = z.array(z.number().nullable()).nullish();
+const stringArray = z.array(z.string()).nullish();
+
+const AirQualityResponseSchema = z
+  .object({
+    current: z
+      .object({
+        us_aqi: nullableNumber,
+        pm10: nullableNumber,
+        pm2_5: nullableNumber,
+        nitrogen_dioxide: nullableNumber,
+        ozone: nullableNumber,
+        sulphur_dioxide: nullableNumber,
+        carbon_monoxide: nullableNumber,
+      })
+      .passthrough()
+      .nullish(),
+    hourly: z
+      .object({
+        time: stringArray,
+        us_aqi: numberArray,
+        pm10: numberArray,
+        pm2_5: numberArray,
+      })
+      .passthrough()
+      .nullish(),
+  })
+  .passthrough();
+
+const WeatherResponseSchema = z
+  .object({
+    latitude: nullableNumber,
+    longitude: nullableNumber,
+    current: z
+      .object({
+        time: z.string().nullish(),
+        temperature_2m: nullableNumber,
+        relative_humidity_2m: nullableNumber,
+        apparent_temperature: nullableNumber,
+        precipitation: nullableNumber,
+        cloud_cover: nullableNumber,
+        weather_code: nullableNumber,
+        uv_index: nullableNumber,
+      })
+      .passthrough()
+      .nullish(),
+    hourly: z
+      .object({
+        time: stringArray,
+        temperature_2m: numberArray,
+        precipitation_probability: numberArray,
+        weather_code: numberArray,
+        uv_index: numberArray,
+      })
+      .passthrough()
+      .nullish(),
+    daily: z
+      .object({
+        time: stringArray,
+        weather_code: numberArray,
+        temperature_2m_max: numberArray,
+        temperature_2m_min: numberArray,
+        precipitation_probability_max: numberArray,
+        sunrise: stringArray,
+        sunset: stringArray,
+        uv_index_max: numberArray,
+      })
+      .passthrough()
+      .nullish(),
+    airQuality: AirQualityResponseSchema.nullish(),
+  })
+  .passthrough();
+
+const MicroClimateResponseSchema = z
+  .object({
+    latitude: nullableNumber,
+    longitude: nullableNumber,
+    current: z
+      .object({
+        temperature_2m: nullableNumber,
+        precipitation: nullableNumber,
+      })
+      .passthrough()
+      .nullish(),
+  })
+  .passthrough();
+
+const GeocodingResponseSchema = z.object({
+  results: z
+    .array(
+      z
+        .object({
+          name: z.string(),
+          latitude: z.number(),
+          longitude: z.number(),
+          admin1: z.string().optional(),
+          country: z.string().optional(),
+        })
+        .passthrough(),
+    )
+    .nullish(),
+}).passthrough();
+
+export type WeatherPayload = z.infer<typeof WeatherResponseSchema>;
+export type AirQualityPayload = z.infer<typeof AirQualityResponseSchema>;
+export type MicroClimatePayload = z.infer<typeof MicroClimateResponseSchema>;
 
 const microClimateCache = new Map<string, { fetchedAt: number; payload: MicroClimatePayload | null }>();
 const MICRO_CLIMATE_CACHE_MS = 15 * 60 * 1000;
 
-async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+/*
+ * Every external request is bounded by a timeout (DAYMARK-SEC-004); timeout
+ * failures surface through the normal friendly error/fallback paths.
+ */
+const FETCH_TIMEOUT_MS = 10_000;
+
+function requestSignal(): AbortSignal | undefined {
+  return typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+    ? AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    : undefined;
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')
+  );
+}
+
+async function getJson<T>(url: string, schema: z.ZodType<T>): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: requestSignal() });
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      throw new Error('The weather service took too long to respond.');
+    }
+    throw error;
+  }
   if (!response.ok) throw new Error(`Weather service returned ${response.status}`);
-  return response.json() as Promise<T>;
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('Weather service sent a response we could not read.');
+  }
+  try {
+    return schema.parse(data);
+  } catch {
+    throw new Error('Weather service sent data in an unexpected shape.');
+  }
 }
 
 export async function fetchWeather(place: Place): Promise<WeatherPayload> {
@@ -104,7 +188,7 @@ export async function fetchWeather(place: Place): Promise<WeatherPayload> {
     forecast_days: '7',
     timezone: 'auto',
   });
-  const weather = await getJson<WeatherPayload>(`${FORECAST_URL}?${weatherParams.toString()}`);
+  const weather = await getJson(`${FORECAST_URL}?${weatherParams.toString()}`, WeatherResponseSchema);
   const airQualityParams = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
@@ -114,7 +198,7 @@ export async function fetchWeather(place: Place): Promise<WeatherPayload> {
     timezone: 'auto',
   });
   try {
-    const airQuality = await getJson<AirQualityPayload>(`https://air-quality-api.open-meteo.com/v1/air-quality?${airQualityParams.toString()}`);
+    const airQuality = await getJson(`${AIR_QUALITY_URL}?${airQualityParams.toString()}`, AirQualityResponseSchema);
     return { ...weather, airQuality };
   } catch {
     return weather;
@@ -136,7 +220,7 @@ export async function fetchMicroClimate(place: Place): Promise<MicroClimatePaylo
   });
   let payload: MicroClimatePayload | null = null;
   try {
-    payload = await getJson<MicroClimatePayload>(`${FORECAST_URL}?${params.toString()}`);
+    payload = await getJson(`${FORECAST_URL}?${params.toString()}`, MicroClimateResponseSchema);
   } catch {
     payload = null;
   }
@@ -144,12 +228,13 @@ export async function fetchMicroClimate(place: Place): Promise<MicroClimatePaylo
   return payload;
 }
 
-export { type GeocodingPayload, type MicroClimatePayload };
-
 export async function reverseGeocode(latitude: number, longitude: number): Promise<Place | undefined> {
   const reverseParams = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), count: '1', language: 'en', format: 'json' });
-  const reverse = await getJson<GeocodingPayload>(`${GEOCODING_URL}?${reverseParams.toString()}`);
-  return reverse.results?.[0];
+  const reverse = await getJson(`${GEOCODING_URL}?${reverseParams.toString()}`, GeocodingResponseSchema);
+  const found = reverse.results?.[0];
+  return found
+    ? { name: found.name, latitude: found.latitude, longitude: found.longitude, admin1: found.admin1, country: found.country }
+    : undefined;
 }
 
 export function weatherCopy(code = 0): string {
@@ -180,8 +265,8 @@ export function weatherIcon(code = 0, isDay = true): LucideIcon {
 
 export type WeatherAdvice = { answer: 'Yes' | 'No'; reason: string };
 
-export function getUmbrellaAdvice(precipProbability: number | undefined, precipTimeWindow?: string): WeatherAdvice {
-  if (precipProbability === undefined || Number.isNaN(precipProbability)) {
+export function getUmbrellaAdvice(precipProbability: number | null | undefined, precipTimeWindow?: string): WeatherAdvice {
+  if (precipProbability == null || Number.isNaN(precipProbability)) {
     return { answer: 'No', reason: 'Rain forecast unavailable' };
   }
   if (precipProbability >= 40) {
@@ -196,29 +281,29 @@ export function getUmbrellaAdvice(precipProbability: number | undefined, precipT
   };
 }
 
-export function getSunglassesAdvice(uvIndex: number | undefined, cloudCover: number | undefined): WeatherAdvice {
-  const hasUv = uvIndex !== undefined && !Number.isNaN(uvIndex);
-  const hasCloud = cloudCover !== undefined && !Number.isNaN(cloudCover);
+export function getSunglassesAdvice(uvIndex: number | null | undefined, cloudCover: number | null | undefined): WeatherAdvice {
+  const hasUv = uvIndex != null && !Number.isNaN(uvIndex);
+  const hasCloud = cloudCover != null && !Number.isNaN(cloudCover);
   if (!hasUv || !hasCloud) {
     return { answer: 'No', reason: 'Brightness forecast unavailable' };
   }
-  if (uvIndex >= 3 && cloudCover < 60) {
+  if ((uvIndex as number) >= 3 && (cloudCover as number) < 60) {
     return { answer: 'Yes', reason: `UV index ${uvValue(uvIndex)}, mostly clear` };
   }
-  if (cloudCover >= 60) {
+  if ((cloudCover as number) >= 60) {
     return { answer: 'No', reason: 'Overcast, low brightness' };
   }
   return { answer: 'No', reason: `UV index ${uvValue(uvIndex)}, low today` };
 }
 
-export function displayTemp(value: number | undefined, unit: Unit): string {
-  if (value === undefined || Number.isNaN(value)) return '—';
+export function displayTemp(value: number | null | undefined, unit: Unit): string {
+  if (value == null || Number.isNaN(value)) return '—';
   const converted = unit === 'fahrenheit' ? (value * 9) / 5 + 32 : value;
   return `${Math.round(converted)}°`;
 }
 
-export function calculateDewPointCelsius(temperatureC: number | undefined, humidity: number | undefined): number | undefined {
-  if (temperatureC === undefined || humidity === undefined || Number.isNaN(temperatureC) || Number.isNaN(humidity)) return undefined;
+export function calculateDewPointCelsius(temperatureC: number | null | undefined, humidity: number | null | undefined): number | undefined {
+  if (temperatureC == null || humidity == null || Number.isNaN(temperatureC) || Number.isNaN(humidity)) return undefined;
   const b = 17.62;
   const c = 243.12;
   const relativeHumidity = Math.min(100, Math.max(0.1, humidity));
@@ -235,8 +320,8 @@ export function dewPointComfort(dewPointC: number | undefined): { label: string;
   return { label: 'Oppressive', className: 'dew-oppressive' };
 }
 
-export function displayWind(value: number | undefined, unit: Unit): string {
-  if (value === undefined || Number.isNaN(value)) return '—';
+export function displayWind(value: number | null | undefined, unit: Unit): string {
+  if (value == null || Number.isNaN(value)) return '—';
   const converted = unit === 'fahrenheit' ? value * 0.621371 : value;
   return `${Math.round(converted)} ${unit === 'fahrenheit' ? 'mph' : 'km/h'}`;
 }
@@ -251,39 +336,39 @@ export function distanceKm(latitude1: number, longitude1: number, latitude2: num
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function signedDelta(value: number | undefined, unit: string, decimals = 1): string {
-  if (value === undefined || Number.isNaN(value)) return '—';
+export function signedDelta(value: number | null | undefined, unit: string, decimals = 1): string {
+  if (value == null || Number.isNaN(value)) return '—';
   const rounded = Math.abs(value) < 0.05 ? 0 : value;
   return `${rounded > 0 ? '+' : ''}${rounded.toFixed(decimals)}${unit}`;
 }
 
-export function localDate(value?: string): Date | null {
+export function localDate(value?: string | null): Date | null {
   if (!value) return null;
   const datePart = value.slice(0, 10);
   const date = new Date(`${datePart}T12:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function shortDay(value?: string, index = 0): string {
+export function shortDay(value?: string | null, index = 0): string {
   if (index === 0) return 'Today';
   if (index === 1) return 'Tomorrow';
   const date = localDate(value);
   return date ? date.toLocaleDateString([], { weekday: 'short' }) : 'Day';
 }
 
-export function dateLabel(value?: string): string {
+export function dateLabel(value?: string | null): string {
   const date = localDate(value);
   return date ? date.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—';
 }
 
-export function timeLabel(value?: string): string {
+export function timeLabel(value?: string | null): string {
   if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value.slice(11, 16) : date.toLocaleTimeString([], { hour: 'numeric' });
 }
 
-export function compass(degrees?: number): string {
-  if (degrees === undefined || Number.isNaN(degrees)) return '—';
+export function compass(degrees?: number | null): string {
+  if (degrees == null || Number.isNaN(degrees)) return '—';
   return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(degrees / 45) % 8];
 }
 
@@ -293,8 +378,8 @@ export type UvLevel = {
   className: string;
 };
 
-export function uvLevel(value: number | undefined): UvLevel {
-  if (value === undefined || Number.isNaN(value)) {
+export function uvLevel(value: number | null | undefined): UvLevel {
+  if (value == null || Number.isNaN(value)) {
     return { label: 'Unavailable', guidance: 'UV detail is unavailable right now.', className: 'uv-unavailable' };
   }
   if (value < 3) {
@@ -312,12 +397,12 @@ export function uvLevel(value: number | undefined): UvLevel {
   return { label: 'Extreme', guidance: 'Avoid being outside in direct sun. Protection is essential.', className: 'uv-extreme' };
 }
 
-export function uvValue(value: number | undefined): string {
-  if (value === undefined || Number.isNaN(value)) return '—';
+export function uvValue(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—';
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-export function uvColor(value: number | undefined): string {
+export function uvColor(value: number | null | undefined): string {
   const level = uvLevel(value);
   if (level.className === 'uv-unavailable') return '#9aaab3';
   if (level.className === 'uv-low') return '#3fb98a';
@@ -332,8 +417,8 @@ export type AirLevel = {
   className: string;
 };
 
-export function airLevel(value: number | undefined): AirLevel {
-  if (value === undefined || Number.isNaN(value)) {
+export function airLevel(value: number | null | undefined): AirLevel {
+  if (value == null || Number.isNaN(value)) {
     return { label: 'Unavailable', guidance: 'Air-quality detail is unavailable right now.', className: 'air-unavailable' };
   }
   if (value <= 50) {
@@ -354,13 +439,13 @@ export function airLevel(value: number | undefined): AirLevel {
   return { label: 'Hazardous', guidance: 'Avoid outdoor activity where possible and follow local health guidance.', className: 'air-hazardous' };
 }
 
-export function pollutionValue(value: number | undefined): string {
-  if (value === undefined || Number.isNaN(value)) return '—';
+export function pollutionValue(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—';
   return value < 10 ? value.toFixed(1) : Math.round(value).toString();
 }
 
-export function airColor(value: number | undefined): string {
-  if (value === undefined || Number.isNaN(value)) return '#9aaab3';
+export function airColor(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '#9aaab3';
   if (value <= 50) return '#3fb98a';
   if (value <= 100) return '#e8b93f';
   if (value <= 150) return '#e8763f';
@@ -369,8 +454,8 @@ export function airColor(value: number | undefined): string {
   return '#7a1f1f';
 }
 
-export function airContext(value: number | undefined): string {
-  if (value === undefined || Number.isNaN(value)) return 'Air-quality context is unavailable right now.';
+export function airContext(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return 'Air-quality context is unavailable right now.';
   if (value <= 50) return 'Roughly equivalent to a normal day with light traffic nearby — no meaningful health risk today.';
   if (value <= 100) return 'A typical moderate day — most people can continue normal outdoor activities.';
   if (value <= 150) return 'Sensitive people may notice symptoms during longer periods of outdoor exertion.';
@@ -379,8 +464,8 @@ export function airContext(value: number | undefined): string {
   return 'Conditions are hazardous; avoid outdoor exposure and follow local health guidance.';
 }
 
-export function pollutantMeterColor(value: number | undefined, threshold: number): string {
-  if (value === undefined || Number.isNaN(value)) return '#9aaab3';
+export function pollutantMeterColor(value: number | null | undefined, threshold: number): string {
+  if (value == null || Number.isNaN(value)) return '#9aaab3';
   const ratio = value / threshold;
   if (ratio <= .7) return '#3fb98a';
   if (ratio <= 1) return '#e8b93f';

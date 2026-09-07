@@ -23,16 +23,16 @@ export function MicroClimateForecast({ weather, place, unit }: { weather: Weathe
   const regionalRainfall = weather.current?.precipitation;
   const modelTemperature = model?.current?.temperature_2m;
   const modelRainfall = model?.current?.precipitation;
-  const temperatureDeltaC = regionalTemperature !== undefined && modelTemperature !== undefined
+  const temperatureDeltaC = regionalTemperature != null && modelTemperature != null
     ? modelTemperature - regionalTemperature
     : undefined;
   const temperatureDelta = temperatureDeltaC === undefined
     ? undefined
     : unit === 'fahrenheit' ? temperatureDeltaC * 9 / 5 : temperatureDeltaC;
-  const rainfallDelta = regionalRainfall !== undefined && modelRainfall !== undefined
+  const rainfallDelta = regionalRainfall != null && modelRainfall != null
     ? modelRainfall - regionalRainfall
     : undefined;
-  const modelDistance = model?.latitude !== undefined && model.longitude !== undefined
+  const modelDistance = model?.latitude != null && model.longitude != null
     ? `UKV model grid: ${distanceKm(place.latitude, place.longitude, model.latitude, model.longitude).toFixed(1)} km away`
     : 'UKV model grid: unavailable';
   const modelValue = modelStatus === 'loading' ? 'Checking UKV…' : modelStatus === 'ready' ? 'Model grid' : 'Regional only';
@@ -51,8 +51,8 @@ export function MicroClimateForecast({ weather, place, unit }: { weather: Weathe
     {
       label: 'Rainfall now',
       icon: Droplets,
-      regional: regionalRainfall === undefined ? '—' : `${regionalRainfall.toFixed(1)} mm`,
-      nearby: modelStatus === 'loading' ? 'Checking…' : modelRainfall === undefined ? 'Regional only' : `${modelRainfall.toFixed(1)} mm`,
+      regional: regionalRainfall == null ? '—' : `${regionalRainfall.toFixed(1)} mm`,
+      nearby: modelStatus === 'loading' ? 'Checking…' : modelRainfall == null ? 'Regional only' : `${modelRainfall.toFixed(1)} mm`,
       delta: rainfallDelta,
       deltaText: signedDelta(rainfallDelta, ' mm grid'),
       notable: rainfallDelta !== undefined && Math.abs(rainfallDelta) >= .2,

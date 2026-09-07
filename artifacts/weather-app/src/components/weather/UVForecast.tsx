@@ -21,7 +21,8 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
   const peakLevel = uvLevel(peakUv);
   const peakHour = hourlyTimes.reduce<{ value: number; time?: string } | null>((best, time, index) => {
     const value = hourly.uv_index?.[index];
-    if (Date.parse(time) < currentTime || value === undefined || (best && value <= best.value)) return best;
+    if (value == null || Number.isNaN(value)) return best;
+    if (Date.parse(time) < currentTime || (best && value <= best.value)) return best;
     return { value, time };
   }, null);
 

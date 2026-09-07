@@ -4,6 +4,7 @@ import { CalendarDays } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
@@ -31,6 +32,7 @@ const queryClient = new QueryClient();
 const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 };
 
 function Home() {
+  const { toast } = useToast();
   const [place, setPlace] = useState<Place>(LONDON);
   const [weather, setWeather] = useState<WeatherPayload | null>(null);
   const [unit, setUnit] = useState<Unit>('celsius');
@@ -55,40 +57,45 @@ function Home() {
     }
   }, []);
 
-  const findMe = useCallback((useFallback = false) => {
+  const findMe = useCallback(() => {
     if (!navigator.geolocation) {
-      if (useFallback) {
-        void loadWeather(LONDON);
-      } else {
-        setError('Location services are not available in this browser.');
-      }
+      toast({ title: 'Location unavailable', description: 'This browser does not offer location services.' });
       return;
     }
-    if (useFallback) void loadWeather(LONDON);
     setIsLocating(true);
     setError('');
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       try {
-        const found = await reverseGeocode(coords.latitude, coords.longitude);
-        await loadWeather(found ?? { name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
+        // Coordinates are rounded to ~1 km before leaving the device
+        // (DAYMARK-SEC-002): every Daymark feature works at neighbourhood
+        // precision, so precise coordinates are never transmitted.
+        const latitude = Number(coords.latitude.toFixed(2));
+        const longitude = Number(coords.longitude.toFixed(2));
+        try {
+          const found = await reverseGeocode(latitude, longitude);
+          await loadWeather(found ?? { name: 'Your location', latitude, longitude });
+        } catch {
+          await loadWeather({ name: 'Your location', latitude, longitude });
+        } finally {
+          setIsLocating(false);
+        }
       } catch {
-        await loadWeather({ name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
-      } finally {
         setIsLocating(false);
       }
     }, () => {
       setIsLocating(false);
-      if (!useFallback) {
-        setError('We could not access your location. Please allow location access and try again.');
-      }
+      toast({ title: 'Location unavailable', description: "We couldn't access your location. Allow location access for this site and try again." });
     }, {
       enableHighAccuracy: false,
       maximumAge: 300000,
       timeout: 5000,
     });
-  }, [loadWeather]);
+  }, [loadWeather, toast]);
 
-  useEffect(() => { findMe(true); }, [findMe]);
+  // No location permission is requested on load (DAYMARK-SEC-002): the app
+  // opens on the default location and only asks when the user presses the
+  // location button.
+  useEffect(() => { void loadWeather(LONDON); }, [loadWeather]);
 
   const weatherState = weather?.current ?? {};
   const updatedLabel = useMemo(() => {
@@ -104,7 +111,7 @@ function Home() {
     : [];
   const upcomingPrecipitation = upcomingIndexes
     .map((index) => weather?.hourly?.precipitation_probability?.[index])
-    .filter((value): value is number => value !== undefined && !Number.isNaN(value));
+    .filter((value): value is number => value != null && !Number.isNaN(value));
   const peakPrecipitation = upcomingPrecipitation.length
     ? Math.max(...upcomingPrecipitation)
     : weather?.daily?.precipitation_probability_max?.[0];
