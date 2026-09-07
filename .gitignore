@@ -46,6 +46,26 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# Local test/coverage output
+/test-results/
+/playwright-report/
+/coverage/
+*.local
+
+# Internal audit/reports kept locally, not for publication
+/SECURITY-AUDIT.md
+/RELEASE-READINESS.md
+/FINAL-SECURITY-AUDIT.md
+/PUBLIC-REPO-READINESS.md
+
+# Android signing material (future TWA work)
+*.keystore
+*.jks
+keystore.properties
+signing.properties
+*.pem
+*.p12
+
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 

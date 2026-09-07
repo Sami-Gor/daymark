@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+        env:
+          PORT: 5173
+          BASE_PATH: /
+
+      - name: Unit tests
+        run: pnpm --filter @workspace/weather-app run test
+
+      - name: Install Playwright browser
+        run: pnpm --filter @workspace/weather-app exec playwright install chromium --with-deps
+
+      - name: Browser tests
+        run: pnpm --filter @workspace/weather-app run test:e2e
+        env:
+          PORT: 5173
+          BASE_PATH: /
+          CI: 1
+
+      # Fail on criticals; highs in dev-only chains (e.g. vite tooling) are
+      # tolerated — verify reachability before bumping this to high.
+      - name: Dependency audit
+        run: pnpm audit --audit-level critical
