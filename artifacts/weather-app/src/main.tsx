@@ -15,3 +15,13 @@ createRoot(document.getElementById('root')!, {
     <App />
   </ErrorBoundary>,
 );
+
+// PWA: register the app-shell service worker in production builds only.
+// BASE_URL keeps the scope correct under any BASE_PATH deployment.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      // The service worker is a progressive enhancement; ignore failures.
+    });
+  });
+}

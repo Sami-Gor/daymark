@@ -1,9 +1,35 @@
 import path from 'path';
+import fs from 'node:fs';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type PluginOption } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
+
+// The hand-written public/sw.js contains a "__PRECACHE_ASSETS__" placeholder.
+// After the build writes dist, patch it with the real hashed asset list so the
+// service worker can precache the full app shell for offline use.
+function swPrecache(): PluginOption {
+  return {
+    name: 'daymark-sw-precache',
+    apply: 'build',
+    closeBundle() {
+      const outDir = path.resolve(import.meta.dirname, 'dist/public');
+      const swPath = path.join(outDir, 'sw.js');
+      const assetsDir = path.join(outDir, 'assets');
+      if (!fs.existsSync(swPath) || !fs.existsSync(assetsDir)) return;
+      const assets = fs
+        .readdirSync(assetsDir)
+        .filter((file) => /\.(js|css)$/.test(file))
+        .map((file) => `./assets/${file}`);
+      const source = fs.readFileSync(swPath, 'utf8').replace(
+        '"__PRECACHE_ASSETS__"',
+        JSON.stringify(['./index.html', ...assets]),
+      );
+      fs.writeFileSync(swPath, source);
+    },
+  };
+}
 
 // Replit injects PORT and BASE_PATH; fall back to local dev defaults when absent.
 const rawPort = process.env.PORT ?? '5173';
@@ -19,6 +45,7 @@ const basePath = process.env.BASE_PATH ?? '/';
 export default defineConfig({
   base: basePath,
   plugins: [
+    swPrecache(),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),

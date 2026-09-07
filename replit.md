@@ -19,7 +19,8 @@ A client-side weather app: current conditions, hourly/daily forecast, UV, air qu
 
 ## Where things live
 
-- `artifacts/weather-app` — the Daymark app; all UI and weather logic in `src/App.tsx`, theme in `src/index.css`
+- `artifacts/weather-app` — the Daymark app; UI in `src/App.tsx` + `src/components/weather/`, weather logic in `src/lib/weather.ts`, theme in `src/index.css`
+- `artifacts/weather-app/public` — PWA assets: `manifest.webmanifest`, `sw.js` (app-shell cache; build injects hashed assets via the `swPrecache` plugin in `vite.config.ts`), icons, favicon
 - `artifacts/mockup-sandbox` — component design sandbox for redesign mockups (dev-only, never deployed)
 - `scripts/` — workspace tooling placeholder; `scripts/post-merge.sh` refreshes installs on merge
 

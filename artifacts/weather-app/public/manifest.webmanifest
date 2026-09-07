@@ -1,0 +1,31 @@
+{
+  "name": "Daymark — weather, simply",
+  "short_name": "Daymark",
+  "description": "A calm, readable weather forecast: current conditions, an hourly outlook, the week ahead, UV index, and air quality — powered by Open-Meteo.",
+  "id": "./",
+  "start_url": ".",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#e7f2f7",
+  "background_color": "#e7f2f7",
+  "lang": "en",
+  "categories": ["weather"],
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
