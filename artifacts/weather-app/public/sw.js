@@ -13,7 +13,8 @@
  */
 const CACHE_NAME = "daymark-shell-v1";
 const PRECACHE_ASSETS = "__PRECACHE_ASSETS__"; // replaced with the built, hashed asset list by vite.config.ts
-const SHELL_ASSETS = [
+// Dedupe: cache.addAll() rejects if the same URL appears twice.
+const SHELL_ASSETS = [...new Set([
   "./",
   "./index.html",
   "./manifest.webmanifest",
@@ -23,7 +24,7 @@ const SHELL_ASSETS = [
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
   ...PRECACHE_ASSETS,
-];
+])];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
