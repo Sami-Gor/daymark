@@ -12,7 +12,7 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
   const fallbackStart = Math.max(0, hourlyTimes.findIndex((time) => Date.parse(time) >= currentTime));
   const daylightStart = firstDaylightIndex >= 0 ? firstDaylightIndex : fallbackStart;
   const hourIndexes = Array.from(
-    { length: Math.min(10, Math.max(0, hourlyTimes.length - daylightStart)) },
+    { length: Math.min(5, Math.max(0, hourlyTimes.length - daylightStart)) },
     (_, index) => daylightStart + index,
   );
   const currentUv = current.uv_index;
@@ -33,56 +33,40 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
         <span className="section-meta">UV forecast</span>
       </div>
       <div className="panel uv-panel" data-testid="panel-uv-forecast">
-        <div className="uv-compact-summary">
-          <div className="uv-score-block" role="img" aria-label={`Current UV index ${uvValue(currentUv)}`}>
-            <span className="uv-kicker">Current UV index</span>
+        <div className="uv-hero">
+          <div className="uv-now" role="img" aria-label={`Current UV index ${uvValue(currentUv)}, ${currentLevel.label}`}>
+            <span className="uv-kicker">Current UV</span>
             <div className="uv-score-line">
               <strong className={currentLevel.className} data-testid="text-current-uv">{uvValue(currentUv)}</strong>
               <div className={`uv-badge ${currentLevel.className}`}>{currentLevel.label}</div>
             </div>
+            <p className="uv-advice">{currentLevel.guidance}</p>
           </div>
-          <div className="uv-summary-copy">
-            <p>{currentLevel.guidance}</p>
-            <small>Protection advice updates with the daylight.</small>
-          </div>
-          <div className="uv-peak">
+          <div className="uv-peak-inline" role="img" aria-label={`Today's peak UV ${uvValue(peakUv)} ${peakLevel.label}${peakHour?.time ? ` around ${timeLabel(peakHour.time)}` : ''}`}>
             <span>Today’s peak</span>
-            <strong>{uvValue(peakUv)} <em>{peakLevel.label}</em></strong>
+            <strong className={peakLevel.className}>{uvValue(peakUv)}</strong>
             {peakHour?.time && <small>around {timeLabel(peakHour.time)}</small>}
           </div>
-          <div className="uv-range" role="img" aria-label="UV index protection range from 0 to 11 plus">
-            <div className="uv-range-heading"><span>Protection range</span><span>0—11+</span></div>
-            <div className="uv-scale">
-              <div className="uv-scale-segment uv-scale-low" />
-              <div className="uv-scale-segment uv-scale-moderate" />
-              <div className="uv-scale-segment uv-scale-high" />
-              <div className="uv-scale-segment uv-scale-extreme" />
-              <i className="uv-scale-marker" style={{ left: `${Math.min(100, Math.max(0, ((currentUv ?? 0) / 11) * 100))}%`, background: uvColor(currentUv) }} />
-            </div>
-            <div className="uv-range-labels"><span>Low</span><span>Moderate</span><span>High</span><span>Very high+</span></div>
+        </div>
+
+        <div className="uv-subheading"><span>By hour</span><span>index</span></div>
+        {hourIndexes.length ? (
+          <div className="uv-hours" data-testid="list-hourly-uv" role="group" aria-label="Hourly UV index forecast" tabIndex={0}>
+            {hourIndexes.map((index, itemIndex) => {
+              const value = hourly.uv_index?.[index];
+              return (
+                <div className={`uv-hour${itemIndex === 0 ? ' uv-hour-current' : ''}`} key={`${hourlyTimes[index]}-${index}`} data-testid={`uv-hour-${index}`}>
+                  <span>{itemIndex === 0 ? 'Now' : timeLabel(hourlyTimes[index])}</span>
+                  <strong style={{ color: uvColor(value) }}>{uvValue(value)}</strong>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        ) : (
+          <p className="uv-empty">Hourly UV detail is unavailable right now.</p>
+        )}
 
-        <div className="uv-timeline-wrap">
-          <div className="uv-subheading"><span>Today by hour</span><span>index</span></div>
-          {hourIndexes.length ? (
-            <div className="uv-hour-strip" data-testid="list-hourly-uv" role="img" aria-label="Hourly UV index forecast" tabIndex={0}>
-              {hourIndexes.map((index, itemIndex) => {
-                const value = hourly.uv_index?.[index];
-                return (
-                  <div className={`uv-hour${itemIndex === 0 ? ' uv-hour-current' : ''}`} key={`${hourlyTimes[index]}-${index}`} data-testid={`uv-hour-${index}`}>
-                    <span>{itemIndex === 0 ? 'Now' : timeLabel(hourlyTimes[index])}</span>
-                    <strong style={{ color: uvColor(value) }}>{uvValue(value)}</strong>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="uv-empty">Hourly UV detail is unavailable right now.</p>
-          )}
-        </div>
-
-        <div className="uv-days-wrap" tabIndex={0} role="group" aria-label="3-day UV outlook, scrolls horizontally">
+        <div className="uv-days-wrap" tabIndex={0} role="group" aria-label="3-day UV outlook">
           <div className="uv-subheading"><span>3-day outlook</span><span>peak index</span></div>
           <div className="uv-days" data-testid="list-daily-uv">
             {(daily.time ?? []).slice(0, 3).map((day, index) => {
@@ -91,21 +75,15 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
               return (
                 <div className="uv-day" key={day} data-testid={`row-uv-${index}`}>
                   <span className="uv-day-name">{shortDay(day, index)}</span>
-                  <span className={`uv-day-score ${level.className}`}>{uvValue(value)}</span>
-                  <div className="uv-day-meter">
-                    <div className={`uv-day-fill ${level.className}`} style={{ height: `${Math.max(4, Math.min(100, ((value ?? 0) / 11) * 100))}%` }} />
-                  </div>
+                  <strong className={`uv-day-score ${level.className}`}>{uvValue(value)}</strong>
                   <span className="uv-day-level">{level.label}</span>
+                  <span className="uv-day-bar" aria-hidden="true">
+                    <i style={{ width: `${Math.max(4, Math.min(100, ((value ?? 0) / 11) * 100))}%`, background: uvColor(value) }} />
+                  </span>
                 </div>
               );
             })}
           </div>
-        </div>
-        <div className="uv-legend">
-          <span><i className="legend-low" />Low</span>
-          <span><i className="legend-moderate" />Moderate</span>
-          <span><i className="legend-high" />High</span>
-          <span><i className="legend-extreme" />Very high+</span>
         </div>
       </div>
     </section>

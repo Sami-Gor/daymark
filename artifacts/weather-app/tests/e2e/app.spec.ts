@@ -148,7 +148,7 @@ test.describe('functional', () => {
   test('renders hourly, 3-day forecast, 3-day UV, air quality, and micro-climate', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.goto('/');
-    await expect(page.getByTestId('list-hourly-forecast').locator('.hour-card')).toHaveCount(12);
+    await expect(page.getByTestId('list-hourly-forecast').locator('.hour-card')).toHaveCount(5);
     await expect(page.getByTestId('list-daily-forecast').locator('.day-row')).toHaveCount(3);
     await expect(page.getByTestId('list-daily-uv').locator('.uv-day')).toHaveCount(3);
     await expect(page.getByTestId('panel-air-quality')).toBeVisible();

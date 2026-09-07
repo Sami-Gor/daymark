@@ -6,7 +6,8 @@ export function HourlyOutlook({ weather, unit }: { weather: WeatherPayload; unit
   const times = hourly.time ?? [];
   const currentTime = weather.current?.time ? Date.parse(weather.current.time) : Date.now();
   const start = Math.max(0, times.findIndex((time) => Date.parse(time) >= currentTime));
-  const indexes = Array.from({ length: Math.min(12, times.length - start) }, (_, index) => start + index);
+  // NOW + the next 4 hours (5 entries), from the current forecast time onward.
+  const indexes = Array.from({ length: Math.min(5, times.length - start) }, (_, index) => start + index);
   return (
     <section aria-labelledby="hourly-title">
       <div className="section-heading">
