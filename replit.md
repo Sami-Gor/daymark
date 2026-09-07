@@ -4,10 +4,10 @@ A client-side weather app: current conditions, hourly/daily forecast, UV, air qu
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/weather-app run dev` — run the weather app (Vite dev server; requires `PORT` and `BASE_PATH` env vars)
+- `pnpm --filter @workspace/weather-app run dev` — run the weather app (Vite dev server, http://localhost:5173; Replit injects its own `PORT`/`BASE_PATH`)
 - `pnpm run typecheck` — typecheck all packages
 - `pnpm run build` — typecheck + build all packages
-- Local build needs env: `PORT=5000 BASE_PATH=/` (Replit injects these in workspaces)
+- Local build defaults to `PORT=5173 BASE_PATH=/` when env vars are absent (Replit injects its own values)
 - No backend, database, or server env vars required — the app calls Open-Meteo directly from the browser
 
 ## Stack
