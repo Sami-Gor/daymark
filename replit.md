@@ -1,28 +1,27 @@
-# [Project name]
+# Daymark
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A client-side weather app: current conditions, hourly/daily forecast, UV, air quality, and a hyperlocal micro-climate comparison, powered by Open-Meteo.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm --filter @workspace/weather-app run dev` — run the weather app (Vite dev server; requires `PORT` and `BASE_PATH` env vars)
+- `pnpm run typecheck` — typecheck all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Local build needs env: `PORT=5000 BASE_PATH=/` (Replit injects these in workspaces)
+- No backend, database, or server env vars required — the app calls Open-Meteo directly from the browser
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Frontend: React 19 + Vite 7 + Tailwind CSS 4, wouter router, TanStack Query provider
+- Data: Open-Meteo APIs (forecast, air quality, geocoding) — direct browser calls, no key required
+- Optional env (documented, not yet consumed): `VITE_PURPLEAIR_API_KEY`
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/weather-app` — the Daymark app; all UI and weather logic in `src/App.tsx`, theme in `src/index.css`
+- `artifacts/mockup-sandbox` — component design sandbox for redesign mockups (dev-only, never deployed)
+- `scripts/` — workspace tooling placeholder; `scripts/post-merge.sh` refreshes installs on merge
 
 ## Architecture decisions
 
