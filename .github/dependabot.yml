@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # App + tooling dependencies (pnpm lockfile at the repo root)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+    commit-message:
+      prefix: chore
+
+  # Keep GitHub Actions workflow versions current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci

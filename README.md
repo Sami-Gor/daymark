@@ -25,7 +25,12 @@ The design is editorial rather than dashboard-like — a serif-led hero with pla
 
 **Responsive, mobile-first** — the full page at 390px:
 
-![Daymark on mobile](docs/images/daymark-mobile.png)
+<details>
+<summary><strong>View the full mobile page</strong></summary>
+
+<p align="center"><img src="docs/images/daymark-mobile.png" width="320" alt="Daymark's full mobile layout at 390px"></p>
+
+</details>
 
 **Matched forecast pair** — the next five hours beside the 3-day outlook:
 
