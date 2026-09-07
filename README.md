@@ -2,7 +2,7 @@
 
 A calm, privacy-conscious weather PWA built with React, Vite, TypeScript, and [Open-Meteo](https://open-meteo.com).
 
-![Daymark on desktop](docs/screenshot-desktop.png)
+![Daymark on desktop](docs/images/daymark-desktop.png)
 
 ## Overview
 
@@ -18,6 +18,26 @@ Daymark answers one question well — *what's the sky doing?* — without dashbo
 - **Your micro-climate** — a nearby high-resolution model grid point compared against the regional forecast
 - **Dew point & comfort** — alongside humidity, because dew point is what your skin actually feels
 - **°C / °F toggle**, graceful offline shell, and installable as an app (PWA)
+
+## Interface
+
+The design is editorial rather than dashboard-like — a serif-led hero with plain-English advice cards, matched forecast cards, and compact feature sections that each keep their own personality.
+
+**Responsive, mobile-first** — the full page at 390px:
+
+![Daymark on mobile](docs/images/daymark-mobile.png)
+
+**Matched forecast pair** — the next five hours beside the 3-day outlook:
+
+![Forecast cards](docs/images/daymark-forecast.png)
+
+**Sun on your skin** — current UV with advice, today's peak, the next five hours, and a 3-day outlook:
+
+![UV section](docs/images/daymark-uv.png)
+
+**Air around you** — live AQI with plain-English context and pollutant readings:
+
+![Air quality section](docs/images/daymark-air-quality.png)
 
 ## Tech stack
 
@@ -96,7 +116,7 @@ artifacts/
     src/fonts/            self-hosted fonts + licences
     tests/e2e/            Playwright suite
   mockup-sandbox/         local design sandbox (never deployed)
-docs/                     screenshot
+docs/                     README screenshots
 scripts/                  workspace tooling
 ```
 
