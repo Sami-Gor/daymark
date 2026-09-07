@@ -27,7 +27,7 @@ export function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
         {airQuality ? (
           <>
             <div className="air-compact-summary">
-              <div className="air-score-block" aria-label={`Current US AQI ${pollutionValue(current.us_aqi)}`}>
+              <div className="air-score-block" role="img" aria-label={`Current US AQI ${pollutionValue(current.us_aqi)}`}>
                 <span className="air-kicker">Current US AQI</span>
                 <div className="air-score-line">
                   <strong data-testid="text-current-aqi" style={{ color: airColor(current.us_aqi) }}>{pollutionValue(current.us_aqi)}</strong>
@@ -38,14 +38,14 @@ export function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
                 <p>{level.guidance}</p>
                 <small>Updated with your local forecast</small>
               </div>
-              <div className="air-range" aria-label="AQI comparison range from 0 to 150">
+              <div className="air-range" role="img" aria-label="AQI comparison range from 0 to 150">
                 <div className="air-range-heading"><span>Quality range</span><span>0—150</span></div>
                 <div className="air-scale">
                   <div className="air-scale-segment air-scale-good" />
                   <div className="air-scale-segment air-scale-moderate" />
                   <div className="air-scale-segment air-scale-sensitive" />
                   {comparisonMarkers.map((marker) => (
-                    <div className={`air-marker ${marker.className}`} key={marker.label} style={{ left: `${marker.position}%` }} aria-label={`${marker.label}: ${pollutionValue(marker.value)}`}>
+                    <div className={`air-marker ${marker.className}`} key={marker.label} style={{ left: `${marker.position}%` }} role="img" aria-label={`${marker.label}: ${pollutionValue(marker.value)}`}>
                       <i style={{ background: marker.color }} />
                     </div>
                   ))}
@@ -59,7 +59,7 @@ export function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
                   <span className="air-stat-label">{stat.label}</span>
                   <strong>{pollutionValue(stat.value)}<em>{stat.unit}</em></strong>
                   <small>{stat.sub}</small>
-                  <div className="air-stat-meter" aria-label={`${stat.label} relative to guideline`}>
+                  <div className="air-stat-meter" role="img" aria-label={`${stat.label} relative to guideline`}>
                     <div style={{ width: `${Math.min(100, ((stat.value ?? 0) / stat.threshold) * 100)}%`, background: pollutantMeterColor(stat.value, stat.threshold) }} />
                   </div>
                 </div>

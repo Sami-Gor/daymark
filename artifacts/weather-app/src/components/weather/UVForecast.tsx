@@ -34,7 +34,7 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
       </div>
       <div className="panel uv-panel" data-testid="panel-uv-forecast">
         <div className="uv-compact-summary">
-          <div className="uv-score-block" aria-label={`Current UV index ${uvValue(currentUv)}`}>
+          <div className="uv-score-block" role="img" aria-label={`Current UV index ${uvValue(currentUv)}`}>
             <span className="uv-kicker">Current UV index</span>
             <div className="uv-score-line">
               <strong className={currentLevel.className} data-testid="text-current-uv">{uvValue(currentUv)}</strong>
@@ -50,7 +50,7 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
             <strong>{uvValue(peakUv)} <em>{peakLevel.label}</em></strong>
             {peakHour?.time && <small>around {timeLabel(peakHour.time)}</small>}
           </div>
-          <div className="uv-range" aria-label="UV index protection range from 0 to 11 plus">
+          <div className="uv-range" role="img" aria-label="UV index protection range from 0 to 11 plus">
             <div className="uv-range-heading"><span>Protection range</span><span>0—11+</span></div>
             <div className="uv-scale">
               <div className="uv-scale-segment uv-scale-low" />
@@ -66,7 +66,7 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
         <div className="uv-timeline-wrap">
           <div className="uv-subheading"><span>Today by hour</span><span>index</span></div>
           {hourIndexes.length ? (
-            <div className="uv-hour-strip" data-testid="list-hourly-uv" aria-label="Hourly UV index forecast">
+            <div className="uv-hour-strip" data-testid="list-hourly-uv" role="img" aria-label="Hourly UV index forecast" tabIndex={0}>
               {hourIndexes.map((index, itemIndex) => {
                 const value = hourly.uv_index?.[index];
                 return (
@@ -82,7 +82,7 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
           )}
         </div>
 
-        <div className="uv-days-wrap">
+        <div className="uv-days-wrap" tabIndex={0} role="group" aria-label="3-day UV outlook, scrolls horizontally">
           <div className="uv-subheading"><span>3-day outlook</span><span>peak index</span></div>
           <div className="uv-days" data-testid="list-daily-uv">
             {(daily.time ?? []).slice(0, 3).map((day, index) => {

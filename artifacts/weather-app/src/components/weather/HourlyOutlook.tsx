@@ -13,7 +13,7 @@ export function HourlyOutlook({ weather, unit }: { weather: WeatherPayload; unit
         <h2 className="section-title" id="hourly-title">The next few hours</h2>
         <span className="section-meta">hour by hour</span>
       </div>
-      <div className="panel hourly-scroll" data-testid="list-hourly-forecast">
+      <div className="panel hourly-scroll" data-testid="list-hourly-forecast" tabIndex={0} role="group" aria-label="Hourly forecast, scrolls horizontally">
         {indexes.length ? indexes.map((index, itemIndex) => {
           const code = hourly.weather_code?.[index] ?? 0;
           const Icon = weatherIcon(code, true);

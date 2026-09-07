@@ -42,10 +42,44 @@ if (Number.isNaN(port) || port <= 0) {
 
 const basePath = process.env.BASE_PATH ?? '/';
 
+// Security headers served by `vite preview` so the production-like local
+// environment can be tested end-to-end. Must stay in sync with
+// public/_headers, which carries the same set for Cloudflare Pages/Netlify
+// hosting. style-src 'unsafe-inline' is required by React style attributes
+// (data-driven meter positioning); scripts remain 'self' only.
+const securityHeaders: Record<string, string> = {
+  'Content-Security-Policy':
+    "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.open-meteo.com https://air-quality-api.open-meteo.com https://geocoding-api.open-meteo.com; manifest-src 'self'; upgrade-insecure-requests",
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'geolocation=(self), camera=(), microphone=()',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
+};
+
+// `preview.headers` is not honored by Vite, so the headers are applied
+// through the preview-server middleware hook instead.
+function previewSecurityHeaders(): PluginOption {
+  return {
+    name: 'daymark-preview-security-headers',
+    apply: 'serve',
+    configurePreviewServer(server) {
+      server.middlewares.use((_req, res, next) => {
+        for (const [name, value] of Object.entries(securityHeaders)) {
+          res.setHeader(name, value);
+        }
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
     swPrecache(),
+    previewSecurityHeaders(),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),

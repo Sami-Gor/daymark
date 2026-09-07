@@ -85,7 +85,7 @@
   --secondary: 48 94% 67%;
   --secondary-foreground: 35 45% 19%;
   --muted: 194 36% 88%;
-  --muted-foreground: 208 24% 44%;
+  --muted-foreground: 208 24% 38%;
   --accent: 17 72% 62%;
   --accent-foreground: 20 48% 17%;
   --destructive: 2 66% 51%;
@@ -450,7 +450,7 @@
 .dew-point-label strong { color: hsl(var(--foreground)); font-family: var(--app-font-serif); font-size: 13px; font-weight: 600; }
 .dew-point-info { display: inline-flex; color: hsl(var(--primary)); cursor: help; }
 .dew-pill { display: inline-flex; padding: 3px 7px; border-radius: 999px; font-family: var(--app-font-mono); font-size: 9px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; }
-.dew-dry, .dew-comfortable { color: hsl(157 46% 35%); background: hsl(157 48% 78% / .42); }
+.dew-dry, .dew-comfortable { color: hsl(157 46% 28%); background: hsl(157 48% 78% / .42); }
 .dew-noticeable { color: hsl(37 71% 35%); background: hsl(44 88% 67% / .58); }
 .dew-humid { color: hsl(21 71% 37%); background: hsl(25 85% 67% / .6); }
 .dew-oppressive { color: hsl(9 69% 38%); background: hsl(10 77% 67% / .58); }

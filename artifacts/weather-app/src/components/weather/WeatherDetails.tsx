@@ -29,7 +29,7 @@ export function WeatherDetails({ weather, unit }: { weather: WeatherPayload; uni
               {humidityDewPoint ? (
                 <div className="dew-point" data-testid="detail-dew-point">
                   <span className="dew-point-label">
-                    <span className="dew-point-info" title="Dew point measures how humid the air actually feels — more reliable than relative humidity alone." aria-label="About dew point"><Info size={11} strokeWidth={1.8} /></span>
+                    <span className="dew-point-info" role="img" title="Dew point measures how humid the air actually feels — more reliable than relative humidity alone." aria-label="About dew point"><Info size={11} strokeWidth={1.8} /></span>
                     Dew point <strong>{humidityDewPoint.value}</strong>
                   </span>
                   <span className={`dew-pill ${humidityDewPoint.comfort.className}`}>{humidityDewPoint.comfort.label}</span>

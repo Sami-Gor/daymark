@@ -9,7 +9,7 @@ export function TopBar({ unit, onUnitChange, onFindMe, isLocating }: {
 }) {
   return (
     <header className="topbar">
-      <div className="brand" aria-label="Daymark weather">
+      <div className="brand">
         <div className="brand-mark"><CloudSun size={21} strokeWidth={1.8} /></div>
         <div><div className="brand-name">daymark</div><div className="brand-note">weather, simply</div></div>
       </div>
