@@ -82,9 +82,9 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
         </div>
 
         <div className="uv-days-wrap">
-          <div className="uv-subheading"><span>7-day outlook</span><span>peak index</span></div>
+          <div className="uv-subheading"><span>3-day outlook</span><span>peak index</span></div>
           <div className="uv-days" data-testid="list-daily-uv">
-            {(daily.time ?? []).slice(0, 7).map((day, index) => {
+            {(daily.time ?? []).slice(0, 3).map((day, index) => {
               const value = daily.uv_index_max?.[index];
               const level = uvLevel(value);
               return (
