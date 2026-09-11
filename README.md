@@ -53,7 +53,7 @@ The design is editorial rather than dashboard-like — a serif-led hero with pla
 - [React 19](https://react.dev) + [TypeScript](https://www.typescriptlang.org) + [Vite 7](https://vite.dev)
 - [Tailwind CSS 4](https://tailwindcss.com) with a hand-written design layer (Fraunces, Plus Jakarta Sans, DM Mono — self-hosted)
 - [Zod](https://zod.dev) for runtime validation of every API response
-- [wouter](https://github.com/molefrog/wouter) for routing, [TanStack Query](https://tanstack.com/query) provider, [Radix](https://www.radix-ui.com) primitives
+- [wouter](https://github.com/molefrog/wouter) for routing and [Radix](https://www.radix-ui.com) primitives
 - Typed English/French/Spanish dictionaries (no i18n dependency) and the browser Web Speech APIs for optional voice
 - pnpm workspaces; Vitest + Playwright for tests
 
@@ -72,7 +72,7 @@ All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifact
 - **Geolocation is never requested on load.** The app opens on a default location (London) and only touches the Geolocation API when you press *Use my location*
 - **Coordinates are rounded to 2 decimals (~1 km) before leaving your device**, then sent only to Open-Meteo endpoints
 - **Nothing else is persisted** — only your language preference (`daymark.locale`) is kept locally; no location, queries, transcripts, cookies, IndexedDB or other storage
-- **No analytics or third-party trackers** — the only external requests are to the three Open-Meteo API hosts (plus the attribution link in the footer)
+- **No analytics or third-party trackers** — weather and location-search data go only to the Open-Meteo API hosts (plus the attribution link in the footer); optional voice input is handled by your browser or device and may use its speech service, but Daymark itself never stores transcripts
 - Fonts are self-hosted; no CDN font requests
 
 ## Weather data source
@@ -139,7 +139,7 @@ scripts/                  workspace tooling
 ## Known limitations
 
 - Unit preference (°C/°F) is not persisted across reloads (the language preference is)
-- The micro-climate comparison uses the UKV model and is hidden outside the UK/near continent, where that model is not valid
+- The Regional comparison uses the UKV model and is hidden outside the UK/near continent, where that model is not valid
 - Severe-weather risks are forecast-derived Daymark estimates, **not** official warnings
 - Voice input/output require browser Web Speech support and matching platform voices; unsupported browsers hide those controls
 - Air-quality "nearby sensor" comparison is not yet wired to a sensor network; the regional forecast is shown
