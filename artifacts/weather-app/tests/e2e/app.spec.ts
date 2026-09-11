@@ -1954,8 +1954,10 @@ test.describe('mobile layout', () => {
     await expect(page.getByTestId('location-option-0')).toBeVisible();
     const field = await page.locator('.location-search-field').boundingBox();
     const panel = await page.getByTestId('location-results').boundingBox();
+    const viewportWidth = await page.evaluate(() => window.innerWidth);
     expect(Math.abs(panel!.x - field!.x), 'panel left alignment').toBeLessThanOrEqual(1);
     expect(Math.abs(panel!.width - field!.width), 'panel width alignment').toBeLessThanOrEqual(1);
-    expect(panel!.x + panel!.width, 'panel right edge').toBeLessThanOrEqual(320.5);
+    expect(panel!.x, 'panel left inset').toBeGreaterThanOrEqual(15.5);
+    expect(panel!.x + panel!.width, 'panel right inset').toBeLessThanOrEqual(viewportWidth - 16 + 0.5);
   });
 });
