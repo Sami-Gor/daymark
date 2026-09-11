@@ -109,7 +109,7 @@ test.describe('functional', () => {
       expect(url).toContain('longitude=-0.13');
       expect(url).not.toContain('5074567');
     }
-    expect(requests.filter((url) => url.includes('geocoding-api.open-meteo.com'))).toEqual([]);
+    expect(requests.filter((url) => new URL(url).hostname === 'geocoding-api.open-meteo.com')).toEqual([]);
     await context.close();
   });
 
@@ -1926,7 +1926,7 @@ test.describe('geolocation flow', () => {
     await stubDeferredGeolocation(page);
     const geocodingRequests: string[] = [];
     page.on('request', (request) => {
-      if (request.url().includes('geocoding-api.open-meteo.com')) geocodingRequests.push(request.url());
+      if (new URL(request.url()).hostname === 'geocoding-api.open-meteo.com') geocodingRequests.push(request.url());
     });
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
@@ -1941,7 +1941,7 @@ test.describe('geolocation flow', () => {
     await page.getByTestId('input-location-search').fill('paris');
     await page.getByTestId('location-option-0').click();
     await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
-    expect(geocodingRequests.some((url) => url.includes('name=')), 'typed search still uses geocoding').toBe(true);
+    expect(geocodingRequests.some((url) => new URL(url).searchParams.has('name')), 'typed search still uses geocoding').toBe(true);
   });
 
   test('loading clears after denied, unavailable and timeout errors', async ({ page }) => {
