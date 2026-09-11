@@ -11,7 +11,7 @@
  * precaches the fresh shell, skipWaiting/claim activate it promptly, and
  * activate deletes every older cache, so stale shells cannot linger.
  */
-const CACHE_NAME = "daymark-shell-v1";
+const CACHE_NAME = "daymark-shell-v1.1";
 const PRECACHE_ASSETS = "__PRECACHE_ASSETS__"; // replaced with the built, hashed asset list by vite.config.ts
 // Dedupe: cache.addAll() rejects if the same URL appears twice.
 const SHELL_ASSETS = [...new Set([

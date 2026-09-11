@@ -10,13 +10,22 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { z } from 'zod';
+import { formatDecimal, translate, type Locale } from './i18n';
 
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const AIR_QUALITY_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 export type Unit = 'celsius' | 'fahrenheit';
-export type Place = { name: string; country?: string; admin1?: string; latitude: number; longitude: number };
+export type Place = {
+  name: string;
+  country?: string;
+  admin1?: string;
+  latitude: number;
+  longitude: number;
+  countryCode?: string;
+  timezone?: string;
+};
 
 /*
  * Open-Meteo responses are untrusted third-party data, so every response is
@@ -59,6 +68,9 @@ const WeatherResponseSchema = z
   .object({
     latitude: nullableNumber,
     longitude: nullableNumber,
+    timezone: z.string().nullish(),
+    timezone_abbreviation: z.string().nullish(),
+    utc_offset_seconds: nullableNumber,
     current: z
       .object({
         time: z.string().nullish(),
@@ -69,6 +81,11 @@ const WeatherResponseSchema = z
         cloud_cover: nullableNumber,
         weather_code: nullableNumber,
         uv_index: nullableNumber,
+        wind_speed_10m: nullableNumber,
+        wind_gusts_10m: nullableNumber,
+        rain: nullableNumber,
+        showers: nullableNumber,
+        snowfall: nullableNumber,
       })
       .passthrough()
       .nullish(),
@@ -79,6 +96,13 @@ const WeatherResponseSchema = z
         precipitation_probability: numberArray,
         weather_code: numberArray,
         uv_index: numberArray,
+        precipitation: numberArray,
+        rain: numberArray,
+        showers: numberArray,
+        snowfall: numberArray,
+        wind_speed_10m: numberArray,
+        wind_gusts_10m: numberArray,
+        apparent_temperature: numberArray,
       })
       .passthrough()
       .nullish(),
@@ -92,6 +116,9 @@ const WeatherResponseSchema = z
         sunrise: stringArray,
         sunset: stringArray,
         uv_index_max: numberArray,
+        precipitation_sum: numberArray,
+        snowfall_sum: numberArray,
+        wind_gusts_10m_max: numberArray,
       })
       .passthrough()
       .nullish(),
@@ -123,6 +150,8 @@ const GeocodingResponseSchema = z.object({
           longitude: z.number(),
           admin1: z.string().optional(),
           country: z.string().optional(),
+          country_code: z.string().optional(),
+          timezone: z.string().optional(),
         })
         .passthrough(),
     )
@@ -154,11 +183,12 @@ function isTimeoutError(error: unknown): boolean {
   );
 }
 
-async function getJson<T>(url: string, schema: z.ZodType<T>): Promise<T> {
+async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url, { signal: requestSignal() });
+    response = await fetch(url, { signal: signal ?? requestSignal() });
   } catch (error) {
+    if (signal?.aborted) throw error; // caller cancelled (e.g. a newer search); let it propagate
     if (isTimeoutError(error)) {
       throw new Error('The weather service took too long to respond.');
     }
@@ -182,13 +212,12 @@ export async function fetchWeather(place: Place): Promise<WeatherPayload> {
   const weatherParams = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,cloud_cover,weather_code,wind_speed_10m,wind_direction_10m,uv_index,uv_index_clear_sky',
-    hourly: 'temperature_2m,precipitation_probability,weather_code,wind_speed_10m,uv_index,uv_index_clear_sky',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset,uv_index_max,uv_index_clear_sky_max',
+    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,cloud_cover,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,uv_index_clear_sky',
+    hourly: 'temperature_2m,apparent_temperature,precipitation,rain,showers,snowfall,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m,uv_index,uv_index_clear_sky',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,sunrise,sunset,uv_index_max,uv_index_clear_sky_max',
     forecast_days: '7',
     timezone: 'auto',
   });
-  const weather = await getJson(`${FORECAST_URL}?${weatherParams.toString()}`, WeatherResponseSchema);
   const airQualityParams = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
@@ -197,12 +226,33 @@ export async function fetchWeather(place: Place): Promise<WeatherPayload> {
     forecast_days: '3',
     timezone: 'auto',
   });
-  try {
-    const airQuality = await getJson(`${AIR_QUALITY_URL}?${airQualityParams.toString()}`, AirQualityResponseSchema);
-    return { ...weather, airQuality };
-  } catch {
-    return weather;
-  }
+
+  // Forecast and air quality are independent once coordinates are known, so
+  // both requests start together. The forecast remains primary (its failure
+  // fails the load); an air-quality failure degrades to the forecast alone,
+  // exactly as the previous sequential implementation did. The catch on the
+  // air-quality promise also prevents an unhandled rejection if the forecast
+  // fails first.
+  const weatherRequest = getJson(`${FORECAST_URL}?${weatherParams.toString()}`, WeatherResponseSchema);
+  const airQualityRequest = getJson(`${AIR_QUALITY_URL}?${airQualityParams.toString()}`, AirQualityResponseSchema)
+    .catch((): AirQualityPayload | null => null);
+  const weather = await weatherRequest;
+  const airQuality = await airQualityRequest;
+  return airQuality == null ? weather : { ...weather, airQuality };
+}
+
+/*
+ * The micro-climate comparison uses the UKV (ukmo_seamless) model, which only
+ * covers the UK and the near continent. Outside that domain there is no
+ * meaningful grid point to compare against, so the feature is hidden rather
+ * than faked with regional data. Callers must gate on this helper.
+ */
+const UKV_BOUNDS = { minLatitude: 49.5, maxLatitude: 61.5, minLongitude: -10, maxLongitude: 3 };
+
+export function isMicroClimateSupported(latitude: number, longitude: number): boolean {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+  return latitude >= UKV_BOUNDS.minLatitude && latitude <= UKV_BOUNDS.maxLatitude
+    && longitude >= UKV_BOUNDS.minLongitude && longitude <= UKV_BOUNDS.maxLongitude;
 }
 
 export async function fetchMicroClimate(place: Place): Promise<MicroClimatePayload | null> {
@@ -233,22 +283,59 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
   const reverse = await getJson(`${GEOCODING_URL}?${reverseParams.toString()}`, GeocodingResponseSchema);
   const found = reverse.results?.[0];
   return found
-    ? { name: found.name, latitude: found.latitude, longitude: found.longitude, admin1: found.admin1, country: found.country }
+    ? {
+        name: found.name,
+        latitude: found.latitude,
+        longitude: found.longitude,
+        admin1: found.admin1,
+        country: found.country,
+        countryCode: found.country_code,
+        timezone: found.timezone,
+      }
     : undefined;
 }
 
-export function weatherCopy(code = 0): string {
-  if (code === 0) return 'Clear sky';
-  if ([1, 2].includes(code)) return 'Mostly clear';
-  if (code === 3) return 'Overcast';
-  if ([45, 48].includes(code)) return 'Misty';
-  if ([51, 53, 55, 56, 57].includes(code)) return 'Light drizzle';
-  if ([61, 63, 65, 66, 67].includes(code)) return 'Rain';
-  if ([71, 73, 75, 77].includes(code)) return 'Snow';
-  if ([80, 81, 82].includes(code)) return 'Rain showers';
-  if ([85, 86].includes(code)) return 'Snow showers';
-  if ([95, 96, 99].includes(code)) return 'Thunderstorms';
-  return 'Changeable';
+/*
+ * Forward geocoding for the location search. Uses the same Open-Meteo
+ * geocoding endpoint as reverseGeocode; no other location provider exists.
+ * `signal` lets the caller cancel a stale search so only the latest query wins.
+ */
+export async function searchPlaces(
+  query: string,
+  options: { count?: number; signal?: AbortSignal; language?: string } = {},
+): Promise<Place[]> {
+  const name = query.trim();
+  if (name.length < 2) return [];
+  const params = new URLSearchParams({
+    name,
+    count: String(options.count ?? 8),
+    language: options.language ?? 'en',
+    format: 'json',
+  });
+  const response = await getJson(`${GEOCODING_URL}?${params.toString()}`, GeocodingResponseSchema, options.signal);
+  return (response.results ?? []).map((result) => ({
+    name: result.name,
+    latitude: result.latitude,
+    longitude: result.longitude,
+    admin1: result.admin1,
+    country: result.country,
+    countryCode: result.country_code,
+    timezone: result.timezone,
+  }));
+}
+
+export function weatherCopy(code = 0, locale: Locale = 'en'): string {
+  if (code === 0) return translate(locale, 'condition.clear');
+  if ([1, 2].includes(code)) return translate(locale, 'condition.mostlyClear');
+  if (code === 3) return translate(locale, 'condition.overcast');
+  if ([45, 48].includes(code)) return translate(locale, 'condition.misty');
+  if ([51, 53, 55, 56, 57].includes(code)) return translate(locale, 'condition.drizzle');
+  if ([61, 63, 65, 66, 67].includes(code)) return translate(locale, 'condition.rain');
+  if ([71, 73, 75, 77].includes(code)) return translate(locale, 'condition.snow');
+  if ([80, 81, 82].includes(code)) return translate(locale, 'condition.showers');
+  if ([85, 86].includes(code)) return translate(locale, 'condition.snowShowers');
+  if ([95, 96, 99].includes(code)) return translate(locale, 'condition.thunder');
+  return translate(locale, 'condition.changeable');
 }
 
 export function weatherIcon(code = 0, isDay = true): LucideIcon {
@@ -263,37 +350,51 @@ export function weatherIcon(code = 0, isDay = true): LucideIcon {
   return Cloud;
 }
 
-export type WeatherAdvice = { answer: 'Yes' | 'No'; reason: string };
+export type WeatherAdvice = { answer: string; tone: 'yes' | 'no'; reason: string };
 
-export function getUmbrellaAdvice(precipProbability: number | null | undefined, precipTimeWindow?: string): WeatherAdvice {
+export function getUmbrellaAdvice(precipProbability: number | null | undefined, precipTimeWindow?: string, locale: Locale = 'en'): WeatherAdvice {
   if (precipProbability == null || Number.isNaN(precipProbability)) {
-    return { answer: 'No', reason: 'Rain forecast unavailable' };
+    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.rainUnavailable') };
   }
   if (precipProbability >= 40) {
     return {
-      answer: 'Yes',
-      reason: precipTimeWindow ? `${Math.round(precipProbability)}% chance around ${precipTimeWindow}` : `${Math.round(precipProbability)}% chance of rain`,
+      answer: translate(locale, 'common.yes'),
+      tone: 'yes',
+      reason: precipTimeWindow
+        ? translate(locale, 'advice.rainChanceTime', { percent: Math.round(precipProbability), time: precipTimeWindow })
+        : translate(locale, 'advice.rainChance', { percent: Math.round(precipProbability) }),
     };
   }
   return {
-    answer: 'No',
-    reason: precipProbability > 0 ? `${Math.round(precipProbability)}% chance of rain` : 'Rain unlikely today',
+    answer: translate(locale, 'common.no'),
+    tone: 'no',
+    reason: precipProbability > 0
+      ? translate(locale, 'advice.rainChance', { percent: Math.round(precipProbability) })
+      : translate(locale, 'advice.rainUnlikely'),
   };
 }
 
-export function getSunglassesAdvice(uvIndex: number | null | undefined, cloudCover: number | null | undefined): WeatherAdvice {
-  const hasUv = uvIndex != null && !Number.isNaN(uvIndex);
-  const hasCloud = cloudCover != null && !Number.isNaN(cloudCover);
-  if (!hasUv || !hasCloud) {
-    return { answer: 'No', reason: 'Brightness forecast unavailable' };
+export function getSunglassesAdvice(uvIndex: number | null | undefined, cloudCover: number | null | undefined, locale: Locale = 'en'): WeatherAdvice {
+  const uv = uvIndex != null && !Number.isNaN(uvIndex) ? uvIndex : null;
+  const cloud = cloudCover != null && !Number.isNaN(cloudCover) ? cloudCover : null;
+  if (uv == null || cloud == null) {
+    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.brightnessUnavailable') };
   }
-  if ((uvIndex as number) >= 3 && (cloudCover as number) < 60) {
-    return { answer: 'Yes', reason: `UV index ${uvValue(uvIndex)}, mostly clear` };
+  if (uv >= 3 && cloud < 60) {
+    return {
+      answer: translate(locale, 'common.yes'),
+      tone: 'yes',
+      reason: translate(locale, 'advice.sunscreenYes', { uv: uvValue(uv) }),
+    };
   }
-  if ((cloudCover as number) >= 60) {
-    return { answer: 'No', reason: 'Overcast, low brightness' };
+  if (cloud >= 60) {
+    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.sunscreenOvercast') };
   }
-  return { answer: 'No', reason: `UV index ${uvValue(uvIndex)}, low today` };
+  return {
+    answer: translate(locale, 'common.no'),
+    tone: 'no',
+    reason: translate(locale, 'advice.sunscreenLow', { uv: uvValue(uv) }),
+  };
 }
 
 export function displayTemp(value: number | null | undefined, unit: Unit): string {
@@ -311,13 +412,13 @@ export function calculateDewPointCelsius(temperatureC: number | null | undefined
   return (c * gamma) / (b - gamma);
 }
 
-export function dewPointComfort(dewPointC: number | undefined): { label: string; className: string } {
-  if (dewPointC === undefined || Number.isNaN(dewPointC)) return { label: 'Unavailable', className: 'dew-unavailable' };
-  if (dewPointC < 10) return { label: 'Dry', className: 'dew-dry' };
-  if (dewPointC < 16) return { label: 'Comfortable', className: 'dew-comfortable' };
-  if (dewPointC < 18) return { label: 'Noticeable', className: 'dew-noticeable' };
-  if (dewPointC < 21) return { label: 'Humid', className: 'dew-humid' };
-  return { label: 'Oppressive', className: 'dew-oppressive' };
+export function dewPointComfort(dewPointC: number | undefined, locale: Locale = 'en'): { label: string; className: string } {
+  if (dewPointC === undefined || Number.isNaN(dewPointC)) return { label: translate(locale, 'details.dewUnavailable'), className: 'dew-unavailable' };
+  if (dewPointC < 10) return { label: translate(locale, 'details.dewDry'), className: 'dew-dry' };
+  if (dewPointC < 16) return { label: translate(locale, 'details.dewComfortable'), className: 'dew-comfortable' };
+  if (dewPointC < 18) return { label: translate(locale, 'details.dewNoticeable'), className: 'dew-noticeable' };
+  if (dewPointC < 21) return { label: translate(locale, 'details.dewHumid'), className: 'dew-humid' };
+  return { label: translate(locale, 'details.dewOppressive'), className: 'dew-oppressive' };
 }
 
 export function displayWind(value: number | null | undefined, unit: Unit): string {
@@ -336,40 +437,157 @@ export function distanceKm(latitude1: number, longitude1: number, latitude2: num
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function signedDelta(value: number | null | undefined, unit: string, decimals = 1): string {
+export function signedDelta(value: number | null | undefined, unit: string, decimals = 1, locale: Locale = 'en'): string {
   if (value == null || Number.isNaN(value)) return '—';
   const rounded = Math.abs(value) < 0.05 ? 0 : value;
-  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(decimals)}${unit}`;
+  return `${rounded > 0 ? '+' : ''}${formatDecimal(rounded, locale, decimals)}${unit}`;
 }
 
-export function localDate(value?: string | null): Date | null {
+/*
+ * Time utilities for Open-Meteo data.
+ *
+ * With `timezone=auto`, Open-Meteo returns every timestamp as the location's
+ * own wall-clock time without a UTC offset (e.g. "2026-09-11T15:00") and
+ * reports the zone metadata separately (`timezone`, `timezone_abbreviation`,
+ * `utc_offset_seconds`). These helpers treat those strings as wall-clock time
+ * in the forecast location — never as the browser's timezone — by parsing the
+ * components into a UTC-based "pseudo instant". Comparisons and formatting run
+ * on those components, so a Tokyo forecast renders identically on a device in
+ * London, New York or Tokyo. Original API strings are never mutated.
+ */
+const LOCATION_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/;
+
+export type LocationClock = {
+  timezone?: string | null;
+  timezone_abbreviation?: string | null;
+  utc_offset_seconds?: number | null;
+};
+
+function padLocationPart(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/* Wall-clock value in ms, treating the location's own clock as the timeline. */
+export function locationTimeMs(value?: string | null): number | null {
   if (!value) return null;
-  const datePart = value.slice(0, 10);
-  const date = new Date(`${datePart}T12:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const match = LOCATION_TIMESTAMP.exec(value.trim());
+  if (match) {
+    const [, year, month, day, hour = '0', minute = '0', second = '0'] = match;
+    return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
 }
 
-export function shortDay(value?: string | null, index = 0): string {
-  if (index === 0) return 'Today';
-  if (index === 1) return 'Tomorrow';
-  const date = localDate(value);
-  return date ? date.toLocaleDateString([], { weekday: 'short' }) : 'Day';
+function formatLocationParts(ms: number, options: Intl.DateTimeFormatOptions, locale?: string | string[]): string {
+  return new Intl.DateTimeFormat(locale ?? undefined, { ...options, timeZone: 'UTC' }).format(new Date(ms));
 }
 
-export function dateLabel(value?: string | null): string {
-  const date = localDate(value);
-  return date ? date.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—';
-}
-
-export function timeLabel(value?: string | null): string {
+export function formatLocationTime(value?: string | null, locale?: string | string[]): string {
   if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value.slice(11, 16) : date.toLocaleTimeString([], { hour: 'numeric' });
+  const ms = locationTimeMs(value);
+  if (ms == null) return value.length >= 16 ? value.slice(11, 16) : value;
+  return formatLocationParts(ms, { hour: 'numeric' }, locale);
 }
 
-export function compass(degrees?: number | null): string {
-  if (degrees == null || Number.isNaN(degrees)) return '—';
-  return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(degrees / 45) % 8];
+export function formatLocationDate(
+  value: string | null | undefined,
+  options: Intl.DateTimeFormatOptions,
+  locale?: string | string[],
+): string | null {
+  const ms = locationTimeMs(value);
+  return ms == null ? null : formatLocationParts(ms, options, locale);
+}
+
+export function getLocationLocalDate(value?: string | null): string | null {
+  const ms = locationTimeMs(value);
+  if (ms == null) return null;
+  const date = new Date(ms);
+  return `${date.getUTCFullYear()}-${padLocationPart(date.getUTCMonth() + 1)}-${padLocationPart(date.getUTCDate())}`;
+}
+
+export function getLocationLocalHour(value?: string | null): number | null {
+  const ms = locationTimeMs(value);
+  return ms == null ? null : new Date(ms).getUTCHours();
+}
+
+export function isSameLocationDay(a?: string | null, b?: string | null): boolean {
+  const dateA = getLocationLocalDate(a);
+  return dateA != null && dateA === getLocationLocalDate(b);
+}
+
+export function compareLocationTimes(a?: string | null, b?: string | null): number {
+  if (!a && !b) return 0;
+  if (!a) return -1;
+  if (!b) return 1;
+  const msA = locationTimeMs(a);
+  const msB = locationTimeMs(b);
+  if (msA == null || msB == null) return a.localeCompare(b);
+  return msA === msB ? 0 : msA < msB ? -1 : 1;
+}
+
+/* Wall-clock arithmetic in the location's clock (DST gaps are treated linearly). */
+export function addLocationHours(value: string, hours: number): string {
+  const ms = locationTimeMs(value);
+  if (ms == null) return value;
+  const date = new Date(ms + hours * 3_600_000);
+  return `${date.getUTCFullYear()}-${padLocationPart(date.getUTCMonth() + 1)}-${padLocationPart(date.getUTCDate())}T${padLocationPart(date.getUTCHours())}:${padLocationPart(date.getUTCMinutes())}`;
+}
+
+/*
+ * Current wall-clock time at the forecast location. Prefers the API's own
+ * `current.time`; otherwise derives it from the IANA zone and only then from
+ * `utc_offset_seconds`. Returns null when there is nothing trustworthy to use.
+ */
+export function getCurrentLocationTime(
+  currentTime: string | null | undefined,
+  location?: LocationClock | null,
+  now: number = Date.now(),
+): string | null {
+  if (currentTime && locationTimeMs(currentTime) != null) return currentTime;
+  const timezone = location?.timezone;
+  if (timezone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(new Date(now));
+      const pick = (type: string) => parts.find((part) => part.type === type)?.value;
+      const year = pick('year');
+      const month = pick('month');
+      const day = pick('day');
+      const hour = pick('hour') === '24' ? '00' : pick('hour');
+      const minute = pick('minute');
+      if (year && month && day && hour && minute) return `${year}-${month}-${day}T${hour}:${minute}`;
+    } catch {
+      // Unknown IANA zone: fall through to the numeric offset.
+    }
+  }
+  const offset = location?.utc_offset_seconds;
+  if (typeof offset === 'number') {
+    const shifted = new Date(now + offset * 1000);
+    return `${shifted.getUTCFullYear()}-${padLocationPart(shifted.getUTCMonth() + 1)}-${padLocationPart(shifted.getUTCDate())}T${padLocationPart(shifted.getUTCHours())}:${padLocationPart(shifted.getUTCMinutes())}`;
+  }
+  return null;
+}
+
+export function shortDay(value?: string | null, index = 0, locale: Locale = 'en'): string {
+  if (index === 0) return translate(locale, 'common.today');
+  if (index === 1) return translate(locale, 'common.tomorrow');
+  return formatLocationDate(value, { weekday: 'short' }, locale) ?? '—';
+}
+
+export function dateLabel(value?: string | null, locale: Locale = 'en'): string {
+  return formatLocationDate(value, { month: 'short', day: 'numeric' }, locale) ?? '—';
+}
+
+export function timeLabel(value?: string | null, locale: Locale = 'en'): string {
+  return formatLocationTime(value, locale);
 }
 
 export type UvLevel = {
@@ -378,28 +596,28 @@ export type UvLevel = {
   className: string;
 };
 
-export function uvLevel(value: number | null | undefined): UvLevel {
+export function uvLevel(value: number | null | undefined, locale: Locale = 'en'): UvLevel {
   if (value == null || Number.isNaN(value)) {
-    return { label: 'Unavailable', guidance: 'UV detail is unavailable right now.', className: 'uv-unavailable' };
+    return { label: translate(locale, 'uv.level.unavailable'), guidance: translate(locale, 'uv.guidance.unavailable'), className: 'uv-unavailable' };
   }
   if (value < 3) {
-    return { label: 'Low', guidance: 'Enjoy the daylight. Protection is usually not needed.', className: 'uv-low' };
+    return { label: translate(locale, 'uv.level.low'), guidance: translate(locale, 'uv.guidance.low'), className: 'uv-low' };
   }
   if (value < 6) {
-    return { label: 'Moderate', guidance: 'Consider shade, a hat, and sunscreen around midday.', className: 'uv-moderate' };
+    return { label: translate(locale, 'uv.level.moderate'), guidance: translate(locale, 'uv.guidance.moderate'), className: 'uv-moderate' };
   }
   if (value < 8) {
-    return { label: 'High', guidance: 'Protection is essential. Seek shade and cover up.', className: 'uv-high' };
+    return { label: translate(locale, 'uv.level.high'), guidance: translate(locale, 'uv.guidance.high'), className: 'uv-high' };
   }
   if (value < 11) {
-    return { label: 'Very high', guidance: 'Avoid midday sun where possible and protect exposed skin.', className: 'uv-very-high' };
+    return { label: translate(locale, 'uv.level.veryHigh'), guidance: translate(locale, 'uv.guidance.veryHigh'), className: 'uv-very-high' };
   }
-  return { label: 'Extreme', guidance: 'Avoid being outside in direct sun. Protection is essential.', className: 'uv-extreme' };
+  return { label: translate(locale, 'uv.level.extreme'), guidance: translate(locale, 'uv.guidance.extreme'), className: 'uv-extreme' };
 }
 
-export function uvValue(value: number | null | undefined): string {
+export function uvValue(value: number | null | undefined, locale: Locale = 'en'): string {
   if (value == null || Number.isNaN(value)) return '—';
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return Number.isInteger(value) ? String(value) : formatDecimal(value, locale, 1);
 }
 
 export function uvColor(value: number | null | undefined): string {
@@ -411,37 +629,119 @@ export function uvColor(value: number | null | undefined): string {
   return '#d9483f';
 }
 
+/*
+ * Sun protection window: the continuous period today during which the hourly
+ * UV index is forecast to reach the protection threshold (UV >= 3, the start
+ * of the "Moderate" band). Runs are read from the location's own local-time
+ * hourly forecast; a missing value breaks a run rather than being guessed at,
+ * and when several separate runs exist the one with the highest peak wins
+ * (earliest start breaks ties).
+ *
+ * `end` is exclusive: the hour after the run, or one hour past the last
+ * reading when the run reaches the end of the available forecast.
+ * "Today", the run order and the times are all in the weather location's
+ * wall clock, never the device timezone.
+ */
+export const SUN_PROTECTION_UV_THRESHOLD = 3;
+
+export type SunProtectionWindow = {
+  start: string;
+  end: string;
+  peak: number;
+};
+
+export type SunProtection =
+  | { status: 'window'; window: SunProtectionWindow }
+  | { status: 'none' }
+  | { status: 'unavailable' };
+
+export function getSunProtectionWindow(
+  times: ReadonlyArray<string | null | undefined> | null | undefined,
+  uvValues: ReadonlyArray<number | null | undefined> | null | undefined,
+  referenceTime?: string | null,
+): SunProtection {
+  if (!times?.length || !uvValues?.length) return { status: 'unavailable' };
+  const today = getLocationLocalDate(referenceTime ?? times[0]);
+  if (!today) return { status: 'unavailable' };
+
+  const readings: { time: string; value: number | null }[] = [];
+  for (let index = 0; index < times.length; index += 1) {
+    const time = times[index];
+    if (!time || !time.startsWith(today)) continue;
+    const raw = uvValues[index];
+    readings.push({ time, value: raw == null || Number.isNaN(raw) ? null : raw });
+  }
+  if (!readings.length) return { status: 'unavailable' };
+
+  let best: { start: number; end: number; peak: number } | null = null;
+  let runStart = -1;
+  let runPeak = 0;
+  for (let index = 0; index <= readings.length; index += 1) {
+    const value = index < readings.length ? readings[index].value : null;
+    if (value != null && value >= SUN_PROTECTION_UV_THRESHOLD) {
+      if (runStart === -1) {
+        runStart = index;
+        runPeak = value;
+      } else {
+        runPeak = Math.max(runPeak, value);
+      }
+      continue;
+    }
+    if (runStart !== -1) {
+      if (!best || runPeak > best.peak) best = { start: runStart, end: index - 1, peak: runPeak };
+      runStart = -1;
+      runPeak = 0;
+    }
+  }
+
+  if (!best) {
+    return readings.some((reading) => reading.value != null)
+      ? { status: 'none' }
+      : { status: 'unavailable' };
+  }
+
+  const nextReading = readings[best.end + 1];
+  return {
+    status: 'window',
+    window: {
+      start: readings[best.start].time,
+      end: nextReading ? nextReading.time : addLocationHours(readings[best.end].time, 1),
+      peak: best.peak,
+    },
+  };
+}
+
 export type AirLevel = {
   label: string;
   guidance: string;
   className: string;
 };
 
-export function airLevel(value: number | null | undefined): AirLevel {
+export function airLevel(value: number | null | undefined, locale: Locale = 'en'): AirLevel {
   if (value == null || Number.isNaN(value)) {
-    return { label: 'Unavailable', guidance: 'Air-quality detail is unavailable right now.', className: 'air-unavailable' };
+    return { label: translate(locale, 'air.level.unavailable'), guidance: translate(locale, 'air.guidance.unavailable'), className: 'air-unavailable' };
   }
   if (value <= 50) {
-    return { label: 'Good', guidance: 'Air quality is considered satisfactory for most people.', className: 'air-good' };
+    return { label: translate(locale, 'air.level.good'), guidance: translate(locale, 'air.guidance.good'), className: 'air-good' };
   }
   if (value <= 100) {
-    return { label: 'Moderate', guidance: 'Sensitive people may want to keep an eye on symptoms.', className: 'air-moderate' };
+    return { label: translate(locale, 'air.level.moderate'), guidance: translate(locale, 'air.guidance.moderate'), className: 'air-moderate' };
   }
   if (value <= 150) {
-    return { label: 'Sensitive groups', guidance: 'Sensitive groups should consider reducing prolonged outdoor exertion.', className: 'air-sensitive' };
+    return { label: translate(locale, 'air.level.sensitive'), guidance: translate(locale, 'air.guidance.sensitive'), className: 'air-sensitive' };
   }
   if (value <= 200) {
-    return { label: 'Unhealthy', guidance: 'Consider shorter outdoor activity, especially if you are sensitive to pollution.', className: 'air-unhealthy' };
+    return { label: translate(locale, 'air.level.unhealthy'), guidance: translate(locale, 'air.guidance.unhealthy'), className: 'air-unhealthy' };
   }
   if (value <= 300) {
-    return { label: 'Very unhealthy', guidance: 'Reduce outdoor activity and keep an eye on local health guidance.', className: 'air-very-unhealthy' };
+    return { label: translate(locale, 'air.level.veryUnhealthy'), guidance: translate(locale, 'air.guidance.veryUnhealthy'), className: 'air-very-unhealthy' };
   }
-  return { label: 'Hazardous', guidance: 'Avoid outdoor activity where possible and follow local health guidance.', className: 'air-hazardous' };
+  return { label: translate(locale, 'air.level.hazardous'), guidance: translate(locale, 'air.guidance.hazardous'), className: 'air-hazardous' };
 }
 
-export function pollutionValue(value: number | null | undefined): string {
+export function pollutionValue(value: number | null | undefined, locale: Locale = 'en'): string {
   if (value == null || Number.isNaN(value)) return '—';
-  return value < 10 ? value.toFixed(1) : Math.round(value).toString();
+  return value < 10 ? formatDecimal(value, locale, 1) : formatDecimal(Math.round(value), locale, 0);
 }
 
 export function airColor(value: number | null | undefined): string {
@@ -454,20 +754,12 @@ export function airColor(value: number | null | undefined): string {
   return '#7a1f1f';
 }
 
-export function airContext(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return 'Air-quality context is unavailable right now.';
-  if (value <= 50) return 'Roughly equivalent to a normal day with light traffic nearby — no meaningful health risk today.';
-  if (value <= 100) return 'A typical moderate day — most people can continue normal outdoor activities.';
-  if (value <= 150) return 'Sensitive people may notice symptoms during longer periods of outdoor exertion.';
-  if (value <= 200) return 'Outdoor activity may feel uncomfortable; consider shorter exposure and cleaner indoor air.';
-  if (value <= 300) return 'Pollution is high enough that everyone should reduce prolonged outdoor exertion.';
-  return 'Conditions are hazardous; avoid outdoor exposure and follow local health guidance.';
-}
-
-export function pollutantMeterColor(value: number | null | undefined, threshold: number): string {
-  if (value == null || Number.isNaN(value)) return '#9aaab3';
-  const ratio = value / threshold;
-  if (ratio <= .7) return '#3fb98a';
-  if (ratio <= 1) return '#e8b93f';
-  return '#e8763f';
+export function airContext(value: number | null | undefined, locale: Locale = 'en'): string {
+  if (value == null || Number.isNaN(value)) return translate(locale, 'air.guidance.unavailable');
+  if (value <= 50) return translate(locale, 'air.context.good');
+  if (value <= 100) return translate(locale, 'air.context.moderate');
+  if (value <= 150) return translate(locale, 'air.context.sensitive');
+  if (value <= 200) return translate(locale, 'air.context.unhealthy');
+  if (value <= 300) return translate(locale, 'air.context.veryUnhealthy');
+  return translate(locale, 'air.context.hazardous');
 }

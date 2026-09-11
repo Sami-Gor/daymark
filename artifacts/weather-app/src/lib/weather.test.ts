@@ -1,17 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  addLocationHours,
   airContext,
   airLevel,
   calculateDewPointCelsius,
-  compass,
+  compareLocationTimes,
   distanceKm,
   displayTemp,
   dewPointComfort,
   fetchMicroClimate,
   fetchWeather,
+  formatLocationDate,
+  formatLocationTime,
+  getCurrentLocationTime,
+  getLocationLocalDate,
+  getLocationLocalHour,
+  getSunProtectionWindow,
   getUmbrellaAdvice,
   getSunglassesAdvice,
+  isMicroClimateSupported,
+  isSameLocationDay,
+  locationTimeMs,
   reverseGeocode,
+  searchPlaces,
+  shortDay,
+  SUN_PROTECTION_UV_THRESHOLD,
   uvLevel,
   uvValue,
 } from './weather';
@@ -235,6 +248,55 @@ describe('fetchWeather', () => {
     await fetchWeather(PLACE);
     expect(sawSignal).toBe(true);
   });
+
+  it('starts the forecast and air-quality requests in parallel', async () => {
+    const started: string[] = [];
+    const pending: Array<{ url: string; resolve: (response: Response) => void }> = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      started.push(url.includes('air-quality') ? 'air' : 'forecast');
+      return new Promise<Response>((resolve) => {
+        pending.push({ url, resolve });
+      });
+    });
+
+    const result = fetchWeather(PLACE);
+    await Promise.resolve();
+    // Both requests are issued before either response resolves.
+    expect(started).toEqual(['forecast', 'air']);
+
+    for (const request of pending) {
+      request.resolve(json(request.url.includes('air-quality') ? validAir : validForecast));
+    }
+    await expect(result).resolves.toMatchObject({ current: { temperature_2m: 20.4 } });
+  });
+
+  it('keeps forecast failure primary even when air quality succeeds', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => Promise.resolve(
+      String(input).includes('air-quality') ? json(validAir) : json({ reason: 'nope' }, 500),
+    ));
+    await expect(fetchWeather(PLACE)).rejects.toThrow('Weather service returned 500');
+  });
+
+  it('issues exactly one forecast and one air-quality request with the same coordinates', async () => {
+    const calls: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      return Promise.resolve(json(url.includes('air-quality') ? validAir : validForecast));
+    });
+    await fetchWeather(PLACE);
+    expect(calls).toHaveLength(2);
+    expect(calls.filter((url) => new URL(url).hostname === 'air-quality-api.open-meteo.com')).toHaveLength(1);
+    expect(calls.filter((url) => {
+      const parsed = new URL(url);
+      return parsed.hostname === 'api.open-meteo.com' && parsed.pathname === '/v1/forecast';
+    })).toHaveLength(1);
+    for (const url of calls) {
+      expect(url).toContain('latitude=51.51');
+      expect(url).toContain('longitude=-0.13');
+    }
+  });
 });
 
 describe('fetchMicroClimate', () => {
@@ -347,13 +409,6 @@ describe('display helpers', () => {
     expect(distanceKm(51.5, -0.13, 51.5, -0.13)).toBe(0);
   });
 
-  it('maps wind degrees to compass points', () => {
-    expect(compass(0)).toBe('N');
-    expect(compass(90)).toBe('E');
-    expect(compass(45)).toBe('NE');
-    expect(compass(undefined)).toBe('—');
-  });
-
   it('gives umbrella advice from precipitation probability', () => {
     expect(getUmbrellaAdvice(80).answer).toBe('Yes');
     expect(getUmbrellaAdvice(10).answer).toBe('No');
@@ -367,5 +422,275 @@ describe('display helpers', () => {
     expect(getSunglassesAdvice(6, 90).answer).toBe('No');
     expect(getSunglassesAdvice(1, 10).answer).toBe('No');
     expect(getSunglassesAdvice(null, 10).answer).toBe('No');
+  });
+});
+
+describe('getSunProtectionWindow', () => {
+  const day = '2026-09-07';
+  const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00']
+    .map((time) => `${day}T${time}`);
+
+  it('finds a continuous multi-hour window with its peak', () => {
+    const result = getSunProtectionWindow(hours, [1, 2, 3, 5, 6, 5, 3, 2], `${day}T12:00`);
+    expect(result).toEqual({
+      status: 'window',
+      window: { start: `${day}T10:00`, end: `${day}T15:00`, peak: 6 },
+    });
+  });
+
+  it('returns none when UV never reaches the threshold', () => {
+    expect(getSunProtectionWindow(hours, [0, 1, 2, 2.9, 2, 1, 0, 0], `${day}T12:00`)).toEqual({ status: 'none' });
+  });
+
+  it('handles a single qualifying hour', () => {
+    expect(getSunProtectionWindow(hours.slice(0, 3), [1, 3, 1], `${day}T12:00`)).toEqual({
+      status: 'window',
+      window: { start: `${day}T09:00`, end: `${day}T10:00`, peak: 3 },
+    });
+  });
+
+  it('treats missing values as a break and prefers the highest-peaking run', () => {
+    const result = getSunProtectionWindow(hours.slice(0, 5), [3, null, 4, undefined, 6], `${day}T12:00`);
+    expect(result).toEqual({
+      status: 'window',
+      window: { start: `${day}T12:00`, end: `${day}T13:00`, peak: 6 },
+    });
+  });
+
+  it('returns unavailable when no usable UV values exist', () => {
+    expect(getSunProtectionWindow([], [], `${day}T12:00`)).toEqual({ status: 'unavailable' });
+    expect(getSunProtectionWindow(hours.slice(0, 3), [null, null, undefined], `${day}T12:00`)).toEqual({ status: 'unavailable' });
+    expect(getSunProtectionWindow(undefined, undefined, `${day}T12:00`)).toEqual({ status: 'unavailable' });
+  });
+
+  it('handles a window that starts at the first available hour', () => {
+    expect(getSunProtectionWindow(hours.slice(3, 6), [3, 5, 2], `${day}T12:00`)).toEqual({
+      status: 'window',
+      window: { start: `${day}T11:00`, end: `${day}T13:00`, peak: 5 },
+    });
+  });
+
+  it('handles a window that reaches the last available hour', () => {
+    expect(getSunProtectionWindow(hours.slice(0, 3), [2, 3, 4], `${day}T12:00`)).toEqual({
+      status: 'window',
+      window: { start: `${day}T09:00`, end: `${day}T11:00`, peak: 4 },
+    });
+  });
+
+  it('ignores qualifying hours from other days', () => {
+    const times = [`${day}T10:00`, `${day}T11:00`, '2026-09-08T12:00', '2026-09-08T13:00'];
+    expect(getSunProtectionWindow(times, [1, 2, 8, 9], `${day}T12:00`)).toEqual({ status: 'none' });
+  });
+
+  it('tolerates a values array shorter than the times array', () => {
+    expect(getSunProtectionWindow(hours.slice(0, 4), [1, 2], `${day}T12:00`)).toEqual({ status: 'none' });
+  });
+
+  it('uses the documented UV threshold of 3', () => {
+    expect(SUN_PROTECTION_UV_THRESHOLD).toBe(3);
+  });
+
+  it('keeps the window on the location wall clock for London, New York and Tokyo', () => {
+    const localDay = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+      '13:00', '14:00', '15:00', '16:00', '17:00'].map((time) => `2026-09-11T${time}`);
+    const uv = [0, 0, 1, 2, 3, 5, 6, 5, 3, 2, 1, 0];
+    const expected = { status: 'window', window: { start: '2026-09-11T10:00', end: '2026-09-11T15:00', peak: 6 } };
+    // The same location-local forecast yields the same window regardless of
+    // which instant "now" happens to be for the device.
+    expect(getSunProtectionWindow(localDay, uv, '2026-09-11T09:00')).toEqual(expected);
+    expect(getSunProtectionWindow(localDay, uv, '2026-09-11T04:00')).toEqual(expected);
+    expect(getSunProtectionWindow(localDay, uv, '2026-09-11T18:00')).toEqual(expected);
+  });
+
+  it('scopes the window to the reference day when the forecast crosses local midnight', () => {
+    const times = ['2026-09-11T22:00', '2026-09-11T23:00', '2026-09-12T00:00', '2026-09-12T01:00', '2026-09-12T02:00'];
+    expect(getSunProtectionWindow(times, [0, 0, 1, 2, 3], '2026-09-11T23:30')).toEqual({ status: 'none' });
+    expect(getSunProtectionWindow(times, [0, 0, 1, 2, 3], '2026-09-12T00:30')).toEqual({
+      status: 'window',
+      window: { start: '2026-09-12T02:00', end: '2026-09-12T03:00', peak: 3 },
+    });
+  });
+
+  it('handles a DST transition day in the location wall clock', () => {
+    // Europe/London springs forward on 2026-03-29; the wall clock stays linear.
+    const times = ['2026-03-29T00:00', '2026-03-29T01:00', '2026-03-29T03:00', '2026-03-29T04:00'];
+    expect(getSunProtectionWindow(times, [0, 0, 3, 4], '2026-03-29T00:30')).toEqual({
+      status: 'window',
+      window: { start: '2026-03-29T03:00', end: '2026-03-29T05:00', peak: 4 },
+    });
+  });
+});
+
+describe('location time utilities', () => {
+  it('parses offset-less Open-Meteo timestamps as wall clock in the forecast location', () => {
+    expect(getLocationLocalDate('2026-09-11T15:00')).toBe('2026-09-11');
+    expect(getLocationLocalHour('2026-09-11T15:00')).toBe(15);
+    expect(locationTimeMs('2026-09-11T15:00')).toBe(Date.UTC(2026, 8, 11, 15, 0));
+  });
+
+  it('formats location wall-clock times with the requested locale', () => {
+    expect(formatLocationTime('2026-09-11T15:00', 'en-GB')).toBe('15');
+    expect(formatLocationTime('2026-09-11T15:00', 'en-US')).toBe('3 PM');
+    expect(formatLocationTime(undefined)).toBe('—');
+  });
+
+  it('formats location dates without shifting the calendar day', () => {
+    expect(formatLocationDate('2026-09-11', { weekday: 'short' }, 'en-US')).toBe('Fri');
+    expect(formatLocationDate('2026-09-11T23:30', { month: 'short', day: 'numeric' }, 'en-US')).toBe('Sep 11');
+  });
+
+  it('compares and orders location times', () => {
+    expect(compareLocationTimes('2026-09-11T09:00', '2026-09-11T15:00')).toBe(-1);
+    expect(compareLocationTimes('2026-09-11T15:00', '2026-09-11T15:00')).toBe(0);
+    expect(compareLocationTimes('2026-09-12T00:00', '2026-09-11T23:00')).toBe(1);
+    expect(compareLocationTimes(undefined, '2026-09-11T15:00')).toBe(-1);
+    expect(compareLocationTimes('2026-09-11T15:00', null)).toBe(1);
+  });
+
+  it('detects day boundaries around local midnight', () => {
+    expect(isSameLocationDay('2026-09-11T23:59', '2026-09-12T00:00')).toBe(false);
+    expect(isSameLocationDay('2026-09-11T00:00', '2026-09-11T23:59')).toBe(true);
+  });
+
+  it('adds hours in wall-clock time, including across midnight and DST', () => {
+    expect(addLocationHours('2026-09-11T23:00', 1)).toBe('2026-09-12T00:00');
+    expect(addLocationHours('2026-09-11T10:00', 2)).toBe('2026-09-11T12:00');
+    expect(addLocationHours('2026-03-29T00:30', 2)).toBe('2026-03-29T02:30');
+  });
+
+  it('derives the current location time from the IANA timezone, not the device', () => {
+    const now = Date.UTC(2026, 8, 11, 6, 0);
+    expect(getCurrentLocationTime(undefined, { timezone: 'Asia/Tokyo' }, now)).toBe('2026-09-11T15:00');
+    expect(getCurrentLocationTime(undefined, { timezone: 'America/New_York' }, now)).toBe('2026-09-11T02:00');
+    expect(getCurrentLocationTime(undefined, { timezone: 'Europe/London' }, now)).toBe('2026-09-11T07:00');
+  });
+
+  it('handles a DST transition when converting an instant to location time', () => {
+    // 01:30 UTC on the UK spring-forward day is 02:30 BST in London.
+    expect(getCurrentLocationTime(undefined, { timezone: 'Europe/London' }, Date.UTC(2026, 2, 29, 1, 30))).toBe('2026-03-29T02:30');
+  });
+
+  it('falls back to utc_offset_seconds when the IANA zone is missing or unknown', () => {
+    const now = Date.UTC(2026, 8, 11, 6, 0);
+    expect(getCurrentLocationTime(undefined, { timezone: null, utc_offset_seconds: 32400 }, now)).toBe('2026-09-11T15:00');
+    expect(getCurrentLocationTime(undefined, { timezone: 'Not/AZone', utc_offset_seconds: -14400 }, now)).toBe('2026-09-11T02:00');
+    expect(getCurrentLocationTime(undefined, {}, now)).toBeNull();
+  });
+
+  it('prefers the API current time when present', () => {
+    expect(getCurrentLocationTime('2026-09-11T15:00', { timezone: 'UTC' }, 0)).toBe('2026-09-11T15:00');
+  });
+
+  it('selects Today and Tomorrow from the location daily list', () => {
+    expect(shortDay('2026-09-11', 0)).toBe('Today');
+    expect(shortDay('2026-09-12', 1)).toBe('Tomorrow');
+    expect(formatLocationDate('2026-09-13', { weekday: 'short' }, 'en-US')).toBe('Sun');
+  });
+
+  it('returns identical results whatever the device timezone is', () => {
+    const original = process.env.TZ;
+    const times = ['2026-09-11T08:00', '2026-09-11T09:00', '2026-09-11T10:00', '2026-09-11T11:00', '2026-09-11T12:00'];
+    const values = [1, 2, 3, 5, 4];
+    try {
+      const baseline = getSunProtectionWindow(times, values, '2026-09-11T12:00');
+      for (const timeZone of ['UTC', 'America/New_York', 'Asia/Tokyo', 'Europe/London']) {
+        process.env.TZ = timeZone;
+        expect(getSunProtectionWindow(times, values, '2026-09-11T12:00')).toEqual(baseline);
+        expect(formatLocationTime('2026-09-11T15:00', 'en-US')).toBe('3 PM');
+        expect(getLocationLocalDate('2026-09-11T23:30')).toBe('2026-09-11');
+      }
+    } finally {
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
+  });
+});
+
+describe('searchPlaces', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('parses results with region, country, country code and timezone', async () => {
+    stubFetch(() => json({
+      results: [
+        {
+          name: 'Paris',
+          latitude: 48.8566,
+          longitude: 2.3522,
+          admin1: 'Île-de-France',
+          country: 'France',
+          country_code: 'FR',
+          timezone: 'Europe/Paris',
+        },
+      ],
+    }));
+    await expect(searchPlaces('paris')).resolves.toEqual([
+      {
+        name: 'Paris',
+        latitude: 48.8566,
+        longitude: 2.3522,
+        admin1: 'Île-de-France',
+        country: 'France',
+        countryCode: 'FR',
+        timezone: 'Europe/Paris',
+      },
+    ]);
+  });
+
+  it('keeps duplicate place names distinct and in order', async () => {
+    stubFetch(() => json({
+      results: [
+        { name: 'Springfield', latitude: 39.78, longitude: -89.65, admin1: 'Illinois', country: 'United States', country_code: 'US' },
+        { name: 'Springfield', latitude: 37.22, longitude: -93.3, admin1: 'Missouri', country: 'United States', country_code: 'US' },
+      ],
+    }));
+    const results = await searchPlaces('springfield');
+    expect(results).toHaveLength(2);
+    expect(results[0].admin1).toBe('Illinois');
+    expect(results[1].admin1).toBe('Missouri');
+  });
+
+  it('does not search empty or single-character queries', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    await expect(searchPlaces('')).resolves.toEqual([]);
+    await expect(searchPlaces(' ')).resolves.toEqual([]);
+    await expect(searchPlaces('a')).resolves.toEqual([]);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty list when there are no matches', async () => {
+    stubFetch(() => json({}));
+    await expect(searchPlaces('zzzzz')).resolves.toEqual([]);
+    stubFetch(() => json({ results: null }));
+    await expect(searchPlaces('zzzzz')).resolves.toEqual([]);
+  });
+
+  it('rejects when the geocoding service fails', async () => {
+    stubFetch(() => json({ reason: 'nope' }, 500));
+    await expect(searchPlaces('paris')).rejects.toThrow('Weather service returned 500');
+  });
+
+  it('propagates an abort so stale searches can be discarded', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+      });
+    }));
+    const controller = new AbortController();
+    const pending = searchPlaces('paris', { signal: controller.signal });
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});
+
+describe('isMicroClimateSupported', () => {
+  it('supports the UK and rejects locations outside the UKV domain', () => {
+    expect(isMicroClimateSupported(51.5074, -0.1278)).toBe(true); // London
+    expect(isMicroClimateSupported(55.9533, -3.1883)).toBe(true); // Edinburgh
+    expect(isMicroClimateSupported(48.8566, 2.3522)).toBe(false); // Paris
+    expect(isMicroClimateSupported(40.7128, -74.006)).toBe(false); // New York
+    expect(isMicroClimateSupported(35.6762, 139.6503)).toBe(false); // Tokyo
+    expect(isMicroClimateSupported(-33.8688, 151.2093)).toBe(false); // Sydney
+    expect(isMicroClimateSupported(25.2048, 55.2708)).toBe(false); // Dubai
+    expect(isMicroClimateSupported(Number.NaN, 0)).toBe(false);
   });
 });

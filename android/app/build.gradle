@@ -22,7 +22,7 @@ plugins {
 
 def twaManifest = [
     applicationId: 'io.github.sami_gor.daymark',
-    hostName: 'localhost:8090', // The domain being opened in the TWA.
+    hostName: 'daymark-weather.pages.dev', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
     name: 'Daymark', // The application name.
     launcherName: 'Daymark', // The name shown on the Android Launcher.
@@ -50,6 +50,21 @@ def twaManifest = [
     orientation: 'default',
 ]
 
+// Release signing credentials are read from android/keystore.properties, which
+// is gitignored and never committed. The upload keystore itself is also
+// gitignored. When the file is absent, release builds fail fast (see the
+// task-graph check at the bottom of this file) while debug builds still work.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def hasReleaseSigning = false
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { stream -> keystoreProperties.load(stream) }
+    hasReleaseSigning = (keystoreProperties.getProperty('storeFile') != null
+        && keystoreProperties.getProperty('storePassword') != null
+        && keystoreProperties.getProperty('keyAlias') != null
+        && keystoreProperties.getProperty('keyPassword') != null)
+}
+
 android {
     compileSdkVersion 36
     namespace "io.github.sami_gor.daymark"
@@ -76,12 +91,12 @@ android {
             // The URL the Web Manifest for the Progressive Web App that the TWA points to. This
             // is used by Chrome OS and Meta Quest to open the Web version of the PWA instead of
             // the TWA, as it will probably give a better user experience for non-mobile devices.
-            resValue "string", "webManifestUrl", 'http://localhost:8090/manifest.webmanifest'
+            resValue "string", "webManifestUrl", 'https://daymark-weather.pages.dev/manifest.webmanifest'
         
 
         
             // This is used by Meta Quest.
-            resValue "string", "fullScopeUrl", 'http://localhost:8090/'
+            resValue "string", "fullScopeUrl", 'https://daymark-weather.pages.dev/'
         
 
         
@@ -150,9 +165,22 @@ android {
 
         
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled true
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     compileOptions {
@@ -210,4 +238,15 @@ dependencies {
     
         implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
     
+}
+
+// Fail clearly if a release build is requested without signing credentials.
+gradle.taskGraph.whenReady { graph ->
+    def releaseTasks = ['bundleRelease', 'assembleRelease', 'packageReleaseBundle', 'packageRelease']
+    if (graph.allTasks.any { it.name in releaseTasks } && !hasReleaseSigning) {
+        throw new GradleException(
+            "Release signing is not configured. Create android/keystore.properties with " +
+            "storeFile, storePassword, keyAlias and keyPassword, then re-run the release build."
+        )
+    }
 }

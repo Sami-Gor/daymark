@@ -1,7 +1,10 @@
+import { useLocale } from '@/hooks/use-locale';
+
 export function LoadingState() {
+  const { t } = useLocale();
   return (
-    <main className="loading-layout" aria-label="Loading weather">
-      <p className="sr-only" role="status">Loading the latest forecast…</p>
+    <main className="loading-layout" aria-label={t('loading.aria')}>
+      <p className="sr-only" role="status">{t('loading.status')}</p>
       <div aria-hidden="true">
         <div className="skeleton" style={{ width: 115, height: 13 }} />
         <div className="skeleton" style={{ width: 'min(70vw, 620px)', height: 90, marginTop: 24 }} />

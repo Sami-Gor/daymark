@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 
 import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { LocaleProvider } from '@/hooks/use-locale';
 
 import './index.css';
 
@@ -12,7 +13,9 @@ createRoot(document.getElementById('root')!, {
   },
 }).render(
   <ErrorBoundary>
-    <App />
+    <LocaleProvider>
+      <App />
+    </LocaleProvider>
   </ErrorBoundary>,
 );
 
