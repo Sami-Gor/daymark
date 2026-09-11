@@ -15,8 +15,12 @@ Daymark answers one question well — *what's the sky doing?* — without dashbo
 - **3-day forecast** — highs, lows, and precipitation per day
 - **Sun on your skin** — current UV index with a protection range gauge, hourly UV strip, and a 3-day outlook
 - **Air around you** — live US AQI with WHO/city comparison markers, pollutant breakdown (PM2.5, PM10, NO₂, O₃), and plain-English context
-- **Your micro-climate** — a nearby high-resolution model grid point compared against the regional forecast
+- **Regional comparison (UK only)** — a nearby UKV model grid point compared against the regional forecast; hidden where that model is not valid
 - **Dew point & comfort** — alongside humidity, because dew point is what your skin actually feels
+- **Location search** — switch to any city or town using Open-Meteo geocoding, with region/country disambiguation
+- **Severe weather risk** — forecast-derived wind, rain, snow, thunderstorm, heat and cold risks, clearly labelled as *not* official warnings
+- **Voice** — *Hear today* reads the briefing aloud; *Ask Daymark* answers spoken weather questions using the browser Web Speech APIs (no cloud TTS)
+- **English, French and Spanish** — locale-aware UI, guidance, alerts and voice, defaulting to the browser language
 - **°C / °F toggle**, graceful offline shell, and installable as an app (PWA)
 
 ## Interface
@@ -50,6 +54,7 @@ The design is editorial rather than dashboard-like — a serif-led hero with pla
 - [Tailwind CSS 4](https://tailwindcss.com) with a hand-written design layer (Fraunces, Plus Jakarta Sans, DM Mono — self-hosted)
 - [Zod](https://zod.dev) for runtime validation of every API response
 - [wouter](https://github.com/molefrog/wouter) for routing, [TanStack Query](https://tanstack.com/query) provider, [Radix](https://www.radix-ui.com) primitives
+- Typed English/French/Spanish dictionaries (no i18n dependency) and the browser Web Speech APIs for optional voice
 - pnpm workspaces; Vitest + Playwright for tests
 
 ## Architecture
@@ -60,13 +65,13 @@ Daymark is a **client-side single-page app + PWA**. There is:
 - **No user accounts, no analytics, no telemetry, no cookies**
 - One workspace package that matters: `artifacts/weather-app` (plus `artifacts/mockup-sandbox`, a local-only design tool that is never deployed)
 
-All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifacts/weather-app/src/lib/weather.ts): typed Open-Meteo clients, permissive-but-strict Zod schemas at the network boundary, 10-second fetch timeouts, and the formatting/categorisation helpers. UI components live in `src/components/weather/`.
+All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifacts/weather-app/src/lib/weather.ts): typed Open-Meteo clients, permissive-but-strict Zod schemas at the network boundary, 10-second fetch timeouts, and the formatting/categorisation helpers. Building on that: `weather-alerts.ts` is a pure forecast-risk engine, `weather-intents.ts` is a language-independent intent/response layer shared by voice, `i18n.ts` + `locales/` hold the typed translations, and `voice-browser.ts` / `voice-input-browser.ts` are framework-free browser speech adapters. UI components live in `src/components/weather/`.
 
 ## Privacy approach
 
 - **Geolocation is never requested on load.** The app opens on a default location (London) and only touches the Geolocation API when you press *Use my location*
 - **Coordinates are rounded to 2 decimals (~1 km) before leaving your device**, then sent only to Open-Meteo endpoints
-- **Nothing is persisted** — no localStorage, sessionStorage, IndexedDB, or cookies; location is used in-memory and discarded
+- **Nothing else is persisted** — only your language preference (`daymark.locale`) is kept locally; no location, queries, transcripts, cookies, IndexedDB or other storage
 - **No analytics or third-party trackers** — the only external requests are to the three Open-Meteo API hosts (plus the attribution link in the footer)
 - Fonts are self-hosted; no CDN font requests
 
@@ -80,7 +85,7 @@ Daymark installs as a standalone app (manifest + icons included). A minimal serv
 
 ## Local development
 
-Requires Node 20+ and [pnpm](https://pnpm.io):
+Requires [Node](https://nodejs.org) and [pnpm](https://pnpm.io). **Node 24 is the CI-tested runtime**; Node 20+ generally works, but local Node 26 is not the compatibility baseline.
 
 ```bash
 pnpm install          # frozen lockfile enforced
@@ -100,15 +105,15 @@ Output lands in `artifacts/weather-app/dist/public` — deploy it to any static 
 ## Test
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (25 tests)
-pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (23 tests)
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (175 tests)
+pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (83 tests)
 ```
 
-The e2e suite runs against a production build served by `vite preview`, mocks Open-Meteo traffic, and covers function, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), failure paths, the service worker, and the served security headers.
+The e2e suite runs against a production build served by `vite preview`, mocks Open-Meteo traffic, and covers function, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), failure paths, the service worker, the served security headers, location search, voice input/output, severe-weather alerts and the English/French/Spanish interface.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md). In short: minimal attack surface (11 runtime dependencies), every external response runtime-validated, a strict CSP (`default-src 'none'`, `script-src 'self'`), and no secrets anywhere in the client — there are none to leak.
+See [SECURITY.md](SECURITY.md). In short: minimal attack surface (9 runtime dependencies), every external response runtime-validated, a strict CSP (`default-src 'none'`, `script-src 'self'`), and no secrets anywhere in the client — there are none to leak.
 
 ## Project structure
 
@@ -116,7 +121,13 @@ See [SECURITY.md](SECURITY.md). In short: minimal attack surface (11 runtime dep
 artifacts/
   weather-app/            the app (React SPA + PWA)
     public/               manifest, service worker, icons, _headers
-    src/lib/weather.ts    API boundary + Zod schemas + helpers
+    src/lib/weather.ts    API boundary + Zod schemas + location-safe time helpers
+    src/lib/weather-alerts.ts   forecast-derived risk engine (not official warnings)
+    src/lib/weather-intents.ts  stable intent IDs + response layer (voice/agents)
+    src/lib/voice-*.ts    browser speech playback + recognition adapters
+    src/lib/i18n.ts
+    src/locales/          EN / FR / ES typed dictionaries
+    src/hooks/            locale + voice React bindings
     src/components/       UI components
     src/fonts/            self-hosted fonts + licences
     tests/e2e/            Playwright suite
@@ -127,8 +138,10 @@ scripts/                  workspace tooling
 
 ## Known limitations
 
-- Unit preference (°C/°F) is not persisted across reloads
-- The micro-climate comparison uses a UK model grid (UKV) — most meaningful in/around the UK
+- Unit preference (°C/°F) is not persisted across reloads (the language preference is)
+- The micro-climate comparison uses the UKV model and is hidden outside the UK/near continent, where that model is not valid
+- Severe-weather risks are forecast-derived Daymark estimates, **not** official warnings
+- Voice input/output require browser Web Speech support and matching platform voices; unsupported browsers hide those controls
 - Air-quality "nearby sensor" comparison is not yet wired to a sensor network; the regional forecast is shown
 - The very first reload immediately after a service-worker update may briefly miss the offline shell (self-heals on the next reload)
 

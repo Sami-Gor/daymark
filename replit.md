@@ -1,6 +1,6 @@
 # Daymark
 
-A client-side weather app: current conditions, hourly/daily forecast, UV, air quality, and a hyperlocal micro-climate comparison, powered by Open-Meteo.
+A client-side weather app: current conditions, hourly/daily forecast, UV, air quality, a UK-only micro-climate comparison, location search, a forecast-derived severe-weather risk layer, and optional voice (*Hear today* / *Ask Daymark*) with English/French/Spanish — all powered by Open-Meteo.
 
 ## Run & Operate
 
@@ -15,11 +15,12 @@ A client-side weather app: current conditions, hourly/daily forecast, UV, air qu
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - Frontend: React 19 + Vite 7 + Tailwind CSS 4, wouter router, TanStack Query provider
 - Data: Open-Meteo APIs (forecast, air quality, geocoding) — direct browser calls, no key required
+- i18n: typed EN/FR/ES dictionaries in `src/locales/` (no i18n dependency); voice via the browser Web Speech APIs
 - Optional env (documented, not yet consumed): `VITE_PURPLEAIR_API_KEY`
 
 ## Where things live
 
-- `artifacts/weather-app` — the Daymark app; UI in `src/App.tsx` + `src/components/weather/`, weather logic in `src/lib/weather.ts`, theme in `src/index.css`
+- `artifacts/weather-app` — the Daymark app; UI in `src/App.tsx` + `src/components/weather/`, weather logic and location-safe time helpers in `src/lib/weather.ts`, forecast-risk engine in `src/lib/weather-alerts.ts`, intent/response layer in `src/lib/weather-intents.ts`, browser speech adapters in `src/lib/voice-*.ts`, translations in `src/locales/`, theme in `src/index.css`
 - `artifacts/weather-app/public` — PWA assets: `manifest.webmanifest`, `sw.js` (app-shell cache; build injects hashed assets via the `swPrecache` plugin in `vite.config.ts`), icons, favicon
 - `artifacts/mockup-sandbox` — component design sandbox for redesign mockups (dev-only, never deployed)
 - `scripts/` — workspace tooling placeholder; `scripts/post-merge.sh` refreshes installs on merge
@@ -30,7 +31,7 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Client-only weather for any searched location: current conditions with plain-English advice, hourly/3-day forecasts, UV with a sun-protection window, US AQI, a UK-only micro-climate comparison, forecast-derived severe-weather risks (not official warnings), and optional voice in English, French or Spanish.
 
 ## User preferences
 
