@@ -452,22 +452,41 @@
   .micro-rows { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
-  .topbar { align-items: flex-start; }
+  /* Mobile container: comfortable gutters plus device safe areas. */
+  .app-shell {
+    padding-top: calc(19px + env(safe-area-inset-top));
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+  /* Deliberate two-row header: brand, then controls across the full width. */
+  .topbar { flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 30px; }
+  .topbar .brand { flex: 1 1 auto; min-width: 0; }
+  .top-actions { flex: 1 1 100%; justify-content: space-between; gap: 8px; }
   .brand-note { display: none; }
-  .top-actions { gap: 6px; }
   /* Comfortable mobile tap targets without enlarging the desktop layout. */
-  .locale-select { min-height: 40px; padding: 8px 12px; font-size: 11px; }
-  .unit-button { min-height: 40px; min-width: 44px; }
-  .icon-button { width: 40px; height: 40px; }
-  .location-search-clear { min-width: 36px; min-height: 40px; justify-content: center; }
+  .locale-select { min-height: 44px; padding: 8px 12px; font-size: 11px; }
+  .unit-button { min-height: 44px; min-width: 44px; }
+  .icon-button { width: 44px; height: 44px; }
+  .location-search-clear { min-width: 40px; min-height: 44px; justify-content: center; }
   .location-option { min-height: 44px; }
-  .place-title { font-size: clamp(40px, 14vw, 58px); }
+  .location-search-field { min-height: 44px; }
+  /* 16px keeps iOS from zooming the page when the search field is focused. */
+  .location-search-field input { font-size: 16px; }
+  /* Hero scales down on narrow phones without becoming miniature. */
+  .place-title { font-size: clamp(36px, 12vw, 52px); }
+  .current-temp { font-size: clamp(84px, 26vw, 118px); }
+  .temp-block { margin-top: 34px; }
   .advice-grid { grid-template-columns: 1fr; max-width: 420px; margin-top: 30px; }
   .advice-card { min-height: 132px; }
+  .hero-actions { gap: 10px 8px; }
+  .local-button { min-height: 44px; padding: 10px 15px; font-size: 12px; }
+  .content-grid { gap: 16px; margin-top: 46px; }
   .day-row { grid-template-columns: minmax(64px, 1fr) 36px minmax(68px, 1fr) 55px; gap: 5px; }
   .forecast-panel { padding-left: 12px; padding-right: 12px; }
-  .footer-note { flex-direction: column; }
-  .uv-panel, .air-panel { padding: 15px; }
+  .details-panel { padding: 16px; }
+  .footer-note { flex-direction: column; margin-top: 40px; }
+  .uv-panel, .air-panel { padding: 16px 15px; }
   .uv-hero, .air-hero { flex-direction: column; gap: 12px; }
   .uv-peak-inline { padding-top: 0; text-align: left; }
   .uv-days { gap: 9px; }
@@ -478,6 +497,9 @@
   .micro-intro { display: block; padding: 15px 0; }
   .micro-intro strong { display: block; margin-top: 6px; }
   .micro-intro p { margin-top: 0; }
+  /* Privacy header wraps instead of clipping the back link. */
+  .privacy-topbar { flex-wrap: wrap; gap: 12px; margin-bottom: 26px; }
+  .privacy-back { white-space: normal; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

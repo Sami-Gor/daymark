@@ -1859,3 +1859,103 @@ test.describe('geolocation flow', () => {
     await expect(page.getByTestId('toast')).toContainText('Allow location access');
   });
 });
+
+test.describe('mobile layout', () => {
+  test('header controls stay fully inside the viewport on narrow phones', async ({ page }) => {
+    await mockOpenMeteo(page);
+    for (const width of [320, 360, 390, 412]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+      for (const selector of ['.locale-select', '.unit-switch', '.icon-button']) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box, `${selector} at ${width}px`).not.toBeNull();
+        expect(box!.x, `${selector} left edge at ${width}px`).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width, `${selector} right edge at ${width}px`).toBeLessThanOrEqual(width + 0.5);
+      }
+    }
+  });
+
+  test('content keeps a comfortable inset and the search input avoids iOS zoom', async ({ page }) => {
+    await mockOpenMeteo(page);
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+      for (const selector of ['.place-title', '.location-search-field', '.forecast-panel', '.uv-panel']) {
+        const box = await page.locator(selector).first().boundingBox();
+        expect(box, `${selector} at ${width}px`).not.toBeNull();
+        expect(box!.x, `${selector} left inset at ${width}px`).toBeGreaterThanOrEqual(16);
+        expect(box!.x + box!.width, `${selector} right inset at ${width}px`).toBeLessThanOrEqual(width - 16 + 0.5);
+      }
+      const inputSize = await page.getByTestId('input-location-search').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+      expect(inputSize, `search input size at ${width}px`).toBeGreaterThanOrEqual(16);
+    }
+  });
+
+  test('hero temperature scales with narrow phones instead of overflowing its block', async ({ page }) => {
+    await mockOpenMeteo(page);
+    const sizes: number[] = [];
+    for (const width of [320, 390, 430]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+      const size = await page.locator('.current-temp').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+      sizes.push(size);
+      const box = await page.locator('.current-temp').boundingBox();
+      expect(box!.x + box!.width, `temperature within viewport at ${width}px`).toBeLessThanOrEqual(width + 0.5);
+    }
+    expect(sizes[0], 'temperature at 320px').toBeLessThanOrEqual(96);
+    expect(sizes[0]).toBeLessThanOrEqual(sizes[1]);
+    expect(sizes[1]).toBeLessThanOrEqual(sizes[2]);
+  });
+
+  test('hero actions meet 44px and never clip their labels in EN/FR/ES', async ({ page }) => {
+    await stubSpeechRecognition(page);
+    await stubSpeechPlayback(page);
+    await mockOpenMeteo(page);
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toBeVisible();
+    for (const locale of ['en', 'fr', 'es']) {
+      await page.getByTestId('select-language').selectOption(locale);
+      const buttons = page.locator('.hero-actions .local-button');
+      const count = await buttons.count();
+      expect(count, `${locale} action count`).toBeGreaterThanOrEqual(3);
+      for (let index = 0; index < count; index += 1) {
+        const button = buttons.nth(index);
+        const box = await button.boundingBox();
+        expect(box!.height, `${locale} button ${index} height`).toBeGreaterThanOrEqual(43.5);
+        const labelFits = await button.evaluate((element) => element.scrollWidth <= element.clientWidth + 1);
+        expect(labelFits, `${locale} button ${index} label clipping`).toBe(true);
+      }
+    }
+  });
+
+  test('privacy pages keep header, text and language switcher inside 320px', async ({ page }) => {
+    for (const path of ['/privacy', '/fr/privacy', '/es/privacy']) {
+      await page.setViewportSize({ width: 320, height: 800 });
+      await page.goto(path);
+      await expect(page.getByTestId('page-privacy')).toBeVisible();
+      const back = await page.getByTestId('link-back-home').boundingBox();
+      expect(back!.x + back!.width, `${path} back link right edge`).toBeLessThanOrEqual(320.5);
+      const paragraph = await page.locator('.privacy-policy p').first().boundingBox();
+      expect(paragraph!.x, `${path} paragraph inset`).toBeGreaterThanOrEqual(16);
+      const chip = await page.getByTestId('link-privacy-lang-es').boundingBox();
+      expect(chip!.x + chip!.width, `${path} language chip right edge`).toBeLessThanOrEqual(320.5);
+    }
+  });
+
+  test('search results panel aligns with the field and stays in view', async ({ page }) => {
+    await mockLocations(page);
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto('/');
+    await page.getByTestId('input-location-search').fill('tokyo');
+    await expect(page.getByTestId('location-option-0')).toBeVisible();
+    const field = await page.locator('.location-search-field').boundingBox();
+    const panel = await page.getByTestId('location-results').boundingBox();
+    expect(Math.abs(panel!.x - field!.x), 'panel left alignment').toBeLessThanOrEqual(1);
+    expect(Math.abs(panel!.width - field!.width), 'panel width alignment').toBeLessThanOrEqual(1);
+    expect(panel!.x + panel!.width, 'panel right edge').toBeLessThanOrEqual(320.5);
+  });
+});
