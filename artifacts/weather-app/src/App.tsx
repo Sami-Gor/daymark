@@ -104,9 +104,12 @@ function Home() {
       const key = geoError?.code === 2 ? 'current.locationUnavailable' : geoError?.code === 3 ? 'current.locationTimeout' : 'current.locationDenied';
       toast({ title: t('current.locationTitle'), description: t(key) });
     }, {
+      // A cold mobile GPS fix routinely takes longer than 5 s, so give the
+      // browser room to deliver a first fix before it reports a timeout.
+      // Cached recent fixes are still returned immediately (maximumAge).
       enableHighAccuracy: false,
       maximumAge: 300000,
-      timeout: 5000,
+      timeout: 12000,
     });
   }, [loadWeather, toast, t]);
 
