@@ -201,6 +201,7 @@ const es: Record<TranslationKey, string> = {
   'error.retry': 'Reintentar',
   'loading.aria': 'Cargando el tiempo',
   'loading.status': 'Cargando el último pronóstico…',
+  'loading.updating': 'Actualizando…',
   'notFound.title': '404 Página no encontrada',
   'notFound.body': '¿Olvidaste añadir la página al enrutador?',
   'footer.by': 'Pronósticos de Open-Meteo',

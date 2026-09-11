@@ -201,6 +201,7 @@ const fr: Record<TranslationKey, string> = {
   'error.retry': 'Réessayer',
   'loading.aria': 'Chargement de la météo',
   'loading.status': 'Chargement des dernières prévisions…',
+  'loading.updating': 'Mise à jour…',
   'notFound.title': '404 Page introuvable',
   'notFound.body': 'Avez-vous oublié d’ajouter la page au routeur ?',
   'footer.by': 'Prévisions par Open-Meteo',

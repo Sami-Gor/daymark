@@ -35,7 +35,7 @@ const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', l
 
 function Home() {
   const { t, locale } = useLocale();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const [place, setPlace] = useState<Place>(LONDON);
   const [weather, setWeather] = useState<WeatherPayload | null>(null);
   const [unit, setUnit] = useState<Unit>('celsius');
@@ -44,6 +44,7 @@ function Home() {
   const [isLocating, setIsLocating] = useState(false);
   const requestId = useRef(0);
   const selectionId = useRef(0);
+  const locationToastId = useRef<string | null>(null);
 
   const loadWeather = useCallback(async (nextPlace: Place) => {
     const id = ++requestId.current;
@@ -52,6 +53,8 @@ function Home() {
     try {
       const result = await fetchWeather(nextPlace);
       if (id !== requestId.current) return;
+      // Atomic swap: the new place and its payload land together, and the
+      // previous render stays mounted until they do.
       setPlace(nextPlace);
       setWeather(result);
     } catch (err) {
@@ -69,11 +72,20 @@ function Home() {
     void loadWeather(nextPlace);
   }, [loadWeather]);
 
+  const clearLocationToast = useCallback(() => {
+    if (locationToastId.current) {
+      dismiss(locationToastId.current);
+      locationToastId.current = null;
+    }
+  }, [dismiss]);
+
   const findMe = useCallback(() => {
     if (!navigator.geolocation) {
       toast({ title: t('current.locationTitle'), description: t('current.locationUnsupported') });
       return;
     }
+    // A new attempt replaces any stale location-error toast.
+    clearLocationToast();
     const id = ++selectionId.current;
     setIsLocating(true);
     setError('');
@@ -86,6 +98,7 @@ function Home() {
       try {
         // A newer search or location interaction wins over this older one.
         if (id !== selectionId.current) return;
+        clearLocationToast();
         // Open-Meteo geocoding is forward-only (typed name search), so device
         // location is labelled directly and weather loads from the rounded
         // coordinates (DAYMARK-SEC-002) with no reverse lookup.
@@ -97,7 +110,7 @@ function Home() {
       if (id !== selectionId.current) return;
       setIsLocating(false);
       const key = geoError?.code === 2 ? 'current.locationUnavailable' : geoError?.code === 3 ? 'current.locationTimeout' : 'current.locationDenied';
-      toast({ title: t('current.locationTitle'), description: t(key) });
+      locationToastId.current = toast({ title: t('current.locationTitle'), description: t(key) }).id;
     }, {
       // A cold mobile GPS fix routinely takes longer than 5 s, so give the
       // browser room to deliver a first fix before it reports a timeout.
@@ -106,12 +119,15 @@ function Home() {
       maximumAge: 300000,
       timeout: 12000,
     });
-  }, [loadWeather, toast, t]);
+  }, [clearLocationToast, loadWeather, toast, t]);
 
   // No location permission is requested on load (DAYMARK-SEC-002): the app
   // opens on the default location and only asks when the user presses the
   // location button.
   useEffect(() => { void loadWeather(LONDON); }, [loadWeather]);
+
+  const showInitialLoading = isLoading && !weather;
+  const isRefreshing = isLoading && Boolean(weather);
 
   const weatherState = weather?.current ?? {};
   const updatedLabel = useMemo(() => {
@@ -139,33 +155,41 @@ function Home() {
   return (
     <div className="weather-app">
       <div className="app-shell">
-        <TopBar unit={unit} onUnitChange={setUnit} onFindMe={() => findMe()} isLocating={isLocating} />
+        <TopBar unit={unit} onUnitChange={setUnit} onFindMe={() => findMe()} isLocating={isLocating} isRefreshing={isRefreshing} />
 
-        {isLoading && <LoadingState />}
-        {!isLoading && error && <WeatherError message={error} onRetry={() => void loadWeather(place)} />}
-        {!isLoading && !error && weather && (
-          <main>
-            <CurrentWeather
-              place={place}
-              weather={weather}
-              unit={unit}
-              umbrellaAdvice={umbrellaAdvice}
-              sunglassesAdvice={sunglassesAdvice}
-              updatedLabel={updatedLabel}
-              isLocating={isLocating}
-              onFindMe={() => findMe()}
-              onSelectPlace={selectPlace}
-            />
-            <WeatherAlerts weather={weather} unit={unit} />
-            <div className="content-grid">
-              <HourlyOutlook weather={weather} unit={unit} />
-              <DailyForecast weather={weather} unit={unit} />
-              <WeatherDetails weather={weather} unit={unit} />
-              <MicroClimateForecast weather={weather} place={place} unit={unit} />
-              <UVForecast weather={weather} />
-              <AirQualityForecast weather={weather} />
-            </div>
-          </main>
+        {showInitialLoading && <LoadingState />}
+        {!showInitialLoading && !weather && error && <WeatherError message={error} onRetry={() => void loadWeather(place)} />}
+        {weather && (
+          <>
+            {error && (
+              <div className="refresh-error" role="alert" data-testid="refresh-error">
+                <span>{error}</span>
+                <button type="button" className="refresh-retry" onClick={() => void loadWeather(place)} data-testid="button-refresh-retry">{t('error.retry')}</button>
+              </div>
+            )}
+            <main aria-busy={isRefreshing}>
+              <CurrentWeather
+                place={place}
+                weather={weather}
+                unit={unit}
+                umbrellaAdvice={umbrellaAdvice}
+                sunglassesAdvice={sunglassesAdvice}
+                updatedLabel={updatedLabel}
+                isLocating={isLocating}
+                onFindMe={() => findMe()}
+                onSelectPlace={selectPlace}
+              />
+              <WeatherAlerts weather={weather} unit={unit} />
+              <div className="content-grid">
+                <HourlyOutlook weather={weather} unit={unit} />
+                <DailyForecast weather={weather} unit={unit} />
+                <WeatherDetails weather={weather} unit={unit} />
+                <MicroClimateForecast weather={weather} place={place} unit={unit} />
+                <UVForecast weather={weather} />
+                <AirQualityForecast weather={weather} />
+              </div>
+            </main>
+          </>
         )}
         <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> {t('footer.by')}</span><span className="footer-links"><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a><Link href={privacyHref} data-testid="link-privacy">{t('footer.privacy')}</Link></span></footer>
       </div>

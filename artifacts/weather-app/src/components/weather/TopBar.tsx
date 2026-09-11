@@ -3,11 +3,12 @@ import { LOCALES, isLocale, type Locale } from '@/lib/i18n';
 import type { Unit } from '@/lib/weather';
 import { useLocale } from '@/hooks/use-locale';
 
-export function TopBar({ unit, onUnitChange, onFindMe, isLocating }: {
+export function TopBar({ unit, onUnitChange, onFindMe, isLocating, isRefreshing }: {
   unit: Unit;
   onUnitChange: (unit: Unit) => void;
   onFindMe: () => void;
   isLocating: boolean;
+  isRefreshing: boolean;
 }) {
   const { locale, setLocale, t } = useLocale();
   const localeLabel = (value: Locale) => t(value === 'en' ? 'topbar.english' : value === 'fr' ? 'topbar.french' : 'topbar.spanish');
@@ -18,6 +19,7 @@ export function TopBar({ unit, onUnitChange, onFindMe, isLocating }: {
         <div><div className="brand-name">daymark</div><div className="brand-note">{t('brand.note')}</div></div>
       </div>
       <div className="top-actions">
+        {isRefreshing && <span className="refresh-indicator" role="status" aria-live="polite" data-testid="refresh-indicator">{t('loading.updating')}</span>}
         <label className="locale-select-wrap">
           <span className="sr-only">{t('topbar.language')}</span>
           <select
