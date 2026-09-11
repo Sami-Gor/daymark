@@ -2061,3 +2061,178 @@ test.describe('mobile layout', () => {
     expect(panel!.x + panel!.width, 'panel right inset').toBeLessThanOrEqual(viewportWidth - 16 + 0.5);
   });
 });
+
+test.describe('non-destructive weather refresh', () => {
+  const PARIS = {
+    results: [{ name: 'Paris', latitude: 48.8566, longitude: 2.3522, admin1: 'Île-de-France', country: 'France', country_code: 'FR', timezone: 'Europe/Paris' }],
+  };
+
+  async function stubDeferredGeolocation(page: Page) {
+    await page.addInitScript(() => {
+      (window as any).__geo = { calls: 0, pending: [] };
+      navigator.geolocation.getCurrentPosition = ((success: PositionCallback, error: PositionErrorCallback) => {
+        (window as any).__geo.calls += 1;
+        (window as any).__geo.pending.push({ success, error });
+      }) as typeof navigator.geolocation.getCurrentPosition;
+    });
+  }
+
+  async function resolveGeolocation(page: Page) {
+    await page.evaluate(() => {
+      for (const entry of (window as any).__geo.pending.splice(0)) {
+        entry.success({ coords: { latitude: 51.5074567, longitude: -0.12789012 } });
+      }
+    });
+  }
+
+  async function failGeolocation(page: Page, code: number) {
+    await page.evaluate((errorCode) => {
+      for (const entry of (window as any).__geo.pending.splice(0)) entry.error({ code: errorCode, message: 'stub' });
+    }, code);
+  }
+
+  async function delayForecast(page: Page, delay: number) {
+    await page.route('**/api.open-meteo.com/**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FORECAST) });
+    });
+  }
+
+  const clickByTestId = (page: Page, testId: string) =>
+    page.evaluate((id) => (document.querySelector(`[data-testid="${id}"]`) as HTMLElement).click(), testId);
+
+  test('initial load still shows the full-page skeleton before first data', async ({ page }) => {
+    await mockOpenMeteo(page, { delay: 1200 });
+    await page.goto('/');
+    await expect(page.locator('.loading-layout')).toBeVisible();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await expect(page.locator('.loading-layout')).toHaveCount(0);
+  });
+
+  test('location update keeps the existing UI mounted (no full-page skeleton)', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await delayForecast(page, 1500);
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page);
+    await expect(page.getByTestId('refresh-indicator')).toBeVisible();
+    await expect(page.locator('.loading-layout')).toHaveCount(0);
+    await expect(page.getByTestId('list-hourly-forecast')).toBeVisible();
+    // Previous content stays visible until the new payload is ready.
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location', { timeout: 15000 });
+    await expect(page.getByTestId('refresh-indicator')).toHaveCount(0);
+  });
+
+  test('search update keeps the existing UI mounted until the new place is ready', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await page.route('**/geocoding-api.open-meteo.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PARIS) }),
+    );
+    await delayForecast(page, 1200);
+
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('refresh-indicator')).toBeVisible();
+    await expect(page.locator('.loading-layout')).toHaveCount(0);
+    await expect(page.getByTestId('list-hourly-forecast')).toBeVisible();
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris', { timeout: 15000 });
+  });
+
+  test('refresh keeps scroll position and document height', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 900));
+    const before = await page.evaluate(() => ({ y: window.scrollY, h: document.documentElement.scrollHeight }));
+    await delayForecast(page, 1200);
+
+    await clickByTestId(page, 'button-refresh-location');
+    await resolveGeolocation(page);
+    await expect(page.getByTestId('refresh-indicator')).toBeVisible();
+    const during = await page.evaluate(() => ({ y: window.scrollY, h: document.documentElement.scrollHeight, skeletons: document.querySelectorAll('.skeleton').length }));
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location', { timeout: 15000 });
+    const after = await page.evaluate(() => ({ y: window.scrollY, h: document.documentElement.scrollHeight }));
+
+    expect(during.skeletons, 'no skeleton takeover during refresh').toBe(0);
+    expect(during.h, 'document height does not collapse').toBeGreaterThanOrEqual(before.h - 50);
+    expect(Math.abs(during.y - before.y), 'scroll stable during refresh').toBeLessThanOrEqual(5);
+    expect(Math.abs(after.y - before.y), 'scroll stable after refresh').toBeLessThanOrEqual(5);
+  });
+
+  test('refresh does not remount the main tree or replay entrance animations', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await page.evaluate(() => { (window as any).__hero = document.querySelector('.hero-grid'); });
+    await delayForecast(page, 1000);
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location', { timeout: 15000 });
+    expect(await page.evaluate(() => (window as any).__hero === document.querySelector('.hero-grid')), 'hero node identity').toBe(true);
+  });
+
+  test('a failed refresh keeps the previous weather and shows a non-destructive error', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await page.route('**/api.open-meteo.com/**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: '{"reason":"boom"}' }),
+    );
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page);
+    await expect(page.getByTestId('refresh-error')).toBeVisible();
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await expect(page.getByTestId('list-hourly-forecast')).toBeVisible();
+    await expect(page.getByTestId('status-weather-error')).toHaveCount(0);
+    await expect(page.locator('.loading-layout')).toHaveCount(0);
+  });
+
+  test('a successful location clears the previous location error toast', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await failGeolocation(page, 1);
+    await expect(page.getByTestId('toast')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('toast')).toHaveCount(0);
+    await resolveGeolocation(page);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
+    await expect(page.getByTestId('toast')).toHaveCount(0);
+  });
+
+  test('both location controls refresh without a reload', async ({ page }) => {
+    for (const testId of ['button-refresh-location', 'button-use-location']) {
+      await mockOpenMeteo(page);
+      await stubDeferredGeolocation(page);
+      await page.goto('/');
+      await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+      await delayForecast(page, 800);
+      await page.evaluate(() => { (window as any).__hero = document.querySelector('.hero-grid'); });
+
+      await clickByTestId(page, testId);
+      await resolveGeolocation(page);
+      await expect(page.getByTestId('refresh-indicator')).toBeVisible();
+      await expect(page.locator('.loading-layout')).toHaveCount(0);
+      await expect(page.getByTestId('text-current-city')).toHaveText('Your location', { timeout: 15000 });
+      expect(await page.evaluate(() => (window as any).__hero === document.querySelector('.hero-grid')), `${testId} node identity`).toBe(true);
+    }
+  });
+});
