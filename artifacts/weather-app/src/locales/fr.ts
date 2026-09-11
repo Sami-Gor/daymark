@@ -33,6 +33,8 @@ const fr: Record<TranslationKey, string> = {
   'current.locationTitle': 'Position indisponible',
   'current.locationUnsupported': 'Ce navigateur ne propose pas de service de localisation.',
   'current.locationDenied': "Nous n'avons pas pu accéder à votre position. Autorisez la localisation pour ce site, puis réessayez.",
+  'current.locationUnavailable': "Nous n'avons pas pu déterminer votre position. Vérifiez que les services de localisation sont activés, puis réessayez.",
+  'current.locationTimeout': 'La recherche de votre position a pris trop de temps. Réessayez ou recherchez un lieu.',
 
   'advice.rainUnavailable': 'Prévision de pluie indisponible',
   'advice.rainChanceTime': '{percent} % de risque vers {time}',
@@ -202,6 +204,7 @@ const fr: Record<TranslationKey, string> = {
   'notFound.title': '404 Page introuvable',
   'notFound.body': 'Avez-vous oublié d’ajouter la page au routeur ?',
   'footer.by': 'Prévisions par Open-Meteo',
+  'footer.privacy': 'Confidentialité',
 
   'condition.clear': 'Ciel dégagé',
   'condition.mostlyClear': 'Plutôt dégagé',

@@ -1238,9 +1238,10 @@ test.describe('negative input / XSS', () => {
     expect(await page.locator('a[href^="javascript:"]').count()).toBe(0);
     expect(await page.locator('a[href^="data:"]').count()).toBe(0);
     expect(await page.locator('img[src^="data:"]').count()).toBe(0);
-    // The only anchor on the page is the static Open-Meteo attribution link.
+    // Anchors are only the static app links (Open-Meteo attribution + Privacy);
+    // no URL-like input became a link or navigation sink.
     const hrefs = await page.evaluate(() => Array.from(document.querySelectorAll('a')).map((anchor) => anchor.getAttribute('href')));
-    expect(hrefs).toEqual(['https://open-meteo.com/']);
+    expect(hrefs).toEqual(['https://open-meteo.com/', '/privacy']);
     expect(await page.evaluate(() => (window as any).__xss)).toBe(0);
   });
 });
@@ -1588,5 +1589,375 @@ test.describe('weather loading', () => {
     await page.getByTestId('location-option-0').click();
     await expect(page.getByTestId('text-current-city')).toHaveText('Tokyo');
     await expect(page.getByTestId('text-current-temperature')).toHaveText('26°C');
+  });
+});
+
+test.describe('privacy policy page', () => {
+  const policies = [
+    { lang: 'en', path: '/privacy', heading: 'Privacy Policy', effective: 'Effective date', back: 'Back to weather' },
+    { lang: 'fr', path: '/fr/privacy', heading: 'Politique de confidentialité', effective: 'Date d’entrée en vigueur', back: 'Retour à la météo' },
+    { lang: 'es', path: '/es/privacy', heading: 'Política de privacidad', effective: 'Fecha de entrada en vigor', back: 'Volver al tiempo' },
+  ] as const;
+
+  for (const policy of policies) {
+    test(`direct ${policy.path} route loads the ${policy.lang} policy`, async ({ page }) => {
+      await page.goto(policy.path);
+      await expect(page.getByTestId('page-privacy')).toBeVisible();
+      await expect(page.getByTestId('page-privacy')).toHaveAttribute('data-lang', policy.lang);
+      await expect(page.getByRole('heading', { level: 1, name: policy.heading })).toBeVisible();
+      await expect(page.getByTestId('text-privacy-effective')).toContainText(policy.effective);
+      await expect(page.getByTestId('link-back-home')).toContainText(policy.back);
+      await expect(page.getByTestId(`link-privacy-lang-${policy.lang}`)).toHaveAttribute('aria-current', 'page');
+    });
+  }
+
+  test('does not call weather APIs or persist anything', async ({ page }) => {
+    const requested: string[] = [];
+    page.on('request', (request) => requested.push(request.url()));
+    await page.goto('/privacy');
+    await expect(page.getByTestId('page-privacy')).toBeVisible();
+    expect(requested.filter((url) => url.includes('open-meteo'))).toEqual([]);
+    const state = await page.evaluate(() => ({
+      local: Object.keys(window.localStorage),
+      session: Object.keys(window.sessionStorage),
+      cookies: document.cookie,
+    }));
+    expect(state).toEqual({ local: [], session: [], cookies: '' });
+  });
+
+  test('footer Privacy link follows the interface language', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('link-privacy')).toHaveAttribute('href', '/privacy');
+    await page.getByTestId('select-language').selectOption('fr');
+    await expect(page.getByTestId('link-privacy')).toHaveText('Confidentialité');
+    await expect(page.getByTestId('link-privacy')).toHaveAttribute('href', '/fr/privacy');
+    await page.getByTestId('link-privacy').click();
+    await expect(page).toHaveURL(/\/fr\/privacy$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Politique de confidentialité' })).toBeVisible();
+    await page.getByTestId('link-back-home').click();
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await page.getByTestId('select-language').selectOption('es');
+    await expect(page.getByTestId('link-privacy')).toHaveText('Privacidad');
+    await expect(page.getByTestId('link-privacy')).toHaveAttribute('href', '/es/privacy');
+  });
+
+  test('language switcher navigates between concrete policy URLs and is keyboard accessible', async ({ page }) => {
+    await page.goto('/privacy');
+    await page.getByTestId('link-privacy-lang-fr').focus();
+    await expect(page.getByTestId('link-privacy-lang-fr')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/fr\/privacy$/);
+    await expect(page.getByTestId('page-privacy')).toHaveAttribute('data-lang', 'fr');
+    await page.getByTestId('link-privacy-lang-es').click();
+    await expect(page).toHaveURL(/\/es\/privacy$/);
+    await expect(page.getByTestId('page-privacy')).toHaveAttribute('data-lang', 'es');
+    await page.getByTestId('link-privacy-lang-en').click();
+    await expect(page).toHaveURL(/\/privacy$/);
+    await expect(page.getByTestId('page-privacy')).toHaveAttribute('data-lang', 'en');
+  });
+
+  test('shows the confirmed operator and contact details in every language', async ({ page }) => {
+    for (const policy of policies) {
+      await page.goto(policy.path);
+      const text = await page.getByTestId('page-privacy').innerText();
+      expect(text).toContain('Sami Belhadj');
+      expect(text).toContain('skylinelabdev@gmail.com');
+    }
+  });
+
+  test('contains no placeholders or draft markers', async ({ page }) => {
+    for (const policy of policies) {
+      await page.goto(policy.path);
+      const text = await page.getByTestId('page-privacy').innerText();
+      for (const forbidden of ['[OPERATOR NAME]', '[CONTACT EMAIL]', 'DECISION REQUIRED', 'Draft notice', 'placeholder']) {
+        expect(text).not.toContain(forbidden);
+      }
+    }
+  });
+
+  test('states the verified data practices in every language', async ({ page }) => {
+    const expectations = {
+      en: {
+        location: 'rounded to two decimal places',
+        speech: 'does not record or store your voice audio or speech transcripts',
+        audience: 'general-audience weather utility',
+      },
+      fr: {
+        location: 'arrondies à deux décimales',
+        speech: 'n’enregistre ni ne conserve votre audio vocal ni vos transcriptions vocales',
+        audience: 'grand public',
+      },
+      es: {
+        location: 'se redondean a dos decimales',
+        speech: 'no graba ni almacena tu audio de voz ni tus transcripciones',
+        audience: 'público general',
+      },
+    } as const;
+    for (const policy of policies) {
+      await page.goto(policy.path);
+      const text = await page.getByTestId('page-privacy').innerText();
+      for (const host of ['api.open-meteo.com', 'air-quality-api.open-meteo.com', 'geocoding-api.open-meteo.com']) {
+        expect(text).toContain(host);
+      }
+      expect(text).toContain('Open-Meteo');
+      expect(text).toContain('daymark.locale');
+      expect(text).toContain(expectations[policy.lang].location);
+      expect(text).toContain(expectations[policy.lang].speech);
+      expect(text).toContain(expectations[policy.lang].audience);
+      expect(text).not.toMatch(/collects? no data/i);
+    }
+  });
+
+  for (const policy of policies) {
+    for (const width of [320, 390]) {
+      test(`${policy.lang} policy has no horizontal overflow at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(policy.path);
+        await expect(page.getByTestId('page-privacy')).toBeVisible();
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(overflow).toBeLessThanOrEqual(0);
+      });
+    }
+  }
+});
+
+test.describe('geolocation flow', () => {
+  const GREENWICH = {
+    results: [{ name: 'Greenwich', latitude: 51.4789, longitude: 0.0107, country: 'United Kingdom', country_code: 'GB', timezone: 'Europe/London' }],
+  };
+  const PARIS = {
+    results: [{ name: 'Paris', latitude: 48.8566, longitude: 2.3522, admin1: 'Île-de-France', country: 'France', country_code: 'FR', timezone: 'Europe/Paris' }],
+  };
+
+  /** Geolocation whose success/error callbacks only fire when the test says so. */
+  async function stubDeferredGeolocation(page: Page) {
+    await page.addInitScript(() => {
+      (window as any).__geo = { calls: 0, pending: [] };
+      navigator.geolocation.getCurrentPosition = ((success: PositionCallback, error: PositionErrorCallback) => {
+        (window as any).__geo.calls += 1;
+        (window as any).__geo.pending.push({ success, error });
+      }) as typeof navigator.geolocation.getCurrentPosition;
+    });
+  }
+
+  async function resolveGeolocation(page: Page, latitude: number, longitude: number) {
+    await page.evaluate(([lat, lon]) => {
+      const pending = (window as any).__geo.pending.splice(0);
+      for (const entry of pending) entry.success({ coords: { latitude: lat, longitude: lon } });
+    }, [latitude, longitude]);
+  }
+
+  async function failGeolocation(page: Page, code: number) {
+    await page.evaluate((errorCode) => {
+      const pending = (window as any).__geo.pending.splice(0);
+      for (const entry of pending) entry.error({ code: errorCode, message: 'stub' });
+    }, code);
+  }
+
+  /** Reverse geocoding returns a place; forward (search) returns another. */
+  async function routeGeocoding(page: Page, reverseBody: object, searchBody: object) {
+    await page.route('**/geocoding-api.open-meteo.com/**', (route) => {
+      const body = route.request().url().includes('count=1') ? reverseBody : searchBody;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+  }
+
+  test('a search made while geolocation is pending is not overwritten by the older location result', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeGeocoding(page, GREENWICH, PARIS);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Finding you…');
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+
+    // The older location request resolves after the newer search selection.
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    expect(await page.evaluate(() => (window as any).__geo.calls)).toBe(1);
+  });
+
+  test('geolocation wins when it is the most recent action', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeGeocoding(page, GREENWICH, PARIS);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
+  });
+
+  test('rapid double-click settles cleanly without duplicate final-state corruption', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeGeocoding(page, GREENWICH, PARIS);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    let mainForecastRequests = 0;
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.hostname === 'api.open-meteo.com' && !request.url().includes('ukmo')) mainForecastRequests += 1;
+    });
+
+    await page.getByTestId('button-refresh-location').click();
+    await page.getByTestId('button-refresh-location').click();
+    expect(await page.evaluate(() => (window as any).__geo.calls)).toBe(2);
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    // One weather load for the winning click, not one per click.
+    expect(mainForecastRequests).toBe(1);
+  });
+
+  test('reports a geolocation timeout as a timeout, not a permission denial', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await failGeolocation(page, 3);
+    await expect(page.getByTestId('toast')).toContainText('took too long');
+    await expect(page.getByTestId('toast')).not.toContainText('Allow location access');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+  });
+
+  test('reports position-unavailable distinctly from permission denial', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await failGeolocation(page, 2);
+    await expect(page.getByTestId('toast')).toContainText('determine your location');
+    await expect(page.getByTestId('toast')).not.toContainText('Allow location access');
+  });
+
+  test('keeps the existing permission-denied message for code 1', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await failGeolocation(page, 1);
+    await expect(page.getByTestId('toast')).toContainText('Allow location access');
+  });
+});
+
+test.describe('mobile layout', () => {
+  test('header controls stay fully inside the viewport on narrow phones', async ({ page }) => {
+    await mockOpenMeteo(page);
+    for (const width of [320, 360, 390, 412]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+      for (const selector of ['.locale-select', '.unit-switch', '.icon-button']) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box, `${selector} at ${width}px`).not.toBeNull();
+        expect(box!.x, `${selector} left edge at ${width}px`).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width, `${selector} right edge at ${width}px`).toBeLessThanOrEqual(width + 0.5);
+      }
+    }
+  });
+
+  test('content keeps a comfortable inset and the search input avoids iOS zoom', async ({ page }) => {
+    await mockOpenMeteo(page);
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+      for (const selector of ['.place-title', '.location-search-field', '.forecast-panel', '.uv-panel']) {
+        const box = await page.locator(selector).first().boundingBox();
+        expect(box, `${selector} at ${width}px`).not.toBeNull();
+        expect(box!.x, `${selector} left inset at ${width}px`).toBeGreaterThanOrEqual(16);
+        expect(box!.x + box!.width, `${selector} right inset at ${width}px`).toBeLessThanOrEqual(width - 16 + 0.5);
+      }
+      const inputSize = await page.getByTestId('input-location-search').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+      expect(inputSize, `search input size at ${width}px`).toBeGreaterThanOrEqual(16);
+    }
+  });
+
+  test('hero temperature scales with narrow phones instead of overflowing its block', async ({ page }) => {
+    await mockOpenMeteo(page);
+    const sizes: number[] = [];
+    for (const width of [320, 390, 430]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+      const size = await page.locator('.current-temp').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+      sizes.push(size);
+      const box = await page.locator('.current-temp').boundingBox();
+      expect(box!.x + box!.width, `temperature within viewport at ${width}px`).toBeLessThanOrEqual(width + 0.5);
+    }
+    expect(sizes[0], 'temperature at 320px').toBeLessThanOrEqual(96);
+    expect(sizes[0]).toBeLessThanOrEqual(sizes[1]);
+    expect(sizes[1]).toBeLessThanOrEqual(sizes[2]);
+  });
+
+  test('hero actions meet 44px and never clip their labels in EN/FR/ES', async ({ page }) => {
+    await stubSpeechRecognition(page);
+    await stubSpeechPlayback(page);
+    await mockOpenMeteo(page);
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toBeVisible();
+    for (const locale of ['en', 'fr', 'es']) {
+      await page.getByTestId('select-language').selectOption(locale);
+      const buttons = page.locator('.hero-actions .local-button');
+      const count = await buttons.count();
+      expect(count, `${locale} action count`).toBeGreaterThanOrEqual(3);
+      for (let index = 0; index < count; index += 1) {
+        const button = buttons.nth(index);
+        const box = await button.boundingBox();
+        expect(box!.height, `${locale} button ${index} height`).toBeGreaterThanOrEqual(43.5);
+        const labelFits = await button.evaluate((element) => element.scrollWidth <= element.clientWidth + 1);
+        expect(labelFits, `${locale} button ${index} label clipping`).toBe(true);
+      }
+    }
+  });
+
+  test('privacy pages keep header, text and language switcher inside 320px', async ({ page }) => {
+    for (const path of ['/privacy', '/fr/privacy', '/es/privacy']) {
+      await page.setViewportSize({ width: 320, height: 800 });
+      await page.goto(path);
+      await expect(page.getByTestId('page-privacy')).toBeVisible();
+      const back = await page.getByTestId('link-back-home').boundingBox();
+      expect(back!.x + back!.width, `${path} back link right edge`).toBeLessThanOrEqual(320.5);
+      const paragraph = await page.locator('.privacy-policy p').first().boundingBox();
+      expect(paragraph!.x, `${path} paragraph inset`).toBeGreaterThanOrEqual(16);
+      const chip = await page.getByTestId('link-privacy-lang-es').boundingBox();
+      expect(chip!.x + chip!.width, `${path} language chip right edge`).toBeLessThanOrEqual(320.5);
+    }
+  });
+
+  test('search results panel aligns with the field and stays in view', async ({ page }) => {
+    await mockLocations(page);
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto('/');
+    await page.getByTestId('input-location-search').fill('tokyo');
+    await expect(page.getByTestId('location-option-0')).toBeVisible();
+    const field = await page.locator('.location-search-field').boundingBox();
+    const panel = await page.getByTestId('location-results').boundingBox();
+    const viewportWidth = await page.evaluate(() => window.innerWidth);
+    expect(Math.abs(panel!.x - field!.x), 'panel left alignment').toBeLessThanOrEqual(1);
+    expect(Math.abs(panel!.width - field!.width), 'panel width alignment').toBeLessThanOrEqual(1);
+    expect(panel!.x, 'panel left inset').toBeGreaterThanOrEqual(15.5);
+    expect(panel!.x + panel!.width, 'panel right inset').toBeLessThanOrEqual(viewportWidth - 16 + 0.5);
   });
 });

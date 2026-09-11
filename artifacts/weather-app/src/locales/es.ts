@@ -33,6 +33,8 @@ const es: Record<TranslationKey, string> = {
   'current.locationTitle': 'Ubicación no disponible',
   'current.locationUnsupported': 'Este navegador no ofrece servicios de ubicación.',
   'current.locationDenied': 'No pudimos acceder a tu ubicación. Permite la ubicación para este sitio y vuelve a intentarlo.',
+  'current.locationUnavailable': 'No pudimos determinar tu ubicación. Comprueba que los servicios de ubicación estén activados y vuelve a intentarlo.',
+  'current.locationTimeout': 'La búsqueda de tu ubicación tardó demasiado. Inténtalo de nuevo o busca un lugar.',
 
   'advice.rainUnavailable': 'Pronóstico de lluvia no disponible',
   'advice.rainChanceTime': '{percent} % de probabilidad hacia las {time}',
@@ -202,6 +204,7 @@ const es: Record<TranslationKey, string> = {
   'notFound.title': '404 Página no encontrada',
   'notFound.body': '¿Olvidaste añadir la página al enrutador?',
   'footer.by': 'Pronósticos de Open-Meteo',
+  'footer.privacy': 'Privacidad',
 
   'condition.clear': 'Cielo despejado',
   'condition.mostlyClear': 'Mayormente despejado',
