@@ -287,8 +287,11 @@ describe('fetchWeather', () => {
     });
     await fetchWeather(PLACE);
     expect(calls).toHaveLength(2);
-    expect(calls.filter((url) => url.includes('air-quality-api.open-meteo.com'))).toHaveLength(1);
-    expect(calls.filter((url) => url.includes('api.open-meteo.com/v1/forecast'))).toHaveLength(1);
+    expect(calls.filter((url) => new URL(url).hostname === 'air-quality-api.open-meteo.com')).toHaveLength(1);
+    expect(calls.filter((url) => {
+      const parsed = new URL(url);
+      return parsed.hostname === 'api.open-meteo.com' && parsed.pathname === '/v1/forecast';
+    })).toHaveLength(1);
     for (const url of calls) {
       expect(url).toContain('latitude=51.51');
       expect(url).toContain('longitude=-0.13');

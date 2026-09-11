@@ -763,7 +763,8 @@ test.describe('location search', () => {
     await page.goto('/');
     const requested: string[] = [];
     page.on('request', (request) => {
-      if (request.url().includes('api.open-meteo.com/v1/forecast')) requested.push(request.url());
+      const parsed = new URL(request.url());
+      if (parsed.hostname === 'api.open-meteo.com' && parsed.pathname === '/v1/forecast') requested.push(request.url());
     });
     await page.getByTestId('input-location-search').fill('springfield');
     await expect(page.getByTestId('location-option-0')).toContainText('Illinois');
@@ -1525,7 +1526,7 @@ test.describe('regional comparison', () => {
   test('hides outside the UK and never requests the UKV model there', async ({ page }) => {
     const requested: string[] = [];
     page.on('request', (request) => {
-      if (request.url().includes('api.open-meteo.com')) requested.push(request.url());
+      if (new URL(request.url()).hostname === 'api.open-meteo.com') requested.push(request.url());
     });
     await mockLocations(page);
     await page.goto('/');
