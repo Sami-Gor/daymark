@@ -278,26 +278,9 @@ export async function fetchMicroClimate(place: Place): Promise<MicroClimatePaylo
   return payload;
 }
 
-export async function reverseGeocode(latitude: number, longitude: number): Promise<Place | undefined> {
-  const reverseParams = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), count: '1', language: 'en', format: 'json' });
-  const reverse = await getJson(`${GEOCODING_URL}?${reverseParams.toString()}`, GeocodingResponseSchema);
-  const found = reverse.results?.[0];
-  return found
-    ? {
-        name: found.name,
-        latitude: found.latitude,
-        longitude: found.longitude,
-        admin1: found.admin1,
-        country: found.country,
-        countryCode: found.country_code,
-        timezone: found.timezone,
-      }
-    : undefined;
-}
-
 /*
- * Forward geocoding for the location search. Uses the same Open-Meteo
- * geocoding endpoint as reverseGeocode; no other location provider exists.
+ * Forward geocoding for the location search. Uses Open-Meteo's geocoding
+ * endpoint with a typed `name`; the endpoint has no reverse (lat/lon) lookup.
  * `signal` lets the caller cancel a stale search so only the latest query wins.
  */
 export async function searchPlaces(

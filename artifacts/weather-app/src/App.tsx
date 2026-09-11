@@ -13,7 +13,6 @@ import {
   fetchWeather,
   getSunglassesAdvice,
   getUmbrellaAdvice,
-  reverseGeocode,
   timeLabel,
   type Place,
   type Unit,
@@ -87,14 +86,10 @@ function Home() {
       try {
         // A newer search or location interaction wins over this older one.
         if (id !== selectionId.current) return;
-        let found: Place | undefined;
-        try {
-          found = await reverseGeocode(latitude, longitude);
-        } catch {
-          found = undefined;
-        }
-        if (id !== selectionId.current) return;
-        await loadWeather(found ?? { name: 'Your location', latitude, longitude });
+        // Open-Meteo geocoding is forward-only (typed name search), so device
+        // location is labelled directly and weather loads from the rounded
+        // coordinates (DAYMARK-SEC-002) with no reverse lookup.
+        await loadWeather({ name: 'Your location', latitude, longitude });
       } finally {
         if (id === selectionId.current) setIsLocating(false);
       }

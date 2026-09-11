@@ -21,7 +21,6 @@ import {
   isMicroClimateSupported,
   isSameLocationDay,
   locationTimeMs,
-  reverseGeocode,
   searchPlaces,
   shortDay,
   SUN_PROTECTION_UV_THRESHOLD,
@@ -314,35 +313,6 @@ describe('fetchMicroClimate', () => {
     await expect(fetchMicroClimate({ ...PLACE, latitude: 20.2, longitude: 0.2 })).resolves.toMatchObject({
       current: { temperature_2m: 18 },
     });
-  });
-});
-
-describe('reverseGeocode', () => {
-  afterEach(() => vi.restoreAllMocks());
-
-  it('maps the first result to a Place', async () => {
-    stubFetch(() =>
-      json({
-        results: [
-          { name: 'London', latitude: 51.51, longitude: -0.13, country: 'UK', extra: 1 },
-        ],
-      }),
-    );
-    await expect(reverseGeocode(51.51, -0.13)).resolves.toMatchObject({
-      name: 'London',
-    });
-  });
-
-  it('returns undefined when there are no results', async () => {
-    stubFetch(() => json({ results: [] }));
-    await expect(reverseGeocode(51.51, -0.13)).resolves.toBeUndefined();
-  });
-
-  it('rejects malformed geocoding payloads', async () => {
-    stubFetch(() => json({ results: [{ nope: true }] }));
-    await expect(reverseGeocode(51.51, -0.13)).rejects.toThrow(
-      'unexpected shape',
-    );
   });
 });
 
