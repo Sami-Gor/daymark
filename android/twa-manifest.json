@@ -1,6 +1,6 @@
 {
   "packageId": "io.github.sami_gor.daymark",
-  "host": "localhost:8090",
+  "host": "daymark-weather.pages.dev",
   "name": "Daymark",
   "launcherName": "Daymark",
   "display": "standalone",
@@ -9,9 +9,9 @@
   "backgroundColor": "#e7f2f7",
   "enableNotifications": false,
   "startUrl": "/",
-  "iconUrl": "http://localhost:8090/icons/icon-512.png",
-  "maskableIconUrl": "http://localhost:8090/icons/icon-maskable-512.png",
-  "webManifestUrl": "http://localhost:8090/manifest.webmanifest",
+  "iconUrl": "https://daymark-weather.pages.dev/icons/icon-512.png",
+  "maskableIconUrl": "https://daymark-weather.pages.dev/icons/icon-maskable-512.png",
+  "webManifestUrl": "https://daymark-weather.pages.dev/manifest.webmanifest",
   "splashScreenFadeOutDuration": 250,
   "signingKey": {
     "path": "./android.keystore",
@@ -30,7 +30,7 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "http://localhost:8090/",
+  "fullScopeUrl": "https://daymark-weather.pages.dev/",
   "minSdkVersion": 23,
   "orientation": "default",
   "fingerprints": [
