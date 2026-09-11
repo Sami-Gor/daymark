@@ -87,28 +87,29 @@ test.describe('functional', () => {
     await expect.poll(() => page.evaluate(() => window.__geoCalls)).toBe(0);
   });
 
-  test('granted geolocation sends rounded coordinates and updates the place', async ({ browser }) => {
+  test('granted geolocation loads weather from rounded coordinates without reverse geocoding', async ({ browser }) => {
     const context = await browser.newContext({
       permissions: ['geolocation'],
       geolocation: { latitude: 51.5074567, longitude: -0.12789012 },
     });
     const page = await context.newPage();
-    const captured: string[] = [];
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
     await mockOpenMeteo(page);
-    // Registered after mockOpenMeteo so this capture route wins (LIFO).
-    await page.route('**/geocoding-api.open-meteo.com/**', async (route) => {
-      captured.push(route.request().url());
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(GEOCODE) });
-    });
     await page.goto('/');
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await page.waitForLoadState('networkidle');
+    requests.length = 0;
     await page.getByTestId('button-refresh-location').click();
-    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
-    expect(captured.length).toBeGreaterThan(0);
-    for (const url of captured) {
-      expect(url).toContain('latitude=51.51&longitude=-0.13');
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
+    const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
+    expect(forecasts.length).toBeGreaterThan(0);
+    for (const url of forecasts) {
+      expect(url).toContain('latitude=51.51');
+      expect(url).toContain('longitude=-0.13');
       expect(url).not.toContain('5074567');
     }
+    expect(requests.filter((url) => url.includes('geocoding-api.open-meteo.com'))).toEqual([]);
     await context.close();
   });
 
@@ -1723,9 +1724,6 @@ test.describe('privacy policy page', () => {
 });
 
 test.describe('geolocation flow', () => {
-  const GREENWICH = {
-    results: [{ name: 'Greenwich', latitude: 51.4789, longitude: 0.0107, country: 'United Kingdom', country_code: 'GB', timezone: 'Europe/London' }],
-  };
   const PARIS = {
     results: [{ name: 'Paris', latitude: 48.8566, longitude: 2.3522, admin1: 'Île-de-France', country: 'France', country_code: 'FR', timezone: 'Europe/Paris' }],
   };
@@ -1770,17 +1768,16 @@ test.describe('geolocation flow', () => {
     }, simulatedDelayMs);
   }
 
-  /** Reverse geocoding returns a place; forward (search) returns another. */
-  async function routeGeocoding(page: Page, reverseBody: object, searchBody: object) {
-    await page.route('**/geocoding-api.open-meteo.com/**', (route) => {
-      const body = route.request().url().includes('count=1') ? reverseBody : searchBody;
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-    });
+  /** Typed place search returns the given results; device location must not call geocoding. */
+  async function routeSearchGeocoding(page: Page, searchBody: object) {
+    await page.route('**/geocoding-api.open-meteo.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(searchBody) }),
+    );
   }
 
   test('a search made while geolocation is pending is not overwritten by the older location result', async ({ page }) => {
     await mockOpenMeteo(page);
-    await routeGeocoding(page, GREENWICH, PARIS);
+    await routeSearchGeocoding(page, PARIS);
     await stubDeferredGeolocation(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
@@ -1801,7 +1798,7 @@ test.describe('geolocation flow', () => {
 
   test('geolocation wins when it is the most recent action', async ({ page }) => {
     await mockOpenMeteo(page);
-    await routeGeocoding(page, GREENWICH, PARIS);
+    await routeSearchGeocoding(page, PARIS);
     await stubDeferredGeolocation(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
@@ -1812,12 +1809,11 @@ test.describe('geolocation flow', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await resolveGeolocation(page, 51.5074567, -0.12789012);
-    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
   });
 
   test('rapid double-click settles cleanly without duplicate final-state corruption', async ({ page }) => {
     await mockOpenMeteo(page);
-    await routeGeocoding(page, GREENWICH, PARIS);
     await stubDeferredGeolocation(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
@@ -1832,7 +1828,7 @@ test.describe('geolocation flow', () => {
     await page.getByTestId('button-refresh-location').click();
     expect(await page.evaluate(() => (window as any).__geo.calls)).toBe(2);
     await resolveGeolocation(page, 51.5074567, -0.12789012);
-    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
     // One weather load for the winning click, not one per click.
     expect(mainForecastRequests).toBe(1);
@@ -1890,13 +1886,12 @@ test.describe('geolocation flow', () => {
 
   test('a simulated 10-second cold GPS fix resolves within the configured timeout', async ({ page }) => {
     await mockOpenMeteo(page);
-    await routeGeocoding(page, GREENWICH, PARIS);
     await stubTimedGeolocation(page, 10000);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
 
     await page.getByTestId('button-refresh-location').click();
-    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
   });
 
@@ -1914,7 +1909,6 @@ test.describe('geolocation flow', () => {
 
   test('the topbar crosshair uses the same location flow', async ({ page }) => {
     await mockOpenMeteo(page);
-    await routeGeocoding(page, GREENWICH, PARIS);
     await stubDeferredGeolocation(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
@@ -1922,24 +1916,32 @@ test.describe('geolocation flow', () => {
     await page.getByTestId('button-use-location').click();
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Finding you…');
     await resolveGeolocation(page, 51.5074567, -0.12789012);
-    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
   });
 
-  test('loads weather with the fallback label when reverse geocoding fails', async ({ page }) => {
+  test('device location makes no reverse geocoding request while typed search still does', async ({ page }) => {
     await mockOpenMeteo(page);
-    await page.route('**/geocoding-api.open-meteo.com/**', (route) =>
-      route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":true}' }),
-    );
+    await routeSearchGeocoding(page, PARIS);
     await stubDeferredGeolocation(page);
+    const geocodingRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('geocoding-api.open-meteo.com')) geocodingRequests.push(request.url());
+    });
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    geocodingRequests.length = 0;
 
     await page.getByTestId('button-refresh-location').click();
     await resolveGeolocation(page, 51.5074567, -0.12789012);
     await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
-    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    expect(geocodingRequests, 'no reverse lookup after device location').toEqual([]);
+
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+    expect(geocodingRequests.some((url) => url.includes('name=')), 'typed search still uses geocoding').toBe(true);
   });
 
   test('loading clears after denied, unavailable and timeout errors', async ({ page }) => {
