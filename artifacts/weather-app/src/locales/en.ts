@@ -40,6 +40,8 @@ const en = {
   'current.locationTitle': 'Location unavailable',
   'current.locationUnsupported': 'This browser does not offer location services.',
   'current.locationDenied': "We couldn't access your location. Allow location access for this site and try again.",
+  'current.locationUnavailable': "We couldn't determine your location. Check that location services are on and try again.",
+  'current.locationTimeout': 'Finding your location took too long. Try again, or search for a place instead.',
 
   // Advice
   'advice.rainUnavailable': 'Rain forecast unavailable',

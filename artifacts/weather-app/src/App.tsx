@@ -44,6 +44,7 @@ function Home() {
   const [error, setError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const requestId = useRef(0);
+  const selectionId = useRef(0);
 
   const loadWeather = useCallback(async (nextPlace: Place) => {
     const id = ++requestId.current;
@@ -62,6 +63,10 @@ function Home() {
   }, []);
 
   const selectPlace = useCallback((nextPlace: Place) => {
+    // A newer selection supersedes any in-flight "Use my location" request
+    // (DAYMARK-LOC-001).
+    selectionId.current += 1;
+    setIsLocating(false);
     void loadWeather(nextPlace);
   }, [loadWeather]);
 
@@ -70,29 +75,34 @@ function Home() {
       toast({ title: t('current.locationTitle'), description: t('current.locationUnsupported') });
       return;
     }
+    const id = ++selectionId.current;
     setIsLocating(true);
     setError('');
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      // Coordinates are rounded to ~1 km before leaving the device
+      // (DAYMARK-SEC-002): every Daymark feature works at neighbourhood
+      // precision, so precise coordinates are never transmitted.
+      const latitude = Number(coords.latitude.toFixed(2));
+      const longitude = Number(coords.longitude.toFixed(2));
       try {
-        // Coordinates are rounded to ~1 km before leaving the device
-        // (DAYMARK-SEC-002): every Daymark feature works at neighbourhood
-        // precision, so precise coordinates are never transmitted.
-        const latitude = Number(coords.latitude.toFixed(2));
-        const longitude = Number(coords.longitude.toFixed(2));
+        // A newer search or location interaction wins over this older one.
+        if (id !== selectionId.current) return;
+        let found: Place | undefined;
         try {
-          const found = await reverseGeocode(latitude, longitude);
-          await loadWeather(found ?? { name: 'Your location', latitude, longitude });
+          found = await reverseGeocode(latitude, longitude);
         } catch {
-          await loadWeather({ name: 'Your location', latitude, longitude });
-        } finally {
-          setIsLocating(false);
+          found = undefined;
         }
-      } catch {
-        setIsLocating(false);
+        if (id !== selectionId.current) return;
+        await loadWeather(found ?? { name: 'Your location', latitude, longitude });
+      } finally {
+        if (id === selectionId.current) setIsLocating(false);
       }
-    }, () => {
+    }, (geoError) => {
+      if (id !== selectionId.current) return;
       setIsLocating(false);
-      toast({ title: t('current.locationTitle'), description: t('current.locationDenied') });
+      const key = geoError?.code === 2 ? 'current.locationUnavailable' : geoError?.code === 3 ? 'current.locationTimeout' : 'current.locationDenied';
+      toast({ title: t('current.locationTitle'), description: t(key) });
     }, {
       enableHighAccuracy: false,
       maximumAge: 300000,

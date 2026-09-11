@@ -1721,3 +1721,141 @@ test.describe('privacy policy page', () => {
     }
   }
 });
+
+test.describe('geolocation flow', () => {
+  const GREENWICH = {
+    results: [{ name: 'Greenwich', latitude: 51.4789, longitude: 0.0107, country: 'United Kingdom', country_code: 'GB', timezone: 'Europe/London' }],
+  };
+  const PARIS = {
+    results: [{ name: 'Paris', latitude: 48.8566, longitude: 2.3522, admin1: 'Île-de-France', country: 'France', country_code: 'FR', timezone: 'Europe/Paris' }],
+  };
+
+  /** Geolocation whose success/error callbacks only fire when the test says so. */
+  async function stubDeferredGeolocation(page: Page) {
+    await page.addInitScript(() => {
+      (window as any).__geo = { calls: 0, pending: [] };
+      navigator.geolocation.getCurrentPosition = ((success: PositionCallback, error: PositionErrorCallback) => {
+        (window as any).__geo.calls += 1;
+        (window as any).__geo.pending.push({ success, error });
+      }) as typeof navigator.geolocation.getCurrentPosition;
+    });
+  }
+
+  async function resolveGeolocation(page: Page, latitude: number, longitude: number) {
+    await page.evaluate(([lat, lon]) => {
+      const pending = (window as any).__geo.pending.splice(0);
+      for (const entry of pending) entry.success({ coords: { latitude: lat, longitude: lon } });
+    }, [latitude, longitude]);
+  }
+
+  async function failGeolocation(page: Page, code: number) {
+    await page.evaluate((errorCode) => {
+      const pending = (window as any).__geo.pending.splice(0);
+      for (const entry of pending) entry.error({ code: errorCode, message: 'stub' });
+    }, code);
+  }
+
+  /** Reverse geocoding returns a place; forward (search) returns another. */
+  async function routeGeocoding(page: Page, reverseBody: object, searchBody: object) {
+    await page.route('**/geocoding-api.open-meteo.com/**', (route) => {
+      const body = route.request().url().includes('count=1') ? reverseBody : searchBody;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+  }
+
+  test('a search made while geolocation is pending is not overwritten by the older location result', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeGeocoding(page, GREENWICH, PARIS);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Finding you…');
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+
+    // The older location request resolves after the newer search selection.
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    expect(await page.evaluate(() => (window as any).__geo.calls)).toBe(1);
+  });
+
+  test('geolocation wins when it is the most recent action', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeGeocoding(page, GREENWICH, PARIS);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
+  });
+
+  test('rapid double-click settles cleanly without duplicate final-state corruption', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeGeocoding(page, GREENWICH, PARIS);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    let mainForecastRequests = 0;
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.hostname === 'api.open-meteo.com' && !request.url().includes('ukmo')) mainForecastRequests += 1;
+    });
+
+    await page.getByTestId('button-refresh-location').click();
+    await page.getByTestId('button-refresh-location').click();
+    expect(await page.evaluate(() => (window as any).__geo.calls)).toBe(2);
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Greenwich');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    // One weather load for the winning click, not one per click.
+    expect(mainForecastRequests).toBe(1);
+  });
+
+  test('reports a geolocation timeout as a timeout, not a permission denial', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await failGeolocation(page, 3);
+    await expect(page.getByTestId('toast')).toContainText('took too long');
+    await expect(page.getByTestId('toast')).not.toContainText('Allow location access');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+  });
+
+  test('reports position-unavailable distinctly from permission denial', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await failGeolocation(page, 2);
+    await expect(page.getByTestId('toast')).toContainText('determine your location');
+    await expect(page.getByTestId('toast')).not.toContainText('Allow location access');
+  });
+
+  test('keeps the existing permission-denied message for code 1', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await failGeolocation(page, 1);
+    await expect(page.getByTestId('toast')).toContainText('Allow location access');
+  });
+});
