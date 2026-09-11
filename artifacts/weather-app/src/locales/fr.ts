@@ -202,6 +202,7 @@ const fr: Record<TranslationKey, string> = {
   'notFound.title': '404 Page introuvable',
   'notFound.body': 'Avez-vous oublié d’ajouter la page au routeur ?',
   'footer.by': 'Prévisions par Open-Meteo',
+  'footer.privacy': 'Confidentialité',
 
   'condition.clear': 'Ciel dégagé',
   'condition.mostlyClear': 'Plutôt dégagé',

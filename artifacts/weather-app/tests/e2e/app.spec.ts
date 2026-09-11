@@ -1238,9 +1238,10 @@ test.describe('negative input / XSS', () => {
     expect(await page.locator('a[href^="javascript:"]').count()).toBe(0);
     expect(await page.locator('a[href^="data:"]').count()).toBe(0);
     expect(await page.locator('img[src^="data:"]').count()).toBe(0);
-    // The only anchor on the page is the static Open-Meteo attribution link.
+    // Anchors are only the static app links (Open-Meteo attribution + Privacy);
+    // no URL-like input became a link or navigation sink.
     const hrefs = await page.evaluate(() => Array.from(document.querySelectorAll('a')).map((anchor) => anchor.getAttribute('href')));
-    expect(hrefs).toEqual(['https://open-meteo.com/']);
+    expect(hrefs).toEqual(['https://open-meteo.com/', '/privacy']);
     expect(await page.evaluate(() => (window as any).__xss)).toBe(0);
   });
 });
@@ -1589,4 +1590,134 @@ test.describe('weather loading', () => {
     await expect(page.getByTestId('text-current-city')).toHaveText('Tokyo');
     await expect(page.getByTestId('text-current-temperature')).toHaveText('26°C');
   });
+});
+
+test.describe('privacy policy page', () => {
+  const policies = [
+    { lang: 'en', path: '/privacy', heading: 'Privacy Policy', effective: 'Effective date', back: 'Back to weather' },
+    { lang: 'fr', path: '/fr/privacy', heading: 'Politique de confidentialité', effective: 'Date d’entrée en vigueur', back: 'Retour à la météo' },
+    { lang: 'es', path: '/es/privacy', heading: 'Política de privacidad', effective: 'Fecha de entrada en vigor', back: 'Volver al tiempo' },
+  ] as const;
+
+  for (const policy of policies) {
+    test(`direct ${policy.path} route loads the ${policy.lang} policy`, async ({ page }) => {
+      await page.goto(policy.path);
+      await expect(page.getByTestId('page-privacy')).toBeVisible();
+      await expect(page.getByTestId('page-privacy')).toHaveAttribute('data-lang', policy.lang);
+      await expect(page.getByRole('heading', { level: 1, name: policy.heading })).toBeVisible();
+      await expect(page.getByTestId('text-privacy-effective')).toContainText(policy.effective);
+      await expect(page.getByTestId('link-back-home')).toContainText(policy.back);
+      await expect(page.getByTestId(`link-privacy-lang-${policy.lang}`)).toHaveAttribute('aria-current', 'page');
+    });
+  }
+
+  test('does not call weather APIs or persist anything', async ({ page }) => {
+    const requested: string[] = [];
+    page.on('request', (request) => requested.push(request.url()));
+    await page.goto('/privacy');
+    await expect(page.getByTestId('page-privacy')).toBeVisible();
+    expect(requested.filter((url) => url.includes('open-meteo'))).toEqual([]);
+    const state = await page.evaluate(() => ({
+      local: Object.keys(window.localStorage),
+      session: Object.keys(window.sessionStorage),
+      cookies: document.cookie,
+    }));
+    expect(state).toEqual({ local: [], session: [], cookies: '' });
+  });
+
+  test('footer Privacy link follows the interface language', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('link-privacy')).toHaveAttribute('href', '/privacy');
+    await page.getByTestId('select-language').selectOption('fr');
+    await expect(page.getByTestId('link-privacy')).toHaveText('Confidentialité');
+    await expect(page.getByTestId('link-privacy')).toHaveAttribute('href', '/fr/privacy');
+    await page.getByTestId('link-privacy').click();
+    await expect(page).toHaveURL(/\/fr\/privacy$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Politique de confidentialité' })).toBeVisible();
+    await page.getByTestId('link-back-home').click();
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await page.getByTestId('select-language').selectOption('es');
+    await expect(page.getByTestId('link-privacy')).toHaveText('Privacidad');
+    await expect(page.getByTestId('link-privacy')).toHaveAttribute('href', '/es/privacy');
+  });
+
+  test('language switcher navigates between concrete policy URLs and is keyboard accessible', async ({ page }) => {
+    await page.goto('/privacy');
+    await page.getByTestId('link-privacy-lang-fr').focus();
+    await expect(page.getByTestId('link-privacy-lang-fr')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/fr\/privacy$/);
+    await expect(page.getByTestId('page-privacy')).toHaveAttribute('data-lang', 'fr');
+    await page.getByTestId('link-privacy-lang-es').click();
+    await expect(page).toHaveURL(/\/es\/privacy$/);
+    await expect(page.getByTestId('page-privacy')).toHaveAttribute('data-lang', 'es');
+    await page.getByTestId('link-privacy-lang-en').click();
+    await expect(page).toHaveURL(/\/privacy$/);
+    await expect(page.getByTestId('page-privacy')).toHaveAttribute('data-lang', 'en');
+  });
+
+  test('shows the confirmed operator and contact details in every language', async ({ page }) => {
+    for (const policy of policies) {
+      await page.goto(policy.path);
+      const text = await page.getByTestId('page-privacy').innerText();
+      expect(text).toContain('Sami Belhadj');
+      expect(text).toContain('skylinelabdev@gmail.com');
+    }
+  });
+
+  test('contains no placeholders or draft markers', async ({ page }) => {
+    for (const policy of policies) {
+      await page.goto(policy.path);
+      const text = await page.getByTestId('page-privacy').innerText();
+      for (const forbidden of ['[OPERATOR NAME]', '[CONTACT EMAIL]', 'DECISION REQUIRED', 'Draft notice', 'placeholder']) {
+        expect(text).not.toContain(forbidden);
+      }
+    }
+  });
+
+  test('states the verified data practices in every language', async ({ page }) => {
+    const expectations = {
+      en: {
+        location: 'rounded to two decimal places',
+        speech: 'does not record or store your voice audio or speech transcripts',
+        audience: 'general-audience weather utility',
+      },
+      fr: {
+        location: 'arrondies à deux décimales',
+        speech: 'n’enregistre ni ne conserve votre audio vocal ni vos transcriptions vocales',
+        audience: 'grand public',
+      },
+      es: {
+        location: 'se redondean a dos decimales',
+        speech: 'no graba ni almacena tu audio de voz ni tus transcripciones',
+        audience: 'público general',
+      },
+    } as const;
+    for (const policy of policies) {
+      await page.goto(policy.path);
+      const text = await page.getByTestId('page-privacy').innerText();
+      for (const host of ['api.open-meteo.com', 'air-quality-api.open-meteo.com', 'geocoding-api.open-meteo.com']) {
+        expect(text).toContain(host);
+      }
+      expect(text).toContain('Open-Meteo');
+      expect(text).toContain('daymark.locale');
+      expect(text).toContain(expectations[policy.lang].location);
+      expect(text).toContain(expectations[policy.lang].speech);
+      expect(text).toContain(expectations[policy.lang].audience);
+      expect(text).not.toMatch(/collects? no data/i);
+    }
+  });
+
+  for (const policy of policies) {
+    for (const width of [320, 390]) {
+      test(`${policy.lang} policy has no horizontal overflow at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(policy.path);
+        await expect(page.getByTestId('page-privacy')).toBeVisible();
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(overflow).toBeLessThanOrEqual(0);
+      });
+    }
+  }
 });

@@ -220,6 +220,7 @@ const en = {
   'notFound.title': '404 Page Not Found',
   'notFound.body': 'Did you forget to add the page to the router?',
   'footer.by': 'Forecasts by Open-Meteo',
+  'footer.privacy': 'Privacy',
 
   // Weather conditions
   'condition.clear': 'Clear sky',

@@ -419,6 +419,25 @@
 .retry-button:hover { transform: translateY(-2px); }
 .footer-note { display: flex; justify-content: space-between; gap: 14px; margin-top: 45px; color: hsl(var(--muted-foreground)); font-family: var(--app-font-mono); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
 .footer-note a { color: hsl(var(--primary)); text-decoration: none; }
+.footer-links { display: flex; align-items: center; gap: 12px; }
+
+/* Public privacy policy page (/privacy) — plain, readable document flow. */
+.privacy-shell { max-width: 880px; }
+.privacy-topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 34px; }
+.privacy-topbar .brand { text-decoration: none; }
+.privacy-back { margin-top: 0; text-decoration: none; white-space: nowrap; }
+.privacy-policy { padding: clamp(22px, 4vw, 44px); border: 1px solid hsl(var(--border)); border-radius: 24px; background: hsl(var(--card) / .84); overflow-wrap: break-word; }
+.privacy-policy h1 { font-family: var(--app-font-serif); font-size: clamp(32px, 5vw, 46px); font-weight: 600; letter-spacing: -.04em; line-height: 1.05; }
+.privacy-policy h2 { margin-top: 32px; font-family: var(--app-font-serif); font-size: 21px; font-weight: 600; letter-spacing: -.02em; }
+.privacy-policy p, .privacy-policy li { margin-top: 10px; font-size: 14px; line-height: 1.65; }
+.privacy-policy ul { margin-top: 10px; padding-left: 20px; list-style: disc; }
+.privacy-policy a { color: hsl(var(--primary)); }
+.privacy-policy code { font-family: var(--app-font-mono); font-size: 12px; }
+.privacy-effective { margin-top: 8px; color: hsl(var(--muted-foreground)); font-family: var(--app-font-mono); font-size: 11px; }
+.privacy-langs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.privacy-lang { padding: 6px 13px; border: 1px solid hsl(var(--border)); border-radius: 999px; color: hsl(var(--primary)); background: hsl(var(--card) / .6); font-size: 12px; font-weight: 600; text-decoration: none; }
+.privacy-lang:hover, .privacy-lang:focus-visible { border-color: hsl(var(--primary) / .5); outline: 2px solid hsl(var(--secondary) / .8); outline-offset: 2px; }
+.privacy-lang.active { color: hsl(var(--secondary-foreground)); background: hsl(var(--secondary)); border-color: transparent; }
 
 @media (max-width: 800px) {
   .app-shell { padding-top: 19px; }

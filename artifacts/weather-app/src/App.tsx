@@ -4,7 +4,10 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+import Privacy from '@/pages/privacy';
+import PrivacyFr from '@/pages/privacy-fr';
+import PrivacyEs from '@/pages/privacy-es';
+import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
   compareLocationTimes,
   fetchWeather,
@@ -123,6 +126,7 @@ function Home() {
   const peakPrecipitationIndex = upcomingIndexes.find((index) => weather?.hourly?.precipitation_probability?.[index] === peakPrecipitation);
   const umbrellaAdvice = getUmbrellaAdvice(peakPrecipitation, peakPrecipitationIndex === undefined ? undefined : timeLabel(hourlyTimes[peakPrecipitationIndex], locale), locale);
   const sunglassesAdvice = getSunglassesAdvice(weatherState.uv_index, weatherState.cloud_cover, locale);
+  const privacyHref = locale === 'fr' ? '/fr/privacy' : locale === 'es' ? '/es/privacy' : '/privacy';
 
   return (
     <div className="weather-app">
@@ -155,7 +159,7 @@ function Home() {
             </div>
           </main>
         )}
-        <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> {t('footer.by')}</span><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a></footer>
+        <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> {t('footer.by')}</span><span className="footer-links"><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a><Link href={privacyHref} data-testid="link-privacy">{t('footer.privacy')}</Link></span></footer>
       </div>
     </div>
   );
@@ -166,6 +170,9 @@ function Router() {
     <RoutedErrorBoundary>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/fr/privacy" component={PrivacyFr} />
+        <Route path="/es/privacy" component={PrivacyEs} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

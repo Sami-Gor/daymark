@@ -202,6 +202,7 @@ const es: Record<TranslationKey, string> = {
   'notFound.title': '404 Página no encontrada',
   'notFound.body': '¿Olvidaste añadir la página al enrutador?',
   'footer.by': 'Pronósticos de Open-Meteo',
+  'footer.privacy': 'Privacidad',
 
   'condition.clear': 'Cielo despejado',
   'condition.mostlyClear': 'Mayormente despejado',
