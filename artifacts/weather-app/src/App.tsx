@@ -1,13 +1,12 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CalendarDays } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
+  compareLocationTimes,
   fetchWeather,
   getSunglassesAdvice,
   getUmbrellaAdvice,
@@ -27,11 +26,13 @@ import { WeatherDetails } from '@/components/weather/WeatherDetails';
 import { MicroClimateForecast } from '@/components/weather/MicroClimate';
 import { UVForecast } from '@/components/weather/UVForecast';
 import { AirQualityForecast } from '@/components/weather/AirQualityForecast';
+import { WeatherAlerts } from '@/components/weather/WeatherAlerts';
+import { useLocale } from '@/hooks/use-locale';
 
-const queryClient = new QueryClient();
 const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 };
 
 function Home() {
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const [place, setPlace] = useState<Place>(LONDON);
   const [weather, setWeather] = useState<WeatherPayload | null>(null);
@@ -57,9 +58,13 @@ function Home() {
     }
   }, []);
 
+  const selectPlace = useCallback((nextPlace: Place) => {
+    void loadWeather(nextPlace);
+  }, [loadWeather]);
+
   const findMe = useCallback(() => {
     if (!navigator.geolocation) {
-      toast({ title: 'Location unavailable', description: 'This browser does not offer location services.' });
+      toast({ title: t('current.locationTitle'), description: t('current.locationUnsupported') });
       return;
     }
     setIsLocating(true);
@@ -84,13 +89,13 @@ function Home() {
       }
     }, () => {
       setIsLocating(false);
-      toast({ title: 'Location unavailable', description: "We couldn't access your location. Allow location access for this site and try again." });
+      toast({ title: t('current.locationTitle'), description: t('current.locationDenied') });
     }, {
       enableHighAccuracy: false,
       maximumAge: 300000,
       timeout: 5000,
     });
-  }, [loadWeather, toast]);
+  }, [loadWeather, toast, t]);
 
   // No location permission is requested on load (DAYMARK-SEC-002): the app
   // opens on the default location and only asks when the user presses the
@@ -99,12 +104,12 @@ function Home() {
 
   const weatherState = weather?.current ?? {};
   const updatedLabel = useMemo(() => {
-    if (!weatherState.time) return 'Forecast ready';
-    return `Updated ${timeLabel(weatherState.time)}`;
-  }, [weatherState.time]);
+    if (!weatherState.time) return t('current.forecastReady');
+    return t('current.updated', { time: timeLabel(weatherState.time, locale) });
+  }, [weatherState.time, t, locale]);
   const hourlyTimes = weather?.hourly?.time ?? [];
   const hourlyStart = hourlyTimes.length
-    ? Math.max(0, hourlyTimes.findIndex((time) => Date.parse(time) >= (weatherState.time ? Date.parse(weatherState.time) : Date.now())))
+    ? Math.max(0, hourlyTimes.findIndex((time) => compareLocationTimes(time, weatherState.time) >= 0))
     : 0;
   const upcomingIndexes = hourlyTimes.length
     ? Array.from({ length: Math.min(6, hourlyTimes.length - hourlyStart) }, (_, index) => hourlyStart + index)
@@ -116,8 +121,8 @@ function Home() {
     ? Math.max(...upcomingPrecipitation)
     : weather?.daily?.precipitation_probability_max?.[0];
   const peakPrecipitationIndex = upcomingIndexes.find((index) => weather?.hourly?.precipitation_probability?.[index] === peakPrecipitation);
-  const umbrellaAdvice = getUmbrellaAdvice(peakPrecipitation, peakPrecipitationIndex === undefined ? undefined : timeLabel(hourlyTimes[peakPrecipitationIndex]));
-  const sunglassesAdvice = getSunglassesAdvice(weatherState.uv_index, weatherState.cloud_cover);
+  const umbrellaAdvice = getUmbrellaAdvice(peakPrecipitation, peakPrecipitationIndex === undefined ? undefined : timeLabel(hourlyTimes[peakPrecipitationIndex], locale), locale);
+  const sunglassesAdvice = getSunglassesAdvice(weatherState.uv_index, weatherState.cloud_cover, locale);
 
   return (
     <div className="weather-app">
@@ -137,7 +142,9 @@ function Home() {
               updatedLabel={updatedLabel}
               isLocating={isLocating}
               onFindMe={() => findMe()}
+              onSelectPlace={selectPlace}
             />
+            <WeatherAlerts weather={weather} unit={unit} />
             <div className="content-grid">
               <HourlyOutlook weather={weather} unit={unit} />
               <DailyForecast weather={weather} unit={unit} />
@@ -148,7 +155,7 @@ function Home() {
             </div>
           </main>
         )}
-        <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> Forecasts by Open-Meteo</span><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a></footer>
+        <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> {t('footer.by')}</span><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a></footer>
       </div>
     </div>
   );
@@ -172,14 +179,12 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <>
+      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+        <Router />
+      </WouterRouter>
+      <Toaster />
+    </>
   );
 }
 

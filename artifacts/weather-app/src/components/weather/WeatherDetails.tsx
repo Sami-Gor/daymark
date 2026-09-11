@@ -1,27 +1,46 @@
-import { Droplets, Gauge, Info, Sunrise, Sunset, Thermometer, Umbrella, type LucideIcon } from 'lucide-react';
-import { calculateDewPointCelsius, dewPointComfort, displayTemp, timeLabel, type Unit, type WeatherPayload } from '@/lib/weather';
+import { Droplets, Info, Sunrise, Sunset, Wind, type LucideIcon } from 'lucide-react';
+import { calculateDewPointCelsius, dewPointComfort, displayTemp, displayWind, timeLabel, type Unit, type WeatherPayload } from '@/lib/weather';
+import { useLocale } from '@/hooks/use-locale';
 
 export function WeatherDetails({ weather, unit }: { weather: WeatherPayload; unit: Unit }) {
+  const { locale, t } = useLocale();
   const current = weather.current ?? {};
   const daily = weather.daily ?? {};
   const dewPoint = calculateDewPointCelsius(current.temperature_2m, current.relative_humidity_2m);
-  const dewComfort = dewPointComfort(dewPoint);
-  const detailItems: { icon: LucideIcon; label: string; value: string; sub?: string; dewPoint?: { value: string; comfort: { label: string; className: string } } }[] = [
-    { icon: Thermometer, label: 'Feels like', value: displayTemp(current.apparent_temperature, unit), sub: 'on your skin' },
-    { icon: Droplets, label: 'Humidity', value: current.relative_humidity_2m != null ? `${current.relative_humidity_2m}%` : '—', sub: 'relative humidity', dewPoint: { value: displayTemp(dewPoint, unit), comfort: dewComfort } },
-    { icon: Umbrella, label: 'Rain now', value: current.precipitation != null ? `${current.precipitation} mm` : '—', sub: 'at this moment' },
-    { icon: Gauge, label: 'Day ahead', value: `${daily.precipitation_probability_max?.[0] ?? 0}%`, sub: 'chance of rain' },
+  const dewComfort = dewPointComfort(dewPoint, locale);
+  const gusts = current.wind_gusts_10m;
+  const windSub = gusts != null
+    ? t('details.gusts', { value: displayWind(gusts, unit) })
+    : t('details.windSub');
+  // Secondary details only: headline facts (feels-like, rain chance, current
+  // precipitation) already live in the hero, advice cards and forecast.
+  const detailItems: { id: string; icon: LucideIcon; label: string; value: string; sub?: string; dewPoint?: { value: string; comfort: { label: string; className: string } } }[] = [
+    {
+      id: 'humidity',
+      icon: Droplets,
+      label: t('details.humidity'),
+      value: current.relative_humidity_2m != null ? `${current.relative_humidity_2m}%` : '—',
+      sub: t('details.humiditySub'),
+      dewPoint: { value: displayTemp(dewPoint, unit), comfort: dewComfort },
+    },
+    {
+      id: 'wind',
+      icon: Wind,
+      label: t('details.wind'),
+      value: displayWind(current.wind_speed_10m, unit),
+      sub: windSub,
+    },
   ];
   return (
     <section className="details-wide" aria-labelledby="details-title">
       <div className="section-heading">
-        <h2 className="section-title" id="details-title">The useful bits</h2>
-        <span className="section-meta">at a glance</span>
+        <h2 className="section-title" id="details-title">{t('details.title')}</h2>
+        <span className="section-meta">{t('details.meta')}</span>
       </div>
       <div className="panel details-panel" data-testid="panel-weather-details">
         <div className="detail-grid">
-          {detailItems.map(({ icon: Icon, label, value, sub, dewPoint: humidityDewPoint }) => (
-            <div className="detail" key={label} data-testid={`detail-${label.toLowerCase().replaceAll(' ', '-')}`}>
+          {detailItems.map(({ id, icon: Icon, label, value, sub, dewPoint: humidityDewPoint }) => (
+            <div className="detail" key={id} data-testid={`detail-${id}`}>
               <Icon className="detail-icon" size={17} strokeWidth={1.7} />
               <div className="detail-label">{label}</div>
               <div className="detail-value">{value}</div>
@@ -29,8 +48,8 @@ export function WeatherDetails({ weather, unit }: { weather: WeatherPayload; uni
               {humidityDewPoint ? (
                 <div className="dew-point" data-testid="detail-dew-point">
                   <span className="dew-point-label">
-                    <span className="dew-point-info" role="img" title="Dew point measures how humid the air actually feels — more reliable than relative humidity alone." aria-label="About dew point"><Info size={11} strokeWidth={1.8} /></span>
-                    Dew point <strong>{humidityDewPoint.value}</strong>
+                    <span className="dew-point-info" role="img" title={t('details.dewPointTitle')} aria-label={t('details.dewPointAria')}><Info size={11} strokeWidth={1.8} /></span>
+                    {t('details.dewPoint')} <strong>{humidityDewPoint.value}</strong>
                   </span>
                   <span className={`dew-pill ${humidityDewPoint.comfort.className}`}>{humidityDewPoint.comfort.label}</span>
                 </div>
@@ -39,13 +58,13 @@ export function WeatherDetails({ weather, unit }: { weather: WeatherPayload; uni
           ))}
         </div>
         <div className="panel sun-panel">
-          <div className="sun-item">
+          <div className="sun-item" data-testid="detail-sunrise">
             <Sunrise size={20} strokeWidth={1.6} />
-            <div><div className="sun-label">Sunrise</div><div className="sun-value">{timeLabel(daily.sunrise?.[0])}</div></div>
+            <div><div className="sun-label">{t('details.sunrise')}</div><div className="sun-value">{timeLabel(daily.sunrise?.[0], locale)}</div></div>
           </div>
-          <div className="sun-item">
+          <div className="sun-item" data-testid="detail-sunset">
             <Sunset size={20} strokeWidth={1.6} />
-            <div><div className="sun-label">Sunset</div><div className="sun-value">{timeLabel(daily.sunset?.[0])}</div></div>
+            <div><div className="sun-label">{t('details.sunset')}</div><div className="sun-value">{timeLabel(daily.sunset?.[0], locale)}</div></div>
           </div>
         </div>
       </div>
