@@ -73,10 +73,16 @@ export default function PrivacyFr() {
       </p>
       <p>
         Dans ce cas, vos coordonnées sont arrondies à deux décimales (environ 1 km) sur votre appareil
-        avant d&rsquo;être envoyées à Open-Meteo pour rechercher votre prévision locale et le nom du
-        lieu. Daymark n&rsquo;enregistre pas votre localisation ; elle n&rsquo;est pas conservée entre
-        les visites et l&rsquo;application revient à son lieu par défaut lorsque vous la rechargez ou
-        la rouvrez.
+        avant d&rsquo;être envoyées à Open-Meteo pour rechercher votre prévision locale. Daymark
+        n&rsquo;enregistre pas votre localisation ; elle n&rsquo;est pas conservée entre les visites et
+        l&rsquo;application revient à son lieu par défaut lorsque vous la rechargez ou la rouvrez.
+      </p>
+      <p>
+        Lorsque vous utilisez la position de l&rsquo;appareil, Daymark détermine aussi un nom de
+        localité proche (par exemple une ville) entièrement dans votre navigateur, à partir d&rsquo;un
+        jeu de données GeoNames statique servi par Daymark et mis en cache sur votre appareil après la
+        première utilisation. Aucun service de géocodage inverse — y compris GeoNames — ne reçoit vos
+        coordonnées, et le résultat reste sur votre appareil.
       </p>
 
       <h2>Recherche de lieu</h2>
@@ -143,10 +149,19 @@ export default function PrivacyFr() {
       <ul>
         <li>Open-Meteo — météo, qualité de l&rsquo;air et recherche de lieux, comme décrit ci-dessus.</li>
         <li>
+          GeoNames — noms de localités pour la position de l&rsquo;appareil. Le jeu de données est
+          téléchargé depuis le site de Daymark et la recherche s&rsquo;effectue sur votre appareil ;
+          aucune coordonnée n&rsquo;est envoyée à GeoNames.
+        </li>
+        <li>
           Les services vocaux de votre navigateur ou de votre appareil — uniquement lorsque vous
           utilisez les fonctions vocales facultatives.
         </li>
       </ul>
+      <p>
+        Données de localités © <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>,
+        utilisées sous licence Creative Commons Attribution 4.0 (CC BY 4.0).
+      </p>
       <p>
         Daymark n&rsquo;utilise ni analyse d&rsquo;audience, ni publicité, ni pixels de suivi, ni aucun
         autre service tiers.
