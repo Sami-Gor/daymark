@@ -3,7 +3,7 @@ import { Glasses, Navigation, Square, Umbrella, Volume2 } from 'lucide-react';
 import { displayTemp, formatLocationDate, weatherCopy, type Place, type Unit, type WeatherAdvice, type WeatherPayload } from '@/lib/weather';
 import { DAYMARK_INTENTS, getIntentResponse } from '@/lib/weather-intents';
 import { SPEECH_LANGS } from '@/lib/i18n';
-import { useBrowserSpeech } from '@/hooks/use-browser-speech';
+import { useDaymarkSpeech } from '@/hooks/use-daymark-speech';
 import { useLocale } from '@/hooks/use-locale';
 import { AskDaymark } from '@/components/weather/AskDaymark';
 import { LocationSearch } from '@/components/weather/LocationSearch';
@@ -22,7 +22,7 @@ export function CurrentWeather({ place, weather, unit, umbrellaAdvice, sunglasse
   const { locale, t } = useLocale();
   const current = weather.current ?? {};
   const currentCode = current.weather_code ?? 0;
-  const speech = useBrowserSpeech();
+  const speech = useDaymarkSpeech();
   const briefing = useMemo(
     () => getIntentResponse(DAYMARK_INTENTS.today, weather, { locationName: place.name, unit, locale }),
     [weather, place.name, unit, locale],
