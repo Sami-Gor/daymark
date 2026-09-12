@@ -45,6 +45,11 @@ cd android && ./gradlew :app:assembleDebug   # or :app:assembleRelease
 `android/kokoro-poc/.build/`, `android/.cargo/`, the fetched assets and the
 generated `jniLibs/` are gitignored; the scripts reproduce them.
 
+The scripts populate two shells: the original TWA test app (`android/app`) and
+the production Capacitor plugin module
+(`artifacts/weather-app/android/daymark-voice`), which packages the same
+`libkokoro_jni.so`, model and `bm_fable` voice for the DaymarkVoice plugin.
+
 ## G2P path (no eSpeak)
 
 Kokoro is built with `--no-default-features --features misaki-lean`, so the
