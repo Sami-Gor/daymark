@@ -70,9 +70,16 @@ export default function PrivacyEs() {
       </p>
       <p>
         En ese caso, tus coordenadas se redondean a dos decimales (aproximadamente 1 km) en tu
-        dispositivo antes de enviarse a Open-Meteo para buscar tu pronóstico local y el nombre del
-        lugar. Daymark no guarda tu ubicación; no se conserva entre visitas y la aplicación vuelve a
-        su ubicación predeterminada cuando la recargas o vuelves a abrirla.
+        dispositivo antes de enviarse a Open-Meteo para buscar tu pronóstico local. Daymark no guarda
+        tu ubicación; no se conserva entre visitas y la aplicación vuelve a su ubicación
+        predeterminada cuando la recargas o vuelves a abrirla.
+      </p>
+      <p>
+        Cuando usas la ubicación del dispositivo, Daymark también resuelve un nombre de localidad
+        cercano (por ejemplo, un pueblo) completamente en tu navegador, a partir de un conjunto de
+        datos GeoNames estático servido por Daymark y guardado en caché en tu dispositivo tras el
+        primer uso. Ningún servicio de geocodificación inversa —incluido GeoNames— recibe tus
+        coordenadas, y el resultado permanece en tu dispositivo.
       </p>
 
       <h2>Búsqueda de lugares</h2>
@@ -134,10 +141,19 @@ export default function PrivacyEs() {
       <ul>
         <li>Open-Meteo — tiempo, calidad del aire y búsqueda de lugares, como se describe arriba.</li>
         <li>
+          GeoNames — nombres de localidades para la ubicación del dispositivo. El conjunto de datos
+          se descarga desde el propio sitio de Daymark y la búsqueda se ejecuta en tu dispositivo; no
+          se envían coordenadas a GeoNames.
+        </li>
+        <li>
           Los servicios de voz de tu navegador o dispositivo — solo cuando utilizas las funciones de
           voz opcionales.
         </li>
       </ul>
+      <p>
+        Datos de localidades © <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>,
+        usados bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0).
+      </p>
       <p>
         Daymark no utiliza analíticas, publicidad, píxeles de seguimiento ni ningún otro servicio
         externo.

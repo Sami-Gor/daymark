@@ -62,9 +62,15 @@ export default function Privacy() {
       </p>
       <p>
         When you do, your coordinates are rounded to two decimal places (roughly 1 km) on your device
-        before being sent to Open-Meteo to look up your local forecast and place name. Daymark does
-        not save your location; it is not kept between visits, and the app returns to its default
-        location when you reload or reopen it.
+        before being sent to Open-Meteo to look up your local forecast. Daymark does not save your
+        location; it is not kept between visits, and the app returns to its default location when you
+        reload or reopen it.
+      </p>
+      <p>
+        When you use device location, Daymark also resolves a nearby locality name (for example, a
+        town name) entirely in your browser, from a static GeoNames dataset served by Daymark and
+        cached on your device after first use. No reverse-geocoding service — including GeoNames —
+        receives your coordinates, and the lookup result stays on your device.
       </p>
 
       <h2>Location search</h2>
@@ -125,10 +131,18 @@ export default function Privacy() {
       <ul>
         <li>Open-Meteo — weather, air quality, and place search, as described above.</li>
         <li>
+          GeoNames — locality names for device location. The dataset is downloaded from Daymark&rsquo;s
+          own site and the lookup runs on your device; no coordinates are sent to GeoNames.
+        </li>
+        <li>
           Your browser&rsquo;s or device&rsquo;s speech services — only when you use the optional voice
           features.
         </li>
       </ul>
+      <p>
+        Locality data © <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>,
+        used under the Creative Commons Attribution 4.0 licence (CC BY 4.0).
+      </p>
       <p>
         Daymark does not use analytics, advertising, tracking pixels, or any other third-party
         service.

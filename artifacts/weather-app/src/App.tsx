@@ -29,6 +29,7 @@ import { MicroClimateForecast } from '@/components/weather/MicroClimate';
 import { UVForecast } from '@/components/weather/UVForecast';
 import { AirQualityForecast } from '@/components/weather/AirQualityForecast';
 import { WeatherAlerts } from '@/components/weather/WeatherAlerts';
+import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
 import { useLocale } from '@/hooks/use-locale';
 
 const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 };
@@ -46,19 +47,21 @@ function Home() {
   const selectionId = useRef(0);
   const locationToastId = useRef<string | null>(null);
 
-  const loadWeather = useCallback(async (nextPlace: Place) => {
+  const loadWeather = useCallback(async (nextPlace: Place): Promise<boolean> => {
     const id = ++requestId.current;
     setIsLoading(true);
     setError('');
     try {
       const result = await fetchWeather(nextPlace);
-      if (id !== requestId.current) return;
+      if (id !== requestId.current) return false;
       // Atomic swap: the new place and its payload land together, and the
       // previous render stays mounted until they do.
       setPlace(nextPlace);
       setWeather(result);
+      return true;
     } catch (err) {
       if (id === requestId.current) setError(err instanceof Error ? err.message : 'We could not reach the weather service.');
+      return false;
     } finally {
       if (id === requestId.current) setIsLoading(false);
     }
@@ -89,6 +92,9 @@ function Home() {
     const id = ++selectionId.current;
     setIsLocating(true);
     setError('');
+    // The locality dataset loads in parallel with the GPS fix; it only ever
+    // improves the place label and never delays weather (see below).
+    void ensureLocalityIndex();
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       // Coordinates are rounded to ~1 km before leaving the device
       // (DAYMARK-SEC-002): every Daymark feature works at neighbourhood
@@ -99,10 +105,20 @@ function Home() {
         // A newer search or location interaction wins over this older one.
         if (id !== selectionId.current) return;
         clearLocationToast();
-        // Open-Meteo geocoding is forward-only (typed name search), so device
-        // location is labelled directly and weather loads from the rounded
-        // coordinates (DAYMARK-SEC-002) with no reverse lookup.
-        await loadWeather({ name: 'Your location', latitude, longitude });
+        const fallbackName = t('current.yourLocation');
+        // Weather starts immediately from the rounded coordinates; naming is
+        // enhancement-only and is resolved locally while weather loads.
+        const loaded = await loadWeather({ name: fallbackName, latitude, longitude });
+        if (!loaded || id !== selectionId.current) return;
+        const match = await lookupLocality(latitude, longitude);
+        if (!match || match.confidence === 'low' || id !== selectionId.current) return;
+        // Update only the label, only for the current intent, and only while
+        // the GPS fallback is still displayed. Weather is never refetched.
+        setPlace((current) => (
+          id === selectionId.current && current.name === fallbackName
+            ? { ...current, name: match.name }
+            : current
+        ));
       } finally {
         if (id === selectionId.current) setIsLocating(false);
       }
