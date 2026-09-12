@@ -176,6 +176,7 @@ name = "daymark-kokoro-jni"
 version = "0.1.0"
 dependencies = [
  "android_logger",
+ "futures",
  "jni",
  "kokoro-en",
  "log",

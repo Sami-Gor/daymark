@@ -53,6 +53,9 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     private native String nativeInit(String modelPath, String voicePath, String voiceName);
     private native float[] nativeSynth(String text);
+    private native String nativeStreamStart(String text);
+    private native float[] nativeStreamNext();
+    private native void nativeStreamClear();
     private native void nativeRelease();
 
     public KokoroLocalTtsEngine(Context context) {
@@ -185,6 +188,19 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     }
 
     private void synthesizeAndPlay(String text, long callTimeMs) {
+        final long synthesisNumber = ++synthesisCount;
+        Log.i(TAG, "synthesis #" + synthesisNumber + ": start " + memorySnapshot("before-synthesis"));
+        String streamError = null;
+        try {
+            streamError = nativeStreamStart(text);
+        } catch (Throwable failure) {
+            streamError = failure.getMessage();
+        }
+        if (streamError == null) {
+            streamAndPlay(synthesisNumber, callTimeMs);
+            return;
+        }
+        Log.w(TAG, "stream: unavailable (" + streamError + "); falling back to monolithic synth");
         try {
             float[] samples = nativeSynth(text);
             if (samples == null || samples.length == 0) {
@@ -193,10 +209,9 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 return;
             }
             long audioDurationMs = Math.round(samples.length * 1000.0 / SAMPLE_RATE);
-            final long synthesisNumber = ++synthesisCount;
             Log.i(TAG, "synthesis #" + synthesisNumber + ": samples=" + samples.length
                     + " sampleRate=" + SAMPLE_RATE + " audioDurationMs=" + audioDurationMs);
-            Log.i(TAG, "synthesis #" + synthesisNumber + ": " + memorySnapshot("synthesis"));
+            Log.i(TAG, "synthesis #" + synthesisNumber + ": " + memorySnapshot("after-generation"));
 
             final Listener current = listener;
             if (current != null) {
@@ -217,25 +232,139 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         }
     }
 
+    private void streamAndPlay(long synthesisNumber, long callTimeMs) {
+        AudioTrack track = null;
+        short[] chunk = new short[2048];
+        long totalSamples = 0;
+        int chunks = 0;
+        boolean stopped = false;
+        try {
+            track = createAudioTrack();
+            audioTrack = track;
+            track.play();
+
+            boolean firstWrite = true;
+            while (!stopRequested) {
+                float[] samples = nativeStreamNext();
+                if (samples == null) {
+                    break;
+                }
+                if (samples.length == 0) {
+                    continue;
+                }
+                chunks++;
+                totalSamples += samples.length;
+                if (chunks == 1) {
+                    Log.i(TAG, "stream: first chunk " + (SystemClock.elapsedRealtime() - callTimeMs)
+                            + "ms after speak() samples=" + samples.length);
+                    Log.i(TAG, "synthesis #" + synthesisNumber + ": " + memorySnapshot("stream-first-chunk"));
+                } else {
+                    Log.i(TAG, "stream: chunk #" + chunks + " " + (SystemClock.elapsedRealtime() - callTimeMs)
+                            + "ms after speak() samples=" + samples.length);
+                }
+                for (int offset = 0; offset < samples.length && !stopRequested; offset += chunk.length) {
+                    int count = Math.min(chunk.length, samples.length - offset);
+                    for (int i = 0; i < count; i++) {
+                        float value = Math.max(-1f, Math.min(1f, samples[offset + i]));
+                        chunk[i] = (short) (value * 32767f);
+                    }
+                    int written = track.write(chunk, 0, count);
+                    if (written < 0) {
+                        throw new IllegalStateException("AudioTrack.write failed: " + written);
+                    }
+                    if (firstWrite) {
+                        firstWrite = false;
+                        Log.i(TAG, "playback: first audio buffer written "
+                                + (SystemClock.elapsedRealtime() - callTimeMs) + "ms after speak()");
+                    }
+                }
+            }
+
+            stopped = stopRequested;
+            if (chunks == 0) {
+                setState(State.ERROR);
+                notifyError("Synthesis returned no audio");
+                return;
+            }
+            long audioDurationMs = Math.round(totalSamples * 1000.0 / SAMPLE_RATE);
+            Log.i(TAG, "synthesis #" + synthesisNumber + ": samples=" + totalSamples
+                    + " sampleRate=" + SAMPLE_RATE + " audioDurationMs=" + audioDurationMs
+                    + " streamChunks=" + chunks);
+            Log.i(TAG, "synthesis #" + synthesisNumber + ": " + memorySnapshot("after-generation"));
+
+            final Listener current = listener;
+            if (current != null) {
+                final long duration = audioDurationMs;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        current.onAudioMeasured(0, duration);
+                    }
+                });
+            }
+
+            if (!stopped) {
+                waitForPlaybackEnd(track, totalSamples);
+                stopped = stopRequested;
+            }
+        } catch (Throwable failure) {
+            Log.e(TAG, "stream playback failed: " + failure.getMessage(), failure);
+            setState(State.ERROR);
+            notifyError("Synthesis failed: " + failure.getMessage());
+            return;
+        } finally {
+            try {
+                nativeStreamClear();
+            } catch (Throwable ignored) {
+                // Instrumentation only.
+            }
+            audioTrack = null;
+            if (track != null) {
+                try {
+                    track.stop();
+                } catch (IllegalStateException ignored) {
+                    // Already stopped.
+                }
+                track.release();
+            }
+            if (state != State.ERROR) {
+                setState(stopped ? State.STOPPED : State.READY);
+            }
+            Log.i(TAG, "playback: finished stopped=" + stopped + " streamChunks=" + chunks
+                    + " " + memorySnapshot("after-playback"));
+        }
+    }
+
+    private AudioTrack createAudioTrack() {
+        int minBufferBytes = AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        int bufferBytes = Math.max(minBufferBytes, 8192);
+        return new AudioTrack.Builder()
+                .setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build())
+                .setAudioFormat(new AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(SAMPLE_RATE)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build())
+                .setBufferSizeInBytes(bufferBytes)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build();
+    }
+
+    private void waitForPlaybackEnd(AudioTrack track, long totalFrames) {
+        long deadlineMs = SystemClock.elapsedRealtime() + 5000;
+        while (!stopRequested && track.getPlaybackHeadPosition() < totalFrames && SystemClock.elapsedRealtime() < deadlineMs) {
+            SystemClock.sleep(20);
+        }
+    }
+
     private void playSamples(float[] samples, long callTimeMs) {
         AudioTrack track = null;
         boolean stopped = false;
         try {
-            int minBufferBytes = AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-            int bufferBytes = Math.max(minBufferBytes, 8192);
-            track = new AudioTrack.Builder()
-                    .setAudioAttributes(new AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build())
-                    .setAudioFormat(new AudioFormat.Builder()
-                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setSampleRate(SAMPLE_RATE)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                            .build())
-                    .setBufferSizeInBytes(bufferBytes)
-                    .setTransferMode(AudioTrack.MODE_STREAM)
-                    .build();
+            track = createAudioTrack();
             audioTrack = track;
             track.play();
 
@@ -258,11 +387,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             }
             stopped = stopRequested;
             if (!stopped) {
-                long totalFrames = samples.length;
-                long deadlineMs = SystemClock.elapsedRealtime() + 5000;
-                while (!stopRequested && track.getPlaybackHeadPosition() < totalFrames && SystemClock.elapsedRealtime() < deadlineMs) {
-                    SystemClock.sleep(20);
-                }
+                waitForPlaybackEnd(track, samples.length);
                 stopped = stopRequested;
             }
         } catch (Throwable failure) {

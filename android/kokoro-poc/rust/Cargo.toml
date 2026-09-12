@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 jni = "0.21"
 tokio = { version = "1", features = ["rt-multi-thread"] }
+futures = "0.3"
 log = "0.4"
 android_logger = "0.14"
 kokoro-en = { path = "../.build/kokoro-src", default-features = false, features = ["misaki-lean"] }
@@ -18,3 +19,5 @@ kokoro-en = { path = "../.build/kokoro-src", default-features = false, features 
 [profile.release]
 lto = true
 strip = true
+panic = "abort"
+codegen-units = 1
