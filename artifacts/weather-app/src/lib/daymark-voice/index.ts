@@ -20,7 +20,12 @@ export type DaymarkVoiceState =
 export interface DaymarkVoicePlugin {
   isAvailable(): Promise<{ available: boolean }>;
   getStatus(): Promise<{ state: DaymarkVoiceState }>;
-  speak(options: { text: string; lang?: string }): Promise<void>;
+  /**
+   * `text` is always the complete narration. `segments` is an optional TTS-only
+   * plan whose concatenation equals `text`; the native side falls back to
+   * `text` when segments are missing or do not match.
+   */
+  speak(options: { text: string; lang?: string; segments?: string[] }): Promise<void>;
   stop(): Promise<void>;
   isSpeaking(): Promise<{ speaking: boolean }>;
 }

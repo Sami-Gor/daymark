@@ -1,4 +1,5 @@
 import { selectSpeechEngine, type SpeechEngine, type SpeechSelection } from './speech-engine';
+import { segmentForSpeech } from './tts-segmentation';
 
 /*
  * Routes speech to the native DaymarkVoice engine or the browser Web Speech
@@ -25,7 +26,7 @@ export type BrowserSpeechAdapter = {
 
 export type NativeSpeechAdapter = {
   isAvailable: () => Promise<boolean>;
-  speak: (text: string, lang?: string) => Promise<void>;
+  speak: (text: string, lang?: string, segments?: string[]) => Promise<void>;
   stop: () => Promise<void>;
 };
 
@@ -125,8 +126,18 @@ export function createSpeechRouter(
       if (selection.engine === 'kokoro') {
         active = 'kokoro';
         handlers.onStart?.();
+        let segments: string[] | undefined;
         try {
-          await native.speak(spoken, lang);
+          const plan = segmentForSpeech(spoken);
+          segments = plan.length > 1 ? plan : undefined;
+          if (segments) {
+            console.info(`DaymarkSpeech segments=${segments.length} firstSegmentChars=${segments[0].length}`);
+          }
+        } catch (error) {
+          console.warn('DaymarkSpeech segmentation failed; using whole-text synthesis', error);
+        }
+        try {
+          await native.speak(spoken, lang, segments);
           if (generation === token) {
             active = null;
             handlers.onEnd?.();

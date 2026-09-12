@@ -42,7 +42,7 @@ describe('createSpeechRouter', () => {
     void router.speak('Good morning.', 'en-GB', handlers);
     await flush();
 
-    expect(native.speak).toHaveBeenCalledWith('Good morning.', 'en-GB');
+    expect(native.speak).toHaveBeenCalledWith('Good morning.', 'en-GB', undefined);
     expect(browser.speak).not.toHaveBeenCalled();
 
     router.stop();
@@ -65,6 +65,20 @@ describe('createSpeechRouter', () => {
     router.stop();
     expect(browser.stop).toHaveBeenCalledTimes(1);
     expect(native.stop).not.toHaveBeenCalled();
+  });
+
+  it('passes a TTS-only segmentation plan to the native engine for long briefings', async () => {
+    const native = makeNative();
+    const router = createSpeechRouter({ isNativePlatform: true, platform: 'android' }, makeBrowser(), native);
+    const text =
+      "It's 23 degrees in London, mostly clear, feels like 22 degrees. Rain isn't expected for the rest of today.";
+    await router.speak(text, 'en-GB', {});
+    expect(native.speak).toHaveBeenCalledTimes(1);
+    const [sentText, sentLang, sentSegments] = native.speak.mock.calls[0] as unknown as [string, string, string[]];
+    expect(sentText).toBe(text);
+    expect(sentLang).toBe('en-GB');
+    expect(sentSegments.length).toBeGreaterThan(1);
+    expect(sentSegments.join('')).toBe(text);
   });
 
   it('falls back to the browser when native playback fails', async () => {

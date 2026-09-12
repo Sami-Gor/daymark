@@ -155,6 +155,15 @@ Android implementation: Gradle module `android/daymark-voice` wrapping the
 validated `KokoroLocalTtsEngine` (unchanged Java + Rust JNI + `bm_fable`), plus
 a `SystemSpeech` plugin (Android `TextToSpeech`) used for French/Spanish.
 
+Before synthesis, `briefing.spokenText` is split by a TTS-only segmenter
+(`src/lib/tts-segmentation.ts`): conservative boundaries at sentence endings,
+clauses and safe conjunctions, no change to the wording. Segments are streamed
+into the running Kokoro session (`nativeStreamStart`/`nativeStreamPush`) and
+each sentence is read ahead while the previous one plays. The first segment is
+kept short so AudioTrack starts early; excessive leading silence at segment
+boundaries is trimmed (the first chunk fully, later chunks down to a natural
+lead) while trailing sentence pauses are preserved.
+
 Lifecycle and audio:
 
 - The engine initializes once per process when the plugin loads, off the UI
@@ -214,7 +223,7 @@ module). The generated assets and `jniLibs` are gitignored.
 |---|---|---|
 | Launch to weather visible | n/a | ~6.6 s |
 | Kokoro init (process start) | 2.7–3.9 s warm | 2.7–3.5 s warm, ~9–13 s cold/under load |
-| First audio after "Hear today" | 1.4–1.7 s (1.7 s first sentence) | ~5.0 s (5.25 s first sentence; ~real-time synthesis) |
+| First audio after "Hear today" | 1.4–1.7 s (1.7 s first sentence) | ~2.4 s after TTS segmentation (was ~4.3 s; first segment 27 chars) |
 | Steady PSS | ~474 MB | ~623 MB (Kokoro ~470 + WebView/app) |
 | Release APK | 164,094,786 B | 169,165,750 B |
 | Release AAB | 84,011,698 B | 89,307,570 B |

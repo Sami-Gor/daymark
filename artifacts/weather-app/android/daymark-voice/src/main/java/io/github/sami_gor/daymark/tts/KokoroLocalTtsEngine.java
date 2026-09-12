@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 /**
  * Kokoro (pguso/kokoro) implementation of {@link LocalTtsEngine}.
@@ -36,6 +37,10 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private static final String MODEL_ASSET = "kokoro/model_quantized.onnx";
     private static final String VOICE_ASSET = "kokoro/bm_fable.bin";
     private static final int SAMPLE_RATE = 24000;
+    private static final float SILENCE_THRESHOLD = 0.004f;
+    private static final int FIRST_CHUNK_TRIM_CAP_MS = 300;
+    private static final int SEGMENT_LEAD_KEEP_MS = 100;
+    private static final int SEGMENT_TRIM_CAP_MS = 600;
 
     static {
         System.loadLibrary("kokoro_jni");
@@ -55,6 +60,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private native String nativeInit(String modelPath, String voicePath, String voiceName);
     private native float[] nativeSynth(String text);
     private native String nativeStreamStart(String text);
+    private native void nativeStreamPush(String text);
+    private native void nativeStreamFinish();
     private native float[] nativeStreamNext();
     private native void nativeStreamClear();
     private native void nativeRelease();
@@ -109,6 +116,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     @Override
     public void speak(final String text) {
+        speak(text, null);
+    }
+
+    /**
+     * @param segments optional TTS-only segmentation plan; must concatenate to
+     *                 {@code text} exactly, otherwise whole-text synthesis is used.
+     */
+    public void speak(final String text, final List<String> segments) {
         if (state != State.READY && state != State.STOPPED) {
             setState(State.ERROR);
             notifyError("Engine is not ready");
@@ -123,7 +138,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         worker.post(new Runnable() {
             @Override
             public void run() {
-                synthesizeAndPlay(text, callTimeMs);
+                synthesizeAndPlay(text, segments, callTimeMs);
             }
         });
     }
@@ -192,12 +207,18 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return target;
     }
 
-    private void synthesizeAndPlay(String text, long callTimeMs) {
+    private void synthesizeAndPlay(String text, List<String> segments, long callTimeMs) {
         final long synthesisNumber = ++synthesisCount;
+        boolean useSegments = segments != null && segments.size() > 1 && segmentsMatch(text, segments);
+        if (segments != null && !useSegments) {
+            Log.w(TAG, "synthesis #" + synthesisNumber + ": segment plan mismatch; using whole-text synthesis");
+        }
         Log.i(TAG, "synthesis #" + synthesisNumber + ": start " + memorySnapshot("before-synthesis"));
+        Log.i(TAG, "synthesis #" + synthesisNumber + ": plan segments=" + (useSegments ? segments.size() : 1)
+                + " firstSegmentChars=" + (useSegments ? segments.get(0).length() : text.length()));
         String streamError = null;
         try {
-            streamError = nativeStreamStart(text);
+            streamError = useSegments ? startSegmentedStream(segments) : startWholeStream(text);
         } catch (Throwable failure) {
             streamError = failure.getMessage();
         }
@@ -237,6 +258,34 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         }
     }
 
+    private static boolean segmentsMatch(String text, List<String> segments) {
+        StringBuilder joined = new StringBuilder(text.length());
+        for (String segment : segments) {
+            joined.append(segment);
+        }
+        return text.equals(joined.toString());
+    }
+
+    private String startWholeStream(String text) {
+        String error = nativeStreamStart(text);
+        if (error == null) {
+            nativeStreamFinish();
+        }
+        return error;
+    }
+
+    private String startSegmentedStream(List<String> segments) {
+        String error = nativeStreamStart(segments.get(0));
+        if (error != null) {
+            return error;
+        }
+        for (int i = 1; i < segments.size(); i++) {
+            nativeStreamPush(segments.get(i));
+        }
+        nativeStreamFinish();
+        return null;
+    }
+
     private void streamAndPlay(long synthesisNumber, long callTimeMs) {
         AudioTrack track = null;
         short[] chunk = new short[2048];
@@ -258,16 +307,22 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     continue;
                 }
                 chunks++;
-                totalSamples += samples.length;
+                int leadSilence = leadingSilenceSamples(samples);
+                int skipSamples = trimLeadingSilence(leadSilence, chunks == 1);
+                totalSamples += samples.length - skipSamples;
                 if (chunks == 1) {
                     Log.i(TAG, "stream: first chunk " + (SystemClock.elapsedRealtime() - callTimeMs)
-                            + "ms after speak() samples=" + samples.length);
+                            + "ms after speak() samples=" + samples.length
+                            + " leadSilenceMs=" + samplesToMs(leadSilence)
+                            + " trimmedLeadMs=" + samplesToMs(skipSamples));
                     Log.i(TAG, "synthesis #" + synthesisNumber + ": " + memorySnapshot("stream-first-chunk"));
                 } else {
                     Log.i(TAG, "stream: chunk #" + chunks + " " + (SystemClock.elapsedRealtime() - callTimeMs)
-                            + "ms after speak() samples=" + samples.length);
+                            + "ms after speak() samples=" + samples.length
+                            + " leadSilenceMs=" + samplesToMs(leadSilence)
+                            + " trimmedLeadMs=" + samplesToMs(skipSamples));
                 }
-                for (int offset = 0; offset < samples.length && !stopRequested; offset += chunk.length) {
+                for (int offset = skipSamples; offset < samples.length && !stopRequested; offset += chunk.length) {
                     int count = Math.min(chunk.length, samples.length - offset);
                     for (int i = 0; i < count; i++) {
                         float value = Math.max(-1f, Math.min(1f, samples[offset + i]));
@@ -338,6 +393,35 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             Log.i(TAG, "playback: finished stopped=" + stopped + " streamChunks=" + chunks
                     + " " + memorySnapshot("after-playback"));
         }
+    }
+
+    private static int samplesToMs(int samples) {
+        return samples * 1000 / SAMPLE_RATE;
+    }
+
+    private static int msToSamples(int milliseconds) {
+        return milliseconds * SAMPLE_RATE / 1000;
+    }
+
+    private static int leadingSilenceSamples(float[] samples) {
+        int count = 0;
+        while (count < samples.length && Math.abs(samples[count]) < SILENCE_THRESHOLD) {
+            count++;
+        }
+        return count;
+    }
+
+    /**
+     * Removes only excessive leading silence: the first chunk is trimmed up to
+     * a short cap so playback starts promptly, later chunks keep a natural lead
+     * so clause boundaries do not sound clipped.
+     */
+    private static int trimLeadingSilence(int leadSilence, boolean firstChunk) {
+        if (firstChunk) {
+            return Math.min(leadSilence, msToSamples(FIRST_CHUNK_TRIM_CAP_MS));
+        }
+        int excess = Math.max(0, leadSilence - msToSamples(SEGMENT_LEAD_KEEP_MS));
+        return Math.min(excess, msToSamples(SEGMENT_TRIM_CAP_MS));
     }
 
     private AudioTrack createAudioTrack() {

@@ -53,8 +53,8 @@ export function useDaymarkSpeech() {
         fallback,
         {
           isAvailable: async () => (await DaymarkVoice.isAvailable()).available,
-          speak: async (text, lang) => {
-            await DaymarkVoice.speak({ text, lang });
+          speak: async (text, lang, segments) => {
+            await DaymarkVoice.speak({ text, lang, segments });
           },
           stop: async () => {
             await DaymarkVoice.stop();

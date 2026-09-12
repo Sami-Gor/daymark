@@ -18,7 +18,7 @@ use futures::StreamExt;
 use jni::objects::{JClass, JString};
 use jni::sys::{jfloatArray, jstring};
 use jni::JNIEnv;
-use kokoro_en::{KokoroTts, SynthStream, Voice};
+use kokoro_en::{KokoroTts, SynthSink, SynthStream, Voice};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use tokio::runtime::Runtime;
@@ -33,7 +33,29 @@ struct Engine {
 }
 
 struct StreamSession {
+    sink: Option<SynthSink<String>>,
     stream: SynthStream,
+}
+
+fn silence_ms(samples: &[f32], from_start: bool) -> usize {
+    let threshold = 0.004f32;
+    let mut count = 0usize;
+    if from_start {
+        for sample in samples {
+            if sample.abs() >= threshold {
+                break;
+            }
+            count += 1;
+        }
+    } else {
+        for sample in samples.iter().rev() {
+            if sample.abs() >= threshold {
+                break;
+            }
+            count += 1;
+        }
+    }
+    count * 1000 / SAMPLE_RATE
 }
 
 static ENGINE: OnceLock<Mutex<Option<Engine>>> = OnceLock::new();
@@ -175,19 +197,64 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     let result = runtime.block_on(async {
         let (mut sink, stream) = tts.stream::<String, _>(Voice::new(voice));
         sink.synth(input).await?;
-        drop(sink);
-        Ok::<_, kokoro_en::KokoroError>(stream)
+        Ok::<_, kokoro_en::KokoroError>((sink, stream))
     });
     match result {
-        Ok(stream) => {
+        Ok((sink, stream)) => {
             let mut slot = stream_slot().lock().unwrap();
-            *slot = Some(StreamSession { stream });
+            *slot = Some(StreamSession {
+                sink: Some(sink),
+                stream,
+            });
             log::info!("stream: started in {}ms", started.elapsed().as_millis());
             std::ptr::null_mut()
         }
         Err(error) => {
             log::error!("stream start failed: {error}");
             to_jstring(&mut env, &format!("stream start failed: {error}"))
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine_nativeStreamPush(
+    mut env: JNIEnv,
+    _class: JClass,
+    text: JString,
+) {
+    let input = match env.get_string(&text) {
+        Ok(value) => value.to_string_lossy().to_string(),
+        Err(_) => {
+            log::error!("stream push: text unavailable");
+            return;
+        }
+    };
+    let Some((runtime, _tts, _voice)) = engine_handles() else {
+        return;
+    };
+    let mut slot = stream_slot().lock().unwrap();
+    let Some(session) = slot.as_mut() else {
+        log::error!("stream push: no active stream");
+        return;
+    };
+    let Some(sink) = session.sink.as_mut() else {
+        log::error!("stream push: input already closed");
+        return;
+    };
+    if let Err(error) = runtime.block_on(sink.synth(input)) {
+        log::error!("stream push failed: {error}");
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine_nativeStreamFinish(
+    _env: JNIEnv,
+    _class: JClass,
+) {
+    let mut slot = stream_slot().lock().unwrap();
+    if let Some(session) = slot.as_mut() {
+        if session.sink.take().is_some() {
+            log::info!("stream: input closed");
         }
     }
 }
@@ -211,11 +278,13 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     match next {
         Some((samples, took)) => {
             log::info!(
-                "stream: chunk generationMs={} waitMs={} samples={} audioMs={}",
+                "stream: chunk generationMs={} waitMs={} samples={} audioMs={} leadSilenceMs={} tailSilenceMs={}",
                 took.as_millis(),
                 started.elapsed().as_millis(),
                 samples.len(),
-                if samples.is_empty() { 0 } else { samples.len() * 1000 / SAMPLE_RATE }
+                if samples.is_empty() { 0 } else { samples.len() * 1000 / SAMPLE_RATE },
+                silence_ms(&samples, true),
+                silence_ms(&samples, false)
             );
             match env.new_float_array(samples.len() as i32) {
                 Ok(array) => {

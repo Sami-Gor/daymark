@@ -9,11 +9,15 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import io.github.sami_gor.daymark.tts.KokoroLocalTtsEngine;
 import io.github.sami_gor.daymark.tts.LocalTtsEngine;
@@ -41,12 +45,14 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
 
     private PluginCall pendingSpeak;
     private String queuedText;
+    private List<String> queuedSegments;
 
     private final Runnable readyTimeout = () -> {
         if (pendingSpeak != null && state != LocalTtsEngine.State.READY && state != LocalTtsEngine.State.STOPPED) {
             PluginCall call = pendingSpeak;
             pendingSpeak = null;
             queuedText = null;
+            queuedSegments = null;
             call.reject("engine not ready in time");
         }
     };
@@ -84,18 +90,40 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             call.reject("native engine unavailable");
             return;
         }
+        List<String> segments = readSegments(call);
+        resolvePendingSpeak();
         if (state == LocalTtsEngine.State.UNINITIALIZED || state == LocalTtsEngine.State.LOADING) {
             // Wait for READY instead of racing initialization.
             queuedText = text;
-            resolvePendingSpeak();
+            queuedSegments = segments;
             pendingSpeak = call;
             scheduleReadyTimeout();
             return;
         }
-        resolvePendingSpeak();
         pendingSpeak = call;
         requestAudioFocus();
-        engine.speak(text);
+        engine.speak(text, segments);
+    }
+
+    private List<String> readSegments(PluginCall call) {
+        JSArray array = call.getArray("segments");
+        if (array == null) {
+            return null;
+        }
+        try {
+            List<String> segments = new ArrayList<>();
+            for (Object item : array.toList()) {
+                if (item instanceof String) {
+                    segments.add((String) item);
+                } else {
+                    return null;
+                }
+            }
+            return segments.size() > 1 ? segments : null;
+        } catch (Exception failure) {
+            Log.w(TAG, "speak: ignoring invalid segments: " + failure.getMessage());
+            return null;
+        }
     }
 
     @PluginMethod
@@ -123,9 +151,11 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         state = next;
         if (next == LocalTtsEngine.State.READY && queuedText != null && pendingSpeak != null) {
             String text = queuedText;
+            List<String> segments = queuedSegments;
             queuedText = null;
+            queuedSegments = null;
             requestAudioFocus();
-            engine.speak(text);
+            engine.speak(text, segments);
             return;
         }
         if (next == LocalTtsEngine.State.READY || next == LocalTtsEngine.State.STOPPED) {
@@ -183,6 +213,8 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     private void resolvePendingSpeak() {
         PluginCall call = pendingSpeak;
         pendingSpeak = null;
+        queuedText = null;
+        queuedSegments = null;
         if (call != null) {
             call.resolve();
         }
@@ -192,6 +224,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         PluginCall call = pendingSpeak;
         pendingSpeak = null;
         queuedText = null;
+        queuedSegments = null;
         if (call != null) {
             call.reject(message);
         }
