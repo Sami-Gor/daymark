@@ -65,6 +65,11 @@ async function mockOpenMeteo(page: Page, overrides: { forecast?: object; air?: o
   await page.route('**/geocoding-api.open-meteo.com/**', async (route) => {
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(GEOCODE) });
   });
+  // Device-location naming is enhancement-only: by default the locality
+  // dataset is unavailable so existing suites keep exercising the
+  // "Your location" fallback. Locality-specific tests register their own
+  // fixture route afterwards (Playwright routes are LIFO, so theirs wins).
+  await page.route('**/locality/**', (route) => route.fulfill({ status: 404, body: '' }));
 }
 
 test.describe('functional', () => {
@@ -2234,5 +2239,203 @@ test.describe('non-destructive weather refresh', () => {
       await expect(page.getByTestId('text-current-city')).toHaveText('Your location', { timeout: 15000 });
       expect(await page.evaluate(() => (window as any).__hero === document.querySelector('.hero-grid')), `${testId} node identity`).toBe(true);
     }
+  });
+});
+
+test.describe('offline locality naming', () => {
+  const LOCALITY_FIXTURE = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'lib', '__fixtures__', 'uxbridge-sample.json'), 'utf8');
+  const UXBRIDGE = { latitude: 51.5462123, longitude: -0.4787123 };
+  const PARIS_RESULT = {
+    results: [{ name: 'Paris', latitude: 48.8566, longitude: 2.3522, admin1: 'Île-de-France', country: 'France', country_code: 'FR', timezone: 'Europe/Paris' }],
+  };
+  // One synthetic record ~11 km from the rounded Uxbridge coordinates, so the
+  // lookup must return LOW confidence and the caller must suppress the label.
+  const LOW_ONLY_INDEX = JSON.stringify({
+    cellSize: 0.25,
+    count: 1,
+    cells: { '566_718': [0, 1] },
+    records: [['Far Village', 51.6458, -0.4787, 'GB', '', 'PPL', 800]],
+  });
+
+  async function stubLocation(page: Page) {
+    await page.addInitScript(() => {
+      (window as any).__geo = { calls: 0, pending: [] };
+      navigator.geolocation.getCurrentPosition = ((success: PositionCallback, error: PositionErrorCallback) => {
+        (window as any).__geo.calls += 1;
+        (window as any).__geo.pending.push({ success, error });
+      }) as typeof navigator.geolocation.getCurrentPosition;
+    });
+  }
+
+  async function resolveLocation(page: Page, coords: { latitude: number; longitude: number }) {
+    await page.evaluate((value) => {
+      for (const entry of (window as any).__geo.pending.splice(0)) entry.success({ coords: value });
+    }, coords);
+  }
+
+  async function routeLocality(page: Page, body: string, options: { delay?: number; status?: number } = {}) {
+    await page.route('**/locality/**', async (route) => {
+      if (options.delay) await new Promise((resolve) => setTimeout(resolve, options.delay));
+      if (options.status && options.status !== 200) {
+        await route.fulfill({ status: options.status, body: '' });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body });
+    });
+  }
+
+  test('resolves the locality label once weather is ready', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOCALITY_FIXTURE);
+    await stubLocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveLocation(page, UXBRIDGE);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Uxbridge');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+  });
+
+  test('weather is never delayed by the locality dataset and the label updates later', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOCALITY_FIXTURE, { delay: 1500 });
+    await stubLocation(page);
+    let forecastRequests = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('/v1/forecast') && !request.url().includes('ukmo')) forecastRequests += 1;
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveLocation(page, UXBRIDGE);
+    // Weather is already rendered with the generic fallback while the dataset loads.
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location', { timeout: 1000 });
+    const requestsAtFallback = forecastRequests;
+    // The label improves in place; no weather refetch happens for naming.
+    await expect(page.getByTestId('text-current-city')).toHaveText('Uxbridge', { timeout: 8000 });
+    expect(forecastRequests).toBe(requestsAtFallback);
+  });
+
+  test('falls back to the generic label when the dataset is unavailable', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOCALITY_FIXTURE, { status: 404 });
+    await stubLocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveLocation(page, UXBRIDGE);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+  });
+
+  test('suppresses LOW-confidence labels', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOW_ONLY_INDEX);
+    await stubLocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveLocation(page, UXBRIDGE);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
+    await page.waitForTimeout(800);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
+  });
+
+  test('a search selection supersedes a pending locality lookup', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOCALITY_FIXTURE, { delay: 1200 });
+    await page.route('**/geocoding-api.open-meteo.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PARIS_RESULT) }),
+    );
+    await stubLocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveLocation(page, UXBRIDGE);
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+    await page.waitForTimeout(1500);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+  });
+
+  test('repeated location taps settle on the latest intent', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOCALITY_FIXTURE);
+    await stubLocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await page.getByTestId('button-refresh-location').click();
+    await page.evaluate((second) => {
+      const pending = (window as any).__geo.pending.splice(0);
+      // First (stale) fix somewhere else, then the latest fix near Uxbridge.
+      if (pending[0]) pending[0].success({ coords: { latitude: 51.0, longitude: 0.0 } });
+      if (pending[1]) pending[1].success({ coords: second });
+    }, UXBRIDGE);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Uxbridge', { timeout: 8000 });
+  });
+
+  test('makes no external reverse-geocoding request and no CSP violations', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOCALITY_FIXTURE);
+    await stubLocation(page);
+    const hosts = new Set<string>();
+    const cspErrors: string[] = [];
+    page.on('request', (request) => {
+      try { hosts.add(new URL(request.url()).hostname); } catch { /* ignore */ }
+    });
+    page.on('console', (message) => {
+      if (message.type() === 'error' && /Content Security Policy|Refused to/i.test(message.text())) cspErrors.push(message.text());
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveLocation(page, UXBRIDGE);
+    await expect(page.getByTestId('text-current-city')).toHaveText('Uxbridge');
+
+    expect([...hosts].sort()).toEqual(['air-quality-api.open-meteo.com', 'api.open-meteo.com', 'localhost']);
+    expect(cspErrors).toEqual([]);
+  });
+
+  test('shows localized fallback labels in EN, FR and ES', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOCALITY_FIXTURE, { status: 404 });
+    await stubLocation(page);
+    for (const [locale, expected] of [['en', 'Your location'], ['fr', 'Votre position'], ['es', 'Tu ubicación']] as const) {
+      await page.goto('/');
+      await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+      await page.getByTestId('select-language').selectOption(locale);
+      await page.getByTestId('button-refresh-location').click();
+      await resolveLocation(page, UXBRIDGE);
+      await expect(page.getByTestId('text-current-city')).toHaveText(expected);
+    }
+  });
+
+  test('keeps the non-destructive refresh behaviour during locality naming', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeLocality(page, LOCALITY_FIXTURE, { delay: 1200 });
+    await stubLocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await page.route('**/api.open-meteo.com/**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FORECAST) });
+    });
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveLocation(page, UXBRIDGE);
+    await expect(page.getByTestId('refresh-indicator')).toBeVisible();
+    await expect(page.locator('.loading-layout')).toHaveCount(0);
+    await expect(page.getByTestId('list-hourly-forecast')).toBeVisible();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Uxbridge', { timeout: 10000 });
   });
 });
