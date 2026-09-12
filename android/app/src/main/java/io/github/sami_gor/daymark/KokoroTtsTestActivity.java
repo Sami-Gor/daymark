@@ -49,7 +49,7 @@ public class KokoroTtsTestActivity extends Activity implements LocalTtsEngine.Li
         root.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Bundled voice: bm_george (Kokoro-82M quantized, offline)");
+        subtitle.setText("Bundled voice: bm_fable (Kokoro-82M quantized, offline)");
         subtitle.setTextSize(12);
         subtitle.setTextColor(Color.DKGRAY);
         subtitle.setGravity(Gravity.CENTER_HORIZONTAL);

@@ -8,10 +8,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ASSETS="$HERE/../../app/src/main/assets/kokoro"
 BASE="https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main"
 MODEL_SHA256="fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478"
-VOICE="bm_george"
-VOICE_SHA256="c4b235a4c1f2cd3b939fed08b899ce9385638b763f7b73a59616c4fc9bd6c9bc"
+VOICE="bm_fable"
+VOICE_SHA256="f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1"
 
 mkdir -p "$ASSETS"
+rm -f "$ASSETS/bm_george.bin"
 curl -sL --fail -o "$ASSETS/model_quantized.onnx" "$BASE/onnx/model_quantized.onnx"
 curl -sL --fail -o "$ASSETS/$VOICE.bin" "$BASE/voices/$VOICE.bin"
 

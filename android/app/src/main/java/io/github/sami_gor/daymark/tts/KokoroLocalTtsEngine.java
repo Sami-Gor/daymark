@@ -19,7 +19,7 @@ import java.io.OutputStream;
 /**
  * Kokoro (pguso/kokoro) implementation of {@link LocalTtsEngine}.
  *
- * The 92 MB quantized model and the single British male voice (bm_george) ship
+ * The 92 MB quantized model and the single British male voice (bm_fable) ship
  * as APK assets; on first initialization they are copied into the app's files
  * directory because Kokoro loads them from paths. Synthesis runs through a
  * minimal Rust JNI bridge (libkokoro_jni.so) with ONNX Runtime statically
@@ -31,9 +31,10 @@ import java.io.OutputStream;
 public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     private static final String TAG = "DaymarkKokoroTts";
-    private static final String VOICE_NAME = "bm_george";
+    private static final String VOICE_NAME = "bm_fable";
+    private static final String LEGACY_VOICE_FILE = "bm_george.bin";
     private static final String MODEL_ASSET = "kokoro/model_quantized.onnx";
-    private static final String VOICE_ASSET = "kokoro/bm_george.bin";
+    private static final String VOICE_ASSET = "kokoro/bm_fable.bin";
     private static final int SAMPLE_RATE = 24000;
 
     static {
@@ -75,9 +76,13 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             public void run() {
                 try {
                     Log.i(TAG, "initialize: start " + memorySnapshot("before-init"));
+                    File legacyVoice = new File(new File(appContext.getFilesDir(), "kokoro"), LEGACY_VOICE_FILE);
+                    if (legacyVoice.exists() && legacyVoice.delete()) {
+                        Log.i(TAG, "initialize: removed legacy " + LEGACY_VOICE_FILE);
+                    }
                     long copyStart = SystemClock.elapsedRealtime();
                     File modelFile = copyAssetIfNeeded(MODEL_ASSET, "model_quantized.onnx");
-                    File voiceFile = copyAssetIfNeeded(VOICE_ASSET, "bm_george.bin");
+                    File voiceFile = copyAssetIfNeeded(VOICE_ASSET, VOICE_NAME + ".bin");
                     Log.i(TAG, "initialize: assets ready in " + (SystemClock.elapsedRealtime() - copyStart)
                             + "ms modelBytes=" + modelFile.length() + " voiceBytes=" + voiceFile.length());
 
@@ -90,7 +95,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         notifyError("Initialization failed: " + error);
                         return;
                     }
-                    Log.i(TAG, "initialize: model loaded in " + elapsedMs + "ms");
+                    Log.i(TAG, "initialize: model loaded in " + elapsedMs + "ms voice=" + VOICE_NAME);
                     Log.i(TAG, "initialize: done " + memorySnapshot("after-init"));
                     setState(State.READY);
                 } catch (Throwable failure) {

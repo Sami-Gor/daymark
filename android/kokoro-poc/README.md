@@ -22,11 +22,11 @@ adb logcat -s DaymarkKokoroTts
 | Rust | 1.98.1 (`aarch64-linux-android` target) |
 | Android NDK | 29.0.14206865 (clang `aarch64-linux-android26`) |
 | Model | `onnx/model_quantized.onnx`, sha256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` (92,361,116 B) |
-| Voice | `bm_george.bin`, sha256 `c4b235a4c1f2cd3b939fed08b899ce9385638b763f7b73a59616c4fc9bd6c9bc` (522,240 B) |
+| Voice | `bm_fable.bin`, sha256 `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1` (522,240 B) |
 
 British male voices available in the official collection (all 522,240 B):
-`bm_daniel`, `bm_fable`, `bm_george`, `bm_lewis`. **bm_george** was selected as
-the neutral narration voice.
+`bm_daniel`, `bm_fable`, `bm_george`, `bm_lewis`. **bm_fable** is the selected
+narration voice; `bm_george` was the initial pick and is no longer bundled.
 
 ## Build
 
@@ -61,7 +61,7 @@ US/GB gold+silver lexicons, the POS tagger data and the OOV table via
 KokoroTtsTestActivity (native UI)
   -> KokoroLocalTtsEngine  (implements LocalTtsEngine: initialize/speak/stop/isSpeaking/shutdown)
        -> System.loadLibrary("kokoro_jni")
-       -> nativeInit(modelPath, voicePath, "bm_george") -> error string | null
+       -> nativeInit(modelPath, voicePath, "bm_fable") -> error string | null
        -> nativeSynth(text) -> float[24000 Hz mono PCM]  (fallback path)
        -> nativeStreamStart(text) -> error string | null  (sentence streaming)
        -> nativeStreamNext() -> next sentence float[] | null when finished
@@ -103,7 +103,9 @@ remains as a fallback when streaming cannot start. The release profile adds
 `panic = "abort"` and `codegen-units = 1` on top of the existing `lto`/`strip`.
 
 *Emulator-only numbers (API 36 arm64, warm engine); they are not device
-performance.*
+performance. The latency/PSS table was measured with `bm_george`; the bundled
+voice was later switched to `bm_fable` (same 522,240 B, no architecture
+change).*
 
 | Measurement | Monolithic (before) | Streaming (after) |
 |---|---|---|
@@ -143,7 +145,7 @@ work, not part of this pass.
 |---|---|---|---|
 | pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | Yes (compiled) | Attribution required |
 | Kokoro model weights (`model_quantized.onnx`) | Apache-2.0 | Yes (asset) | hexgrad/onnx-community release; verify upstream card |
-| `bm_george.bin` voice | Apache-2.0 (per model repo) | Yes (asset) | Per-voice training-data provenance is not documented upstream — review |
+| `bm_fable.bin` voice | Apache-2.0 (per model repo) | Yes (asset) | Per-voice training-data provenance is not documented upstream — review |
 | ONNX Runtime 1.28.2 (static) | MIT | Yes (linked) | Downloaded by `ort-sys` at build time |
 | `ort` / `ort-sys` | MIT OR Apache-2.0 | Yes (compiled) | |
 | tokio, log, android_logger, jni, bincode, fancy-regex, regex, futures, pin-project, ndarray, num2words, unicode-segmentation | MIT / Apache-2.0 | Yes (compiled) | Permissive |
@@ -160,7 +162,7 @@ license and the per-voice provenance question need review.
 
 | | Sherpa POC | Kokoro POC |
 |---|---|---|
-| Voice | Piper `en_GB-northern_english_male-medium` | Kokoro `bm_george` |
+| Voice | Piper `en_GB-northern_english_male-medium` | Kokoro `bm_fable` |
 | Runtime | sherpa-onnx (Apache-2.0) | pguso/kokoro (Apache-2.0) + ONNX Runtime (MIT) |
 | G2P | Piper/espeak-ng data | Misaki + embedded GB lexicons, **no eSpeak** |
 | Initialization on this emulator | **Aborted** (`FORTIFY: pthread_mutex_lock called on a destroyed mutex`) on API 35 and 36, both AAR variants | **READY**, repeats cleanly |
