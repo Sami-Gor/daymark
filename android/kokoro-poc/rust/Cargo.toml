@@ -1,0 +1,20 @@
+[package]
+name = "daymark-kokoro-jni"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Minimal JNI bridge exposing pguso/kokoro (Kokoro TTS) to the Daymark Android POC."
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+log = "0.4"
+android_logger = "0.14"
+kokoro-en = { path = "../.build/kokoro-src", default-features = false, features = ["misaki-lean"] }
+
+[profile.release]
+lto = true
+strip = true

@@ -178,6 +178,7 @@ android {
     buildTypes {
         release {
             minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (hasReleaseSigning) {
                 signingConfig signingConfigs.release
             }
@@ -186,6 +187,12 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+    androidResources {
+        // Kokoro POC assets: copied to the files directory on first use, so
+        // there is no benefit to compressing them in the APK.
+        noCompress 'onnx'
+        noCompress 'bin'
     }
     lintOptions {
         checkReleaseBuilds false
