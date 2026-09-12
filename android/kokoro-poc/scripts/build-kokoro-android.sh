@@ -52,16 +52,27 @@ env "CC_aarch64-linux-android=$TOOLCHAIN/bin/aarch64-linux-android26-clang" \
     "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" \
     cargo build --release --target aarch64-linux-android --no-default-features
 
-JNI_LIBS="$ROOT/app/src/main/jniLibs/arm64-v8a"
-mkdir -p "$JNI_LIBS"
 RELEASE_DIR="$RUST_DIR/target/aarch64-linux-android/release"
-cp "$RELEASE_DIR/libdaymark_kokoro_jni.so" "$JNI_LIBS/libkokoro_jni.so"
-# ONNX Runtime is statically linked into the cdylib; only the C++ runtime is shared.
 CXX_SHARED="$TOOLCHAIN/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
-if [ -f "$CXX_SHARED" ]; then
-  cp "$CXX_SHARED" "$JNI_LIBS/libc++_shared.so"
-else
+if [ ! -f "$CXX_SHARED" ]; then
   echo "error: libc++_shared.so not found in the NDK sysroot" >&2
   exit 1
 fi
-ls -la "$JNI_LIBS"
+
+copy_libs() {
+  local target="$1"
+  mkdir -p "$target"
+  cp "$RELEASE_DIR/libdaymark_kokoro_jni.so" "$target/libkokoro_jni.so"
+  # ONNX Runtime is statically linked into the cdylib; only the C++ runtime is shared.
+  cp "$CXX_SHARED" "$target/libc++_shared.so"
+  ls -la "$target"
+}
+
+# TWA shell (rollback point).
+copy_libs "$ROOT/app/src/main/jniLibs/arm64-v8a"
+
+# Capacitor shell: the local DaymarkVoice plugin module packages the libraries.
+CAPACITOR_JNI_LIBS="$ROOT/../artifacts/weather-app/android/daymark-voice/src/main/jniLibs/arm64-v8a"
+if [ -d "$(dirname "$CAPACITOR_JNI_LIBS")" ]; then
+  copy_libs "$CAPACITOR_JNI_LIBS"
+fi

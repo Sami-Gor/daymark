@@ -3,6 +3,7 @@ import { CalendarDays } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
+import { useDeepLinks } from '@/hooks/use-deep-links';
 import NotFound from '@/pages/not-found';
 import Privacy from '@/pages/privacy';
 import PrivacyFr from '@/pages/privacy-fr';
@@ -232,11 +233,17 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
+function DeepLinks() {
+  useDeepLinks();
+  return null;
+}
+
 function App() {
   return (
     <>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <Router />
+        <DeepLinks />
       </WouterRouter>
       <Toaster />
     </>
