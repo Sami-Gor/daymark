@@ -157,11 +157,12 @@ work, not part of this pass.
 | misaki-rs 0.3.0 | MIT | Yes (compiled) | Lexicons/tagger embedded; no eSpeak |
 | cmudict-fast 0.8.0 | MIT/Apache-2.0 | Yes (compiled) | CMUdict-derived data |
 | waken_snowball 0.1.0 | BSD-3-Clause | Yes (compiled) | |
-| `language-tokenizer` 0.1.0 | **no license field in its manifest** | Yes (compiled) | **Requires legal review** |
+| `language-tokenizer` 0.1.0 | WTFPL-2.0 (`license-file`, no SPDX field) | Yes (compiled) | Permissive; cleared |
 | espeak-ng | GPL-3.0 | **No** | Excluded by `--no-default-features`; verified absent |
 
-No claim of commercial safety is made; the unpinned `language-tokenizer`
-license and the per-voice provenance question need review.
+`language-tokenizer` 0.1.0 ships `LICENSE.md` (WTFPL-2.0) and is permissive;
+the remaining open question is the per-voice training-data provenance of
+`bm_fable`, which upstream does not document.
 
 ## Comparison with the Sherpa POC (`poc/local-tts`)
 
