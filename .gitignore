@@ -83,3 +83,12 @@ android/build/
 android/local.properties
 android/*.apk
 android/*.aab
+
+# Kokoro POC build artifacts (external crate checkout + cargo/NDK leftovers)
+android/kokoro-poc/.build/
+android/.cargo/
+
+# Kokoro POC generated inputs (fetch/build via android/kokoro-poc/scripts)
+android/app/src/main/assets/kokoro/
+android/app/src/main/jniLibs/
+android/kokoro-poc/rust/target/

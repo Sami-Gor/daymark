@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the Daymark brand palette and the retired TWA theme colors. -->
+    <color name="colorPrimary">#e7f2f7</color>
+    <color name="colorPrimaryDark">#e7f2f7</color>
+    <color name="colorAccent">#226c9b</color>
+</resources>

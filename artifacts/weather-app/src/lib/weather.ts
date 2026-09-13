@@ -194,7 +194,11 @@ async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSigna
     }
     throw error;
   }
-  if (!response.ok) throw new Error(`Weather service returned ${response.status}`);
+  if (!response.ok) {
+    // Raw status stays in developer logs only; users get friendly copy.
+    if (import.meta.env.DEV) console.warn('weather: HTTP', response.status, response.url);
+    throw new Error("Weather data isn't available right now. Try again shortly.");
+  }
   let data: unknown;
   try {
     data = await response.json();

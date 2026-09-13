@@ -1,0 +1,8 @@
+include ':app'
+include ':capacitor-cordova-android-plugins'
+project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
+
+include ':daymark-voice'
+project(':daymark-voice').projectDir = new File('./daymark-voice/')
+
+apply from: 'capacitor.settings.gradle'

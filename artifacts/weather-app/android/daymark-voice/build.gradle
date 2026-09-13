@@ -1,0 +1,24 @@
+apply plugin: 'com.android.library'
+
+android {
+    namespace = "io.github.sami_gor.daymark.voice"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        consumerProguardFiles 'consumer-rules.pro'
+        ndk {
+            // The validated Kokoro JNI library is built for arm64-v8a only.
+            abiFilters 'arm64-v8a'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+}

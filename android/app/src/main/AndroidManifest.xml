@@ -159,6 +159,14 @@
 
         <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
 
+        <!-- Native-only Kokoro local TTS proof of concept (not reachable from the web UI).
+             Launch manually: adb shell am start -n io.github.sami_gor.daymark/.KokoroTtsTestActivity -->
+        <activity
+            android:name=".KokoroTtsTestActivity"
+            android:exported="true"
+            android:label="Daymark Kokoro Voice Test"
+            android:theme="@android:style/Theme.DeviceDefault.Light" />
+
         <activity android:name="com.google.androidbrowserhelper.trusted.WebViewFallbackActivity"
             android:configChanges="orientation|screenSize" />
 
