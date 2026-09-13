@@ -212,6 +212,9 @@ const en = {
   'voice.stop': 'Stop',
   'voice.ariaStart': "Read today's forecast aloud",
   'voice.ariaStop': 'Stop reading the forecast aloud',
+  'voice.preparing': 'Preparing voice…',
+  'voice.ariaPreparing': 'Preparing voice. Tap to cancel.',
+  'voice.error.unavailable': "Voice playback isn't available right now. Try again.",
 
   // Error / loading / not found / footer
   'error.title': 'That forecast went cloudy.',

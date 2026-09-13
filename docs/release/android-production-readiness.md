@@ -1,6 +1,7 @@
 # Daymark Android production readiness audit
 
-Scope: Capacitor shell on `migration/capacitor-native-shell` at `24b2b5e`.
+Scope: Capacitor shell on `migration/capacitor-native-shell` (audit snapshot at
+`24b2b5e`; later commits resolved the minor findings below).
 Method: repository/static inspection, artifact inspection of the signed release
 APK/AAB, emulator runtime checks from the migration and performance passes.
 No code or configuration changes were made by this audit. Findings are
@@ -196,7 +197,8 @@ VERIFIED/READY:
 - Model/voice load from `filesDir` copies of bundled assets; hashes match.
 - JNI returns error strings/nulls; Java falls back to whole-text synthesis if a
   segment plan does not match, then to the monolithic path if streaming cannot
-  start; browser/system TTS is only used when native is unavailable.
+  start; French/Spanish use the system engine by design, while English
+  narration failures surface an error and never fall back to system TTS.
 - AudioTrack is created per narration and released in `finally`; Stop pauses and
   flushes immediately, clears the pending stream, resolves the pending call.
 - Pause stops narration; audio focus (`GAIN_TRANSIENT`) is requested per
@@ -373,11 +375,11 @@ responses by design.
 |---|---|
 | No location permission / unavailable / timeout | distinct friendly copy, retryable, no crash (PDT for prompt flows) |
 | Network unavailable / API timeout / malformed response | validated response → retry UI, no infinite loading |
-| Kokoro init failure | plugin rejects → router falls back to browser/system TTS; native marked error for the session |
+| Kokoro init failure | English surfaces the narration error (no system fallback); fr/es keep their system-TTS path |
 | Kokoro synth/playback failure | error state, listener notified, no crash |
 | Microphone denied / recognition unavailable | UI error; no crash (PDT) |
 | System TTS unavailable | speak rejection surfaces as a state reset; no crash |
-| Unsupported language | fr/es use system TTS; if unavailable the control hides rather than failing silently |
+| Unsupported language | fr/es use system TTS; if unavailable the narration error is shown |
 | Low memory / process restart | cold start; engine re-initializes; in-memory briefing regenerated |
 
 ## 18. Physical-device test matrix

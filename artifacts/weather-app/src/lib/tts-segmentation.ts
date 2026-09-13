@@ -16,7 +16,7 @@ const MIN = 20;
 const PREFERRED_MAX = 90;
 const HARD_MAX = 140;
 
-export const SEGMENT_TARGETS = {
+const SEGMENT_TARGETS = {
   MIN_FIRST,
   FIRST_MAX,
   MIN,
@@ -24,7 +24,7 @@ export const SEGMENT_TARGETS = {
   HARD_MAX,
 } as const;
 
-export const TTS_ABBREVIATIONS = new Set([
+const TTS_ABBREVIATIONS = new Set([
   'mr',
   'mrs',
   'ms',

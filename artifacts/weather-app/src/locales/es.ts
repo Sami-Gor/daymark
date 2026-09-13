@@ -195,6 +195,9 @@ const es: Record<TranslationKey, string> = {
   'voice.stop': 'Parar',
   'voice.ariaStart': 'Leer el pronóstico de hoy en voz alta',
   'voice.ariaStop': 'Parar la lectura del pronóstico',
+  'voice.preparing': 'Preparando la voz…',
+  'voice.ariaPreparing': 'Preparando la voz. Toca para cancelar.',
+  'voice.error.unavailable': 'La reproducción de voz no está disponible ahora mismo. Inténtalo de nuevo.',
 
   'error.title': 'El pronóstico se nubló.',
   'error.suffix': 'Comprueba tu conexión y vuelve a mirar el cielo.',

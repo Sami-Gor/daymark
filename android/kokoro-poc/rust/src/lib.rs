@@ -37,27 +37,6 @@ struct StreamSession {
     stream: SynthStream,
 }
 
-fn silence_ms(samples: &[f32], from_start: bool) -> usize {
-    let threshold = 0.004f32;
-    let mut count = 0usize;
-    if from_start {
-        for sample in samples {
-            if sample.abs() >= threshold {
-                break;
-            }
-            count += 1;
-        }
-    } else {
-        for sample in samples.iter().rev() {
-            if sample.abs() >= threshold {
-                break;
-            }
-            count += 1;
-        }
-    }
-    count * 1000 / SAMPLE_RATE
-}
-
 static ENGINE: OnceLock<Mutex<Option<Engine>>> = OnceLock::new();
 static STREAM: OnceLock<Mutex<Option<StreamSession>>> = OnceLock::new();
 
@@ -109,8 +88,6 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
         Err(_) => return to_jstring(&mut env, "voice name unavailable"),
     };
 
-    let started = Instant::now();
-
     let runtime = match tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build() {
         Ok(value) => value,
         Err(error) => return to_jstring(&mut env, &format!("tokio runtime failed: {error}")),
@@ -124,12 +101,6 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
         }
     };
 
-    log::info!(
-        "initialize: model loaded in {}ms (model={}, voice={})",
-        started.elapsed().as_millis(),
-        model,
-        voice
-    );
     let mut slot = engine_slot().lock().unwrap();
     *slot = Some(Engine {
         runtime: Arc::new(runtime),
@@ -193,7 +164,6 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     let Some((runtime, tts, voice)) = engine_handles() else {
         return to_jstring(&mut env, "engine not initialized");
     };
-    let started = Instant::now();
     let result = runtime.block_on(async {
         let (mut sink, stream) = tts.stream::<String, _>(Voice::new(voice));
         sink.synth(input).await?;
@@ -206,7 +176,6 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
                 sink: Some(sink),
                 stream,
             });
-            log::info!("stream: started in {}ms", started.elapsed().as_millis());
             std::ptr::null_mut()
         }
         Err(error) => {
@@ -253,9 +222,7 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
 ) {
     let mut slot = stream_slot().lock().unwrap();
     if let Some(session) = slot.as_mut() {
-        if session.sink.take().is_some() {
-            log::info!("stream: input closed");
-        }
+        session.sink.take();
     }
 }
 
@@ -267,7 +234,6 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     let Some((runtime, _tts, _voice)) = engine_handles() else {
         return std::ptr::null_mut();
     };
-    let started = Instant::now();
     let next = {
         let mut slot = stream_slot().lock().unwrap();
         let Some(session) = slot.as_mut() else {
@@ -276,16 +242,7 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
         runtime.block_on(session.stream.next())
     };
     match next {
-        Some((samples, took)) => {
-            log::info!(
-                "stream: chunk generationMs={} waitMs={} samples={} audioMs={} leadSilenceMs={} tailSilenceMs={}",
-                took.as_millis(),
-                started.elapsed().as_millis(),
-                samples.len(),
-                if samples.is_empty() { 0 } else { samples.len() * 1000 / SAMPLE_RATE },
-                silence_ms(&samples, true),
-                silence_ms(&samples, false)
-            );
+        Some((samples, _took)) => {
             match env.new_float_array(samples.len() as i32) {
                 Ok(array) => {
                     if env.set_float_array_region(&array, 0, &samples).is_err() {
@@ -297,7 +254,6 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
             }
         }
         None => {
-            log::info!("stream: completed waitMs={}", started.elapsed().as_millis());
             std::ptr::null_mut()
         }
     }
@@ -311,7 +267,6 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     let mut slot = stream_slot().lock().unwrap();
     if slot.is_some() {
         *slot = None;
-        log::info!("stream: cleared");
     }
 }
 
@@ -323,5 +278,4 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     *stream_slot().lock().unwrap() = None;
     let mut slot = engine_slot().lock().unwrap();
     *slot = None;
-    log::info!("engine released");
 }

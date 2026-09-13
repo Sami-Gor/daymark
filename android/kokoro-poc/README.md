@@ -1,11 +1,29 @@
-# Kokoro Local TTS POC (native Android only)
+# Kokoro local TTS (shared production source)
 
-Status: **proof of concept**. This is a separate native test screen for
-[pguso/kokoro](https://github.com/pguso/kokoro). It does not touch the Daymark
-TWA, the React app, the production Web Speech narration, or the Sherpa POC
-(which lives on `poc/local-tts`).
+This directory started as the local Kokoro proof of concept and now contains
+the **shared production Rust/JNI source and the fetch/build scripts** for
+[pguso/kokoro](https://github.com/pguso/kokoro). The production consumer is the
+Capacitor plugin module:
 
-Launch it manually:
+```
+artifacts/weather-app/android/daymark-voice/
+```
+
+Production facts:
+
+- model: `model_quantized.onnx` (SHA-256 verified by the fetch script)
+- voice: `bm_fable` (SHA-256 verified by the fetch script)
+- G2P: Misaki-only, no eSpeak
+- the scripts populate **both** the production plugin module and the retained
+  TWA rollback project, and fail clearly if the `daymark-voice` module is
+  missing
+
+The legacy `KokoroTtsTestActivity` (TWA rollback project only, at
+`android/app/`) remains as a diagnostic/historical test screen. It is **not**
+the production launch path; the production app is the Capacitor shell. Its
+frozen engine copy must not be edited (see `android/README.md`).
+
+Diagnostic launch (legacy TWA rollback project only):
 
 ```bash
 adb shell am start -n io.github.sami_gor.daymark/.KokoroTtsTestActivity
@@ -63,12 +81,14 @@ US/GB gold+silver lexicons, the POS tagger data and the OOV table via
 ## JNI / FFI architecture
 
 ```
-KokoroTtsTestActivity (native UI)
+DaymarkVoicePlugin (production, Capacitor) / KokoroTtsTestActivity (legacy)
   -> KokoroLocalTtsEngine  (implements LocalTtsEngine: initialize/speak/stop/isSpeaking/shutdown)
        -> System.loadLibrary("kokoro_jni")
        -> nativeInit(modelPath, voicePath, "bm_fable") -> error string | null
        -> nativeSynth(text) -> float[24000 Hz mono PCM]  (fallback path)
        -> nativeStreamStart(text) -> error string | null  (sentence streaming)
+       -> nativeStreamPush(text)  (additional TTS segments, same stream)
+       -> nativeStreamFinish()    (closes segment input)
        -> nativeStreamNext() -> next sentence float[] | null when finished
        -> nativeStreamClear()
        -> nativeRelease()

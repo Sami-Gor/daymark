@@ -149,6 +149,9 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     @Override
     public void onStateChanged(LocalTtsEngine.State next) {
         state = next;
+        JSObject stateEvent = new JSObject();
+        stateEvent.put("state", mapState(next));
+        notifyListeners("stateChanged", stateEvent);
         if (next == LocalTtsEngine.State.READY && queuedText != null && pendingSpeak != null) {
             String text = queuedText;
             List<String> segments = queuedSegments;

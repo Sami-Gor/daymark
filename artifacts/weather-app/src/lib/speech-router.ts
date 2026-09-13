@@ -1,4 +1,4 @@
-import { selectSpeechEngine, type SpeechEngine, type SpeechSelection } from './speech-engine';
+import { isEnglish, selectSpeechEngine, type SpeechEngine, type SpeechSelection } from './speech-engine';
 import { segmentForSpeech } from './tts-segmentation';
 
 /*
@@ -60,14 +60,12 @@ export function createSpeechRouter(
         nativeAvailable = false;
       }
     }
-    const selection = selectSpeechEngine({
+    return selectSpeechEngine({
       isNativePlatform: env.isNativePlatform,
       platform: env.platform,
       lang,
       nativeAvailable,
     });
-    console.info(`DaymarkSpeech engine=${selection.engine} reason=${selection.reason}`);
-    return selection;
   }
 
   function speakWithBrowser(
@@ -119,7 +117,12 @@ export function createSpeechRouter(
       if (!spoken) {
         return false;
       }
+      const beforeSelect = generation;
       const selection = await select(lang);
+      // Stop (or a newer utterance) during the availability check wins.
+      if (generation !== beforeSelect) {
+        return false;
+      }
       handlers.onEngine?.(selection);
       const token = ++generation;
 
@@ -130,9 +133,6 @@ export function createSpeechRouter(
         try {
           const plan = segmentForSpeech(spoken);
           segments = plan.length > 1 ? plan : undefined;
-          if (segments) {
-            console.info(`DaymarkSpeech segments=${segments.length} firstSegmentChars=${segments[0].length}`);
-          }
         } catch (error) {
           console.warn('DaymarkSpeech segmentation failed; using whole-text synthesis', error);
         }
@@ -147,10 +147,25 @@ export function createSpeechRouter(
           if (generation !== token) {
             return false;
           }
-          console.warn('DaymarkSpeech native speak failed; using browser fallback', error);
           active = null;
+          // English narration is local-only by design: never switch it to the
+          // device/system TTS engine (which may be cloud-backed). Surface the
+          // failure instead so the UI can tell the user.
+          if (isEnglish(lang)) {
+            console.warn('DaymarkSpeech native speak failed', error);
+            handlers.onError?.('native-failed');
+            return false;
+          }
+          console.warn('DaymarkSpeech native speak failed; using browser fallback', error);
           return speakWithBrowser(spoken, lang, handlers, token);
         }
+      }
+
+      // Android English selected but the native engine is unavailable: the
+      // whole point of the local engine, so no system-TTS fallback here.
+      if (selection.reason === 'native-unavailable') {
+        handlers.onError?.(selection.reason);
+        return false;
       }
 
       return speakWithBrowser(spoken, lang, handlers, token);

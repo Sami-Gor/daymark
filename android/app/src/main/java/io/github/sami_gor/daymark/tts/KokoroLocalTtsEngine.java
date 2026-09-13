@@ -17,6 +17,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
+ * FROZEN ROLLBACK COPY. Production implementation lives in
+ * artifacts/weather-app/android/daymark-voice/ and has diverged (streaming
+ * segmentation, silence trimming, lifecycle). Do not edit this copy.
+ *
  * Kokoro (pguso/kokoro) implementation of {@link LocalTtsEngine}.
  *
  * The 92 MB quantized model and the single British male voice (bm_fable) ship

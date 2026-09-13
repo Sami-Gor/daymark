@@ -13,7 +13,7 @@ import { resolveDeepLink } from '@/lib/deep-links';
  *   WebView's native canGoBack() does not track pushState entries;
  * - keeps the task in the background when back is pressed at the root.
  */
-export function useDeepLinks() {
+export function useNativeNavigation() {
   const [, navigate] = useLocation();
 
   useEffect(() => {

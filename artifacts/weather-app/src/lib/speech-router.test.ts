@@ -81,14 +81,54 @@ describe('createSpeechRouter', () => {
     expect(sentSegments.join('')).toBe(text);
   });
 
-  it('falls back to the browser when native playback fails', async () => {
+  it('surfaces an error for English instead of falling back to system TTS when native playback fails', async () => {
     const native = makeNative();
     native.speak.mockRejectedValue(new Error('engine error'));
     const browser = makeBrowser();
     const router = createSpeechRouter({ isNativePlatform: true, platform: 'android' }, browser, native);
+    const onError = vi.fn();
 
-    await router.speak('Good morning.', 'en-GB', {});
-    expect(browser.speak).toHaveBeenCalledTimes(1);
+    await router.speak('Good morning.', 'en-GB', { onError });
+    expect(onError).toHaveBeenCalledWith('native-failed');
+    expect(browser.speak).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an error for English without touching system TTS when the native engine is unavailable', async () => {
+    const native = makeNative(false);
+    const browser = makeBrowser();
+    const router = createSpeechRouter({ isNativePlatform: true, platform: 'android' }, browser, native);
+    const onError = vi.fn();
+
+    await router.speak('Good morning.', 'en-GB', { onError });
+    expect(onError).toHaveBeenCalledWith('native-unavailable');
+    expect(browser.speak).not.toHaveBeenCalled();
+    expect(native.speak).not.toHaveBeenCalled();
+  });
+
+  it('keeps French and Spanish on the system/browser engine', async () => {
+    const native = makeNative();
+    const browser = makeBrowser();
+    const router = createSpeechRouter({ isNativePlatform: true, platform: 'android' }, browser, native);
+
+    await router.speak('Bonjour.', 'fr-FR', {});
+    await router.speak('Buenos días.', 'es-ES', {});
+    expect(browser.speak).toHaveBeenCalledTimes(2);
+    expect(native.speak).not.toHaveBeenCalled();
+  });
+
+  it('cancel during the availability check prevents any speech starting', async () => {
+    const availability = deferred<boolean>();
+    const native = makeNative();
+    native.isAvailable.mockReturnValue(availability.promise);
+    const browser = makeBrowser();
+    const router = createSpeechRouter({ isNativePlatform: true, platform: 'android' }, browser, native);
+
+    void router.speak('Good morning.', 'en-GB', {});
+    router.stop();
+    availability.resolve(true);
+    await flush();
+    expect(native.speak).not.toHaveBeenCalled();
+    expect(browser.speak).not.toHaveBeenCalled();
   });
 
   it('does not emit completion for superseded speech', async () => {

@@ -4,7 +4,6 @@ import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
-import android.os.Debug;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -82,7 +81,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             @Override
             public void run() {
                 try {
-                    Log.i(TAG, "initialize: start " + memorySnapshot("before-init"));
                     File legacyVoice = new File(new File(appContext.getFilesDir(), "kokoro"), LEGACY_VOICE_FILE);
                     if (legacyVoice.exists() && legacyVoice.delete()) {
                         Log.i(TAG, "initialize: removed legacy " + LEGACY_VOICE_FILE);
@@ -103,7 +101,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         return;
                     }
                     Log.i(TAG, "initialize: model loaded in " + elapsedMs + "ms voice=" + VOICE_NAME);
-                    Log.i(TAG, "initialize: done " + memorySnapshot("after-init"));
                     setState(State.READY);
                 } catch (Throwable failure) {
                     Log.e(TAG, "initialize: failed: " + failure.getMessage(), failure);
@@ -213,9 +210,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         if (segments != null && !useSegments) {
             Log.w(TAG, "synthesis #" + synthesisNumber + ": segment plan mismatch; using whole-text synthesis");
         }
-        Log.i(TAG, "synthesis #" + synthesisNumber + ": start " + memorySnapshot("before-synthesis"));
-        Log.i(TAG, "synthesis #" + synthesisNumber + ": plan segments=" + (useSegments ? segments.size() : 1)
-                + " firstSegmentChars=" + (useSegments ? segments.get(0).length() : text.length()));
         String streamError = null;
         try {
             streamError = useSegments ? startSegmentedStream(segments) : startWholeStream(text);
@@ -235,9 +229,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 return;
             }
             long audioDurationMs = Math.round(samples.length * 1000.0 / SAMPLE_RATE);
-            Log.i(TAG, "synthesis #" + synthesisNumber + ": samples=" + samples.length
-                    + " sampleRate=" + SAMPLE_RATE + " audioDurationMs=" + audioDurationMs);
-            Log.i(TAG, "synthesis #" + synthesisNumber + ": " + memorySnapshot("after-generation"));
 
             final Listener current = listener;
             if (current != null) {
@@ -310,18 +301,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 int leadSilence = leadingSilenceSamples(samples);
                 int skipSamples = trimLeadingSilence(leadSilence, chunks == 1);
                 totalSamples += samples.length - skipSamples;
-                if (chunks == 1) {
-                    Log.i(TAG, "stream: first chunk " + (SystemClock.elapsedRealtime() - callTimeMs)
-                            + "ms after speak() samples=" + samples.length
-                            + " leadSilenceMs=" + samplesToMs(leadSilence)
-                            + " trimmedLeadMs=" + samplesToMs(skipSamples));
-                    Log.i(TAG, "synthesis #" + synthesisNumber + ": " + memorySnapshot("stream-first-chunk"));
-                } else {
-                    Log.i(TAG, "stream: chunk #" + chunks + " " + (SystemClock.elapsedRealtime() - callTimeMs)
-                            + "ms after speak() samples=" + samples.length
-                            + " leadSilenceMs=" + samplesToMs(leadSilence)
-                            + " trimmedLeadMs=" + samplesToMs(skipSamples));
-                }
                 for (int offset = skipSamples; offset < samples.length && !stopRequested; offset += chunk.length) {
                     int count = Math.min(chunk.length, samples.length - offset);
                     for (int i = 0; i < count; i++) {
@@ -347,10 +326,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 return;
             }
             long audioDurationMs = Math.round(totalSamples * 1000.0 / SAMPLE_RATE);
-            Log.i(TAG, "synthesis #" + synthesisNumber + ": samples=" + totalSamples
-                    + " sampleRate=" + SAMPLE_RATE + " audioDurationMs=" + audioDurationMs
-                    + " streamChunks=" + chunks);
-            Log.i(TAG, "synthesis #" + synthesisNumber + ": " + memorySnapshot("after-generation"));
 
             final Listener current = listener;
             if (current != null) {
@@ -390,13 +365,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             if (state != State.ERROR) {
                 setState(stopped ? State.STOPPED : State.READY);
             }
-            Log.i(TAG, "playback: finished stopped=" + stopped + " streamChunks=" + chunks
-                    + " " + memorySnapshot("after-playback"));
+            Log.i(TAG, "playback: finished stopped=" + stopped + " streamChunks=" + chunks);
         }
-    }
-
-    private static int samplesToMs(int samples) {
-        return samples * 1000 / SAMPLE_RATE;
     }
 
     private static int msToSamples(int milliseconds) {
@@ -497,22 +467,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             if (state != State.ERROR) {
                 setState(stopped ? State.STOPPED : State.READY);
             }
-            Log.i(TAG, "playback: finished stopped=" + stopped + " " + memorySnapshot("after-playback"));
+            Log.i(TAG, "playback: finished stopped=" + stopped);
         }
-    }
-
-    private static String memorySnapshot(String label) {
-        Runtime runtime = Runtime.getRuntime();
-        long heapUsedKb = (runtime.totalMemory() - runtime.freeMemory()) / 1024;
-        long pssKb = -1;
-        try {
-            Debug.MemoryInfo info = new Debug.MemoryInfo();
-            Debug.getMemoryInfo(info);
-            pssKb = info.getTotalPss();
-        } catch (Throwable ignored) {
-            // Instrumentation only.
-        }
-        return label + " heapUsedKb=" + heapUsedKb + " pssKb=" + pssKb;
     }
 
     private void setState(final State next) {

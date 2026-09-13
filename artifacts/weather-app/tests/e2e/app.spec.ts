@@ -189,7 +189,7 @@ test.describe('functional', () => {
     });
     await page.goto('/');
     await expect(page.getByTestId('status-weather-error')).toBeVisible();
-    await expect(page.locator('[data-testid="status-weather-error"]')).toContainText('Weather service returned 500');
+    await expect(page.locator('[data-testid="status-weather-error"]')).toContainText("Weather data isn't available right now");
     failing = false;
     await page.getByTestId('button-retry-weather').click();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
@@ -499,6 +499,66 @@ test.describe('voice controls', () => {
     await expect(button).toHaveText(/Stop/);
     await page.evaluate(() => (window as any).__speech.last?.onend?.());
     await expect(button).toHaveText(/Hear today/);
+  });
+
+  test('changing the language stops the active narration', async ({ page }) => {
+    await stubSpeechPlayback(page);
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    const button = page.getByTestId('button-hear-today');
+    await button.click();
+    await expect(button).toHaveText(/Stop/);
+    await page.getByTestId('select-language').selectOption('fr');
+    await expect(button).not.toHaveText(/^Stop$/);
+    expect(await page.evaluate(() => (window as any).__speech.cancelCount)).toBeGreaterThanOrEqual(1);
+  });
+
+  test('Hear today stops an active listening session', async ({ page }) => {
+    await stubSpeechRecognition(page);
+    await stubSpeechPlayback(page);
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await page.getByTestId('button-ask-daymark').click();
+    expect(await page.evaluate(() => (window as any).__recognition.starts)).toBe(1);
+    await page.getByTestId('button-hear-today').click();
+    expect(await page.evaluate(() => (window as any).__recognition.stops)).toBeGreaterThanOrEqual(1);
+  });
+
+  test('shows a narration error when playback cannot start', async ({ page }) => {
+    await page.addInitScript(() => {
+      class FakeUtterance {
+        text: string;
+        lang = '';
+        onstart: (() => void) | null = null;
+        onend: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        constructor(text: string) {
+          this.text = text;
+        }
+      }
+      const synthesis = {
+        speaking: false,
+        speak() {
+          throw new Error('no audio output');
+        },
+        cancel() {
+          // no-op
+        },
+        getVoices() {
+          return [];
+        },
+      };
+      Object.defineProperty(window, 'SpeechSynthesisUtterance', { value: FakeUtterance, configurable: true });
+      Object.defineProperty(window, 'speechSynthesis', { value: synthesis, configurable: true });
+    });
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    const button = page.getByTestId('button-hear-today');
+    await button.click();
+    await expect(page.getByTestId('voice-error')).toBeVisible();
+    await expect(page.getByTestId('voice-error')).toHaveText(/Voice playback isn't available/);
+    await expect(button).toHaveText(/Hear today/);
+    await expect(button).not.toHaveAttribute('aria-pressed', 'true');
   });
 
   test('Ask Daymark hides when speech recognition is unsupported', async ({ page }) => {

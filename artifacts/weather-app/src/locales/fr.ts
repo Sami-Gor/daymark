@@ -195,6 +195,9 @@ const fr: Record<TranslationKey, string> = {
   'voice.stop': 'Arrêter',
   'voice.ariaStart': 'Lire les prévisions du jour à voix haute',
   'voice.ariaStop': 'Arrêter la lecture des prévisions',
+  'voice.preparing': 'Préparation de la voix…',
+  'voice.ariaPreparing': 'Préparation de la voix. Appuyez pour annuler.',
+  'voice.error.unavailable': "La lecture vocale n'est pas disponible pour le moment. Réessayez.",
 
   'error.title': 'Ces prévisions se sont couvertes.',
   'error.suffix': 'Vérifiez votre connexion et retentez votre chance.',

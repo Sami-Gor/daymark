@@ -4,6 +4,10 @@
  * Capacitor launches the bundled app at its start URL and reports the external
  * launch URL separately, so the SPA has to navigate itself. Only URLs for
  * Daymark's own origin are accepted.
+ *
+ * MAINTENANCE: this host list must stay aligned with the app-link intent
+ * filter in artifacts/weather-app/android/app/src/main/AndroidManifest.xml
+ * (`<data android:host=...>`).
  */
 
 const ALLOWED_HOSTS = new Set(['daymark-weather.pages.dev', 'localhost']);

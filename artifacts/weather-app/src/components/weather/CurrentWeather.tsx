@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Glasses, Navigation, Square, Umbrella, Volume2 } from 'lucide-react';
 import { displayTemp, formatLocationDate, weatherCopy, type Place, type Unit, type WeatherAdvice, type WeatherPayload } from '@/lib/weather';
 import { DAYMARK_INTENTS, getIntentResponse } from '@/lib/weather-intents';
@@ -23,10 +23,20 @@ export function CurrentWeather({ place, weather, unit, umbrellaAdvice, sunglasse
   const current = weather.current ?? {};
   const currentCode = current.weather_code ?? 0;
   const speech = useDaymarkSpeech();
+  const stopSpeech = speech.stop;
+  const previousLocale = useRef(locale);
   const briefing = useMemo(
     () => getIntentResponse(DAYMARK_INTENTS.today, weather, { locationName: place.name, unit, locale }),
     [weather, place.name, unit, locale],
   );
+
+  // Switching language stops the current narration instead of leaving the
+  // previous language playing; nothing restarts automatically.
+  useEffect(() => {
+    if (previousLocale.current === locale) return;
+    previousLocale.current = locale;
+    stopSpeech();
+  }, [locale, stopSpeech]);
   return (
     <section className="hero-grid" aria-labelledby="place-title">
       <div className="hero-location">
@@ -53,21 +63,28 @@ export function CurrentWeather({ place, weather, unit, umbrellaAdvice, sunglasse
             <button
               type="button"
               className="local-button"
-              onClick={() => (speech.isSpeaking ? speech.stop() : speech.speak(briefing.spokenText, SPEECH_LANGS[locale]))}
-              aria-label={speech.isSpeaking ? t('voice.ariaStop') : t('voice.ariaStart')}
-              aria-pressed={speech.isSpeaking}
+              onClick={() => (speech.isActive ? stopSpeech() : speech.speak(briefing.spokenText, SPEECH_LANGS[locale]))}
+              aria-label={speech.isPreparing ? t('voice.ariaPreparing') : speech.isSpeaking ? t('voice.ariaStop') : t('voice.ariaStart')}
+              aria-pressed={speech.isActive}
               data-testid="button-hear-today"
             >
-              {speech.isSpeaking ? <Square size={11} /> : <Volume2 size={13} />}
-              {speech.isSpeaking ? t('voice.stop') : t('voice.hearToday')}
+              {speech.isActive ? <Square size={11} /> : <Volume2 size={13} />}
+              {speech.isPreparing ? t('voice.preparing') : speech.isSpeaking ? t('voice.stop') : t('voice.hearToday')}
             </button>
+          )}
+          {speech.isPreparing && (
+            <span className="sr-only" role="status" aria-live="polite" data-testid="voice-preparing-status">{t('voice.preparing')}</span>
+          )}
+          {speech.error && (
+            <p className="voice-error" role="alert" data-testid="voice-error">{t('voice.error.unavailable')}</p>
           )}
           <AskDaymark
             weather={weather}
             place={place}
             unit={unit}
+            narrationActive={speech.isActive}
             speak={speech.speak}
-            stopSpeech={speech.stop}
+            stopSpeech={stopSpeech}
           />
         </div>
       </div>

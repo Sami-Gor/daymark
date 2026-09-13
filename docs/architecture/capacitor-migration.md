@@ -179,7 +179,7 @@ Engine selection (`src/lib/speech-engine.ts`):
 | Platform | Language | Engine |
 |---|---|---|
 | Android Capacitor, native available | English | Kokoro `bm_fable` |
-| Android Capacitor, native unavailable | English | Web Speech API if present, else Android system TTS |
+| Android Capacitor, native unavailable | English | Narration error shown; never falls back to system TTS (English stays local-only) |
 | Android Capacitor | French/Spanish | Android system TTS (`SystemSpeech`) |
 | Web/PWA/desktop | any | Web Speech API |
 | iOS | any | Web Speech API (native plugin is a future path) |
@@ -212,14 +212,14 @@ gitignored.
   force-stop/relaunch all work.
 - Kokoro: READY, `voice=bm_fable`, streamed narration, Stop
   (`stopped=true`), offline (airplane mode) and repeated narration all pass.
-- Web/PWA: typecheck, 203 unit tests, 133 e2e tests and the production Vite
+- Web/PWA: typecheck, 214 unit tests, 133 e2e tests and the production Vite
   build pass; the service worker is skipped and cleaned up inside the native
   shell only.
 - Known environment limitations: the emulator has no fresh fused location fix
   and blocks mock providers, so "Use my location" could not be validated
   end-to-end; its permission wiring is in place. Google TTS on the emulator
   has no French voice data, so French narration fails cleanly (handled error,
-  no crash) — English system TTS works.
+  no crash) — English narration always uses local Kokoro and never falls back to system TTS.
 
 | Measurement (emulator) | TWA + Kokoro POC | Capacitor shell |
 |---|---|---|

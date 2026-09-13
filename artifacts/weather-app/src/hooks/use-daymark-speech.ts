@@ -1,21 +1,26 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 
 import { DaymarkVoice } from '@/lib/daymark-voice';
 import type { BrowserSpeechAdapter } from '@/lib/speech-router';
 import { pickFallbackAdapter } from '@/lib/speech-adapters';
 import type { SpeechEngine } from '@/lib/speech-engine';
 import { createSpeechRouter } from '@/lib/speech-router';
+import { initialSpeechUiState, reduceSpeechUi } from '@/lib/speech-ui-state';
 import { SystemSpeech } from '@/lib/system-speech';
 import { createBrowserSpeechController } from '@/lib/voice-browser';
 
 /*
  * Unified Daymark speech hook.
  *
- * Keeps the previous UI contract (supported / isSpeaking / speak / stop) while
- * routing English speech on Android Capacitor builds through the native
- * DaymarkVoice (Kokoro) engine and everything else through the Web Speech API.
+ * Keeps the existing UI contract (supported / speak / stop) and adds an
+ * explicit status machine: idle → preparing (local engine loading) → speaking
+ * → idle, plus a localized error flag when narration cannot start.
+ *
+ * Routing rules (see speech-router): English on Android only ever uses the
+ * local Kokoro engine; French/Spanish use the system TTS; the web keeps the
+ * Web Speech API.
  */
 export function useDaymarkSpeech() {
   const controller = useMemo(() => createBrowserSpeechController(), []);
@@ -64,15 +69,29 @@ export function useDaymarkSpeech() {
     [fallback],
   );
 
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [ui, dispatch] = useReducer(reduceSpeechUi, initialSpeechUiState);
   const [engine, setEngine] = useState<SpeechEngine | null>(null);
-  const tokenRef = useRef(0);
 
+  // The native engine reports when synthesis actually starts, which moves the
+  // UI out of the "Preparing voice…" state.
   useEffect(() => {
-    console.info(
-      `DaymarkSpeech platform=${Capacitor.getPlatform()} native=${Capacitor.isNativePlatform()} browserSpeech=${controller.supported}`,
-    );
-  }, [controller]);
+    if (!Capacitor.isNativePlatform()) return;
+    let active = true;
+    let handle: PluginListenerHandle | undefined;
+    void DaymarkVoice.addListener('stateChanged', (event) => {
+      if (event.state === 'speaking') dispatch({ type: 'audioStarted' });
+    }).then((created) => {
+      if (active) {
+        handle = created;
+      } else {
+        void created.remove();
+      }
+    });
+    return () => {
+      active = false;
+      void handle?.remove();
+    };
+  }, []);
 
   useEffect(() => () => router.stop(), [router]);
 
@@ -80,16 +99,13 @@ export function useDaymarkSpeech() {
     (text: string, lang?: string) => {
       const spoken = text?.trim();
       if (!spoken) return false;
-      const token = ++tokenRef.current;
-      setIsSpeaking(true);
       void router.speak(spoken, lang, {
-        onEngine: (selection) => setEngine(selection.engine),
-        onEnd: () => {
-          if (tokenRef.current === token) setIsSpeaking(false);
+        onEngine: (selection) => {
+          setEngine(selection.engine);
+          dispatch({ type: 'speakStarted', engine: selection.engine });
         },
-        onError: () => {
-          if (tokenRef.current === token) setIsSpeaking(false);
-        },
+        onEnd: () => dispatch({ type: 'finished' }),
+        onError: () => dispatch({ type: 'failed' }),
       });
       return true;
     },
@@ -97,10 +113,19 @@ export function useDaymarkSpeech() {
   );
 
   const stop = useCallback(() => {
-    tokenRef.current++;
     router.stop();
-    setIsSpeaking(false);
+    dispatch({ type: 'stopped' });
   }, [router]);
 
-  return { supported: router.supported(), isSpeaking, speak, stop, engine };
+  return {
+    supported: router.supported(),
+    status: ui.status,
+    error: ui.error,
+    isSpeaking: ui.status === 'speaking',
+    isPreparing: ui.status === 'preparing',
+    isActive: ui.status !== 'idle',
+    speak,
+    stop,
+    engine,
+  };
 }

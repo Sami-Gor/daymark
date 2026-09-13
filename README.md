@@ -124,7 +124,7 @@ See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migra
 ## Test
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (203 tests)
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (214 tests)
 pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (133 tests)
 ```
 
@@ -138,7 +138,7 @@ See [SECURITY.md](SECURITY.md). In short: minimal attack surface (9 runtime depe
 
 ```
 artifacts/
-  weather-app/            the app (React SPA + PWA)
+  weather-app/            production React/Vite app (SPA + PWA)
     public/               manifest, service worker, icons, _headers
     src/lib/weather.ts    API boundary + Zod schemas + location-safe time helpers
     src/lib/weather-alerts.ts   forecast-derived risk engine (not official warnings)
@@ -150,8 +150,13 @@ artifacts/
     src/components/       UI components
     src/fonts/            self-hosted fonts + licences
     tests/e2e/            Playwright suite
+    android/              production Capacitor Android shell
+      app/                Capacitor application module
+      daymark-voice/      native DaymarkVoice plugin (Kokoro, local TTS)
   mockup-sandbox/         local design sandbox (never deployed)
-docs/                     README screenshots
+android/                  frozen TWA/Bubblewrap rollback project (see android/README.md)
+  kokoro-poc/             shared Kokoro Rust/JNI source + fetch/build scripts
+docs/                     architecture, release audit, README screenshots
 scripts/                  workspace tooling
 ```
 
