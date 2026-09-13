@@ -72,7 +72,10 @@ copy_libs() {
 copy_libs "$ROOT/app/src/main/jniLibs/arm64-v8a"
 
 # Capacitor shell: the local DaymarkVoice plugin module packages the libraries.
-CAPACITOR_JNI_LIBS="$ROOT/../artifacts/weather-app/android/daymark-voice/src/main/jniLibs/arm64-v8a"
-if [ -d "$(dirname "$CAPACITOR_JNI_LIBS")" ]; then
-  copy_libs "$CAPACITOR_JNI_LIBS"
+CAPACITOR_MODULE="$ROOT/../artifacts/weather-app/android/daymark-voice"
+CAPACITOR_JNI_LIBS="$CAPACITOR_MODULE/src/main/jniLibs/arm64-v8a"
+if [ ! -d "$CAPACITOR_MODULE" ]; then
+  echo "error: Capacitor DaymarkVoice plugin module not found at $CAPACITOR_MODULE" >&2
+  exit 1
 fi
+copy_libs "$CAPACITOR_JNI_LIBS"

@@ -173,7 +173,7 @@ the remaining open question is the per-voice training-data provenance of
 | G2P | Piper/espeak-ng data | Misaki + embedded GB lexicons, **no eSpeak** |
 | Initialization on this emulator | **Aborted** (`FORTIFY: pthread_mutex_lock called on a destroyed mutex`) on API 35 and 36, both AAR variants | **READY**, repeats cleanly |
 | AAB increase | ~+101 MB (static-link build) | ~+79.1 MB |
-| Licensing concerns | GPL-3.0 `espeak-ng-data`, CC-BY-SA voice dataset | `language-tokenizer` lacks a license; per-voice provenance |
+| Licensing concerns | GPL-3.0 `espeak-ng-data`, CC-BY-SA voice dataset | `language-tokenizer` is WTFPL-2.0 (cleared); per-voice provenance undocumented |
 | Model quality expectation | Piper medium, robust G2P for OOV words | Kokoro-82M int8; natural prosody, but no eSpeak fallback for unusual words |
 
 ## Limitations

@@ -198,9 +198,11 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
 ```
 
-Kokoro native material is restored with the scripts in `android/kokoro-poc`
-(they now populate both the TWA rollback project and the Capacitor plugin
-module). The generated assets and `jniLibs` are gitignored.
+Kokoro native material is restored with the scripts in `android/kokoro-poc`.
+Both scripts populate the TWA rollback project and the Capacitor plugin module
+unconditionally in a clean checkout, and fail with a clear error if the
+`daymark-voice` module is missing. The generated assets and `jniLibs` are
+gitignored.
 
 ## Validation results (API 36 arm64 emulator, release build)
 
