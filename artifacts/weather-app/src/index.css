@@ -210,7 +210,6 @@
 .date-line { color: hsl(var(--muted-foreground)); font-size: 13px; }
 .condition-line { display: flex; align-items: center; gap: 12px; margin-top: 25px; color: hsl(var(--foreground)); font-size: 16px; font-weight: 600; }
 .condition-icon { color: hsl(var(--accent)); }
-.advice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-width: 560px; margin-top: 52px; }
 .advice-card { min-height: 150px; display: grid; grid-template-columns: 24px 1fr; grid-template-rows: auto auto 1fr; column-gap: 9px; padding: 18px 20px; border: 1px solid transparent; border-radius: 17px; }
 .advice-card.advice-no { color: hsl(157 46% 35%); background: hsl(157 48% 92%); border-color: hsl(157 35% 84%); }
 .advice-card.advice-yes { color: hsl(21 71% 39%); background: hsl(25 85% 93%); border-color: hsl(25 55% 86%); }
@@ -223,6 +222,15 @@
 .local-button:focus-visible, .retry-button:focus-visible { outline: 2px solid hsl(var(--secondary) / .8); outline-offset: 2px; }
 .locale-select { padding: 6px 10px; border: 1px solid hsl(var(--border)); border-radius: 999px; color: hsl(var(--primary)); background: hsl(var(--card) / .36); font-family: var(--app-font-sans); font-size: 10px; font-weight: 700; cursor: pointer; }
 .locale-select:focus-visible { outline: 2px solid hsl(var(--secondary) / .8); outline-offset: 2px; }
+/* Today hero: the day cue is the visual answer, then Hear today. */
+.today-hero { display: flex; flex-direction: column; }
+.day-cue { display: flex; align-items: center; justify-content: center; gap: clamp(14px, 4vw, 26px); margin-top: clamp(26px, 4.5vw, 46px); min-height: clamp(84px, 22vw, 104px); }
+.day-cue-emoji { font-size: clamp(64px, 19vw, 88px); line-height: 1; animation: cue-in .3s ease-out both; }
+.day-cue-emoji-trail { animation-delay: .1s; }
+@keyframes cue-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+.day-cue-action { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 18px; min-height: 46px; }
+.day-cue-action .primary-speak { margin-top: 0; min-height: 46px; padding: 11px 22px; font-size: 13px; }
+.advice-row { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 15px; }
 .hero-actions .local-button { margin-top: 0; }
 .location-search { position: relative; flex: 1 1 100%; min-width: 0; max-width: 560px; }
@@ -485,7 +493,7 @@
   .place-title { font-size: clamp(36px, 12vw, 52px); }
   .current-temp { font-size: clamp(84px, 26vw, 118px); }
   .temp-block { margin-top: 34px; }
-  .advice-grid { grid-template-columns: 1fr; max-width: 420px; margin-top: 30px; }
+  .advice-row { grid-template-columns: 1fr; }
   .advice-card { min-height: 132px; }
   .hero-actions { gap: 10px 8px; }
   .local-button { min-height: 44px; padding: 10px 15px; font-size: 12px; }

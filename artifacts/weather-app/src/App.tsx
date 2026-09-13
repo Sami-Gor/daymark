@@ -22,6 +22,7 @@ import {
 } from '@/lib/weather';
 import { LoadingState } from '@/components/weather/LoadingState';
 import { WEATHER_ERROR_KEYS, WeatherError, type WeatherErrorCode } from '@/components/weather/WeatherError';
+import { WeatherAdviceCards } from '@/components/weather/WeatherAdviceCards';
 import { TopBar } from '@/components/weather/TopBar';
 import { CurrentWeather } from '@/components/weather/CurrentWeather';
 import { HourlyOutlook } from '@/components/weather/HourlyOutlook';
@@ -31,6 +32,7 @@ import { MicroClimateForecast } from '@/components/weather/MicroClimate';
 import { UVForecast } from '@/components/weather/UVForecast';
 import { AirQualityForecast } from '@/components/weather/AirQualityForecast';
 import { WeatherAlerts } from '@/components/weather/WeatherAlerts';
+import { deriveDayCue } from '@/lib/day-cue';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
 import { useLocale } from '@/hooks/use-locale';
 
@@ -168,6 +170,7 @@ function Home() {
   const peakPrecipitationIndex = upcomingIndexes.find((index) => weather?.hourly?.precipitation_probability?.[index] === peakPrecipitation);
   const umbrellaAdvice = getUmbrellaAdvice(peakPrecipitation, peakPrecipitationIndex === undefined ? undefined : timeLabel(hourlyTimes[peakPrecipitationIndex], locale), locale);
   const sunglassesAdvice = getSunglassesAdvice(weatherState.uv_index, weatherState.cloud_cover, locale);
+  const dayCue = useMemo(() => (weather ? deriveDayCue(weather) : null), [weather]);
   const privacyHref = locale === 'fr' ? '/fr/privacy' : locale === 'es' ? '/es/privacy' : '/privacy';
 
   return (
@@ -190,8 +193,7 @@ function Home() {
                 place={place}
                 weather={weather}
                 unit={unit}
-                umbrellaAdvice={umbrellaAdvice}
-                sunglassesAdvice={sunglassesAdvice}
+                dayCue={dayCue ?? deriveDayCue(weather)}
                 updatedLabel={updatedLabel}
                 isLocating={isLocating}
                 onFindMe={() => findMe()}
@@ -199,6 +201,7 @@ function Home() {
               />
               <WeatherAlerts weather={weather} unit={unit} />
               <div className="content-grid">
+                <WeatherAdviceCards umbrellaAdvice={umbrellaAdvice} sunglassesAdvice={sunglassesAdvice} />
                 <HourlyOutlook weather={weather} unit={unit} />
                 <DailyForecast weather={weather} unit={unit} />
                 <WeatherDetails weather={weather} unit={unit} />

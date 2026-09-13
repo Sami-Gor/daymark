@@ -216,6 +216,108 @@ test.describe('functional', () => {
   });
 });
 
+test.describe('day cue hero', () => {
+  const rainEverywhere = {
+    ...FORECAST,
+    current: { ...FORECAST.current, cloud_cover: 90, uv_index: 1 },
+    hourly: {
+      ...FORECAST.hourly,
+      precipitation_probability: FORECAST.hourly.time.map(() => 80),
+      weather_code: FORECAST.hourly.time.map(() => 61),
+    },
+  };
+  const mixedDay = {
+    ...FORECAST,
+    hourly: {
+      ...FORECAST.hourly,
+      precipitation_probability: FORECAST.hourly.time.map((_, index) => (index % 2 ? 50 : 5)),
+      weather_code: FORECAST.hourly.time.map((_, index) => (index % 2 ? 61 : 0)),
+    },
+  };
+  const dryOvercast = {
+    ...FORECAST,
+    hourly: {
+      ...FORECAST.hourly,
+      precipitation_probability: FORECAST.hourly.time.map(() => 10),
+      weather_code: FORECAST.hourly.time.map(() => 3),
+    },
+  };
+
+  test('shows one visual cue with no explanatory text and Hear today underneath', async ({ page }) => {
+    await stubSpeechPlayback(page);
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    const cue = page.getByTestId('day-cue');
+    await expect(cue).toBeVisible();
+    await expect(cue).toHaveText('😎');
+    await expect(cue).toHaveAttribute('aria-label', 'Sunny conditions today');
+    const hero = page.locator('.today-hero');
+    await expect(hero).not.toContainText('Sunglasses');
+    await expect(hero).not.toContainText('Umbrella?');
+    const cueBox = await cue.boundingBox();
+    const hearBox = await page.getByTestId('button-hear-today').boundingBox();
+    expect(hearBox!.y).toBeGreaterThan(cueBox!.y);
+    await expect(page.getByTestId('button-hear-today')).toBeVisible();
+    await expect(page.getByTestId('button-hear-today')).toHaveText(/Hear today/);
+  });
+
+  test('renders the rain cue for a wet day', async ({ page }) => {
+    await mockOpenMeteo(page, { forecast: rainEverywhere });
+    await page.goto('/');
+    const cue = page.getByTestId('day-cue');
+    await expect(cue).toHaveText('☔');
+    await expect(cue).toHaveAttribute('aria-label', 'Rain expected today');
+  });
+
+  test('renders the mixed cue when sun and showers share the day', async ({ page }) => {
+    await mockOpenMeteo(page, { forecast: mixedDay });
+    await page.goto('/');
+    const cue = page.getByTestId('day-cue');
+    await expect(cue).toHaveText('😎☔');
+    await expect(cue).toHaveAttribute('aria-label', 'Sunshine and rain expected today');
+  });
+
+  test('renders the neutral cue when neither sunglasses nor umbrella is warranted', async ({ page }) => {
+    await mockOpenMeteo(page, { forecast: dryOvercast });
+    await page.goto('/');
+    const cue = page.getByTestId('day-cue');
+    await expect(cue).toHaveText('☁️');
+    await expect(cue).toHaveAttribute('aria-label', 'Cloudy conditions today');
+  });
+
+  test('localizes the cue label in EN, FR and ES', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    const cue = page.getByTestId('day-cue');
+    await expect(cue).toHaveAttribute('aria-label', 'Sunny conditions today');
+    await page.getByTestId('select-language').selectOption('fr');
+    await expect(cue).toHaveAttribute('aria-label', 'Temps ensoleillé aujourd’hui');
+    await page.getByTestId('select-language').selectOption('es');
+    await expect(cue).toHaveAttribute('aria-label', 'Condiciones soleadas hoy');
+  });
+
+  test('keeps the detailed cards reachable below the hero', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    const advice = page.getByTestId('card-umbrella-advice');
+    await expect(advice).toHaveCount(1);
+    await advice.scrollIntoViewIfNeeded();
+    await expect(advice).toBeVisible();
+    await page.getByTestId('panel-uv-forecast').scrollIntoViewIfNeeded();
+    await expect(page.getByTestId('panel-uv-forecast')).toBeVisible();
+  });
+
+  test('renders the cue without animation under reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    const emoji = page.getByTestId('day-cue').locator('.day-cue-emoji').first();
+    await expect(emoji).toBeVisible();
+    const duration = await emoji.evaluate((element) => getComputedStyle(element).animationDuration);
+    expect(parseFloat(duration)).toBeLessThanOrEqual(0.01);
+  });
+});
+
 test.describe('responsive', () => {
   const widths = [320, 375, 390, 430, 768, 1024, 1280, 1440];
 
@@ -1324,7 +1426,7 @@ test.describe('negative input / XSS', () => {
 });
 
 test.describe('hero action hierarchy', () => {
-  test('keeps all four actions available with search first in reading order', async ({ page }) => {
+  test('keeps all four actions with Hear today under the cue and search first in the tools row', async ({ page }) => {
     await stubSpeechRecognition(page);
     await stubSpeechPlayback(page);
     await mockOpenMeteo(page);
@@ -1335,14 +1437,22 @@ test.describe('hero action hierarchy', () => {
     await expect(page.getByTestId('button-hear-today')).toBeVisible();
     await expect(page.getByTestId('button-ask-daymark')).toBeVisible();
 
-    const searchPrecedesSecondary = await page.evaluate(() => {
-      const search = document.querySelector('[data-testid="input-location-search"]');
-      const secondary = ['button-refresh-location', 'button-hear-today', 'button-ask-daymark']
-        .map((id) => document.querySelector(`[data-testid="${id}"]`));
-      if (!search || secondary.some((node) => !node)) return false;
-      return secondary.every((node) => (search.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+    const cuePrecedesHearToday = await page.evaluate(() => {
+      const cue = document.querySelector('[data-testid="day-cue"]');
+      const hear = document.querySelector('[data-testid="button-hear-today"]');
+      if (!cue || !hear) return false;
+      return (cue.compareDocumentPosition(hear) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
     });
-    expect(searchPrecedesSecondary).toBe(true);
+    expect(cuePrecedesHearToday).toBe(true);
+
+    const searchPrecedesTools = await page.evaluate(() => {
+      const search = document.querySelector('[data-testid="input-location-search"]');
+      const tools = ['button-refresh-location', 'button-ask-daymark']
+        .map((id) => document.querySelector(`[data-testid="${id}"]`));
+      if (!search || tools.some((node) => !node)) return false;
+      return tools.every((node) => (search.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+    });
+    expect(searchPrecedesTools).toBe(true);
   });
 
   test('keeps every hero control visible and unclipped at 320px', async ({ page }) => {
@@ -2095,7 +2205,7 @@ test.describe('mobile layout', () => {
     await expect(page.getByTestId('text-current-city')).toBeVisible();
     for (const locale of ['en', 'fr', 'es']) {
       await page.getByTestId('select-language').selectOption(locale);
-      const buttons = page.locator('.hero-actions .local-button');
+      const buttons = page.locator('.today-hero .local-button');
       const count = await buttons.count();
       expect(count, `${locale} action count`).toBeGreaterThanOrEqual(3);
       for (let index = 0; index < count; index += 1) {

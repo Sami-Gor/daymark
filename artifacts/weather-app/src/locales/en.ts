@@ -215,6 +215,12 @@ const en = {
   'voice.preparing': 'Preparing voice…',
   'voice.ariaPreparing': 'Preparing voice. Tap to cancel.',
   'voice.error.unavailable': "Voice playback isn't available right now. Try again.",
+  'dayCue.sun': 'Sunny conditions today',
+  'dayCue.rain': 'Rain expected today',
+  'dayCue.mixed': 'Sunshine and rain expected today',
+  'dayCue.cloud': 'Cloudy conditions today',
+  'dayCue.fog': 'Foggy conditions today',
+  'dayCue.snow': 'Snow expected today',
 
   // Error / loading / not found / footer
   'error.title': 'That forecast went cloudy.',
@@ -265,6 +271,9 @@ const en = {
   'intent.title.hours': 'The next few hours',
   'intent.title.tomorrow': 'Tomorrow',
   'intent.title.today': "Today's briefing",
+  'intent.today.range': 'High around {max}, low around {min}.',
+  'intent.today.uv': 'UV is {level}.',
+  'intent.today.air': 'Air quality is {level}.',
   'intent.current.unavailable': 'Current conditions are unavailable right now.',
   'intent.current.unavailableFor': 'Current conditions for {place} are unavailable right now.',
   'intent.current.base': "It's {temp} degrees{place}.",
