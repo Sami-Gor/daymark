@@ -16,8 +16,6 @@ import {
   getLocationLocalDate,
   getLocationLocalHour,
   getSunProtectionWindow,
-  getUmbrellaAdvice,
-  getSunglassesAdvice,
   isMicroClimateSupported,
   isSameLocationDay,
   locationTimeMs,
@@ -383,21 +381,6 @@ describe('display helpers', () => {
     expect(d).toBeGreaterThan(330);
     expect(d).toBeLessThan(360);
     expect(distanceKm(51.5, -0.13, 51.5, -0.13)).toBe(0);
-  });
-
-  it('gives umbrella advice from precipitation probability', () => {
-    expect(getUmbrellaAdvice(80).answer).toBe('Yes');
-    expect(getUmbrellaAdvice(10).answer).toBe('No');
-    expect(getUmbrellaAdvice(0).reason).toBe('Rain unlikely today');
-    expect(getUmbrellaAdvice(undefined).reason).toBe('Rain forecast unavailable');
-    expect(getUmbrellaAdvice(50, '2 PM').reason).toContain('2 PM');
-  });
-
-  it('gives sunglasses advice from UV and cloud cover', () => {
-    expect(getSunglassesAdvice(6, 20).answer).toBe('Yes');
-    expect(getSunglassesAdvice(6, 90).answer).toBe('No');
-    expect(getSunglassesAdvice(1, 10).answer).toBe('No');
-    expect(getSunglassesAdvice(null, 10).answer).toBe('No');
   });
 });
 

@@ -5,8 +5,6 @@
  */
 const en = {
   // Shared
-  'common.yes': 'Yes',
-  'common.no': 'No',
   'common.today': 'Today',
   'common.tomorrow': 'Tomorrow',
   'common.now': 'Now',
@@ -29,8 +27,6 @@ const en = {
   'search.results': 'Location results',
 
   // Current weather
-  'current.umbrella': 'Umbrella?',
-  'current.sunglasses': 'Sunglasses?',
   'current.feelsLike': 'Feels like',
   'current.useLocation': 'Use my location',
   'current.findingYou': 'Finding you…',
@@ -42,16 +38,6 @@ const en = {
   'current.locationDenied': "We couldn't access your location. Allow location access for this site and try again.",
   'current.locationUnavailable': "We couldn't determine your location. Check that location services are on and try again.",
   'current.locationTimeout': 'Finding your location took too long. Try again, or search for a place instead.',
-
-  // Advice
-  'advice.rainUnavailable': 'Rain forecast unavailable',
-  'advice.rainChanceTime': '{percent}% chance around {time}',
-  'advice.rainChance': '{percent}% chance of rain',
-  'advice.rainUnlikely': 'Rain unlikely today',
-  'advice.brightnessUnavailable': 'Brightness forecast unavailable',
-  'advice.sunscreenYes': 'UV index {uv}, mostly clear',
-  'advice.sunscreenOvercast': 'Overcast, low brightness',
-  'advice.sunscreenLow': 'UV index {uv}, low today',
 
   // Hourly
   'hourly.title': 'The next few hours',

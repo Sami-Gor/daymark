@@ -353,53 +353,6 @@ export function weatherIcon(code = 0, isDay = true): LucideIcon {
   return Cloud;
 }
 
-export type WeatherAdvice = { answer: string; tone: 'yes' | 'no'; reason: string };
-
-export function getUmbrellaAdvice(precipProbability: number | null | undefined, precipTimeWindow?: string, locale: Locale = 'en'): WeatherAdvice {
-  if (precipProbability == null || Number.isNaN(precipProbability)) {
-    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.rainUnavailable') };
-  }
-  if (precipProbability >= 40) {
-    return {
-      answer: translate(locale, 'common.yes'),
-      tone: 'yes',
-      reason: precipTimeWindow
-        ? translate(locale, 'advice.rainChanceTime', { percent: Math.round(precipProbability), time: precipTimeWindow })
-        : translate(locale, 'advice.rainChance', { percent: Math.round(precipProbability) }),
-    };
-  }
-  return {
-    answer: translate(locale, 'common.no'),
-    tone: 'no',
-    reason: precipProbability > 0
-      ? translate(locale, 'advice.rainChance', { percent: Math.round(precipProbability) })
-      : translate(locale, 'advice.rainUnlikely'),
-  };
-}
-
-export function getSunglassesAdvice(uvIndex: number | null | undefined, cloudCover: number | null | undefined, locale: Locale = 'en'): WeatherAdvice {
-  const uv = uvIndex != null && !Number.isNaN(uvIndex) ? uvIndex : null;
-  const cloud = cloudCover != null && !Number.isNaN(cloudCover) ? cloudCover : null;
-  if (uv == null || cloud == null) {
-    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.brightnessUnavailable') };
-  }
-  if (uv >= 3 && cloud < 60) {
-    return {
-      answer: translate(locale, 'common.yes'),
-      tone: 'yes',
-      reason: translate(locale, 'advice.sunscreenYes', { uv: uvValue(uv) }),
-    };
-  }
-  if (cloud >= 60) {
-    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.sunscreenOvercast') };
-  }
-  return {
-    answer: translate(locale, 'common.no'),
-    tone: 'no',
-    reason: translate(locale, 'advice.sunscreenLow', { uv: uvValue(uv) }),
-  };
-}
-
 export function displayTemp(value: number | null | undefined, unit: Unit): string {
   if (value == null || Number.isNaN(value)) return '—';
   const converted = unit === 'fahrenheit' ? (value * 9) / 5 + 32 : value;

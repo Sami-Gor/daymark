@@ -14,7 +14,7 @@ import {
 import en from '@/locales/en';
 import fr from '@/locales/fr';
 import es from '@/locales/es';
-import { airLevel, getSunglassesAdvice, getUmbrellaAdvice, uvLevel, weatherCopy, type WeatherPayload } from './weather';
+import { airLevel, uvLevel, weatherCopy, type WeatherPayload } from './weather';
 import { getCurrentConditions, getIntentResponse, getTomorrowSummary, resolveIntentTranscript } from './weather-intents';
 import { getWeatherAlerts } from './weather-alerts';
 
@@ -91,9 +91,6 @@ describe('translation and formatting', () => {
     expect(uvLevel(4, 'fr').label).toBe('Modéré');
     expect(uvLevel(4, 'es').label).toBe('Moderado');
     expect(airLevel(33, 'es').label).toBe('Bueno');
-    expect(getUmbrellaAdvice(80, undefined, 'fr').answer).toBe('Oui');
-    expect(getUmbrellaAdvice(80, undefined, 'fr').tone).toBe('yes');
-    expect(getSunglassesAdvice(6, 20, 'es').answer).toBe('Sí');
   });
 });
 

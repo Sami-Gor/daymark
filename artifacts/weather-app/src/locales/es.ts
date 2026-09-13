@@ -1,8 +1,6 @@
 import type { TranslationKey } from './en';
 
 const es: Record<TranslationKey, string> = {
-  'common.yes': 'Sí',
-  'common.no': 'No',
   'common.today': 'Hoy',
   'common.tomorrow': 'Mañana',
   'common.now': 'Ahora',
@@ -22,8 +20,6 @@ const es: Record<TranslationKey, string> = {
   'search.error': 'La búsqueda de ubicaciones no está disponible ahora mismo.',
   'search.results': 'Resultados de búsqueda',
 
-  'current.umbrella': '¿Paraguas?',
-  'current.sunglasses': '¿Gafas de sol?',
   'current.feelsLike': 'Sensación',
   'current.useLocation': 'Usar mi ubicación',
   'current.findingYou': 'Localizando…',
@@ -35,15 +31,6 @@ const es: Record<TranslationKey, string> = {
   'current.locationDenied': 'No pudimos acceder a tu ubicación. Permite la ubicación para este sitio y vuelve a intentarlo.',
   'current.locationUnavailable': 'No pudimos determinar tu ubicación. Comprueba que los servicios de ubicación estén activados y vuelve a intentarlo.',
   'current.locationTimeout': 'La búsqueda de tu ubicación tardó demasiado. Inténtalo de nuevo o busca un lugar.',
-
-  'advice.rainUnavailable': 'Pronóstico de lluvia no disponible',
-  'advice.rainChanceTime': '{percent} % de probabilidad hacia las {time}',
-  'advice.rainChance': '{percent} % de probabilidad de lluvia',
-  'advice.rainUnlikely': 'Lluvia poco probable hoy',
-  'advice.brightnessUnavailable': 'Pronóstico de luminosidad no disponible',
-  'advice.sunscreenYes': 'Índice UV {uv}, mayormente despejado',
-  'advice.sunscreenOvercast': 'Cubierto, poca luminosidad',
-  'advice.sunscreenLow': 'Índice UV {uv}, bajo hoy',
 
   'hourly.title': 'Las próximas horas',
   'hourly.meta': 'hora a hora',
