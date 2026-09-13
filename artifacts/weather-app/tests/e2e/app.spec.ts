@@ -296,15 +296,23 @@ test.describe('day cue hero', () => {
     await expect(cue).toHaveAttribute('aria-label', 'Condiciones soleadas hoy');
   });
 
-  test('keeps the detailed cards reachable below the hero', async ({ page }) => {
+  test('does not render the redundant umbrella or sunglasses advice cards', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.goto('/');
-    const advice = page.getByTestId('card-umbrella-advice');
-    await expect(advice).toHaveCount(1);
-    await advice.scrollIntoViewIfNeeded();
-    await expect(advice).toBeVisible();
-    await page.getByTestId('panel-uv-forecast').scrollIntoViewIfNeeded();
-    await expect(page.getByTestId('panel-uv-forecast')).toBeVisible();
+    await expect(page.getByTestId('card-umbrella-advice')).toHaveCount(0);
+    await expect(page.getByTestId('card-sunglasses-advice')).toHaveCount(0);
+    await expect(page.getByTestId('text-umbrella-advice')).toHaveCount(0);
+    await expect(page.getByTestId('text-sunglasses-advice')).toHaveCount(0);
+    await expect(page.locator('.advice-card, .advice-row')).toHaveCount(0);
+  });
+
+  test('keeps the detailed forecast stack reachable below the hero', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    for (const id of ['list-hourly-forecast', 'list-daily-forecast', 'panel-weather-details', 'panel-micro-climate', 'panel-uv-forecast', 'panel-air-quality']) {
+      await page.getByTestId(id).scrollIntoViewIfNeeded();
+      await expect(page.getByTestId(id)).toBeVisible();
+    }
   });
 
   test('renders the cue without animation under reduced motion', async ({ page }) => {

@@ -10,11 +10,8 @@ import PrivacyFr from '@/pages/privacy-fr';
 import PrivacyEs from '@/pages/privacy-es';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
-  compareLocationTimes,
   fetchWeather,
   WeatherFetchError,
-  getSunglassesAdvice,
-  getUmbrellaAdvice,
   timeLabel,
   type Place,
   type Unit,
@@ -22,7 +19,6 @@ import {
 } from '@/lib/weather';
 import { LoadingState } from '@/components/weather/LoadingState';
 import { WEATHER_ERROR_KEYS, WeatherError, type WeatherErrorCode } from '@/components/weather/WeatherError';
-import { WeatherAdviceCards } from '@/components/weather/WeatherAdviceCards';
 import { TopBar } from '@/components/weather/TopBar';
 import { CurrentWeather } from '@/components/weather/CurrentWeather';
 import { HourlyOutlook } from '@/components/weather/HourlyOutlook';
@@ -154,22 +150,6 @@ function Home() {
     if (!weatherState.time) return t('current.forecastReady');
     return t('current.updated', { time: timeLabel(weatherState.time, locale) });
   }, [weatherState.time, t, locale]);
-  const hourlyTimes = weather?.hourly?.time ?? [];
-  const hourlyStart = hourlyTimes.length
-    ? Math.max(0, hourlyTimes.findIndex((time) => compareLocationTimes(time, weatherState.time) >= 0))
-    : 0;
-  const upcomingIndexes = hourlyTimes.length
-    ? Array.from({ length: Math.min(6, hourlyTimes.length - hourlyStart) }, (_, index) => hourlyStart + index)
-    : [];
-  const upcomingPrecipitation = upcomingIndexes
-    .map((index) => weather?.hourly?.precipitation_probability?.[index])
-    .filter((value): value is number => value != null && !Number.isNaN(value));
-  const peakPrecipitation = upcomingPrecipitation.length
-    ? Math.max(...upcomingPrecipitation)
-    : weather?.daily?.precipitation_probability_max?.[0];
-  const peakPrecipitationIndex = upcomingIndexes.find((index) => weather?.hourly?.precipitation_probability?.[index] === peakPrecipitation);
-  const umbrellaAdvice = getUmbrellaAdvice(peakPrecipitation, peakPrecipitationIndex === undefined ? undefined : timeLabel(hourlyTimes[peakPrecipitationIndex], locale), locale);
-  const sunglassesAdvice = getSunglassesAdvice(weatherState.uv_index, weatherState.cloud_cover, locale);
   const dayCue = useMemo(() => (weather ? deriveDayCue(weather) : null), [weather]);
   const privacyHref = locale === 'fr' ? '/fr/privacy' : locale === 'es' ? '/es/privacy' : '/privacy';
 
@@ -201,7 +181,6 @@ function Home() {
               />
               <WeatherAlerts weather={weather} unit={unit} />
               <div className="content-grid">
-                <WeatherAdviceCards umbrellaAdvice={umbrellaAdvice} sunglassesAdvice={sunglassesAdvice} />
                 <HourlyOutlook weather={weather} unit={unit} />
                 <DailyForecast weather={weather} unit={unit} />
                 <WeatherDetails weather={weather} unit={unit} />
