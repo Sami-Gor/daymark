@@ -196,6 +196,12 @@ describe('fetchWeather', () => {
     );
   });
 
+  it('reports a typed network failure without raw browser text', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')));
+    await expect(fetchWeather(PLACE)).rejects.toMatchObject({ name: 'WeatherFetchError', code: 'network' });
+    await expect(fetchWeather(PLACE)).rejects.toThrow("We couldn't reach the weather service.");
+  });
+
   it('throws a friendly message for malformed JSON', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
       Promise.resolve(

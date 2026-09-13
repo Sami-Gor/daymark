@@ -195,6 +195,17 @@ test.describe('functional', () => {
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
   });
 
+  test('network failure shows friendly copy without raw browser text', async ({ page }) => {
+    await page.route('**/api.open-meteo.com/**', (route) => route.abort());
+    await page.route('**/air-quality-api.open-meteo.com/**', (route) => route.abort());
+    await page.goto('/');
+    const panel = page.locator('[data-testid="status-weather-error"]');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText("We couldn't reach the weather service");
+    await expect(panel).not.toContainText('Failed to fetch');
+    await expect(page.getByTestId('button-retry-weather')).toBeVisible();
+  });
+
   test('malformed API data shows a friendly error without crashing the page', async ({ page }) => {
     await mockOpenMeteo(page, { forecast: { current: 'garbage', hourly: 42 } });
     await page.goto('/');

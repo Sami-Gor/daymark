@@ -12,6 +12,7 @@ import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter
 import {
   compareLocationTimes,
   fetchWeather,
+  WeatherFetchError,
   getSunglassesAdvice,
   getUmbrellaAdvice,
   timeLabel,
@@ -20,7 +21,7 @@ import {
   type WeatherPayload,
 } from '@/lib/weather';
 import { LoadingState } from '@/components/weather/LoadingState';
-import { WeatherError } from '@/components/weather/WeatherError';
+import { WEATHER_ERROR_KEYS, WeatherError, type WeatherErrorCode } from '@/components/weather/WeatherError';
 import { TopBar } from '@/components/weather/TopBar';
 import { CurrentWeather } from '@/components/weather/CurrentWeather';
 import { HourlyOutlook } from '@/components/weather/HourlyOutlook';
@@ -42,7 +43,7 @@ function Home() {
   const [weather, setWeather] = useState<WeatherPayload | null>(null);
   const [unit, setUnit] = useState<Unit>('celsius');
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<WeatherErrorCode | ''>('');
   const [isLocating, setIsLocating] = useState(false);
   const requestId = useRef(0);
   const selectionId = useRef(0);
@@ -61,7 +62,7 @@ function Home() {
       setWeather(result);
       return true;
     } catch (err) {
-      if (id === requestId.current) setError(err instanceof Error ? err.message : 'We could not reach the weather service.');
+      if (id === requestId.current) setError(err instanceof WeatherFetchError ? err.code : 'unknown');
       return false;
     } finally {
       if (id === requestId.current) setIsLoading(false);
@@ -175,12 +176,12 @@ function Home() {
         <TopBar unit={unit} onUnitChange={setUnit} onFindMe={() => findMe()} isLocating={isLocating} isRefreshing={isRefreshing} />
 
         {showInitialLoading && <LoadingState />}
-        {!showInitialLoading && !weather && error && <WeatherError message={error} onRetry={() => void loadWeather(place)} />}
+        {!showInitialLoading && !weather && error && <WeatherError code={error} onRetry={() => void loadWeather(place)} />}
         {weather && (
           <>
             {error && (
               <div className="refresh-error" role="alert" data-testid="refresh-error">
-                <span>{error}</span>
+                <span>{t(WEATHER_ERROR_KEYS[error])}</span>
                 <button type="button" className="refresh-retry" onClick={() => void loadWeather(place)} data-testid="button-refresh-retry">{t('error.retry')}</button>
               </div>
             )}

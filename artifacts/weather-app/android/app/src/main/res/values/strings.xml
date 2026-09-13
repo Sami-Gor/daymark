@@ -4,4 +4,6 @@
     <string name="title_activity_main">Daymark</string>
     <string name="package_name">io.github.sami_gor.daymark</string>
     <string name="custom_url_scheme">io.github.sami_gor.daymark</string>
+    <string name="webview_required_title">Daymark needs a newer Android System WebView</string>
+    <string name="webview_required_message">Update Android System WebView from Google Play, then reopen Daymark.</string>
 </resources>
