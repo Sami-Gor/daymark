@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.sami_gor.daymark",
+      "sha256_cert_fingerprints": [
+        "__PLAY_APP_SIGNING_SHA256__",
+        "3C:60:AD:BB:70:EB:70:4C:26:A7:B8:16:C2:6A:FC:B4:06:E2:A1:0A:ED:32:2A:EE:AB:A9:3C:6C:B0:81:20:57"
+      ]
+    }
+  }
+]

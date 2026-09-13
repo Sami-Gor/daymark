@@ -1,5 +1,12 @@
 # Digital Asset Links — NOT YET ACTIVE
 
+> **Superseded for the Capacitor release:** use
+> [`docs/release/play-console-checklist.md`](../../docs/release/play-console-checklist.md)
+> and `docs/release/assetlinks.template.json`. This directory is kept only as
+> the TWA rollback reference; its key table is stale (the upload keystore is now
+> `artifacts/weather-app/android/daymark-upload.keystore`, alias
+> `daymark-upload`).
+
 This directory prepares Step 9B (live domain + asset links verification).
 **No assetlinks.json has been published anywhere.** The template above is a
 structure only; it intentionally contains a placeholder fingerprint.
