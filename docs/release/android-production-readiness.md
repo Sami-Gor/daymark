@@ -386,7 +386,9 @@ responses by design.
 
 Device classes: **A** recent flagship (e.g. Pixel 9/10 class), **B** mid-range
 (4–6 GB, e.g. Pixel a-series / Galaxy A), **C** older supported (Android 7–9,
-3–4 GB, arm64).
+3–4 GB, arm64). The ✓ marks indicate test applicability to each device class,
+not previously completed execution; a brief subset was executed on one device
+on 14 September 2026 (details in the section below).
 
 | # | Test | A | B | C | Pass criteria |
 |---|---|---|---|---|---|
@@ -413,6 +415,37 @@ Device classes: **A** recent flagship (e.g. Pixel 9/10 class), **B** mid-range
 | 21 | TalkBack + 200% font | ✓ | ✓ | ✓ | controls announced; no clipping |
 | 22 | French/Spanish narration | ✓ | ✓ | ✓ | system TTS used; voice data present; clear error if absent |
 
+### Brief physical-device validation — 14 September 2026
+
+Brief physical-device validation completed on a Nothing A059P running Android
+16. Core launch/weather, location, voice input, local Kokoro narration,
+stop/restart behaviour, lifecycle handling, enlarged-font usability and short
+stability checks passed. Extended multi-device testing, full TalkBack audit,
+long thermal soak, and Play-distributed validation were not part of this brief
+merge-confidence pass.
+
+| Item | Value |
+|---|---|
+| Device | Nothing A059P (`A059P`, AsteroidsProEEA) |
+| Android | 16 / API 36 (targetSdk 36) |
+| Source commit | `69e21c18374957429be173c9b0b7d87d2e0464f2` |
+| APK | `app-release.apk`, 169,135,817 bytes |
+| APK SHA-256 | `7e24bbcecac8d6f2a3c5843340cc52691099b503ce90001fb1e1e25b281cb7d0` |
+| versionCode / versionName | 1 / 1.0.0 |
+| Signer certificate SHA-256 | `346BBEF3438C6FE81E89F63FC0A0FF29E96DA1989874E6BA187A9E52C3AAFA7E` (matches upload key; verified with `apksigner`) |
+| A — launch / weather / location | PASS: launch and weather render; permission granted; "Use my location" resolved to the locality (Uxbridge); refresh applied; no crash/ANR |
+| B — voice input (Ask Daymark) | PASS: `RECORD_AUDIO` granted; transcript "will it rain today" and the answer both appeared |
+| C — Kokoro narration | PASS: start toggles to Stop; audio audible and intelligible; Stop silences immediately; restart plays again with no overlap |
+| D — lifecycle | PASS: narration stops on Home; app usable after returning |
+| E — font scale + stability | PASS: 1.5x layout readable with no clipping observed; no crash/ANR; battery 35.0 °C, thermal status 0; font restored to 1.0 |
+| Signer verification | PASS (`apksigner verify --print-certs`) |
+| Bluetooth routing | NOT RETESTED IN BRIEF SESSION (no device connected) |
+
+Not covered by this brief pass: the full matrix above across classes A/B/C,
+TalkBack, 10-minute thermal soak, call/music interruption, screen lock, rotation,
+low-memory kill, fr/es system-TTS voice data, Play-distributed install and
+asset-links validation, upgrade install.
+
 ## 19. Cleanup checklist (do not remove yet)
 
 - TWA rollback project `android/`, `twa-manifest.json`, `asset-links/` template
@@ -436,12 +469,12 @@ Device classes: **A** recent flagship (e.g. Pixel 9/10 class), **B** mid-range
 | assetlinks.json deployment | MANUAL | blocks App Links | SPA fallback served at path | deploy exact JSON from §3 |
 | Data Safety / content rating / store forms | MANUAL | release gate | repo-side data map ready | complete in Play Console |
 | Closed testing (personal account) | MANUAL | release gate | account-type dependent | confirm + run testers |
-| Location behavior | PDT | medium | emulator cannot provide fix | device matrix #3–#4 |
-| Speech recognition | PDT | medium | WebView API depends on platform service | device matrix #12 |
-| Audio focus/BT/calls | PDT | medium | not testable on emulator | device matrix #8–#11 |
+| Location behavior | PARTIAL (brief) | medium | brief pass 14 Sep 2026 (A059P); emulator cannot provide fix | full matrix #3–#4 |
+| Speech recognition | PARTIAL (brief) | medium | brief pass 14 Sep 2026 (A059P); WebView API depends on platform service | full matrix #12 |
+| Audio focus/BT/calls | PARTIAL (brief) | medium | Home lifecycle passed 14 Sep 2026; BT/calls not testable on emulator | device matrix #8–#11 |
 | Memory on lower-RAM devices | PDT | medium | ~626 MB emulator peak | device matrix #5–#6, #19 |
-| Battery/thermal | PDT | low-medium | not measured | device matrix #18 |
-| Accessibility (TalkBack/font scale) | PDT | low-medium | web automations pass | device matrix #21 |
+| Battery/thermal | PARTIAL (brief) | low-medium | brief 1-min pass: 35.0 °C, thermal status 0 | device matrix #18 (10-min soak) |
+| Accessibility (TalkBack/font scale) | PARTIAL (brief) | low-medium | 1.5x font pass 14 Sep 2026; web automations pass | device matrix #21 (TalkBack) |
 | Real-device latency | PDT | low | emulator ~2.4 s | device matrix #5 |
 | Privacy/data flow | READY | — | no analytics, rounded coords, no text logs | feed into Data Safety |
 | Security (WebView/bridge/components) | READY | — | audit §12 | optional CSP hardening |
@@ -457,11 +490,14 @@ Device classes: **A** recent flagship (e.g. Pixel 9/10 class), **B** mid-range
 None found in code or packaging. All gating items are external (Play App
 Signing/assetlinks/console forms) or require physical-device validation.
 
-### B. REQUIRES PHYSICAL DEVICE VALIDATION
-Location flows, speech recognition, audio focus/Bluetooth/calls, real-device
-latency, memory/thermal/battery on 3–6 GB devices, TalkBack/font scaling, app
-links after DAL deployment, fr/es system TTS with real voice data, upgrade
-install.
+### B. PARTIALLY VALIDATED ON PHYSICAL DEVICE
+Brief physical-device validation completed on a Nothing A059P running Android 16
+(§18): launch/weather, location, voice input, local Kokoro narration,
+stop/restart, lifecycle handling, enlarged-font usability and short stability
+checks passed. Still requiring validation: extended multi-device matrix (classes
+B/C, memory), full TalkBack audit, long thermal soak, call/music interruption,
+Bluetooth routing, fr/es system TTS with real voice data, app links after DAL
+deployment, upgrade install, and Play-distributed validation.
 
 ### C. READY NOW
 Build and signing pipeline, package/SDK/ABI configuration, model/voice
@@ -478,8 +514,10 @@ with the upstream voice source.
 
 ## 21. Release sequence
 
-1. Physical-device validation (matrix #1–#22 on at least one A and one B device;
-   C best effort).
+1. Complete physical-device validation (matrix #1–#22 on at least one A and one
+   B device; C best effort). A brief merge-confidence pass on a Nothing A059P
+   (Android 16) completed 14 September 2026; the extended and multi-device runs
+   listed in §18 remain outstanding.
 2. Play Console: enable App Signing, copy fingerprints, complete Data Safety,
    content rating, app access, ads declaration.
 3. Deploy `assetlinks.json` with Play + upload fingerprints; verify with Play
