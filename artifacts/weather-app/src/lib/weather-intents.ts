@@ -587,11 +587,33 @@ export function getTodayBriefing(weather: WeatherPayload, context: IntentContext
   const uv = getUVSummary(weather, context);
   const air = getAirQualitySummary(weather, context);
 
+  /*
+   * Concise spoken rundown (~15-20 s): current conditions, alerts, rain only
+   * when it matters, the day's temperature range, meaningful UV and air
+   * quality that is not simply "good". The full detail stays in displayText
+   * and the cards below the hero.
+   */
   const alertCount = typeof alerts.data?.count === 'number' ? alerts.data.count : 0;
+  const unit = context.unit ?? DEFAULT_UNIT;
+  const maxTemp = convertTemperature(weather.daily?.temperature_2m_max?.[0], unit);
+  const minTemp = convertTemperature(weather.daily?.temperature_2m_min?.[0], unit);
+  const currentUv = weather.current?.uv_index;
+  const uvLevelLabel = typeof uv.data?.level === 'string' ? uv.data.level : null;
+  const aqi = typeof air.data?.aqi === 'number' ? air.data.aqi : null;
+  const airLevelLabel = typeof air.data?.level === 'string' ? air.data.level : null;
+
   const spokenParts = [current.spokenText];
   if (alertCount > 0) spokenParts.push(alerts.spokenText);
-  spokenParts.push(rain.spokenText, uv.spokenText);
-  if (air.data?.available === true) spokenParts.push(air.spokenText);
+  if (rain.data?.expected === true) spokenParts.push(rain.spokenText);
+  if (maxTemp != null && minTemp != null) {
+    spokenParts.push(t('intent.today.range', { max: maxTemp, min: minTemp }));
+  }
+  if (currentUv != null && !Number.isNaN(currentUv) && currentUv >= 3 && uvLevelLabel) {
+    spokenParts.push(t('intent.today.uv', { level: uvLevelLabel.toLowerCase() }));
+  }
+  if (aqi != null && aqi > 50 && airLevelLabel) {
+    spokenParts.push(t('intent.today.air', { level: airLevelLabel.toLowerCase() }));
+  }
 
   const priorities = [current.priority, alerts.priority, rain.priority, uv.priority, air.priority];
   const priority: IntentPriority = priorities.includes('high') ? 'high' : 'normal';

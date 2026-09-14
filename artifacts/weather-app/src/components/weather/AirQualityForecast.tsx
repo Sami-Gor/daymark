@@ -1,8 +1,14 @@
+import { useEffect, useState } from 'react';
 import { airColor, airContext, airLevel, pollutionValue, type WeatherPayload } from '@/lib/weather';
 import { useLocale } from '@/hooks/use-locale';
 
 export function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
   const { locale, t } = useLocale();
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setSettled(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const airQuality = weather.airQuality;
   const current = airQuality?.current ?? {};
   const level = airLevel(current.us_aqi, locale);
@@ -20,12 +26,12 @@ export function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
   ];
 
   return (
-    <section className="air-wide" aria-labelledby="air-title">
+    <section className="promo-card promo-air section-wide" aria-labelledby="air-title">
       <div className="section-heading">
         <h2 className="section-title" id="air-title">{t('air.title')}</h2>
-          <span className="section-meta">{t('air.meta')}</span>
+        <span className="section-meta">{t('air.meta')}</span>
       </div>
-      <div className="panel air-panel" data-testid="panel-air-quality">
+      <div className="promo-panel" data-testid="panel-air-quality">
         {airQuality ? (
           <>
             <div className="air-hero">
@@ -45,7 +51,13 @@ export function AirQualityForecast({ weather }: { weather: WeatherPayload }) {
                 <div className="air-scale-segment air-scale-moderate" />
                 <div className="air-scale-segment air-scale-sensitive" />
                 {comparisonMarkers.map((marker) => (
-                  <div className={`air-marker ${marker.className}`} key={marker.label} style={{ left: `${marker.position}%` }} role="img" aria-label={t('air.markerAria', { label: marker.label, value: pollutionValue(marker.value, locale) })}>
+                  <div
+                    className={`air-marker ${marker.className}`}
+                    key={marker.label}
+                    style={{ left: marker.className === 'air-marker-current' && !settled ? '0%' : `${marker.position}%` }}
+                    role="img"
+                    aria-label={t('air.markerAria', { label: marker.label, value: pollutionValue(marker.value, locale) })}
+                  >
                     <i style={{ background: marker.color }} />
                   </div>
                 ))}

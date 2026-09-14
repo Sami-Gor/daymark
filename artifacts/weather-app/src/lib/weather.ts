@@ -76,6 +76,7 @@ const WeatherResponseSchema = z
         time: z.string().nullish(),
         temperature_2m: nullableNumber,
         relative_humidity_2m: nullableNumber,
+        dew_point_2m: nullableNumber,
         apparent_temperature: nullableNumber,
         precipitation: nullableNumber,
         cloud_cover: nullableNumber,
@@ -232,7 +233,7 @@ export async function fetchWeather(place: Place): Promise<WeatherPayload> {
   const weatherParams = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,cloud_cover,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,uv_index_clear_sky',
+    current: 'temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,is_day,precipitation,rain,cloud_cover,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,uv_index_clear_sky',
     hourly: 'temperature_2m,apparent_temperature,precipitation,rain,showers,snowfall,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m,uv_index,uv_index_clear_sky',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,sunrise,sunset,uv_index_max,uv_index_clear_sky_max',
     forecast_days: '7',
@@ -353,53 +354,6 @@ export function weatherIcon(code = 0, isDay = true): LucideIcon {
   return Cloud;
 }
 
-export type WeatherAdvice = { answer: string; tone: 'yes' | 'no'; reason: string };
-
-export function getUmbrellaAdvice(precipProbability: number | null | undefined, precipTimeWindow?: string, locale: Locale = 'en'): WeatherAdvice {
-  if (precipProbability == null || Number.isNaN(precipProbability)) {
-    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.rainUnavailable') };
-  }
-  if (precipProbability >= 40) {
-    return {
-      answer: translate(locale, 'common.yes'),
-      tone: 'yes',
-      reason: precipTimeWindow
-        ? translate(locale, 'advice.rainChanceTime', { percent: Math.round(precipProbability), time: precipTimeWindow })
-        : translate(locale, 'advice.rainChance', { percent: Math.round(precipProbability) }),
-    };
-  }
-  return {
-    answer: translate(locale, 'common.no'),
-    tone: 'no',
-    reason: precipProbability > 0
-      ? translate(locale, 'advice.rainChance', { percent: Math.round(precipProbability) })
-      : translate(locale, 'advice.rainUnlikely'),
-  };
-}
-
-export function getSunglassesAdvice(uvIndex: number | null | undefined, cloudCover: number | null | undefined, locale: Locale = 'en'): WeatherAdvice {
-  const uv = uvIndex != null && !Number.isNaN(uvIndex) ? uvIndex : null;
-  const cloud = cloudCover != null && !Number.isNaN(cloudCover) ? cloudCover : null;
-  if (uv == null || cloud == null) {
-    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.brightnessUnavailable') };
-  }
-  if (uv >= 3 && cloud < 60) {
-    return {
-      answer: translate(locale, 'common.yes'),
-      tone: 'yes',
-      reason: translate(locale, 'advice.sunscreenYes', { uv: uvValue(uv) }),
-    };
-  }
-  if (cloud >= 60) {
-    return { answer: translate(locale, 'common.no'), tone: 'no', reason: translate(locale, 'advice.sunscreenOvercast') };
-  }
-  return {
-    answer: translate(locale, 'common.no'),
-    tone: 'no',
-    reason: translate(locale, 'advice.sunscreenLow', { uv: uvValue(uv) }),
-  };
-}
-
 export function displayTemp(value: number | null | undefined, unit: Unit): string {
   if (value == null || Number.isNaN(value)) return '—';
   const converted = unit === 'fahrenheit' ? (value * 9) / 5 + 32 : value;
@@ -417,11 +371,12 @@ export function calculateDewPointCelsius(temperatureC: number | null | undefined
 
 export function dewPointComfort(dewPointC: number | undefined, locale: Locale = 'en'): { label: string; className: string } {
   if (dewPointC === undefined || Number.isNaN(dewPointC)) return { label: translate(locale, 'details.dewUnavailable'), className: 'dew-unavailable' };
-  if (dewPointC < 10) return { label: translate(locale, 'details.dewDry'), className: 'dew-dry' };
-  if (dewPointC < 16) return { label: translate(locale, 'details.dewComfortable'), className: 'dew-comfortable' };
-  if (dewPointC < 18) return { label: translate(locale, 'details.dewNoticeable'), className: 'dew-noticeable' };
-  if (dewPointC < 21) return { label: translate(locale, 'details.dewHumid'), className: 'dew-humid' };
-  return { label: translate(locale, 'details.dewOppressive'), className: 'dew-oppressive' };
+  if (dewPointC < 5) return { label: translate(locale, 'dew.band.dry'), className: 'dew-dry' };
+  if (dewPointC < 13) return { label: translate(locale, 'dew.band.comfortable'), className: 'dew-comfortable' };
+  if (dewPointC < 16) return { label: translate(locale, 'dew.band.slightlyHumid'), className: 'dew-noticeable' };
+  if (dewPointC < 19) return { label: translate(locale, 'dew.band.humid'), className: 'dew-humid' };
+  if (dewPointC <= 21) return { label: translate(locale, 'dew.band.veryHumid'), className: 'dew-very-humid' };
+  return { label: translate(locale, 'dew.band.muggy'), className: 'dew-oppressive' };
 }
 
 export function displayWind(value: number | null | undefined, unit: Unit): string {

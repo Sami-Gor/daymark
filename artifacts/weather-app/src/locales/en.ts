@@ -5,8 +5,6 @@
  */
 const en = {
   // Shared
-  'common.yes': 'Yes',
-  'common.no': 'No',
   'common.today': 'Today',
   'common.tomorrow': 'Tomorrow',
   'common.now': 'Now',
@@ -29,8 +27,6 @@ const en = {
   'search.results': 'Location results',
 
   // Current weather
-  'current.umbrella': 'Umbrella?',
-  'current.sunglasses': 'Sunglasses?',
   'current.feelsLike': 'Feels like',
   'current.useLocation': 'Use my location',
   'current.findingYou': 'Finding you…',
@@ -42,16 +38,6 @@ const en = {
   'current.locationDenied': "We couldn't access your location. Allow location access for this site and try again.",
   'current.locationUnavailable': "We couldn't determine your location. Check that location services are on and try again.",
   'current.locationTimeout': 'Finding your location took too long. Try again, or search for a place instead.',
-
-  // Advice
-  'advice.rainUnavailable': 'Rain forecast unavailable',
-  'advice.rainChanceTime': '{percent}% chance around {time}',
-  'advice.rainChance': '{percent}% chance of rain',
-  'advice.rainUnlikely': 'Rain unlikely today',
-  'advice.brightnessUnavailable': 'Brightness forecast unavailable',
-  'advice.sunscreenYes': 'UV index {uv}, mostly clear',
-  'advice.sunscreenOvercast': 'Overcast, low brightness',
-  'advice.sunscreenLow': 'UV index {uv}, low today',
 
   // Hourly
   'hourly.title': 'The next few hours',
@@ -74,14 +60,16 @@ const en = {
   'details.windSub': 'sustained speed',
   'details.gusts': 'Gusts {value}',
   'details.dewPoint': 'Dew point',
-  'details.dewPointTitle': 'Dew point measures how humid the air actually feels — more reliable than relative humidity alone.',
-  'details.dewPointAria': 'About dew point',
-  'details.dewDry': 'Dry',
-  'details.dewComfortable': 'Comfortable',
-  'details.dewNoticeable': 'Noticeable',
-  'details.dewHumid': 'Humid',
-  'details.dewOppressive': 'Oppressive',
+  'details.dewFeel': 'How humid the air feels.',
+  'details.dewExplainer': 'Dew point measures the amount of moisture in the air. Higher values feel more humid.',
   'details.dewUnavailable': 'Unavailable',
+  'dew.scaleAria': 'Dew point scale, currently {value} ({band})',
+  'dew.band.dry': 'Dry',
+  'dew.band.comfortable': 'Comfortable',
+  'dew.band.slightlyHumid': 'Slightly humid',
+  'dew.band.humid': 'Humid',
+  'dew.band.veryHumid': 'Very humid',
+  'dew.band.muggy': 'Muggy',
   'details.sunrise': 'Sunrise',
   'details.sunset': 'Sunset',
 
@@ -215,6 +203,31 @@ const en = {
   'voice.preparing': 'Preparing voice…',
   'voice.ariaPreparing': 'Preparing voice. Tap to cancel.',
   'voice.error.unavailable': "Voice playback isn't available right now. Try again.",
+  'dayCue.sun': 'Sunny conditions today',
+  'dayCue.rain': 'Rain expected today',
+  'dayCue.mixed': 'Sunshine and rain expected today',
+  'dayCue.cloud': 'Cloudy conditions today',
+  'dayCue.fog': 'Foggy conditions today',
+  'dayCue.snow': 'Snow expected today',
+
+  // Redesigned live sections (temperature / rain / sun)
+  'temperature.title': 'Temperature',
+  'temperature.meta': 'next hours',
+  'temperature.aria': 'Hourly temperature from {min} to {max}',
+  'precip.title': 'Chance of rain',
+  'precip.meta': 'hour by hour',
+  'precip.aria': 'Hourly rain chance, peaking at {peak}',
+  'precip.pointAria': '{time}: {percent} chance',
+  'precip.highestAround': 'Highest around {time}',
+  'precip.noRain': 'No rain expected in the next 5 hours',
+  'precip.caption': 'Spot the wet hours before you leave.',
+  'sun.title': 'Sun & daylight',
+  'sun.meta': 'sunrise to sunset',
+  'sun.solarNoon': 'Solar noon',
+  'sun.daylight': 'Daylight',
+  'sun.daylightValue': '{hours}h {minutes}m',
+  'sun.aria': 'Sun arc from sunrise at {sunrise} to sunset at {sunset}, {daylight} of daylight',
+  'sun.unavailable': 'Sun and daylight detail is unavailable right now.',
 
   // Error / loading / not found / footer
   'error.title': 'That forecast went cloudy.',
@@ -265,6 +278,9 @@ const en = {
   'intent.title.hours': 'The next few hours',
   'intent.title.tomorrow': 'Tomorrow',
   'intent.title.today': "Today's briefing",
+  'intent.today.range': 'High around {max}, low around {min}.',
+  'intent.today.uv': 'UV is {level}.',
+  'intent.today.air': 'Air quality is {level}.',
   'intent.current.unavailable': 'Current conditions are unavailable right now.',
   'intent.current.unavailableFor': 'Current conditions for {place} are unavailable right now.',
   'intent.current.base': "It's {temp} degrees{place}.",

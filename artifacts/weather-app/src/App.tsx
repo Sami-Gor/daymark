@@ -8,13 +8,11 @@ import NotFound from '@/pages/not-found';
 import Privacy from '@/pages/privacy';
 import PrivacyFr from '@/pages/privacy-fr';
 import PrivacyEs from '@/pages/privacy-es';
+import StorePreview from '@/pages/store-preview';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
-  compareLocationTimes,
   fetchWeather,
   WeatherFetchError,
-  getSunglassesAdvice,
-  getUmbrellaAdvice,
   timeLabel,
   type Place,
   type Unit,
@@ -24,13 +22,16 @@ import { LoadingState } from '@/components/weather/LoadingState';
 import { WEATHER_ERROR_KEYS, WeatherError, type WeatherErrorCode } from '@/components/weather/WeatherError';
 import { TopBar } from '@/components/weather/TopBar';
 import { CurrentWeather } from '@/components/weather/CurrentWeather';
-import { HourlyOutlook } from '@/components/weather/HourlyOutlook';
+import { TemperatureSection } from '@/components/weather/TemperatureSection';
+import { RainSection } from '@/components/weather/RainSection';
+import { SunDaylightSection } from '@/components/weather/SunDaylightSection';
 import { DailyForecast } from '@/components/weather/DailyForecast';
 import { WeatherDetails } from '@/components/weather/WeatherDetails';
 import { MicroClimateForecast } from '@/components/weather/MicroClimate';
 import { UVForecast } from '@/components/weather/UVForecast';
 import { AirQualityForecast } from '@/components/weather/AirQualityForecast';
 import { WeatherAlerts } from '@/components/weather/WeatherAlerts';
+import { deriveDayCue } from '@/lib/day-cue';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
 import { useLocale } from '@/hooks/use-locale';
 
@@ -152,22 +153,7 @@ function Home() {
     if (!weatherState.time) return t('current.forecastReady');
     return t('current.updated', { time: timeLabel(weatherState.time, locale) });
   }, [weatherState.time, t, locale]);
-  const hourlyTimes = weather?.hourly?.time ?? [];
-  const hourlyStart = hourlyTimes.length
-    ? Math.max(0, hourlyTimes.findIndex((time) => compareLocationTimes(time, weatherState.time) >= 0))
-    : 0;
-  const upcomingIndexes = hourlyTimes.length
-    ? Array.from({ length: Math.min(6, hourlyTimes.length - hourlyStart) }, (_, index) => hourlyStart + index)
-    : [];
-  const upcomingPrecipitation = upcomingIndexes
-    .map((index) => weather?.hourly?.precipitation_probability?.[index])
-    .filter((value): value is number => value != null && !Number.isNaN(value));
-  const peakPrecipitation = upcomingPrecipitation.length
-    ? Math.max(...upcomingPrecipitation)
-    : weather?.daily?.precipitation_probability_max?.[0];
-  const peakPrecipitationIndex = upcomingIndexes.find((index) => weather?.hourly?.precipitation_probability?.[index] === peakPrecipitation);
-  const umbrellaAdvice = getUmbrellaAdvice(peakPrecipitation, peakPrecipitationIndex === undefined ? undefined : timeLabel(hourlyTimes[peakPrecipitationIndex], locale), locale);
-  const sunglassesAdvice = getSunglassesAdvice(weatherState.uv_index, weatherState.cloud_cover, locale);
+  const dayCue = useMemo(() => (weather ? deriveDayCue(weather) : null), [weather]);
   const privacyHref = locale === 'fr' ? '/fr/privacy' : locale === 'es' ? '/es/privacy' : '/privacy';
 
   return (
@@ -190,8 +176,7 @@ function Home() {
                 place={place}
                 weather={weather}
                 unit={unit}
-                umbrellaAdvice={umbrellaAdvice}
-                sunglassesAdvice={sunglassesAdvice}
+                dayCue={dayCue ?? deriveDayCue(weather)}
                 updatedLabel={updatedLabel}
                 isLocating={isLocating}
                 onFindMe={() => findMe()}
@@ -199,10 +184,14 @@ function Home() {
               />
               <WeatherAlerts weather={weather} unit={unit} />
               <div className="content-grid">
-                <HourlyOutlook weather={weather} unit={unit} />
-                <DailyForecast weather={weather} unit={unit} />
+                <TemperatureSection weather={weather} unit={unit} />
+                <RainSection weather={weather} />
                 <WeatherDetails weather={weather} unit={unit} />
-                <MicroClimateForecast weather={weather} place={place} unit={unit} />
+                <SunDaylightSection weather={weather} />
+                <div className="pair-card section-wide" data-testid="forecast-pair">
+                  <DailyForecast weather={weather} unit={unit} />
+                  <MicroClimateForecast weather={weather} place={place} unit={unit} />
+                </div>
                 <UVForecast weather={weather} />
                 <AirQualityForecast weather={weather} />
               </div>
@@ -223,6 +212,7 @@ function Router() {
         <Route path="/privacy" component={Privacy} />
         <Route path="/fr/privacy" component={PrivacyFr} />
         <Route path="/es/privacy" component={PrivacyEs} />
+        <Route path="/store-preview" component={StorePreview} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

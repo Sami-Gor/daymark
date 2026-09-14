@@ -303,15 +303,26 @@ describe('getTomorrowSummary', () => {
 });
 
 describe('getTodayBriefing', () => {
-  it('assembles a prioritised briefing from current, rain, UV and air', () => {
+  it('assembles a concise spoken rundown of the day', () => {
     const response = getTodayBriefing(buildWeather(), { locationName: 'London', locale: 'en-US' });
     expect(response.intent).toBe(DAYMARK_INTENTS.today);
     expect(response.spokenText).toContain('18 degrees in London');
     expect(response.spokenText).toContain('Rain is likely later today');
-    expect(response.spokenText).toContain('Sun protection is recommended until 5 PM');
-    expect(response.spokenText).toContain('Air quality is good');
+    expect(response.spokenText).toContain('High around 19, low around 11.');
+    expect(response.spokenText).toContain('UV is moderate.');
+    // Good air quality is not read aloud; it stays in the cards.
+    expect(response.spokenText).not.toContain('Air quality');
+    expect((response.spokenText.match(/\S+/g) ?? []).length).toBeLessThanOrEqual(45);
     expect(response.data?.current).toBeTruthy();
     expect(response.data?.rain).toBeTruthy();
+  });
+
+  it('reads air quality only when it is not simply good', () => {
+    const moderate = getTodayBriefing(buildWeather({ airQuality: { current: { us_aqi: 80 } } }), {
+      locationName: 'London',
+      locale: 'en',
+    });
+    expect(moderate.spokenText).toContain('Air quality is moderate.');
   });
 
   it('omits unavailable sections and escalates priority when needed', () => {
@@ -323,6 +334,7 @@ describe('getTodayBriefing', () => {
       airQuality: { current: { us_aqi: 180 } },
     }));
     expect(stormy.priority).toBe('high');
+    expect(stormy.spokenText).toContain('Air quality is');
   });
 });
 

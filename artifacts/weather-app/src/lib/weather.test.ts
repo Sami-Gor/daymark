@@ -16,8 +16,6 @@ import {
   getLocationLocalDate,
   getLocationLocalHour,
   getSunProtectionWindow,
-  getUmbrellaAdvice,
-  getSunglassesAdvice,
   isMicroClimateSupported,
   isSameLocationDay,
   locationTimeMs,
@@ -369,11 +367,13 @@ describe('display helpers', () => {
     const dew = calculateDewPointCelsius(20, 50) ?? -999;
     expect(dew).toBeGreaterThan(8.8);
     expect(dew).toBeLessThan(9.8);
-    expect(dewPointComfort(9.3).label).toBe('Dry');
+    expect(dewPointComfort(3).label).toBe('Dry');
+    expect(dewPointComfort(8).label).toBe('Comfortable');
     expect(dewPointComfort(12).label).toBe('Comfortable');
-    expect(dewPointComfort(17).label).toBe('Noticeable');
-    expect(dewPointComfort(19).label).toBe('Humid');
-    expect(dewPointComfort(25).label).toBe('Oppressive');
+    expect(dewPointComfort(14).label).toBe('Slightly humid');
+    expect(dewPointComfort(17).label).toBe('Humid');
+    expect(dewPointComfort(20).label).toBe('Very humid');
+    expect(dewPointComfort(24).label).toBe('Muggy');
     expect(calculateDewPointCelsius(undefined, 50)).toBeUndefined();
   });
 
@@ -383,21 +383,6 @@ describe('display helpers', () => {
     expect(d).toBeGreaterThan(330);
     expect(d).toBeLessThan(360);
     expect(distanceKm(51.5, -0.13, 51.5, -0.13)).toBe(0);
-  });
-
-  it('gives umbrella advice from precipitation probability', () => {
-    expect(getUmbrellaAdvice(80).answer).toBe('Yes');
-    expect(getUmbrellaAdvice(10).answer).toBe('No');
-    expect(getUmbrellaAdvice(0).reason).toBe('Rain unlikely today');
-    expect(getUmbrellaAdvice(undefined).reason).toBe('Rain forecast unavailable');
-    expect(getUmbrellaAdvice(50, '2 PM').reason).toContain('2 PM');
-  });
-
-  it('gives sunglasses advice from UV and cloud cover', () => {
-    expect(getSunglassesAdvice(6, 20).answer).toBe('Yes');
-    expect(getSunglassesAdvice(6, 90).answer).toBe('No');
-    expect(getSunglassesAdvice(1, 10).answer).toBe('No');
-    expect(getSunglassesAdvice(null, 10).answer).toBe('No');
   });
 });
 
