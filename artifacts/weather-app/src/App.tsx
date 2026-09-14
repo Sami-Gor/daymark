@@ -8,6 +8,7 @@ import NotFound from '@/pages/not-found';
 import Privacy from '@/pages/privacy';
 import PrivacyFr from '@/pages/privacy-fr';
 import PrivacyEs from '@/pages/privacy-es';
+import StorePreview from '@/pages/store-preview';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
   fetchWeather,
@@ -21,7 +22,9 @@ import { LoadingState } from '@/components/weather/LoadingState';
 import { WEATHER_ERROR_KEYS, WeatherError, type WeatherErrorCode } from '@/components/weather/WeatherError';
 import { TopBar } from '@/components/weather/TopBar';
 import { CurrentWeather } from '@/components/weather/CurrentWeather';
-import { HourlyOutlook } from '@/components/weather/HourlyOutlook';
+import { TemperatureSection } from '@/components/weather/TemperatureSection';
+import { RainSection } from '@/components/weather/RainSection';
+import { SunDaylightSection } from '@/components/weather/SunDaylightSection';
 import { DailyForecast } from '@/components/weather/DailyForecast';
 import { WeatherDetails } from '@/components/weather/WeatherDetails';
 import { MicroClimateForecast } from '@/components/weather/MicroClimate';
@@ -181,10 +184,14 @@ function Home() {
               />
               <WeatherAlerts weather={weather} unit={unit} />
               <div className="content-grid">
-                <HourlyOutlook weather={weather} unit={unit} />
-                <DailyForecast weather={weather} unit={unit} />
+                <TemperatureSection weather={weather} unit={unit} />
+                <RainSection weather={weather} />
                 <WeatherDetails weather={weather} unit={unit} />
-                <MicroClimateForecast weather={weather} place={place} unit={unit} />
+                <SunDaylightSection weather={weather} />
+                <div className="pair-card section-wide" data-testid="forecast-pair">
+                  <DailyForecast weather={weather} unit={unit} />
+                  <MicroClimateForecast weather={weather} place={place} unit={unit} />
+                </div>
                 <UVForecast weather={weather} />
                 <AirQualityForecast weather={weather} />
               </div>
@@ -205,6 +212,7 @@ function Router() {
         <Route path="/privacy" component={Privacy} />
         <Route path="/fr/privacy" component={PrivacyFr} />
         <Route path="/es/privacy" component={PrivacyEs} />
+        <Route path="/store-preview" component={StorePreview} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

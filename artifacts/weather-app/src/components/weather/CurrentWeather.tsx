@@ -42,7 +42,7 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
     <div className="today-hero">
       <section className="hero-grid" aria-labelledby="place-title">
         <div className="hero-location">
-          <h1 className="place-title" id="place-title" data-testid="text-current-city">{place.name}</h1>
+          <h1 className="place-title" key={place.name} id="place-title" data-testid="text-current-city">{place.name}</h1>
           <div className="date-line" data-testid="text-current-date">{formatLocationDate(current.time, { weekday: 'long', month: 'long', day: 'numeric' }, locale) ?? t('common.today')}</div>
         </div>
         <div className="temp-block">

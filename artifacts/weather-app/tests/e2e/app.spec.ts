@@ -14,6 +14,7 @@ const FORECAST = {
     time: '2026-09-07T12:00',
     temperature_2m: 20.4,
     relative_humidity_2m: 62,
+    dew_point_2m: 12.1,
     apparent_temperature: 19.1,
     precipitation: 0,
     cloud_cover: 80,
@@ -157,7 +158,8 @@ test.describe('functional', () => {
   test('renders hourly, 3-day forecast, 3-day UV, air quality, and micro-climate', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.goto('/');
-    await expect(page.getByTestId('list-hourly-forecast').locator('.hour-card')).toHaveCount(5);
+    await expect(page.getByTestId('list-hourly-forecast').locator('.temp-dot')).toHaveCount(5);
+    await expect(page.getByTestId('list-rain-probability').locator('.rain-point')).toHaveCount(5);
     await expect(page.getByTestId('list-daily-forecast').locator('.day-row')).toHaveCount(3);
     await expect(page.getByTestId('list-daily-uv').locator('.uv-day')).toHaveCount(3);
     await expect(page.getByTestId('text-uv-protection-window')).toContainText('Sun protection recommended');
@@ -326,6 +328,172 @@ test.describe('day cue hero', () => {
   });
 });
 
+test.describe('clean card redesign', () => {
+  test('renders exactly five live hourly points and five live rain bars', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+
+    const tempDots = page.getByTestId('list-hourly-forecast').locator('.temp-dot');
+    await expect(tempDots).toHaveCount(5);
+    const tempValues = await page.locator('.temp-value').allTextContents();
+    expect(tempValues).toEqual(['20°', '21°', '21°', '21°', '20°']);
+    const tempTimes = await page.locator('.temp-time').allTextContents();
+    expect(tempTimes).toEqual(['Now', '1 PM', '2 PM', '3 PM', '4 PM']);
+
+    const points = page.getByTestId('list-rain-probability').locator('.rain-point');
+    await expect(points).toHaveCount(5);
+    const rainValues = await page.locator('.rain-point-value').allTextContents();
+    expect(rainValues).toEqual(['10%', '20%', '10%', '0%', '0%']);
+    const rainTimes = await page.locator('.rain-point-time').allTextContents();
+    expect(rainTimes).toEqual(['Now', '1 PM', '2 PM', '3 PM', '4 PM']);
+    await expect(page.getByTestId('text-rain-peak')).toHaveText('20%');
+    await expect(page.getByTestId('text-rain-peak-note')).toHaveText('Highest around 1 PM');
+    await expect(points.nth(1)).toHaveClass(/rain-point-peak/);
+    await expect(page.getByTestId('list-rain-probability').getByRole('listitem').first()).toHaveAttribute('aria-label', 'Now: 10% chance');
+
+    await expect(page.getByTestId('text-current-aqi')).toHaveText('33');
+    await expect(page.getByTestId('detail-sunrise')).toContainText('6:30 AM');
+    await expect(page.getByTestId('detail-sunset')).toContainText('7:40 PM');
+    await expect(page.locator('.sun-noon')).toHaveText('1:05 PM');
+    await expect(page.locator('.sun-total strong')).toHaveText('13h 10m');
+
+    const body = await page.locator('body').innerText();
+    for (const fabricated of ['15h 51m', '5:12am', '1:48pm', '9:03pm', '32 AQI']) {
+      expect(body).not.toContain(fabricated);
+    }
+  });
+
+  test('builds a peak-first droplet timeline with no bar-chart elements', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    await expect(page.locator('.rain-chart, .rain-bar, .rain-value')).toHaveCount(0);
+    const timeline = page.locator('.rain-timeline');
+    await expect(timeline).toBeVisible();
+    const points = timeline.locator('.rain-point');
+    await expect(points).toHaveCount(5);
+    await expect(points.nth(1)).toHaveClass(/rain-point-peak/);
+
+    const lefts = await points.evaluateAll((elements) => elements.map((element) => Math.round(element.getBoundingClientRect().x)));
+    for (let index = 1; index < lefts.length; index += 1) expect(lefts[index]).toBeGreaterThan(lefts[index - 1]);
+    const dropCenters = await timeline.locator('.rain-drop-wrap').evaluateAll((elements) => elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.x + rect.width / 2;
+    }));
+    const labelCenters = await timeline.locator('.rain-point-value').evaluateAll((elements) => elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.x + rect.width / 2;
+    }));
+    for (let index = 0; index < dropCenters.length; index += 1) {
+      expect(Math.abs(labelCenters[index] - dropCenters[index])).toBeLessThanOrEqual(2);
+    }
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const timelineWidth = await timeline.evaluate((element) => element.getBoundingClientRect().width);
+    expect(timelineWidth).toBeLessThanOrEqual(440);
+  });
+
+  test('handles tied peaks, zero-rain windows and localized peak copy', async ({ page }) => {
+    await mockOpenMeteo(page, { forecast: { ...FORECAST, hourly: { ...FORECAST.hourly, precipitation_probability: [10, 20, 20, 5, 0, 0, 0, 0] } } });
+    await page.goto('/');
+    await expect(page.getByTestId('text-rain-peak')).toHaveText('20%');
+    await expect(page.getByTestId('text-rain-peak-note')).toHaveText('Highest around 1 PM');
+    await expect(page.locator('.rain-point').nth(1)).toHaveClass(/rain-point-peak/);
+    await expect(page.locator('.rain-point').nth(2)).not.toHaveClass(/rain-point-peak/);
+
+    await page.getByTestId('select-language').selectOption('fr');
+    await expect(page.getByTestId('text-rain-peak-note')).toContainText('Maximum vers');
+    await page.getByTestId('select-language').selectOption('en');
+
+    await page.route('**/api.open-meteo.com/**', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ...FORECAST, hourly: { ...FORECAST.hourly, precipitation_probability: [0, 0, 0, 0, 0, 0, 0, 0] } }),
+    }));
+    await page.reload();
+    await expect(page.getByTestId('text-rain-peak')).toHaveText('0%');
+    await expect(page.getByTestId('text-rain-peak-note')).toHaveText('No rain expected in the next 5 hours');
+    await expect(page.locator('.rain-point')).toHaveCount(5);
+  });
+
+  test('live cards use clean surfaces with no scenic artwork', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.locator('.promo-card')).toHaveCount(4);
+    await expect(page.locator('.atmos-bg')).toHaveCount(0);
+    await expect(page.locator('img[src*="weather-art"], img[src*="store-assets"]')).toHaveCount(0);
+    const backgrounds = await page.locator('.promo-card').evaluateAll((elements) => elements.map((element) => getComputedStyle(element).backgroundImage));
+    for (const image of backgrounds) expect(image).not.toContain('url(');
+  });
+
+  test('useful bits follows chance of rain and pairs daily with regional comparison', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+
+    const rainBox = await page.getByTestId('list-rain-probability').boundingBox();
+    const detailsBox = await page.getByTestId('panel-weather-details').boundingBox();
+    const airBox = await page.getByTestId('panel-air-quality').boundingBox();
+    expect(rainBox && detailsBox && airBox).toBeTruthy();
+    expect(detailsBox!.y).toBeGreaterThan(rainBox!.y);
+    expect(airBox!.y).toBeGreaterThan(detailsBox!.y);
+
+    const pair = page.getByTestId('forecast-pair');
+    await expect(pair).toBeVisible();
+    await expect(pair).toHaveClass(/pair-card/);
+    await expect(pair.getByTestId('list-daily-forecast')).toBeVisible();
+    await expect(pair.getByTestId('panel-micro-climate')).toBeVisible();
+    const wideColumns = await pair.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+    expect(wideColumns).toBe(2);
+    const wideXs = await pair.evaluate((element) => Array.from(element.children).map((child) => Math.round(child.getBoundingClientRect().x)));
+    expect(wideXs[1]).toBeGreaterThan(wideXs[0]);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const narrowColumns = await pair.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+    expect(narrowColumns).toBe(1);
+    const narrowXs = await pair.evaluate((element) => Array.from(element.children).map((child) => Math.round(child.getBoundingClientRect().x)));
+    expect(narrowXs[1]).toBe(narrowXs[0]);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('renders Air around you once, after every other main section', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    await expect(page.getByTestId('panel-air-quality')).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Air around you' })).toHaveCount(1);
+
+    const airBox = await page.getByTestId('panel-air-quality').boundingBox();
+    const pairBox = await page.getByTestId('forecast-pair').boundingBox();
+    const uvBox = await page.getByTestId('panel-uv-forecast').boundingBox();
+    expect(airBox && pairBox && uvBox).toBeTruthy();
+    expect(airBox!.y).toBeGreaterThan(pairBox!.y);
+    expect(airBox!.y).toBeGreaterThan(uvBox!.y);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const airWide = await page.getByTestId('panel-air-quality').boundingBox();
+    const pairWide = await page.getByTestId('forecast-pair').boundingBox();
+    const uvWide = await page.getByTestId('panel-uv-forecast').boundingBox();
+    expect(airWide && pairWide && uvWide).toBeTruthy();
+    expect(airWide!.y).toBeGreaterThan(pairWide!.y);
+    expect(airWide!.y).toBeGreaterThan(uvWide!.y);
+  });
+
+  test('collapses redesigned section animation under reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    const dot = page.locator('.temp-dot').first();
+    const duration = await dot.evaluate((element) => getComputedStyle(element).animationDuration);
+    expect(parseFloat(duration)).toBeLessThanOrEqual(0.01);
+  });
+});
+
 test.describe('responsive', () => {
   const widths = [320, 375, 390, 430, 768, 1024, 1280, 1440];
 
@@ -345,16 +513,14 @@ test.describe('responsive', () => {
     });
   }
 
-  test('hourly strip scrolls internally on mobile', async ({ page }) => {
+  test('redesigned sections fit mobile width with live values', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');
-    await expect(page.getByTestId('list-hourly-forecast')).toBeVisible();
-    const scrolls = await page.evaluate(() => {
-      const el = document.querySelector('[data-testid="list-hourly-forecast"]');
-      return el ? el.scrollWidth > el.clientWidth : false;
-    });
-    expect(scrolls).toBe(true);
+    await expect(page.getByTestId('list-hourly-forecast').locator('.temp-dot')).toHaveCount(5);
+    await expect(page.getByTestId('list-rain-probability').locator('.rain-point')).toHaveCount(5);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 
   test('long location names wrap safely', async ({ page }) => {
@@ -1502,33 +1668,54 @@ test.describe('useful bits', () => {
     current: { ...FORECAST.current, wind_speed_10m: 14, wind_gusts_10m: 22 },
   };
 
-  test('keeps unique secondary details and drops duplicated hero facts', async ({ page }) => {
+  test('shows humidity and dew point, drops wind, with explanatory copy', async ({ page }) => {
     await mockOpenMeteo(page, { forecast: forecastWithWind });
     await page.goto('/');
 
     const panel = page.getByTestId('panel-weather-details');
     await expect(panel).toBeVisible();
 
-    // Retained: humidity + dew point, wind, sunrise/sunset.
     await expect(page.getByTestId('detail-humidity')).toContainText('62%');
-    await expect(page.getByTestId('detail-dew-point')).toBeVisible();
-    await expect(page.getByTestId('detail-wind')).toContainText('14 km/h');
-    await expect(page.getByTestId('detail-wind')).toContainText('Gusts 22 km/h');
+    await expect(page.getByTestId('detail-humidity')).toContainText('relative humidity');
+    await expect(page.getByTestId('detail-dew-point')).toContainText('12°');
+    await expect(page.getByTestId('detail-dew-point')).toContainText('Comfortable');
+    await expect(page.getByTestId('detail-dew-point')).toContainText('How humid the air feels.');
+    await expect(page.getByTestId('detail-dew-point')).toContainText('Dew point measures the amount of moisture in the air. Higher values feel more humid.');
+
+    // Vertical comfort scale: every band label plus a live marker at the value.
+    const scale = page.locator('.dew-scale');
+    await expect(scale).toBeVisible();
+    await expect(scale).toHaveAttribute('aria-label', 'Dew point scale, currently 12° (Comfortable)');
+    for (const band of ['Dry', 'Comfortable', 'Slightly humid', 'Humid', 'Very humid', 'Muggy']) {
+      await expect(scale.getByText(band, { exact: true })).toHaveCount(1);
+    }
+    await expect
+      .poll(async () => {
+        const top = await page.locator('.dew-scale-marker').evaluate((element) => (element as HTMLElement).style.top);
+        return Math.abs(parseFloat(top) - (12.1 / 26) * 100) < 1;
+      })
+      .toBe(true);
+
+    // °F display still maps to the Celsius-based interpretation.
+    await page.getByTestId('button-unit-fahrenheit').click();
+    await expect(page.getByTestId('detail-dew-point')).toContainText('54°');
+    await expect(page.getByTestId('detail-dew-point')).toContainText('Comfortable');
+
+    // Wind is no longer part of The useful bits.
+    await expect(page.getByTestId('detail-wind')).toHaveCount(0);
     await expect(page.getByTestId('detail-sunrise')).toBeVisible();
     await expect(page.getByTestId('detail-sunset')).toBeVisible();
 
-    // Removed: facts already shown in the hero, advice cards or forecast.
     await expect(page.getByTestId('detail-feels-like')).toHaveCount(0);
     await expect(page.getByTestId('detail-rain-now')).toHaveCount(0);
     await expect(page.getByTestId('detail-day-ahead')).toHaveCount(0);
   });
 
-  test('renders without a wind gust value when gusts are absent', async ({ page }) => {
-    await mockOpenMeteo(page, { forecast: { ...FORECAST, current: { ...FORECAST.current, wind_speed_10m: 9 } } });
+  test('falls back to a computed dew point when the API value is absent', async ({ page }) => {
+    await mockOpenMeteo(page, { forecast: { ...FORECAST, current: { ...FORECAST.current, temperature_2m: 10, relative_humidity_2m: 50, dew_point_2m: undefined } } });
     await page.goto('/');
-    await expect(page.getByTestId('detail-wind')).toContainText('9 km/h');
-    await expect(page.getByTestId('detail-wind')).toContainText('sustained speed');
-    await expect(page.getByTestId('detail-wind')).not.toContainText('Gusts');
+    await expect(page.getByTestId('detail-dew-point')).toContainText('0°');
+    await expect(page.getByTestId('detail-dew-point')).toContainText('Dry');
   });
 
   test('stays localized and overflow-free at 320px', async ({ page }) => {
@@ -1539,13 +1726,13 @@ test.describe('useful bits', () => {
     const panel = page.getByTestId('panel-weather-details');
     await page.getByTestId('select-language').selectOption('fr');
     await expect(panel).toContainText('Humidité');
-    await expect(panel).toContainText('Vent');
+    await expect(panel).toContainText('Point de rosée');
     let overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
 
     await page.getByTestId('select-language').selectOption('es');
     await expect(panel).toContainText('Humedad');
-    await expect(panel).toContainText('Viento');
+    await expect(panel).toContainText('Punto de rocío');
     overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
@@ -2626,5 +2813,55 @@ test.describe('offline locality naming', () => {
     await expect(page.locator('.loading-layout')).toHaveCount(0);
     await expect(page.getByTestId('list-hourly-forecast')).toBeVisible();
     await expect(page.getByTestId('text-current-city')).toHaveText('Uxbridge', { timeout: 10000 });
+  });
+});
+
+test.describe('store promo gallery', () => {
+  test('renders the five Play promo images in listing order', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/store-preview');
+
+    const images = page.locator('.store-promo-gallery img');
+    await expect(images).toHaveCount(5);
+    await expect(page.locator('.store-promo-title')).toHaveText([
+      'Temperature',
+      'Chance of rain',
+      'Air quality',
+      'Sun & daylight',
+      'Privacy',
+    ]);
+    await expect(page.locator('.store-promo-caption')).toHaveText([
+      'Track the day’s temperature in seconds.',
+      'Spot the wet hours before you leave.',
+      'Air quality, simplified.',
+      'Sunrise, sunset, and daylight — beautifully clear.',
+      'Private by design.',
+    ]);
+
+    const sources = await images.evaluateAll((elements) => elements.map((element) => new URL((element as HTMLImageElement).src).pathname));
+    expect(sources).toEqual([
+      '/store-assets/daymark-promo/daymark-temperature.png',
+      '/store-assets/daymark-promo/daymark-rain.png',
+      '/store-assets/daymark-promo/daymark-air-quality.png',
+      '/store-assets/daymark-promo/daymark-sun-daylight.png',
+      '/store-assets/daymark-promo/daymark-privacy.png',
+    ]);
+
+    await expect(images.nth(0)).toHaveAttribute('loading', 'lazy');
+    await expect(images.nth(0)).toHaveAttribute('alt', 'Daymark temperature forecast promo showing an hourly line chart from 16 to 21 degrees.');
+    await expect(images.nth(4)).toHaveAttribute('alt', 'Daymark privacy promo showing no tracking, no ads and no account.');
+
+    await images.nth(0).scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () => images.nth(0).evaluate((element) => (element as HTMLImageElement).naturalWidth))
+      .toBe(941);
+    const natural = await images.nth(0).evaluate((element) => {
+      const image = element as HTMLImageElement;
+      return { width: image.naturalWidth, height: image.naturalHeight };
+    });
+    expect(natural).toEqual({ width: 941, height: 1672 });
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });

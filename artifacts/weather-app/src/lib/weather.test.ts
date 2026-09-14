@@ -367,11 +367,13 @@ describe('display helpers', () => {
     const dew = calculateDewPointCelsius(20, 50) ?? -999;
     expect(dew).toBeGreaterThan(8.8);
     expect(dew).toBeLessThan(9.8);
-    expect(dewPointComfort(9.3).label).toBe('Dry');
+    expect(dewPointComfort(3).label).toBe('Dry');
+    expect(dewPointComfort(8).label).toBe('Comfortable');
     expect(dewPointComfort(12).label).toBe('Comfortable');
-    expect(dewPointComfort(17).label).toBe('Noticeable');
-    expect(dewPointComfort(19).label).toBe('Humid');
-    expect(dewPointComfort(25).label).toBe('Oppressive');
+    expect(dewPointComfort(14).label).toBe('Slightly humid');
+    expect(dewPointComfort(17).label).toBe('Humid');
+    expect(dewPointComfort(20).label).toBe('Very humid');
+    expect(dewPointComfort(24).label).toBe('Muggy');
     expect(calculateDewPointCelsius(undefined, 50)).toBeUndefined();
   });
 
