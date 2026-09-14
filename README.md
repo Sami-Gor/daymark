@@ -103,11 +103,29 @@ pnpm run build        # typecheck + build all packages
 
 Output lands in `artifacts/weather-app/dist/public` — deploy it to any static host. `public/_headers` ships a production security-header set (CSP, HSTS, etc.) for hosts that honour it (Cloudflare Pages, Netlify); configure the same headers manually on hosts that don't.
 
+## Android app (Capacitor shell)
+
+The Android build wraps the same web bundle in a Capacitor shell
+(`artifacts/weather-app/android`) with a native `DaymarkVoice` plugin: the
+bundled Kokoro model and `bm_fable` voice run fully on-device (streaming
+AudioTrack) for English narration; French/Spanish use Android system TTS, and
+the browser build keeps Web Speech. The legacy TWA project is preserved at
+`android/` as the rollback point.
+
+```bash
+cd artifacts/weather-app
+pnpm exec cap sync android
+cd android
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
+```
+
+See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API, lifecycle and release details.
+
 ## Test
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (175 tests)
-pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (83 tests)
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (214 tests)
+pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (133 tests)
 ```
 
 The e2e suite runs against a production build served by `vite preview`, mocks Open-Meteo traffic, and covers function, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), failure paths, the service worker, the served security headers, location search, voice input/output, severe-weather alerts and the English/French/Spanish interface.
@@ -120,7 +138,7 @@ See [SECURITY.md](SECURITY.md). In short: minimal attack surface (9 runtime depe
 
 ```
 artifacts/
-  weather-app/            the app (React SPA + PWA)
+  weather-app/            production React/Vite app (SPA + PWA)
     public/               manifest, service worker, icons, _headers
     src/lib/weather.ts    API boundary + Zod schemas + location-safe time helpers
     src/lib/weather-alerts.ts   forecast-derived risk engine (not official warnings)
@@ -132,8 +150,13 @@ artifacts/
     src/components/       UI components
     src/fonts/            self-hosted fonts + licences
     tests/e2e/            Playwright suite
+    android/              production Capacitor Android shell
+      app/                Capacitor application module
+      daymark-voice/      native DaymarkVoice plugin (Kokoro, local TTS)
   mockup-sandbox/         local design sandbox (never deployed)
-docs/                     README screenshots
+android/                  frozen TWA/Bubblewrap rollback project (see android/README.md)
+  kokoro-poc/             shared Kokoro Rust/JNI source + fetch/build scripts
+docs/                     architecture, release audit, README screenshots
 scripts/                  workspace tooling
 ```
 
@@ -143,6 +166,8 @@ scripts/                  workspace tooling
 - The Regional comparison uses the UKV model and is hidden outside the UK/near continent, where that model is not valid
 - Severe-weather risks are forecast-derived Daymark estimates, **not** official warnings
 - Voice input/output require browser Web Speech support and matching platform voices; unsupported browsers hide those controls
+- On Android, English narration uses the bundled local Kokoro voice (offline); French/Spanish use the device TTS engine, which needs the matching voice data installed
+- The Android shell currently bundles the arm64-v8a Kokoro library only
 - Air-quality "nearby sensor" comparison is not yet wired to a sensor network; the regional forecast is shown
 - The very first reload immediately after a service-worker update may briefly miss the offline shell (self-heals on the next reload)
 

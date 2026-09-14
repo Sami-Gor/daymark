@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="webview_required_title">Daymark necesita una versión más reciente de Android System WebView</string>
+    <string name="webview_required_message">Actualiza Android System WebView desde Google Play y vuelve a abrir Daymark.</string>
+</resources>

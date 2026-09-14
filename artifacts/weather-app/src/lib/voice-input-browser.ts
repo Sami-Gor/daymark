@@ -157,13 +157,17 @@ export function createBrowserRecognitionController(): BrowserRecognitionControll
       instance.interimResults = false;
       instance.maxAlternatives = 1;
 
+      let gotResult = false;
       instance.onstart = () => {
         if (session === mySession && active === instance) handlers.onStart?.();
       };
       instance.onresult = (event) => {
         if (session !== mySession || active !== instance) return;
         const transcript = extractTranscript(event);
-        if (transcript) handlers.onResult?.(transcript);
+        if (transcript) {
+          gotResult = true;
+          handlers.onResult?.(transcript);
+        }
       };
       instance.onerror = (event) => {
         if (session !== mySession || active !== instance) return;
@@ -177,7 +181,13 @@ export function createBrowserRecognitionController(): BrowserRecognitionControll
         session += 1;
         active = null;
         detach(instance);
-        handlers.onEnd?.();
+        if (gotResult) {
+          handlers.onEnd?.();
+        } else {
+          // Ended without a usable transcript and without an explicit error:
+          // reuse the no-speech feedback instead of silently returning to idle.
+          handlers.onError?.('no-speech');
+        }
       };
 
       active = instance;

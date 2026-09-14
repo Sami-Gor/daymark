@@ -1,0 +1,3 @@
+# Build-generated Kokoro material (reproduced by the scripts in android/kokoro-poc)
+src/main/assets/kokoro/
+src/main/jniLibs/

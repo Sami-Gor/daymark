@@ -17,10 +17,11 @@ type Exchange = { question: string; answer: string };
  *
  * Only the latest exchange is kept in state — no history, no storage, no logs.
  */
-export function AskDaymark({ weather, place, unit, speak, stopSpeech }: {
+export function AskDaymark({ weather, place, unit, narrationActive, speak, stopSpeech }: {
   weather: WeatherPayload;
   place: Place;
   unit: Unit;
+  narrationActive: boolean;
   speak: (text: string, lang?: string) => boolean;
   stopSpeech: () => void;
 }) {
@@ -28,6 +29,12 @@ export function AskDaymark({ weather, place, unit, speak, stopSpeech }: {
   const recognition = useSpeechRecognition();
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const pendingSpoken = useRef('');
+
+  // Narration and microphone capture must never run together; the opposite
+  // direction (listening stops playback) is handled in the ask handler.
+  useEffect(() => {
+    if (narrationActive && recognition.isListening) recognition.stop();
+  }, [narrationActive, recognition.isListening, recognition.stop]);
 
   // Speak the answer only after recognition has fully stopped, so the
   // microphone never picks up Daymark's own reply.

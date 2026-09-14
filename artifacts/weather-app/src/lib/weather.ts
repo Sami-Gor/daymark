@@ -171,6 +171,20 @@ const MICRO_CLIMATE_CACHE_MS = 15 * 60 * 1000;
  */
 const FETCH_TIMEOUT_MS = 10_000;
 
+/*
+ * Typed fetch failures so the UI can show localized Daymark copy instead of
+ * raw browser/network messages (e.g. "Failed to fetch"). The English message
+ * is kept for logs and tests; the UI maps `code` to translated copy.
+ */
+export type WeatherFetchErrorCode = 'timeout' | 'network' | 'http' | 'malformed';
+
+export class WeatherFetchError extends Error {
+  constructor(public readonly code: WeatherFetchErrorCode, message: string) {
+    super(message);
+    this.name = 'WeatherFetchError';
+  }
+}
+
 function requestSignal(): AbortSignal | undefined {
   return typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
     ? AbortSignal.timeout(FETCH_TIMEOUT_MS)
@@ -190,21 +204,27 @@ async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSigna
   } catch (error) {
     if (signal?.aborted) throw error; // caller cancelled (e.g. a newer search); let it propagate
     if (isTimeoutError(error)) {
-      throw new Error('The weather service took too long to respond.');
+      throw new WeatherFetchError('timeout', 'The weather service took too long to respond.');
     }
-    throw error;
+    // Never surface the raw browser message ("Failed to fetch") to users.
+    if (import.meta.env.DEV) console.warn('weather: network request failed', error);
+    throw new WeatherFetchError('network', "We couldn't reach the weather service.");
   }
-  if (!response.ok) throw new Error(`Weather service returned ${response.status}`);
+  if (!response.ok) {
+    // Raw status stays in developer logs only; users get friendly copy.
+    if (import.meta.env.DEV) console.warn('weather: HTTP', response.status, response.url);
+    throw new WeatherFetchError('http', "Weather data isn't available right now. Try again shortly.");
+  }
   let data: unknown;
   try {
     data = await response.json();
   } catch {
-    throw new Error('Weather service sent a response we could not read.');
+    throw new WeatherFetchError('malformed', 'Weather service sent a response we could not read.');
   }
   try {
     return schema.parse(data);
   } catch {
-    throw new Error('Weather service sent data in an unexpected shape.');
+    throw new WeatherFetchError('malformed', 'Weather service sent data in an unexpected shape.');
   }
 }
 

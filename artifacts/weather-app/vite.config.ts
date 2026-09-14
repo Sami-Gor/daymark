@@ -58,6 +58,26 @@ const securityHeaders: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
 };
 
+// Capacitor serves the bundled shell without HTTP headers, so the production
+// CSP is also embedded in index.html at build time. This mirrors the _headers
+// policy minus `frame-ancestors` (not allowed in a meta tag). Injection is
+// build-only to keep the Vite dev server working.
+function nativeShellCsp(): PluginOption {
+  const metaPolicy = securityHeaders['Content-Security-Policy']
+    .split(';')
+    .map((directive) => directive.trim())
+    .filter((directive) => !directive.startsWith('frame-ancestors'))
+    .join('; ');
+  return {
+    name: 'daymark-native-shell-csp',
+    apply: 'build',
+    transformIndexHtml(html) {
+      const tag = `<meta http-equiv="Content-Security-Policy" content="${metaPolicy}" />`;
+      return html.replace('</head>', `    ${tag}\n  </head>`);
+    },
+  };
+}
+
 // `preview.headers` is not honored by Vite, so the headers are applied
 // through the preview-server middleware hook instead.
 function previewSecurityHeaders(): PluginOption {
@@ -79,6 +99,7 @@ export default defineConfig({
   base: basePath,
   plugins: [
     swPrecache(),
+    nativeShellCsp(),
     previewSecurityHeaders(),
     react(),
     tailwindcss(),

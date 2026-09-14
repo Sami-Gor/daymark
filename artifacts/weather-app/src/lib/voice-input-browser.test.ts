@@ -139,13 +139,29 @@ describe('createBrowserRecognitionController', () => {
     expect(onEnd).not.toHaveBeenCalled();
   });
 
-  it('resets internal state when recognition ends', () => {
+  it('reports no-speech when recognition ends without a transcript', () => {
     stubRecognitionWindow();
     const controller = createBrowserRecognitionController();
+    const onError = vi.fn();
     const onEnd = vi.fn();
-    controller.start({ onEnd });
+    controller.start({ onError, onEnd });
     FakeRecognition.instances[0].emitEnd();
+    expect(onError).toHaveBeenCalledWith('no-speech');
+    expect(onEnd).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('resets internal state when recognition ends after a transcript', () => {
+    stubRecognitionWindow();
+    const controller = createBrowserRecognitionController();
+    const onError = vi.fn();
+    const onEnd = vi.fn();
+    controller.start({ onError, onEnd });
+    const instance = FakeRecognition.instances[0];
+    instance.emitResult('Will it rain later?');
+    instance.emitEnd();
     expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
     expect(controller.isListening()).toBe(false);
   });
 

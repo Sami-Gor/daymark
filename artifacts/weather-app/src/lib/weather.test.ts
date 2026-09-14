@@ -188,12 +188,18 @@ describe('fetchWeather', () => {
   it('throws a friendly message for HTTP 4xx/5xx', async () => {
     stubFetch(() => json({ reason: 'nope' }, 500));
     await expect(fetchWeather(PLACE)).rejects.toThrow(
-      'Weather service returned 500',
+      "Weather data isn't available right now. Try again shortly.",
     );
     stubFetch(() => json({ reason: 'nope' }, 404));
     await expect(fetchWeather(PLACE)).rejects.toThrow(
-      'Weather service returned 404',
+      "Weather data isn't available right now. Try again shortly.",
     );
+  });
+
+  it('reports a typed network failure without raw browser text', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')));
+    await expect(fetchWeather(PLACE)).rejects.toMatchObject({ name: 'WeatherFetchError', code: 'network' });
+    await expect(fetchWeather(PLACE)).rejects.toThrow("We couldn't reach the weather service.");
   });
 
   it('throws a friendly message for malformed JSON', async () => {
@@ -274,7 +280,7 @@ describe('fetchWeather', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => Promise.resolve(
       String(input).includes('air-quality') ? json(validAir) : json({ reason: 'nope' }, 500),
     ));
-    await expect(fetchWeather(PLACE)).rejects.toThrow('Weather service returned 500');
+    await expect(fetchWeather(PLACE)).rejects.toThrow("Weather data isn't available right now. Try again shortly.");
   });
 
   it('issues exactly one forecast and one air-quality request with the same coordinates', async () => {
@@ -636,7 +642,7 @@ describe('searchPlaces', () => {
 
   it('rejects when the geocoding service fails', async () => {
     stubFetch(() => json({ reason: 'nope' }, 500));
-    await expect(searchPlaces('paris')).rejects.toThrow('Weather service returned 500');
+    await expect(searchPlaces('paris')).rejects.toThrow("Weather data isn't available right now. Try again shortly.");
   });
 
   it('propagates an abort so stale searches can be discarded', async () => {
