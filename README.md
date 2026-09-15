@@ -1,31 +1,32 @@
 # Daymark
 
-A calm, privacy-conscious weather PWA built with React, Vite, TypeScript, and [Open-Meteo](https://open-meteo.com).
+A calm, privacy-conscious weather app for the web (PWA) and Android, built with React, Vite, TypeScript, [Capacitor](https://capacitorjs.com), and [Open-Meteo](https://open-meteo.com).
 
 ![Daymark on desktop](docs/images/daymark-desktop.png)
 
 ## Overview
 
-Daymark answers one question well — *what's the sky doing?* — without dashboards, accounts, or tracking. It is a fully client-side app: your browser talks directly to the free Open-Meteo API, nothing is stored on any server, and location is only used when you ask for it.
+Daymark answers one question well — *what's the sky doing?* — without dashboards, accounts, ads, or tracking. It is a fully client-side app on the web and in the Android WebView: the client talks directly to the free Open-Meteo API, nothing is stored on any server, and location is only used when you ask for it.
 
 ## Features
 
-- **Current weather** — temperature, feels-like, condition, and plain-English "umbrella?" / "sunglasses?" advice cards
-- **Hourly outlook** — the next 12 hours with icons, temperatures, and rain chance
+- **Current weather** — temperature, feels-like, condition, and a day cue (umbrella / sunglasses / mixed / neutral) in the hero
+- **Temperature** — a compact five-hour trend with the peak marked; **Chance of rain** — a peak-first droplet timeline for the next five hours
 - **3-day forecast** — highs, lows, and precipitation per day
 - **Sun on your skin** — current UV index with a protection range gauge, hourly UV strip, and a 3-day outlook
+- **Sun & daylight** — sunrise, solar noon, sunset and daylight length with a sun-path arc
 - **Air around you** — live US AQI with WHO/city comparison markers, pollutant breakdown (PM2.5, PM10, NO₂, O₃), and plain-English context
-- **Regional comparison (UK only)** — a nearby UKV model grid point compared against the regional forecast; hidden where that model is not valid
+- **A look ahead + Regional comparison** — the 3-day outlook and a higher-resolution regional model compared against the wider forecast; hidden where that model is not valid
 - **Dew point & comfort** — alongside humidity, because dew point is what your skin actually feels
 - **Location search** — switch to any city or town using Open-Meteo geocoding, with region/country disambiguation
 - **Severe weather risk** — forecast-derived wind, rain, snow, thunderstorm, heat and cold risks, clearly labelled as *not* official warnings
-- **Voice** — *Hear today* reads the briefing aloud; *Ask Daymark* answers spoken weather questions using the browser Web Speech APIs (no cloud TTS)
+- **Voice** — *Hear today* reads the briefing aloud (fully on-device Kokoro on Android; browser speech synthesis on the web); *Ask Daymark* answers spoken weather questions through the browser/platform speech service, which may process audio remotely — Daymark itself stores no transcripts
 - **English, French and Spanish** — locale-aware UI, guidance, alerts and voice, defaulting to the browser language
 - **°C / °F toggle**, graceful offline shell, and installable as an app (PWA)
 
 ## Interface
 
-The design is editorial rather than dashboard-like — a serif-led hero with plain-English advice cards, matched forecast cards, and compact feature sections that each keep their own personality.
+The design is editorial rather than dashboard-like — a serif-led hero with a plain-English day cue, matched forecast cards, and compact feature sections that each keep their own personality.
 
 **Responsive, mobile-first** — the full page at 390px:
 
@@ -36,7 +37,7 @@ The design is editorial rather than dashboard-like — a serif-led hero with pla
 
 </details>
 
-**Matched forecast pair** — the next five hours beside the 3-day outlook:
+**A look ahead + Regional comparison** — the 3-day outlook beside the higher-resolution regional model:
 
 ![Forecast cards](docs/images/daymark-forecast.png)
 
@@ -62,7 +63,7 @@ The design is editorial rather than dashboard-like — a serif-led hero with pla
 Daymark is a **client-side single-page app + PWA**. There is:
 
 - **No backend, no database, no server code** — the repository ships static files only
-- **No user accounts, no analytics, no telemetry, no cookies**
+- **No user accounts, no ads, no analytics, no telemetry, no cookies**
 - One workspace package that matters: `artifacts/weather-app` (plus `artifacts/mockup-sandbox`, a local-only design tool that is never deployed)
 
 All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifacts/weather-app/src/lib/weather.ts): typed Open-Meteo clients, permissive-but-strict Zod schemas at the network boundary, 10-second fetch timeouts, and the formatting/categorisation helpers. Building on that: `weather-alerts.ts` is a pure forecast-risk engine, `weather-intents.ts` is a language-independent intent/response layer shared by voice, `i18n.ts` + `locales/` hold the typed translations, and `voice-browser.ts` / `voice-input-browser.ts` are framework-free browser speech adapters. UI components live in `src/components/weather/`.
@@ -86,7 +87,7 @@ Daymark installs as a standalone app (manifest + icons included). A minimal serv
 
 ## Local development
 
-Requires [Node](https://nodejs.org) and [pnpm](https://pnpm.io). **Node 24 is the CI-tested runtime**; Node 20+ generally works, but local Node 26 is not the compatibility baseline.
+Requires [Node](https://nodejs.org) and [pnpm](https://pnpm.io). **Node 24 is the CI-tested runtime**; Node 20+ generally works.
 
 ```bash
 pnpm install          # frozen lockfile enforced
@@ -119,20 +120,20 @@ cd android
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
 ```
 
-See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API, lifecycle and release details.
+Release: package `io.github.sami_gor.daymark` (versionCode 1 / versionName 1.0.0), currently in Google Play closed testing. See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
 
 ## Test
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (214 tests)
-pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (133 tests)
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (236 tests)
+pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (153 tests)
 ```
 
 The e2e suite runs against a production build served by `vite preview`, mocks Open-Meteo traffic, and covers function, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), failure paths, the service worker, the served security headers, location search, voice input/output, severe-weather alerts and the English/French/Spanish interface.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md). In short: minimal attack surface (9 runtime dependencies), every external response runtime-validated, a strict CSP (`default-src 'none'`, `script-src 'self'`), and no secrets anywhere in the client — there are none to leak.
+See [SECURITY.md](SECURITY.md) for the web/PWA and Android posture. In short: minimal attack surface (12 runtime dependencies), every external response runtime-validated, a strict CSP (`default-src 'none'`, `script-src 'self'`), a native voice engine that runs fully on-device, and no secrets anywhere in the client — there are none to leak.
 
 ## Project structure
 
@@ -163,7 +164,7 @@ scripts/                  workspace tooling
 ## Known limitations
 
 - Unit preference (°C/°F) is not persisted across reloads (the language preference is)
-- The Regional comparison uses the UKV model and is hidden outside the UK/near continent, where that model is not valid
+- The regional comparison uses the UKV model and is hidden where that model is not valid
 - Severe-weather risks are forecast-derived Daymark estimates, **not** official warnings
 - Voice input/output require browser Web Speech support and matching platform voices; unsupported browsers hide those controls
 - On Android, English narration uses the bundled local Kokoro voice (offline); French/Spanish use the device TTS engine, which needs the matching voice data installed
@@ -173,7 +174,7 @@ scripts/                  workspace tooling
 
 ## License
 
-[MIT](LICENSE). Fonts are licensed under the SIL Open Font License 1.1 (see [`artifacts/weather-app/src/fonts/LICENSE.md`](artifacts/weather-app/src/fonts/LICENSE.md)). Weather data by [Open-Meteo](https://open-meteo.com) (CC BY 4.0 attribution requested for non-commercial use).
+Daymark's source is [MIT](LICENSE). Bundled third-party components keep their own upstream licences and are **not** relicensed by MIT: the self-hosted fonts (SIL OFL 1.1, see [`artifacts/weather-app/src/fonts/LICENSE.md`](artifacts/weather-app/src/fonts/LICENSE.md)); the Kokoro runtime/model and `bm_fable` voice assets (Apache-2.0, see the licensing matrix in [`android/kokoro-poc/README.md`](android/kokoro-poc/README.md)); other native libraries (MIT/Apache-2.0). Weather data by [Open-Meteo](https://open-meteo.com) (CC BY 4.0 attribution requested for non-commercial use).
 
 ## Contributing
 

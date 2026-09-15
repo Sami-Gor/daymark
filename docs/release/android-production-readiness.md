@@ -1,7 +1,8 @@
 # Daymark Android production readiness audit
 
-Scope: Capacitor shell on `migration/capacitor-native-shell` (audit snapshot at
-`24b2b5e`; later commits resolved the minor findings below).
+Scope: Capacitor shell, audited on `migration/capacitor-native-shell` (snapshot
+at `24b2b5e`; later commits resolved the minor findings below). The migration
+is now merged into `main` (PR #15).
 Method: repository/static inspection, artifact inspection of the signed release
 APK/AAB, emulator runtime checks from the migration and performance passes.
 No code or configuration changes were made by this audit. Findings are
@@ -18,7 +19,7 @@ Verified from the current tree:
 | Release APK | passes (`:app:assembleRelease`, R8 minification on) |
 | Release AAB | passes (`:app:bundleRelease`); `jarsigner -verify` → verified |
 | Signing | upload keystore copy inside the Android project, `keystore.properties`, not tracked |
-| Certificate | `CN=Daymark Upload`, SHA-256 `3C:60:AD:…:20:57` |
+| Certificate | `CN=Daymark Upload`, SHA-256 `34:6B:BE:…:FA:7E` (rotated 2026-09-13; the earlier `3C:60:AD:…:20:57` key is retired) |
 | versionCode / versionName | `1` / `1.0.0` |
 | SDKs | compile/target 36, min 24 (Capacitor 8 minimum) |
 | Native libs in AAB/APK | `arm64-v8a` only (`libkokoro_jni.so`, `libc++_shared.so`) |
@@ -84,20 +85,23 @@ Repository-side readiness:
 | Foreground services | none |
 | Storage permissions | none |
 
-Play Console actions still required (MANUAL, cannot be verified from the repo):
+Play Console status (manual, cannot be verified from the repo):
 
-1. Enable/confirm Play App Signing and copy the **app signing key** SHA-256
-   fingerprint; also copy the **upload key** fingerprint already in this repo.
-2. Complete Data Safety (see §10): location (approximate/precise), audio
-   (speech recognition), and third-party processing disclosures.
-3. Content rating questionnaire (weather utility, no ads, no user content).
-4. App access declaration: fully accessible without restrictions.
-5. Declare the location and microphone permissions in the store listing where
-   requested, with the in-app purpose strings.
-6. Closed-testing requirement applicable to personal developer accounts
-   (testers/duration gate) before production access; confirm account type.
-7. Store listing assets, screenshots, feature graphic (outside this audit).
-8. Upload `app-release.aab`; bump `versionCode` for subsequent uploads.
+1. Play App Signing enrolled via the first upload; the **app signing key**
+   SHA-256 still needs to be copied from Play Console → App integrity.
+2. Data Safety completed (mapping in §10: location approximate/precise sent to
+   Open-Meteo; audio not stored by the app; no analytics/crash logs).
+3. Content rating, target audience, ads (no ads; advertising ID = No),
+   government/financial/health, app access and AI asset declarations completed.
+4. Store listing / default store listing completed (graphics outside this
+   audit).
+5. Closed-testing (Alpha) release submitted with the first AAB
+   (`309abe94…`, 96,463,981 bytes); review pending. Tester mechanism: Google
+   Group `daymark-testers@googlegroups.com`; all countries/regions selected.
+6. Production access remains gated by Google's closed-test requirement
+   (12 testers / 14 continuous days for personal accounts, if applicable).
+7. `assetlinks.json` still to be deployed once the Play app-signing SHA-256 is
+   recorded (the upload-key fingerprint must not be substituted).
 
 ## 3. Digital Asset Links / App Links
 
@@ -123,7 +127,7 @@ Final structure to deploy at `https://daymark-weather.pages.dev/.well-known/asse
       "package_name": "io.github.sami_gor.daymark",
       "sha256_cert_fingerprints": [
         "<PLAY_APP_SIGNING_SHA256>",
-        "3C:60:AD:BB:70:EB:70:4C:26:A7:B8:16:C2:6A:FC:B4:06:E2:A1:0A:ED:32:2A:EE:AB:A9:3C:6C:B0:81:20:57"
+        "34:6B:BE:F3:43:8C:6F:E8:1E:89:F6:3F:C0:A0:FF:29:E9:6D:A1:98:98:74:E6:BA:18:7A:9E:52:C3:AA:FA:7E"
       ]
     }
   }
@@ -349,7 +353,7 @@ unresolved but low risk (official voice collection, Apache-2.0 declared).
 
 ## 15. Accessibility
 
-Web-side (automated): axe-core checks run in the 133-test e2e suite across
+Web-side (automated): axe-core checks run in the 153-test e2e suite across
 widths and flows; the Hear today control has an `aria-label` that swaps between
 start/stop, `aria-pressed` reflects state, buttons are real `<button>` elements,
 touch targets follow the 44 px minimum, `prefers-reduced-motion` is honoured,
@@ -465,10 +469,10 @@ asset-links validation, upgrade install.
 | Area | Status | Severity | Evidence | Required action |
 |---|---|---|---|---|
 | Build/signing/versioning | READY | — | builds pass, AAB verified, hashes match | none |
-| Play App Signing fingerprint | MANUAL | blocks App Links | production assetlinks absent | enable signing, copy fingerprint |
-| assetlinks.json deployment | MANUAL | blocks App Links | SPA fallback served at path | deploy exact JSON from §3 |
-| Data Safety / content rating / store forms | MANUAL | release gate | repo-side data map ready | complete in Play Console |
-| Closed testing (personal account) | MANUAL | release gate | account-type dependent | confirm + run testers |
+| Play App Signing fingerprint | PENDING (manual) | blocks App Links | signing enrolled on first upload; app-signing SHA-256 not yet recorded | copy from Play Console → App integrity |
+| assetlinks.json deployment | PENDING (manual) | blocks App Links | SPA fallback served at path | deploy exact JSON from §3 once the app-signing fingerprint is known |
+| Data Safety / content rating / store forms | DONE (manual) | release gate | declared in Play Console | none |
+| Closed testing (personal account) | IN REVIEW (manual) | release gate | Alpha submitted; Google Group testers; all regions | await review, then 12 testers / 14 days if required |
 | Location behavior | PARTIAL (brief) | medium | brief pass 14 Sep 2026 (A059P); emulator cannot provide fix | full matrix #3–#4 |
 | Speech recognition | PARTIAL (brief) | medium | brief pass 14 Sep 2026 (A059P); WebView API depends on platform service | full matrix #12 |
 | Audio focus/BT/calls | PARTIAL (brief) | medium | Home lifecycle passed 14 Sep 2026; BT/calls not testable on emulator | device matrix #8–#11 |
@@ -503,7 +507,7 @@ deployment, upgrade install, and Play-distributed validation.
 Build and signing pipeline, package/SDK/ABI configuration, model/voice
 integrity, Kokoro lifecycle/Stop/offline/no-text-logging, segmentation
 invariants, privacy data map, WebView/bridge security configuration, component
-exposure, dependency hygiene, offline shell, web tests (214 unit / 133 e2e),
+exposure, dependency hygiene, offline shell, web tests (236 unit / 153 e2e),
 production web build, privacy policy URL.
 
 ### D. OPTIONAL POST-LAUNCH

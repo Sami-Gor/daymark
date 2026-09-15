@@ -1,6 +1,6 @@
 # Capacitor native shell migration
 
-Status: in progress (branch `migration/capacitor-native-shell`).
+Status: merged to `main` (PR #15); release UI and branding merged via PRs #18 and #19.
 
 ## Why
 
@@ -26,9 +26,9 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
 | Rollback tag | `pre-capacitor-daymark` (annotated, local) |
 | applicationId / namespace | `io.github.sami_gor.daymark` |
 | versionCode / versionName | `1` / `1.0.0` |
-| minSdk / targetSdk / compileSdk | `23` / `36` / `36` |
-| Signing | `android/daymark-upload.keystore`, alias `daymark-upload`, SHA-256 `3C:60:AD:…:20:57` |
-| Play metadata | package `io.github.sami_gor.daymark`; AAB versionCode 1; assetlinks pending Play App Signing |
+| minSdk / targetSdk / compileSdk | `24` / `36` / `36` |
+| Signing | `android/daymark-upload.keystore`, alias `daymark-upload`, SHA-256 `34:6B:BE:…:FA:7E` (rotated 2026-09-13; earlier `3C:60:AD:…:20:57` retired) |
+| Play metadata | package `io.github.sami_gor.daymark`; AAB versionCode 1; closed testing submitted; assetlinks pending the Play app-signing SHA-256 |
 | Deep links | `https://daymark-weather.pages.dev` intent filter, `autoVerify`, fallback Custom Tabs |
 | Manifest permissions (TWA) | none declared (web APIs: geolocation, microphone) |
 | Release AAB | 84,011,698 B (Kokoro bm_fable) |
@@ -212,7 +212,7 @@ gitignored.
   force-stop/relaunch all work.
 - Kokoro: READY, `voice=bm_fable`, streamed narration, Stop
   (`stopped=true`), offline (airplane mode) and repeated narration all pass.
-- Web/PWA: typecheck, 214 unit tests, 133 e2e tests and the production Vite
+- Web/PWA: typecheck, 236 unit tests, 153 e2e tests and the production Vite
   build pass; the service worker is skipped and cleaned up inside the native
   shell only.
 - Known environment limitations: the emulator has no fresh fused location fix
