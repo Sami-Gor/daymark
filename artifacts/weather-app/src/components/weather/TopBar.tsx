@@ -1,4 +1,4 @@
-import { CloudSun, LocateFixed } from 'lucide-react';
+import { LocateFixed } from 'lucide-react';
 import { LOCALES, isLocale, type Locale } from '@/lib/i18n';
 import type { Unit } from '@/lib/weather';
 import { useLocale } from '@/hooks/use-locale';
@@ -15,7 +15,7 @@ export function TopBar({ unit, onUnitChange, onFindMe, isLocating, isRefreshing 
   return (
     <header className="topbar">
       <div className="brand">
-        <div className="brand-mark"><CloudSun size={21} strokeWidth={1.8} /></div>
+        <div className="brand-mark"><img src="/daymark-logo.png" alt="" width={38} height={38} /></div>
         <div><div className="brand-name">daymark</div><div className="brand-note">{t('brand.note')}</div></div>
       </div>
       <div className="top-actions">

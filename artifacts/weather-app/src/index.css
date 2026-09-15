@@ -190,8 +190,8 @@
 .app-shell { position: relative; z-index: 1; max-width: 1480px; margin: 0 auto; padding: 26px clamp(18px, 4vw, 68px) 52px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: clamp(35px, 6vw, 72px); animation: reveal-up .65s ease both; }
 .brand { display: flex; align-items: center; gap: 12px; color: hsl(var(--foreground)); text-decoration: none; }
-.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 13px 13px 13px 4px; background: hsl(var(--primary)); color: hsl(var(--secondary)); transform: rotate(-8deg); box-shadow: 0 8px 22px hsl(203 64% 37% / .22); }
-.brand-mark svg { transform: rotate(8deg); }
+.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; }
+.brand-mark img { width: 100%; height: 100%; display: block; }
 .brand-name { font-family: var(--app-font-serif); font-size: 22px; font-weight: 600; letter-spacing: -.035em; }
 .brand-note { color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; margin-left: 3px; }
 .top-actions { display: flex; align-items: center; gap: 10px; }
