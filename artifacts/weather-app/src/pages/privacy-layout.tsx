@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect } from 'react';
 import { Link } from 'wouter';
-import { CloudSun } from 'lucide-react';
 
 /*
  * Shared chrome for the public privacy policy pages. Each language owns its
@@ -50,7 +49,7 @@ export function PrivacyPolicyLayout({
       <div className="app-shell privacy-shell">
         <header className="privacy-topbar">
           <div className="brand">
-            <div className="brand-mark"><CloudSun size={21} strokeWidth={1.8} /></div>
+            <div className="brand-mark"><img src="/daymark-logo.png" alt="" width={38} height={38} /></div>
             <div><div className="brand-name">daymark</div><div className="brand-note">{brandNote}</div></div>
           </div>
           <Link href="/" className="local-button privacy-back" data-testid="link-back-home">{backLabel}</Link>
