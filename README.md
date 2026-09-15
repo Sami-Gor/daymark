@@ -10,12 +10,13 @@ Daymark answers one question well — *what's the sky doing?* — without dashbo
 
 ## Features
 
-- **Current weather** — temperature, feels-like, condition, and plain-English "umbrella?" / "sunglasses?" advice cards
-- **Hourly outlook** — the next 12 hours with icons, temperatures, and rain chance
+- **Current weather** — temperature, feels-like, condition, and a day cue (umbrella / sunglasses / mixed / neutral) in the hero
+- **Temperature** — a compact five-hour trend with the peak marked; **Chance of rain** — a peak-first droplet timeline for the next five hours
 - **3-day forecast** — highs, lows, and precipitation per day
 - **Sun on your skin** — current UV index with a protection range gauge, hourly UV strip, and a 3-day outlook
+- **Sun & daylight** — sunrise, solar noon, sunset and daylight length with a sun-path arc
 - **Air around you** — live US AQI with WHO/city comparison markers, pollutant breakdown (PM2.5, PM10, NO₂, O₃), and plain-English context
-- **Regional comparison (UK only)** — a nearby UKV model grid point compared against the regional forecast; hidden where that model is not valid
+- **A look ahead + Regional comparison** — the 3-day outlook and a higher-resolution regional model compared against the wider forecast; hidden where that model is not valid
 - **Dew point & comfort** — alongside humidity, because dew point is what your skin actually feels
 - **Location search** — switch to any city or town using Open-Meteo geocoding, with region/country disambiguation
 - **Severe weather risk** — forecast-derived wind, rain, snow, thunderstorm, heat and cold risks, clearly labelled as *not* official warnings
@@ -25,7 +26,7 @@ Daymark answers one question well — *what's the sky doing?* — without dashbo
 
 ## Interface
 
-The design is editorial rather than dashboard-like — a serif-led hero with plain-English advice cards, matched forecast cards, and compact feature sections that each keep their own personality.
+The design is editorial rather than dashboard-like — a serif-led hero with a plain-English day cue, matched forecast cards, and compact feature sections that each keep their own personality.
 
 **Responsive, mobile-first** — the full page at 390px:
 
@@ -124,8 +125,8 @@ See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migra
 ## Test
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (214 tests)
-pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (133 tests)
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (236 tests)
+pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (153 tests)
 ```
 
 The e2e suite runs against a production build served by `vite preview`, mocks Open-Meteo traffic, and covers function, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), failure paths, the service worker, the served security headers, location search, voice input/output, severe-weather alerts and the English/French/Spanish interface.
