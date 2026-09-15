@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
 
 // Replit injects PORT and BASE_PATH; fall back to local dev defaults when absent.
 const rawPort = process.env.PORT ?? "5174";
@@ -19,7 +18,6 @@ const basePath = process.env.BASE_PATH ?? "/";
 export default defineConfig({
   base: basePath,
   plugins: [
-    mockupPreviewPlugin(),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
