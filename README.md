@@ -1,6 +1,6 @@
 # Daymark
 
-A calm, privacy-conscious weather app for the web (PWA) and Android, built with React, Vite, TypeScript, [Capacitor](https://capacitorjs.com), and [Open-Meteo](https://open-meteo.com).
+A privacy-conscious weather app for the web (PWA) and Android, built with React, Vite, TypeScript, [Capacitor](https://capacitorjs.com), and [Open-Meteo](https://open-meteo.com).
 
 **Live app:** https://daymark-weather.pages.dev
 
