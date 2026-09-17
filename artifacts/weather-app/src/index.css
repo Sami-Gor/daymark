@@ -321,10 +321,10 @@
 .uv-advice { max-width: 430px; margin: 10px 0 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
 .uv-window-note { max-width: 430px; margin: 8px 0 0; color: hsl(var(--foreground)); font-size: 12px; font-weight: 600; line-height: 1.45; }
 .uv-window-note-quiet { color: hsl(var(--muted-foreground)); font-weight: 500; }
-.uv-timeline { display: flex; gap: 4px; margin: 20px 0 2px; padding: 0 6px; }
-.uv-timeline-col { display: flex; flex: 1 1 0; min-width: 0; flex-direction: column; align-items: center; gap: 9px; }
-.uv-timeline-bar-wrap { display: flex; align-items: center; justify-content: center; width: 100%; height: 54px; }
-.uv-timeline-bar { display: block; width: 7px; max-width: 62%; border-radius: 999px; }
+.uv-timeline { display: flex; justify-content: center; gap: 8px; margin: 16px 0 0; padding: 0 6px; }
+.uv-timeline-col { display: flex; flex: 1 1 0; min-width: 0; max-width: 44px; flex-direction: column; align-items: center; gap: 7px; }
+.uv-timeline-bar-wrap { display: flex; align-items: center; justify-content: center; width: 100%; height: 46px; }
+.uv-timeline-bar { display: block; width: 9px; max-width: 72%; border-radius: 999px; }
 .uv-timeline-time { color: hsl(var(--muted-foreground)); font-family: var(--app-font-mono); font-size: 9px; line-height: 1; white-space: nowrap; }
 .uv-peak-inline { flex: 0 0 auto; margin-left: 6px; padding: 18px 0 6px 26px; border-left: 1px solid hsl(var(--border) / .8); text-align: right; }
 .uv-peak-inline > span { display: block; color: hsl(var(--muted-foreground)); font-family: var(--app-font-mono); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
@@ -503,8 +503,10 @@
   .details-panel { padding: 16px; }
   .footer-note { flex-direction: column; margin-top: 40px; }
   .uv-panel { padding: 16px 15px; }
-  .uv-timeline { gap: 2px; margin-top: 14px; padding: 0 2px; }
-  .uv-timeline-bar-wrap { height: 42px; }
+  .uv-timeline { gap: 4px; margin-top: 14px; padding: 0 2px; }
+  .uv-timeline-col { max-width: 28px; gap: 6px; }
+  .uv-timeline-bar-wrap { height: 38px; }
+  .uv-timeline-bar { width: 7px; }
   .uv-hero, .air-hero { flex-direction: column; gap: 12px; }
   .uv-peak-inline { width: 100%; margin-left: 0; padding: 14px 0 0; border-left: 0; border-top: 1px solid hsl(var(--border) / .8); text-align: left; }
   .uv-days { gap: 9px; }
