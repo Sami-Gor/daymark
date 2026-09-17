@@ -588,6 +588,16 @@ export function uvColor(value: number | null | undefined): string {
 }
 
 /*
+ * Segmented UV timeline palette: inactive/very-low hours read as a pale
+ * blue-grey, while UV >= 1 follows the semantic uvColor bands (soft green
+ * low, amber moderate, then the existing high/very-high colours).
+ */
+export function uvBarColor(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value) || value < 1) return 'hsl(var(--muted) / .9)';
+  return uvColor(value);
+}
+
+/*
  * Sun protection window: the continuous period today during which the hourly
  * UV index is forecast to reach the protection threshold (UV >= 3, the start
  * of the "Moderate" band). Runs are read from the location's own local-time
