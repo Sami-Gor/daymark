@@ -41,20 +41,33 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
       ? t('uv.window.none')
       : t('uv.window.unavailable');
 
-  const todayPrefix = getLocationLocalDate(current.time) ?? getLocationLocalDate(hourlyTimes[0]) ?? '';
-  const daylightIndexes = hourlyTimes
-    .map((time, index) => ({ time, index }))
-    .filter(({ time, index }) => getLocationLocalDate(time) === todayPrefix && (hourly.uv_index?.[index] ?? 0) > 0);
-  // Bar heights are normalized against the day's visible peak; a minimum
-  // share keeps near-zero daylight hours visible as slim dots.
-  const visibleUv = daylightIndexes.map(({ index }) => Math.max(0, hourly.uv_index?.[index] ?? 0));
-  const maxVisibleUv = Math.max(visibleUv.length ? Math.max(...visibleUv) : 0, 0.1);
-  const minBarPercent = 12;
-  const barHeight = (value: number) => Math.round(minBarPercent + (value / maxVisibleUv) * (100 - minBarPercent));
   const hourOf = (time: string) => {
     const hour = Number(time.slice(11, 13));
     return Number.isFinite(hour) ? hour : -1;
   };
+  const todayPrefix = getLocationLocalDate(current.time) ?? getLocationLocalDate(hourlyTimes[0]) ?? '';
+  // The timeline covers the whole daylight window (sunrise to sunset, floored
+  // to whole hours) so the curve reads as a continuous rise and fall, with
+  // every real hourly UV reading in between. When the daily window is
+  // unavailable it falls back to the hours that actually carry UV > 0.
+  const sunrise = daily.sunrise?.[0];
+  const sunset = daily.sunset?.[0];
+  const windowStartHour = sunrise && getLocationLocalDate(sunrise) === todayPrefix ? hourOf(sunrise) : null;
+  const windowEndHour = sunset && getLocationLocalDate(sunset) === todayPrefix ? hourOf(sunset) : null;
+  const timelineIndexes = hourlyTimes
+    .map((time, index) => ({ time, index }))
+    .filter(({ time, index }) => {
+      if (getLocationLocalDate(time) !== todayPrefix) return false;
+      if (windowStartHour == null || windowEndHour == null) return (hourly.uv_index?.[index] ?? 0) > 0;
+      const hour = hourOf(time);
+      return hour >= windowStartHour && hour <= windowEndHour;
+    });
+  // Bar heights are normalized against the day's visible peak; a minimum
+  // share keeps near-zero daylight hours visible as slim dots.
+  const visibleUv = timelineIndexes.map(({ index }) => Math.max(0, hourly.uv_index?.[index] ?? 0));
+  const maxVisibleUv = Math.max(visibleUv.length ? Math.max(...visibleUv) : 0, 0.1);
+  const minBarPercent = 12;
+  const barHeight = (value: number) => Math.round(minBarPercent + (value / maxVisibleUv) * (100 - minBarPercent));
 
   const peakAriaTime = peakHour?.time ? t('uv.peakAriaTime', { time: timeLabel(peakHour.time, locale) }) : '';
 
@@ -87,9 +100,9 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
           </div>
         </div>
 
-        {daylightIndexes.length > 1 && (
+        {timelineIndexes.length > 1 && (
           <div className="uv-timeline" data-testid="uv-protection-timeline" aria-hidden="true">
-            {daylightIndexes.map(({ time, index }) => {
+            {timelineIndexes.map(({ time, index }) => {
               const value = Math.max(0, hourly.uv_index?.[index] ?? 0);
               const hour = hourOf(time);
               return (
