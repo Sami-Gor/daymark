@@ -547,8 +547,8 @@ with the upstream voice source.
    verify using the Digital Asset Links endpoint, Play link checker, and
    `pm verify-app-links`; re-test cold/warm links.
 5. Check the Play Console Dashboard and submit or verify the production-access
-   application using `production-access-application.md`. Use actual tester
-   feedback and engagement data; do not reuse invented or assumed metrics.
+   application using actual tester feedback and engagement data; do not reuse
+   invented or assumed metrics.
 6. After access is approved, use the current Play Console Production workflow
    with the approved/tested release. If another AAB is required, increment
    versionCode, validate its bundle/signature, smoke-test a Play-signed install,
