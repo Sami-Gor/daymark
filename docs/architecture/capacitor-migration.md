@@ -245,12 +245,13 @@ Keep for rollback: the whole root `android/` TWA project, `twa-manifest.json`,
 `asset-links/`, `androidbrowserhelper` dependency (only referenced by the TWA
 project).
 
-Candidates once the Capacitor shell is released:
+Post-rollout cleanup candidates (do not execute before the Capacitor production rollout is stable):
 
 - `src/hooks/use-browser-speech.ts` — no production usages left (the unified
   hook talks to `lib/voice-browser` directly).
-- The root TWA project can be moved to a tag/archive branch; it is not part of
-  any production build.
+- The root TWA project can be moved to an archive branch only after the
+  Capacitor production rollout is stable; it is not part of the current
+  production build and remains the documented rollback path until then.
 
 ## Rollback
 
