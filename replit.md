@@ -1,6 +1,6 @@
 # Daymark
 
-A client-side weather app: current conditions, hourly/daily forecast, UV, air quality, a UK-only micro-climate comparison, location search, a forecast-derived severe-weather risk layer, and optional voice (*Hear today* / *Ask Daymark*) with English/French/Spanish — all powered by Open-Meteo.
+A client-side weather app: current conditions, hourly/daily forecast, UV, air quality, a UK-only micro-climate comparison, location search, a forecast-derived severe-weather risk layer, and optional voice (*Hear today* / *Ask Daymark*) with English/French/Spanish. Weather and place search use Open-Meteo.
 
 ## Run & Operate
 
@@ -27,15 +27,13 @@ A client-side weather app: current conditions, hourly/daily forecast, UV, air qu
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The web/PWA is a static client-side app; weather and geocoding requests go directly from the client to Open-Meteo.
+- Android production builds use Capacitor with bundled local assets; the root `android/` directory is only the legacy TWA rollback project.
+- Android English narration uses bundled local Kokoro; Android French/Spanish use system TTS. Web narration uses browser speech synthesis.
 
 ## Product
 
 Client-only weather for any searched location: current conditions with plain-English advice, hourly/3-day forecasts, UV with a sun-protection window, US AQI, a UK-only micro-climate comparison, forecast-derived severe-weather risks (not official warnings), and optional voice in English, French or Spanish.
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
 
 ## Gotchas
 
