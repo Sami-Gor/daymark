@@ -9,8 +9,9 @@ complete. The website is already deployed. Remaining work: confirm the
 production-access application status, capture the Play app-signing SHA-256,
 verify the existing `/.well-known/assetlinks.json` endpoint (make a website
 change only if that file is missing or wrong), and review Data safety answers
-for speech input. A physical-device pass is already documented; only the
-additional test gaps listed in the readiness audit remain.
+for speech input. Core physical-device testing is already complete and does not
+need to be repeated. The readiness audit's wider test matrix is optional
+additional QA, not a blanket production-release blocker.
 
 Package: `io.github.sami_gor.daymark` · versionCode `1` / versionName `1.0.0`
 · minSdk `24` / targetSdk `36`
@@ -166,10 +167,10 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pages.dev/fr/privacy"
 ```
 
-- [ ] Once Digital Asset Links is valid, verify Android's **verified App Links**
-      on device, including cold/warm opens. This is a separate test from the
-      already-completed core device pass; the previous emulator routing test
-      verified in-app handling, not Android domain verification.
+- [ ] If Android's verified App Links have not already been checked, test the
+      domain-verification behaviour on a suitable install, including cold/warm
+      opens. This is a distinct check from the completed core device pass and
+      is only outstanding if you have not already verified it.
 
 ## 8. Closed testing — COMPLETE (maintainer-confirmed)
 
