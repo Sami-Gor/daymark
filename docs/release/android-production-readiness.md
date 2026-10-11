@@ -111,9 +111,9 @@ Play Console status (manual, cannot be verified from the repo):
 4. The store listing/default listing was previously marked complete. Verify
    status and listed assets in Console before production.
 5. Closed testing is **reported complete by the maintainer (11 October 2026)**.
-   Repository notes record the first AAB (`309abe94…`, 96,463,981 bytes), the
-   Google Group `daymark-testers@googlegroups.com`, and all countries/regions.
-   The live track and tester metrics are not independently verifiable here.
+   Repository notes record the first AAB (`309abe94…`, 96,463,981 bytes) and
+   the closed-testing track. The live track and tester metrics are not
+   independently verifiable here.
 6. **Production-access application status is partly known.** The maintainer
    confirmed that **Apply for production is available** in Play Console on
    11 October 2026. Whether the form has since been submitted, approved, or
@@ -497,7 +497,7 @@ merge-confidence pass.
 | APK SHA-256 | `7e24bbcecac8d6f2a3c5843340cc52691099b503ce90001fb1e1e25b281cb7d0` |
 | versionCode / versionName | 1 / 1.0.0 |
 | Signer certificate SHA-256 | `346BBEF3438C6FE81E89F63FC0A0FF29E96DA1989874E6BA187A9E52C3AAFA7E` (matches upload key; verified with `apksigner`) |
-| A — launch / weather / location | PASS: launch and weather render; permission granted; "Use my location" resolved to the locality (Uxbridge); refresh applied; no crash/ANR |
+| A — launch / weather / location | PASS: launch and weather render; permission granted; "Use my location" resolved to the expected test locality; refresh applied; no crash/ANR |
 | B — voice input (Ask Daymark) | PASS: `RECORD_AUDIO` granted; transcript "will it rain today" and the answer both appeared |
 | C — Kokoro narration | PASS: start toggles to Stop; audio audible and intelligible; Stop silences immediately; restart plays again with no overlap |
 | D — lifecycle | PASS: narration stops on Home; app usable after returning |
