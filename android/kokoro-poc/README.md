@@ -123,8 +123,11 @@ On first initialization the model and voice are copied from APK assets into
 | Memory during synthesis | heapUsedKb ~3,000–4,300 / PSS ~455–559 MB (see streaming pass below) |
 | Memory after playback | heapUsedKb ~3,100–4,400 / PSS ~456–559 MB |
 
-The activity never crashed; the AudioTrack playback path completed. Subjective
-voice quality cannot be judged from logs and needs a physical device.
+The activity never crashed; the AudioTrack playback path completed. Emulator
+logs do not evaluate subjective sound quality. A later physical-device pass is
+recorded in `docs/release/android-production-readiness.md` §18: playback was
+audible and intelligible, but a formal voice-quality evaluation was not part of
+that brief pass.
 
 ## Streaming performance pass
 
@@ -210,4 +213,7 @@ the remaining open question is the per-voice training-data provenance of
   then plateaus; see the streaming pass section.
 - The non-eSpeak G2P path depends on the embedded Misaki/CMUdict lexicons;
   pronunciation of unusual names/abbreviations should be reviewed on a device.
-- Subjective voice quality was not evaluated (no audible inspection).
+- A formal subjective voice-quality evaluation was not performed. The later
+  brief physical-device pass noted audible, intelligible playback (§18 of
+  `docs/release/android-production-readiness.md`), but did not constitute a
+  structured quality assessment.
