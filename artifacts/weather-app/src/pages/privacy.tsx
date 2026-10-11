@@ -47,13 +47,14 @@ export default function Privacy() {
       <h2>What information Daymark processes</h2>
       <p>To show weather, Daymark processes:</p>
       <ul>
-        <li>the place you choose (from search, or from your device&rsquo;s location if you allow it);</li>
+        <li>the default place shown when the app opens (London), a place you search for, or your device&rsquo;s location if you allow it;</li>
         <li>the weather, air-quality, and place-search responses returned by Open-Meteo;</li>
         <li>your on-device preferences, such as language.</li>
       </ul>
       <p>
-        This information exists in your browser while you use the app. It is not sent to any backend
-        or application server operated by Daymark, because Daymark does not operate one.
+        This information is processed in your browser or installed app while you use Daymark. It is
+        not sent to any backend or application server operated by Daymark, because Daymark does not
+        operate one.
       </p>
 
       <h2>Location data</h2>
@@ -69,9 +70,11 @@ export default function Privacy() {
       </p>
       <p>
         When you use device location, Daymark also resolves a nearby locality name (for example, a
-        town name) entirely in your browser, from a static GeoNames dataset served by Daymark and
-        cached on your device after first use. No reverse-geocoding service — including GeoNames —
-        receives your coordinates, and the lookup result stays on your device.
+        town name) locally from a static GeoNames dataset. In the web/PWA version, the dataset is
+        downloaded from Daymark&rsquo;s site and the app caches it locally in Cache Storage after first
+        use. In the installed Android app, the dataset is included with the app&rsquo;s bundled assets.
+        No reverse-geocoding service — including GeoNames — receives your coordinates, and the lookup
+        result stays on your device.
       </p>
 
       <h2>Location search</h2>
@@ -121,23 +124,25 @@ export default function Privacy() {
         Daymark stores your language preference (English, French, or Spanish) in your browser&rsquo;s
         local storage under the key <code>daymark.locale</code>. This is the only persistent user
         preference Daymark intentionally stores. It remains until you change it or clear your browser
-        or site storage. Separately, the service worker caches app-shell files and the locality dataset
-        in Cache Storage to support offline use; these caches are application resources, not a history
-        of your locations or weather.
+        or site storage. In the web/PWA version, Daymark caches the static locality dataset in Cache
+        Storage for offline lookup, while the service worker separately caches app-shell files. The
+        installed Android app loads the locality dataset from bundled assets. These are application
+        resources, not a history of your locations or weather.
       </p>
       <p>
         Daymark does not use cookies, does not use browser session storage or IndexedDB, and does not
-        keep a history of locations, searches, transcripts, or weather. Daymark&rsquo;s service worker
-        caches the app&rsquo;s own files (HTML, scripts, styles, icons, and fonts) so the app can open
-        offline; it does not cache weather or air-quality responses.
+        keep a history of locations, searches, transcripts, or weather. In the web/PWA version,
+        Daymark&rsquo;s service worker caches the app&rsquo;s own files (HTML, scripts, styles, icons,
+        and fonts) so the app can open offline; it does not cache weather or air-quality responses.
       </p>
 
       <h2>Third-party services</h2>
       <ul>
         <li>Open-Meteo — weather, air quality, and place search, as described above.</li>
         <li>
-          GeoNames — locality names for device location. The dataset is downloaded from Daymark&rsquo;s
-          own site and the lookup runs on your device; no coordinates are sent to GeoNames.
+          GeoNames — locality names for device location. In the web/PWA version, the static dataset
+          is downloaded from Daymark&rsquo;s site; in the installed Android app it is bundled with the
+          app. The lookup runs on your device; no coordinates are sent to GeoNames.
         </li>
         <li>
           Your browser&rsquo;s or device&rsquo;s speech services — only when you use the optional voice
