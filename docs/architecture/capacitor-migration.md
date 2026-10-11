@@ -124,7 +124,10 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
     use the Android `SystemSpeech` plugin.
 - Unified speech layer: `useDaymarkSpeech` selects
   `kokoro` only for Android native + English + healthy engine;
-  `browser` for web/desktop, iOS, French, Spanish, and any native failure.
+  `browser` for web/desktop and iOS. French/Spanish on Android use the
+  `SystemSpeech` plugin. If Android's native English engine is unavailable,
+  the app surfaces a narration error; it does not fall back to browser/system
+  speech for English.
 - Lifecycle: engine initializes once per process, asynchronously, when the
   plugin loads; `speak()` waits for readiness (bounded), Stop cancels
   immediately; audio focus is requested per utterance and abandoned on stop or
