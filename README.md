@@ -22,7 +22,7 @@ Daymark answers one question well — *what's the sky doing?* — without dashbo
 - **Dew point & comfort** — alongside humidity, because dew point is what your skin actually feels
 - **Location search** — switch to any city or town using Open-Meteo geocoding, with region/country disambiguation
 - **Severe weather risk** — forecast-derived wind, rain, snow, thunderstorm, heat and cold risks, clearly labelled as *not* official warnings
-- **Voice** — *Hear today* reads the briefing aloud (fully on-device Kokoro on Android; browser speech synthesis on the web); *Ask Daymark* answers spoken weather questions through the browser/platform speech service, which may process audio remotely — Daymark itself stores no transcripts
+- **Voice** — *Hear today* uses bundled local Kokoro for English on Android, Android system TTS for French/Spanish, and browser speech synthesis on the web. *Ask Daymark* uses browser/platform speech recognition, which may process audio remotely; Daymark itself stores no transcripts
 - **English, French and Spanish** — locale-aware UI, guidance, alerts and voice, defaulting to the browser language
 - **°C / °F toggle**, graceful offline shell, and installable as an app (PWA)
 
@@ -57,7 +57,7 @@ The design is editorial rather than dashboard-like — a serif-led hero with a p
 - [Tailwind CSS 4](https://tailwindcss.com) with a hand-written design layer (Fraunces, Plus Jakarta Sans, DM Mono — self-hosted)
 - [Zod](https://zod.dev) for runtime validation of every API response
 - [wouter](https://github.com/molefrog/wouter) for routing and [Radix](https://www.radix-ui.com) primitives
-- Typed English/French/Spanish dictionaries (no i18n dependency) and the browser Web Speech APIs for optional voice
+- Typed English/French/Spanish dictionaries (no i18n dependency); web voice uses browser Web Speech APIs, while Android uses native Kokoro for English narration and system TTS for French/Spanish
 - pnpm workspaces; Vitest + Playwright for tests
 
 ## Architecture
@@ -76,7 +76,7 @@ All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifact
 - **Coordinates are rounded to 2 decimals (~1 km) before leaving your device**, then sent only to Open-Meteo endpoints
 - **No user history is persisted by Daymark** — the language preference (`daymark.locale`) is stored in localStorage. The web/PWA service worker caches app-shell files; app code separately caches the locality dataset in Cache Storage. The Android app loads its locality dataset from bundled assets. The app does not persist location history, search history, transcripts or weather responses
 - **Public privacy policy** — a full policy is part of the app at `/privacy` (English), `/fr/privacy` (French) and `/es/privacy` (Spanish); the footer links to the version matching the interface language. It documents the actual data flows, local-storage behavior and third-party services described above
-- **No analytics or third-party trackers** — weather and location-search data go only to the Open-Meteo API hosts (plus the attribution link in the footer); optional voice input is handled by your browser or device and may use its speech service, but Daymark itself never stores transcripts
+- **No analytics or third-party trackers** — weather and location-search requests go to Open-Meteo; optional voice input uses browser/platform speech recognition and may be processed remotely. Web narration uses browser speech synthesis, and Android French/Spanish narration uses system TTS; provider handling depends on the browser, device, settings and selected voice. Daymark does not store transcripts or narration text
 - Fonts are self-hosted; no CDN font requests
 
 ## Weather data source
