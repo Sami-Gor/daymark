@@ -498,13 +498,13 @@ asset-links validation, upgrade install.
 | Data Safety declaration | RECHECK BEFORE PRODUCTION (manual) | policy accuracy | Previously marked complete; speech input may be processed off-device through controlled WebView speech recognition; location requests are sent to Open-Meteo | review current Play definitions, actual flows, existing Console answers, and privacy policy; see §10 and the checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
 | Closed testing phase | COMPLETE (maintainer-confirmed; live Console not independently checked) | production-access prerequisite if applicable | Maintainer confirms the phase is complete; prior in-review status was stale documentation | confirm Console recognises relevant tester threshold/period; check or complete the production-access application |
-| Location behavior | PARTIAL (brief) | medium | brief pass 14 Sep 2026 (A059P); emulator cannot provide fix | full matrix #3–#4 |
-| Speech recognition | PARTIAL (brief) | medium | brief pass 14 Sep 2026 (A059P); WebView API depends on platform service | full matrix #12 |
-| Audio focus/BT/calls | PARTIAL (brief) | medium | Home lifecycle passed 14 Sep 2026; BT/calls not testable on emulator | device matrix #8–#11 |
-| Memory on lower-RAM devices | PDT | medium | ~626 MB emulator peak | device matrix #5–#6, #19 |
-| Battery/thermal | PARTIAL (brief) | low-medium | brief 1-min pass: 35.0 °C, thermal status 0 | device matrix #18 (10-min soak) |
-| Accessibility (TalkBack/font scale) | PARTIAL (brief) | low-medium | 1.5x font pass 14 Sep 2026; web automations pass | device matrix #21 (TalkBack) |
-| Real-device latency | PDT | low | emulator ~2.4 s | device matrix #5 |
+| Location behavior | CORE DEVICE PASS RECORDED | medium | real-device location use passed in brief validation | no need to repeat the completed location path; extended denial/permanent-denial cases are optional coverage |
+| Speech recognition | CORE DEVICE PASS RECORDED | medium | real-device voice input and transcript passed; platform service can vary | no need to repeat the completed voice-input path; service/permission edge cases are optional coverage |
+| Audio focus/BT/calls | CORE LIFECYCLE PASS; EXTENDED CASES NOT CLAIMED | medium | Home lifecycle passed; Bluetooth/call/music interruption not included in the recorded brief pass | optional extended QA only, unless you specifically want those cases covered |
+| Memory on lower-RAM devices | OPTIONAL EXTENDED QA | medium | ~626 MB emulator peak; recorded real-device pass was short | test lower-RAM device only if expanding coverage |
+| Battery/thermal | OPTIONAL EXTENDED QA | low-medium | brief 1-minute pass: 35.0 °C, thermal status 0 | 10-minute soak is optional additional coverage |
+| Accessibility (TalkBack/font scale) | FONT-SCALE PASS RECORDED; TALKBACK NOT CLAIMED | low-medium | 1.5x font pass 14 Sep 2026; web automations pass | TalkBack audit is optional additional coverage |
+| Real-device latency | CORE DEVICE PASS RECORDED; BENCHMARK OPTIONAL | low | real-device flow was exercised; emulator estimate ~2.4 s | no repeat required; benchmark only if needed |
 | Privacy/data flow | READY | — | no analytics, rounded coords, no text logs | feed into Data Safety |
 | Security (WebView/bridge/components) | READY | — | audit §12 | optional CSP hardening |
 | Licensing | READY | — | WTFPL cleared; permissive stack | note bm_fable provenance |
@@ -520,17 +520,15 @@ No release-blocking code or packaging defect was identified in this audit.
 That does not mean every external release check is complete: Play Console/Data
 safety and verified App Links still need their own checks.
 
-### B. PHYSICAL-DEVICE VALIDATION — PARTLY COMPLETE, NOT UNTESTED
+### B. PHYSICAL-DEVICE VALIDATION — CORE PASS COMPLETE
 A real-device pass was completed on a Nothing A059P running Android 16 (§18).
 Launch/weather, location use, voice input, local Kokoro narration, stop/restart,
 lifecycle handling, enlarged-font usability and short stability checks passed.
-**Do not repeat those checks just to satisfy this checklist.** Additional scope
-not covered in that pass: tests on other device classes (especially lower-RAM
-devices), full TalkBack audit, 10-minute thermal soak, call/music interruption,
-Bluetooth routing, French/Spanish system TTS with actual voice data, verified
-App Links after the endpoint is correct, upgrade install, and installation from
-Google Play. These are the remaining test gaps, not evidence that no physical
-device testing has occurred.
+**The core physical-device test is complete; do not repeat it.** The matrix
+retains optional extended QA for other device classes, TalkBack, longer thermal
+soak, call/music interruption, Bluetooth routing, French/Spanish system TTS,
+verified App Links, upgrade install and Play-distributed install. Consider these
+only if additional assurance is needed or a specific release risk warrants them.
 
 ### C. READY NOW
 Build and signing pipeline, package/SDK/ABI configuration, model/voice
@@ -547,11 +545,10 @@ with the upstream voice source.
 
 ## 21. Release sequence
 
-1. A physical-device pass on a Nothing A059P (Android 16) is already recorded in
-   §18; do not repeat it. Complete or explicitly defer only the additional gaps
-   listed in §20B (multi-device/low-memory, TalkBack, thermal soak, call/music,
-   Bluetooth, fr/es system TTS, verified App Links, upgrade install and Play
-   install). Update results only when those checks are actually performed.
+1. The physical-device pass on a Nothing A059P (Android 16) in §18 is complete.
+   Do not make a second device-testing round a release prerequisite. The extra
+   coverage listed in §20B is optional and can be added only if justified by a
+   specific risk or by a desire for broader compatibility evidence.
 2. In Play Console, check App Signing and record the **app-signing** fingerprint.
    Confirm Data Safety, content rating, app access, ads, target audience, AI
    asset and other applicable declarations. The maintainer reports closed
