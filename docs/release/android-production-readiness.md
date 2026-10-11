@@ -94,12 +94,12 @@ Play Console status (manual, cannot be verified from the repo):
 
 1. Play App Signing enrolled via the first upload; the **app signing key**
    SHA-256 still needs to be copied from Play Console → App integrity.
-2. Data Safety was previously reported complete, but must be rechecked before
-   production. In particular, do not infer “not collected” for voice recordings
-   just because Daymark does not persist them: controlled WebView data flows
-   and any off-device speech-service processing must be assessed against current
-   Play guidance. Also verify how the user-initiated, rounded location request
-   should be answered under the current ephemeral-processing rules. See
+2. Data safety was previously reported complete, but must be rechecked before
+   production. Assess the user-initiated location request, WebView speech input,
+   and speech-output handoff to browser/system TTS. Do not infer “not collected”
+   solely because Daymark itself stores none of these values: controlled WebView
+   flows and any off-device provider processing must be assessed under current
+   Play guidance, including the conditions for ephemeral processing. See
    [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469).
 3. Content rating, target audience, ads (no ads; advertising ID = No),
    government/financial/health, app access and AI asset declarations were
@@ -111,10 +111,11 @@ Play Console status (manual, cannot be verified from the repo):
    Repository notes record the first AAB (`309abe94…`, 96,463,981 bytes), the
    Google Group `daymark-testers@googlegroups.com`, and all countries/regions.
    The live track and tester metrics are not independently verifiable here.
-6. **Production-access application status is not verified.** Check the Console
-   Dashboard to see whether the request is available, submitted, approved, or
-   returned for additional testing. The account-type-specific testing gate, if
-   applicable, must be shown as satisfied in Console.
+6. **Production-access application status is partly known.** The maintainer
+   confirmed that **Apply for production is available** in Play Console on
+   11 October 2026. Whether the form has since been submitted, approved, or
+   returned for additional testing is not verified here. Record the actual live
+   state before following the next step.
 7. The Daymark website is already deployed. The separate
    `/.well-known/assetlinks.json` endpoint needs a fresh live check: the last
    recorded check returned the SPA HTML fallback, and the JSON file is absent
@@ -306,18 +307,22 @@ made that the extended soak was completed; it is not a blanket release gate.
 | Locality name lookup | `localities-v1.json` | Bundled + Cache Storage | No | — | On device |
 | Microphone audio | User gesture | No | Depending on platform speech service (possibly Google) | OS/browser speech service | Outside app control |
 | Recognition transcript | Speech service | No | No (in-memory only) | — | No |
-| TTS narration text | Intent layer | No | **No** for English (Kokoro local); device TTS engine for fr/es may fetch voice data | Google/system TTS (fr/es only) | No |
+| TTS narration text | Intent layer | No | Android English: no, local Kokoro; web and Android fr/es: handed to browser/system speech API, whose processing depends on provider/voice configuration | Browser speech service or Android system TTS for relevant paths | Daymark does not retain it; provider-side processing/retention depends on service |
 | Preferences | App | `localStorage` (`daymark.locale`) | No | — | Until cleared |
 | Analytics | none | — | — | — | — |
 | Crash reports | none in-app | — | — | — | — |
 | App logs | Instrumentation | logcat only | No | — | Device log buffer |
 
-Privacy summary (usable for policy/Data Safety): Daymark sends only rounded
-(≈1 km) coordinates and weather/search queries to Open-Meteo; locality naming
-uses a bundled GeoNames dataset; English narration runs entirely on-device with
-the bundled Kokoro model; no analytics, no ads, no accounts, no narration text
-or location history is stored or transmitted; speech input is handled by the
-platform/browser speech service and may be processed remotely by that provider.
+Privacy summary (for policy/Data Safety review): Daymark sends user-initiated
+rounded coordinates and weather/search queries to Open-Meteo; locality naming
+uses a bundled GeoNames dataset. Android English narration runs locally through
+the bundled Kokoro model. Web narration and Android French/Spanish narration are
+handed to browser/system speech APIs; their processing depends on the selected
+provider and voice. Daymark does not retain narration text or location history
+and has no backend; Ask Daymark input is handed to the browser/platform
+recognition service and may be processed remotely. Assess these provider flows
+against current Data safety definitions rather than treating “not stored by
+Daymark” as equivalent to “not transmitted off device.”
 
 ## 11. Logging / debugging
 
@@ -342,8 +347,10 @@ READY:
 - App UI loads only bundled assets from `https://localhost`; no `server.url`.
 - External navigations are handed to the system browser; the app host never
   loads remote HTML.
-- Only `MainActivity` is exported (launcher + verified-app-link filter);
-  `FileProvider` and `InitializationProvider` are not exported;
+- Only `MainActivity` is exported (launcher + HTTPS App Links intent filter
+  declaring `autoVerify`; successful domain verification depends on the
+  Digital Asset Links endpoint); `FileProvider` and
+  `InitializationProvider` are not exported;
   `ProfileInstallReceiver` is exported but protected by `android.permission.DUMP`.
 - No foreground services, no pending intents, no dynamic receivers of ours.
 - Deep-link parsing validates scheme/host and never executes input.
@@ -504,8 +511,9 @@ risk makes a specific case necessary.
 ## 19. Cleanup checklist (do not remove yet)
 
 - TWA rollback project `android/`, `twa-manifest.json`, `asset-links/` template
-  and `androidbrowserhelper` dependency — keep until the Capacitor shell has
-  shipped and a rollback is no longer needed.
+  and `androidbrowserhelper` dependency — keep until the production rollout is
+  stable and the rollback path is no longer needed. The core physical-device pass
+  is already complete (§18).
 - `artifacts/weather-app/src/hooks/use-browser-speech.ts` — unused in
   production (the unified hook uses `lib/voice-browser` directly).
 - `KokoroTtsTestActivity` (TWA project only) — diagnostic, not in the
@@ -522,9 +530,9 @@ risk makes a specific case necessary.
 | Build/signing/versioning | READY | — | builds pass, AAB verified, hashes match | none |
 | Play App Signing fingerprint | PENDING (manual) | blocks App Links | signing enrolled on first upload; app-signing SHA-256 not yet recorded | copy from Play Console → App integrity |
 | Digital Asset Links endpoint | NEEDS LIVE RECHECK | blocks verified App Links | Last recorded check returned SPA fallback; site is deployed, but this branch has no actual `.well-known/assetlinks.json` file | check live endpoint; if incorrect, publish only the JSON asset with the Play app-signing SHA-256 |
-| Data Safety declaration | RECHECK BEFORE PRODUCTION (manual) | policy accuracy | Previously marked complete; speech input may be processed off-device through controlled WebView speech recognition; location requests are sent to Open-Meteo | review current Play definitions, actual flows, existing Console answers, and privacy policy; see §10 and the checklist |
+| Data Safety declaration | RECHECK BEFORE PRODUCTION (manual) | policy accuracy | Previously marked complete; location is sent to Open-Meteo after rounding; speech input may be processed off-device; browser/system TTS also receives narration text | review current Play definitions, actual flows, existing Console answers, and privacy policy; see §10 and the checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
-| Closed testing phase | COMPLETE (maintainer-confirmed; live Console not independently checked) | production-access prerequisite if applicable | Maintainer confirms the phase is complete; prior in-review status was stale documentation | confirm Console recognises relevant tester threshold/period; check or complete the production-access application |
+| Closed testing / production-access | CLOSED TEST COMPLETE (maintainer-confirmed); Apply for production reported available | production-access prerequisite if applicable | Maintainer reports closed-test phase complete and Apply for production available; submission/decision status not verified | inspect current Console application status and record whether submitted/approved/returned |
 | Location behavior | CORE DEVICE PASS RECORDED | medium | real-device location use passed in brief validation | no need to repeat the completed location path; extended denial/permanent-denial cases are optional coverage |
 | Speech recognition | CORE DEVICE PASS RECORDED | medium | real-device voice input and transcript passed; platform service can vary | no need to repeat the completed voice-input path; service/permission edge cases are optional coverage |
 | Audio focus/BT/calls | CORE LIFECYCLE PASS; EXTENDED CASES NOT CLAIMED | medium | Home lifecycle passed; Bluetooth/call/music interruption not included in the recorded brief pass | optional extended QA only, unless you specifically want those cases covered |
@@ -580,11 +588,12 @@ with the upstream voice source.
    Confirm Data Safety, content rating, app access, ads, target audience, AI
    asset and other applicable declarations. The maintainer reports closed
    testing complete; production-access application status remains unverified.
-3. Reconcile Data Safety for the controlled WebView speech-recognition path and
-   user-initiated location flow against current Play policy and actual behaviour.
-   Google says controlled WebView data flows and off-device transmission must
-   be considered in the form; do not infer answers solely from lack of app-side
-   storage. See https://support.google.com/googleplay/android-developer/answer/10787469.
+3. Reconcile Data safety for the user-initiated location request, controlled
+   WebView speech-recognition path, and browser/system TTS handoff against
+   current Play policy and actual provider behaviour. Google says controlled
+   WebView data flows and off-device transmission must be considered; do not
+   infer answers solely from lack of app-side storage. See
+   https://support.google.com/googleplay/android-developer/answer/10787469.
 4. Verify the existing website's `/.well-known/assetlinks.json` endpoint
    and the Digital Asset Links statement response. Publish/update that JSON
    asset only if missing or incorrect, using the Play app-signing and upload
