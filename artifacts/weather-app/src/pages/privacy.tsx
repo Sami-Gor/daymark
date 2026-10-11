@@ -3,9 +3,10 @@ import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
 /*
  * English privacy policy. This page describes verified production behaviour:
  * Daymark operates no backend or database of its own, so the important
- * distinction is between what Daymark itself stores (nothing but the language
- * preference) and what is transmitted to third-party services (Open-Meteo,
- * browser/device speech) when the user invokes a feature.
+ * distinction is between what Daymark itself stores (the language preference
+ * plus non-user-history app resources) and what is transmitted to third-party
+ * services (Open-Meteo, browser/device speech) during normal use, including the
+ * default forecast request and optional location/voice features.
  */
 
 export default function Privacy() {
