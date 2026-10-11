@@ -54,16 +54,16 @@ export default function PrivacyFr() {
       <p>Pour afficher la météo, Daymark traite :</p>
       <ul>
         <li>
-          le lieu que vous choisissez (via la recherche, ou via la localisation de votre appareil si
-          vous l&rsquo;autorisez) ;
+          le lieu par défaut affiché à l’ouverture de l’application (Londres), un lieu recherché, ou
+          la localisation de votre appareil si vous l’autorisez ;
         </li>
         <li>les réponses météo, de qualité de l&rsquo;air et de recherche de lieux renvoyées par Open-Meteo ;</li>
         <li>vos préférences stockées sur l&rsquo;appareil, comme la langue.</li>
       </ul>
       <p>
-        Ces informations existent dans votre navigateur pendant que vous utilisez l&rsquo;application.
-        Elles ne sont envoyées à aucun backend ni serveur d&rsquo;application exploité par Daymark,
-        car Daymark n&rsquo;en exploite aucun.
+        Ces informations sont traitées dans votre navigateur ou votre application installée pendant
+        l’utilisation de Daymark. Elles ne sont envoyées à aucun backend ni serveur d’application
+        exploité par Daymark, car Daymark n’en exploite aucun.
       </p>
 
       <h2>Données de localisation</h2>
@@ -79,11 +79,13 @@ export default function PrivacyFr() {
         l&rsquo;application revient à son lieu par défaut lorsque vous la rechargez ou la rouvrez.
       </p>
       <p>
-        Lorsque vous utilisez la position de l&rsquo;appareil, Daymark détermine aussi un nom de
-        localité proche (par exemple une ville) entièrement dans votre navigateur, à partir d&rsquo;un
-        jeu de données GeoNames statique servi par Daymark et mis en cache sur votre appareil après la
-        première utilisation. Aucun service de géocodage inverse — y compris GeoNames — ne reçoit vos
-        coordonnées, et le résultat reste sur votre appareil.
+        Lorsque vous utilisez la position de l’appareil, Daymark détermine aussi un nom de localité
+        proche (par exemple une ville) localement à partir d’un jeu de données GeoNames statique. Dans
+        la version web/PWA, le jeu de données est téléchargé depuis le site de Daymark et mis en cache
+        localement dans Cache Storage après la première utilisation. Dans l’application Android
+        installée, il est inclus dans les ressources de l’application. Aucun service de géocodage
+        inverse — y compris GeoNames — ne reçoit vos coordonnées, et le résultat reste sur votre
+        appareil.
       </p>
 
       <h2>Recherche de lieu</h2>
@@ -137,27 +139,28 @@ export default function PrivacyFr() {
         Daymark stocke votre préférence de langue (anglais, français ou espagnol) dans le stockage
         local de votre navigateur sous la clé <code>daymark.locale</code>. C’est la seule préférence
         utilisateur persistante que Daymark stocke intentionnellement. Elle reste jusqu’à ce que vous la
-        modifiiez ou effaciez le stockage du navigateur ou du site. Séparément, le service worker met en
-        cache les fichiers de l’application et le jeu de données des localités dans Cache Storage pour
-        permettre l’utilisation hors ligne ; ces caches sont des ressources de l’application, pas un
-        historique de vos localisations ou de la météo.
+        modifiiez ou effaciez le stockage du navigateur ou du site. Dans la version web/PWA, Daymark met
+        en cache le jeu de données statique des localités dans Cache Storage pour les recherches hors
+        ligne ; le service worker met séparément en cache les fichiers de l’application. L’application
+        Android installée utilise le jeu de données inclus dans ses ressources. Il s’agit de ressources
+        de l’application, pas d’un historique de vos localisations ou de la météo.
       </p>
       <p>
         Daymark n&rsquo;utilise pas de cookies, n&rsquo;utilise pas le stockage de session du
         navigateur ni IndexedDB, et ne conserve aucun historique de localisations, de recherches, de
-        transcriptions ou de météo. Le service worker de Daymark met en cache les fichiers de
-        l&rsquo;application elle-même (HTML, scripts, styles, icônes et polices) afin que
-        l&rsquo;application puisse s&rsquo;ouvrir hors ligne ; il ne met pas en cache les réponses
-        météo ou de qualité de l&rsquo;air.
+        transcriptions ou de météo. Dans la version web/PWA, le service worker met en cache les fichiers
+        de l’application (HTML, scripts, styles, icônes et polices) pour permettre une ouverture hors
+        ligne ; il ne met pas en cache les réponses météo ou de qualité de l’air.
       </p>
 
       <h2>Services tiers</h2>
       <ul>
         <li>Open-Meteo — météo, qualité de l&rsquo;air et recherche de lieux, comme décrit ci-dessus.</li>
         <li>
-          GeoNames — noms de localités pour la position de l&rsquo;appareil. Le jeu de données est
-          téléchargé depuis le site de Daymark et la recherche s&rsquo;effectue sur votre appareil ;
-          aucune coordonnée n&rsquo;est envoyée à GeoNames.
+          GeoNames — noms de localités pour la position de l’appareil. Dans la version web/PWA, le jeu
+          de données statique est téléchargé depuis le site de Daymark ; dans l’application Android
+          installée, il est inclus dans les ressources de l’application. La recherche s’effectue sur
+          l’appareil ; aucune coordonnée n’est envoyée à GeoNames.
         </li>
         <li>
           Les services vocaux de votre navigateur ou de votre appareil — uniquement lorsque vous
