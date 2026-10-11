@@ -37,4 +37,4 @@ Out of scope: third-party services themselves (Open-Meteo, Google Play, device s
 
 ## Supported versions
 
-The default branch (`main`) is supported. There are no tagged releases yet; fixes apply to the tip of `main`. Release status last confirmed on 11 October 2026: the maintainer reports closed testing complete and **Apply for production** available in Play Console. Whether the production-access application has been submitted or approved is not verified here. Android package: `io.github.sami_gor.daymark`, versionCode 1 / versionName 1.0.0.
+The default branch (`main`) is supported. There are no tagged releases yet; fixes apply to the tip of `main`. For current Android release status, consult the maintained release checklist rather than this security policy.
