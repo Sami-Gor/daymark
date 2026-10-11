@@ -15,7 +15,7 @@ export default function PrivacyFr() {
       brandNote="Politique de confidentialité"
       backLabel="← Retour à la météo"
       switcherLabel="Langue de la politique"
-      effectiveText="Date d’entrée en vigueur : 11 septembre 2026"
+      effectiveText="Date d’entrée en vigueur : 11 octobre 2026"
       tagline="Daymark — la météo, simplement"
     >
       <p>
