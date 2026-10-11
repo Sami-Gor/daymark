@@ -110,9 +110,13 @@ Play Console status (manual, cannot be verified from the repo):
    Dashboard to see whether the request is available, submitted, approved, or
    returned for additional testing. The account-type-specific testing gate, if
    applicable, must be shown as satisfied in Console.
-7. `assetlinks.json` still needs the Play app-signing SHA-256 before deployment
-   and verification; do not substitute the upload-key fingerprint. This
-   primarily blocks verified App Links, not basic AAB file upload.
+7. The Daymark website is already deployed. The separate
+   `/.well-known/assetlinks.json` endpoint needs a fresh live check: the last
+   recorded check returned the SPA HTML fallback, and the JSON file is absent
+   from this branch. Do not redeploy the site from scratch. If the endpoint is
+   still incorrect, add/publish that single JSON asset after obtaining the Play
+   app-signing SHA-256; do not substitute the upload-key fingerprint. This
+   affects verified App Links, not basic AAB file upload.
 
 ## 3. Digital Asset Links / App Links
 
@@ -121,13 +125,22 @@ Play Console status (manual, cannot be verified from the repo):
 - Runtime routing: `resolveDeepLink()` accepts only
   `daymark-weather.pages.dev`/`localhost` and routes through the SPA; cold and
   warm links verified on the emulator (`/privacy`, `/fr/privacy`).
-- Production `/.well-known/assetlinks.json` currently returns the SPA HTML
-  fallback (verified again during this audit): **DAL is not deployed**, so
-  App Links will not verify and links may open in the browser/chooser.
+- The Daymark website itself is already deployed at
+  `https://daymark-weather.pages.dev`.
+- The last result recorded by this repo's audit was that the separate
+  `/.well-known/assetlinks.json` path returned the SPA HTML fallback. The
+  actual JSON file is also absent from this branch. I could not independently
+  recheck the live endpoint in this session, so treat that as the last recorded
+  result, not a new live verification.
+- **Action:** check the endpoint first. If it already serves valid JSON with
+  the correct package and Play app-signing SHA-256, no deployment is needed.
+  If not, publish the missing/corrected JSON asset through the existing
+  website deployment workflow; this is an update to the deployed site, not an
+  initial website deployment.
 
-**MANUAL blocker (external):** the Play App Signing fingerprint is required.
-Final structure to deploy at `https://daymark-weather.pages.dev/.well-known/assetlinks.json`
-(content-type `application/json`):
+**Manual dependency:** the Play App Signing fingerprint is required.
+The expected JSON structure for `https://daymark-weather.pages.dev/.well-known/assetlinks.json`
+(content-type `application/json`) is:
 
 ```json
 [
@@ -481,7 +494,7 @@ asset-links validation, upgrade install.
 |---|---|---|---|---|
 | Build/signing/versioning | READY | — | builds pass, AAB verified, hashes match | none |
 | Play App Signing fingerprint | PENDING (manual) | blocks App Links | signing enrolled on first upload; app-signing SHA-256 not yet recorded | copy from Play Console → App integrity |
-| assetlinks.json deployment | PENDING (manual) | blocks App Links | SPA fallback served at path | deploy exact JSON from §3 once the app-signing fingerprint is known |
+| Digital Asset Links endpoint | NEEDS LIVE RECHECK | blocks verified App Links | Last recorded check returned SPA fallback; site is deployed, but this branch has no actual `.well-known/assetlinks.json` file | check live endpoint; if incorrect, publish only the JSON asset with the Play app-signing SHA-256 |
 | Data Safety declaration | RECHECK BEFORE PRODUCTION (manual) | policy accuracy | Previously marked complete; speech input may be processed off-device through controlled WebView speech recognition; location requests are sent to Open-Meteo | review current Play definitions, actual flows, existing Console answers, and privacy policy; see §10 and the checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
 | Closed testing phase | COMPLETE (maintainer-confirmed; live Console not independently checked) | production-access prerequisite if applicable | Maintainer confirms the phase is complete; prior in-review status was stale documentation | confirm Console recognises relevant tester threshold/period; check or complete the production-access application |
@@ -502,18 +515,22 @@ asset-links validation, upgrade install.
 | Resource shrinking | OPTIONAL | low | not enabled | consider post-launch |
 | CSP in native shell | OPTIONAL | low | no CSP headers native | consider meta CSP later |
 
-### A. MUST FIX BEFORE RELEASE
-None found in code or packaging. All gating items are external (Play App
-Signing/assetlinks/console forms) or require physical-device validation.
+### A. CODE/PACKAGING GATE
+No release-blocking code or packaging defect was identified in this audit.
+That does not mean every external release check is complete: Play Console/Data
+safety and verified App Links still need their own checks.
 
-### B. PARTIALLY VALIDATED ON PHYSICAL DEVICE
-Brief physical-device validation completed on a Nothing A059P running Android 16
-(§18): launch/weather, location, voice input, local Kokoro narration,
-stop/restart, lifecycle handling, enlarged-font usability and short stability
-checks passed. Still requiring validation: extended multi-device matrix (classes
-B/C, memory), full TalkBack audit, long thermal soak, call/music interruption,
-Bluetooth routing, fr/es system TTS with real voice data, app links after DAL
-deployment, upgrade install, and Play-distributed validation.
+### B. PHYSICAL-DEVICE VALIDATION — PARTLY COMPLETE, NOT UNTESTED
+A real-device pass was completed on a Nothing A059P running Android 16 (§18).
+Launch/weather, location use, voice input, local Kokoro narration, stop/restart,
+lifecycle handling, enlarged-font usability and short stability checks passed.
+**Do not repeat those checks just to satisfy this checklist.** Additional scope
+not covered in that pass: tests on other device classes (especially lower-RAM
+devices), full TalkBack audit, 10-minute thermal soak, call/music interruption,
+Bluetooth routing, French/Spanish system TTS with actual voice data, verified
+App Links after the endpoint is correct, upgrade install, and installation from
+Google Play. These are the remaining test gaps, not evidence that no physical
+device testing has occurred.
 
 ### C. READY NOW
 Build and signing pipeline, package/SDK/ABI configuration, model/voice
@@ -530,10 +547,11 @@ with the upstream voice source.
 
 ## 21. Release sequence
 
-1. Review the physical-device matrix in §18. A brief merge-confidence pass on a
-   Nothing A059P (Android 16) completed on 14 September 2026; the extended and
-   multi-device checks listed there remain outstanding unless they have since
-   been completed. Update this audit with real results.
+1. A physical-device pass on a Nothing A059P (Android 16) is already recorded in
+   §18; do not repeat it. Complete or explicitly defer only the additional gaps
+   listed in §20B (multi-device/low-memory, TalkBack, thermal soak, call/music,
+   Bluetooth, fr/es system TTS, verified App Links, upgrade install and Play
+   install). Update results only when those checks are actually performed.
 2. In Play Console, check App Signing and record the **app-signing** fingerprint.
    Confirm Data Safety, content rating, app access, ads, target audience, AI
    asset and other applicable declarations. The maintainer reports closed
