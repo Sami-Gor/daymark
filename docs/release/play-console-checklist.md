@@ -4,11 +4,11 @@ Companion to [`android-production-readiness.md`](android-production-readiness.md
 (§2 Play requirements, §3 Asset Links, §10 data map, §20 matrix, §21 release
 sequence).
 
-**Status (15 September 2026):** Play Console setup is complete through the first
-closed-testing submission. The closed-testing (Alpha) release has been
-submitted to Google Play and is **in review**. Remaining gates: retrieve the
-**Play app-signing** SHA-256, deploy `assetlinks.json`, satisfy the
-closed-testing requirement, then production access.
+**Status (11 October 2026):** The maintainer confirms the closed-testing phase is
+complete. This repository cannot verify live Play Console state. Remaining
+work: confirm the production-access application status, capture the Play
+app-signing SHA-256, deploy and verify `assetlinks.json`, review Data safety
+answers for speech input, and close outstanding device validation.
 
 Package: `io.github.sami_gor.daymark` · versionCode `1` / versionName `1.0.0`
 · minSdk `24` / targetSdk `36`
@@ -30,9 +30,10 @@ First submitted artifact: `app-release.aab` — SHA-256
       longer signs builds.
 - [ ] Keep the offline keystore + password backup confirmed in safe storage.
       Losing them requires a Play key-reset request.
-- [ ] Confirm the developer account type. Personal accounts created after
-      Nov 2023 must run closed testing with **12 testers for 14 continuous
-      days** before production access (see step 8).
+- [ ] Record whether the developer account is personal or organisation. The
+      maintainer reports closed testing is complete; for personal accounts
+      created after 13 November 2023, confirm Play Console recognises the
+      12-testers / 14-continuous-days gate as satisfied.
 - [x] AAB built from merged `main` and uploaded (metadata above). Rebuild
       command kept for reference:
 
@@ -55,7 +56,7 @@ On a clean clone, run the Kokoro JNI + asset steps from
       language English (US), type App, Free.
 - [x] Accept the developer program policies.
 
-## 2. App content declarations — DONE
+## 2. App content declarations — PREVIOUSLY REPORTED DONE; RECHECK BEFORE PRODUCTION
 
 Play Console → **Policy and programs → App content**. All rows completed:
 
@@ -66,16 +67,22 @@ Play Console → **Policy and programs → App content**. All rows completed:
 - [x] Content rating questionnaire (weather utility, no user content, no ads).
 - [x] Target audience completed.
 - [x] Government apps: No · Financial features: No · Health: No · News: No.
-- [x] Data safety — mapped from `android-production-readiness.md` §10:
+- [x] Data safety form was previously reported complete. **Recheck the
+      existing answers before production**, particularly speech input: Daymark
+      does not persist audio, but the Android/browser speech service may process
+      it remotely. Use current Play definitions and the actual production flow;
+      do not infer the answer from the absence of app-side storage alone.
 
-| Data type | Collected? | Shared? | Use |
-|---|---|---|---|
-| Location → Approximate + Precise | Yes (sent to Open-Meteo, rounded to ~1 km) | No (service provider) | App functionality |
-| Audio → Voice/sound recordings | No (in-memory only; the platform speech service may process it remotely — see §10) | No | App functionality |
-| App activity / personal info / messages / contacts | No | — | — |
-| Analytics / crash logs | None in-app | — | — |
+| Data type / flow | Current repo evidence | Console follow-up |
+|---|---|---|
+| Location | User-initiated device location; coordinates rounded to 2 decimals before the weather request | Confirm collection/sharing answers accurately describe the provider transfer and any applicable ephemeral-processing exception |
+| Voice-input audio | Daymark does not store recordings; the Android/browser speech service may process audio remotely | **Unresolved policy check:** determine whether this WebView speech path must be reported as collected/shared under current Data safety rules |
+| App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
+| Analytics / crash logs | No in-app analytics/crash SDK found in repo | Confirm existing answers remain accurate |
 
-- [x] Data deletion: no accounts and no stored user data.
+- [x] Data deletion form previously reported complete. Daymark offers no accounts
+      and has no server-side user-data store; only a language preference is
+      stored locally.
 - [x] AI asset declaration completed.
 
 ## 3. Store listing — DONE (default store listing)
@@ -144,28 +151,42 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 
 - [ ] Confirm links open in the app cold and warm (readiness §3).
 
-## 8. Closed testing — SUBMITTED, IN REVIEW
+## 8. Closed testing — COMPLETE (maintainer-confirmed)
 
-- [x] **Test and release → Testing → Closed testing** (Alpha) track created;
-      the first AAB submitted for review.
-- [x] Tester mechanism: Google Group `daymark-testers@googlegroups.com`.
-- [x] Countries/regions: all available countries/regions selected.
-- [ ] Once the release passes review: have ≥ 12 testers opt in and keep them
-      active for 14 continuous days (personal-account production gate), collect
-      feedback.
-- [ ] Fix and re-upload with a bumped `versionCode` as needed.
+- [x] The maintainer confirms the closed-testing phase is complete
+      (11 October 2026). This status has not been independently checked against
+      the live Play Console.
+- [x] The repository records an Alpha track, first AAB submission, Google Group
+      `daymark-testers@googlegroups.com`, and all available countries/regions.
+- [x] The closed-test phase is reported complete. For a personal account
+      created after 13 November 2023, confirm Play Console recognises the
+      required tester count and continuous opt-in period as satisfied.
+- [ ] Record factual tester engagement, feedback and changes made in response
+      in [production-access-application.md](production-access-application.md).
+- [ ] If another bundle is required, increment `versionCode`; do not reuse a
+      code already uploaded for this app.
 
-## 9. Production rollout — PENDING
+## 9. Production access and rollout — STATUS NOT VERIFIED
 
-- [ ] Production access remains gated by Google's closed-test requirement
-      (step 8) for personal accounts.
-- [ ] Apply for production access when eligible, then **Production → Create
-      release** with the tested AAB.
-- [ ] Staged rollout 10% → 50% → 100%; watch **Monitor and improve → Android
-      vitals** for ANRs/crashes, especially memory-related kills on lower-RAM
-      devices.
-- [ ] Keep the `pre-capacitor-daymark` TWA rollback tag until the rollout is
-      stable.
+- [ ] In the Play Console Dashboard, confirm whether production access is
+      available to request, already submitted, approved, or returned for more
+      testing. Closed testing is reported complete; production access is a
+      separate decision.
+- [ ] If not already submitted, prepare the application using
+      [production-access-application.md](production-access-application.md).
+      Replace all prompts with truthful evidence; do not invent tester feedback,
+      engagement or install estimates.
+- [ ] Reconcile the speech-input Data safety declaration and verify all Console
+      policy declarations still match the app and privacy policy.
+- [ ] Copy the Play app-signing SHA-256 from App integrity, deploy
+      `assetlinks.json`, and verify it as described in steps 5–7. This is an
+      App Links task separate from AAB acceptance.
+- [ ] Once access is approved, create the Production release using the tested
+      bundle through the current Console workflow. If a new AAB is required,
+      increment versionCode and validate the new build.
+- [ ] Roll out in stages (for example 10% → 50% → 100%) and monitor Android
+      vitals for ANRs/crashes, especially memory-related kills on low-RAM devices.
+- [ ] Keep the `pre-capacitor-daymark` TWA rollback tag until rollout is stable.
 
 ## 10. Follow-ups (non-blocking)
 
