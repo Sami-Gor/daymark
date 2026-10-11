@@ -161,8 +161,9 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 - [x] The closed-test phase is reported complete. For a personal account
       created after 13 November 2023, confirm Play Console recognises the
       required tester count and continuous opt-in period as satisfied.
-- [ ] Record factual tester engagement, feedback and changes made in response
-      in [production-access-application.md](production-access-application.md).
+- [ ] Prepare production-access responses in Play Console using actual tester
+      engagement, feedback, and changes made in response. Keep evidence factual;
+      do not invent metrics or feedback.
 - [ ] If another bundle is required, increment `versionCode`; do not reuse a
       code already uploaded for this app.
 
@@ -172,10 +173,9 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       available to request, already submitted, approved, or returned for more
       testing. Closed testing is reported complete; production access is a
       separate decision.
-- [ ] If not already submitted, prepare the application using
-      [production-access-application.md](production-access-application.md).
-      Replace all prompts with truthful evidence; do not invent tester feedback,
-      engagement or install estimates.
+- [ ] If not already submitted, prepare the application in Play Console.
+      Use truthful evidence; do not invent tester feedback, engagement or
+      install estimates.
 - [ ] Reconcile the speech-input Data safety declaration and verify all Console
       policy declarations still match the app and privacy policy.
 - [ ] Copy the Play app-signing SHA-256 from App integrity, deploy
