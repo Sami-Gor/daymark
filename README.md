@@ -119,6 +119,7 @@ the browser build keeps Web Speech. The legacy TWA project is preserved at
 cd artifacts/weather-app
 pnpm exec cap sync android
 cd android
+# macOS example; on other systems set JAVA_HOME to your installed JDK 21 path.
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
 ```
 
