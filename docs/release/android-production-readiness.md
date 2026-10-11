@@ -46,7 +46,7 @@ Notes:
 Clean-build instructions (verified path, network required for downloads):
 
 ```bash
-# prerequisites: Node 26+, pnpm 12+, Rust 1.98.1 + aarch64-linux-android target,
+# prerequisites: Node 24 (CI-tested), pnpm 12+, Rust 1.98.1 + aarch64-linux-android target,
 # Android NDK 29.0.14206865, JDK 21, Android SDK 36
 
 pnpm install
