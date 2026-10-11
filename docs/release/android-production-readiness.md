@@ -5,14 +5,17 @@ at `24b2b5e`; later commits resolved the minor findings below). The migration
 is now merged into `main` (PR #15).
 Method: repository/static inspection, artifact inspection of the signed release
 APK/AAB, emulator runtime checks from the migration and performance passes.
-No code or configuration changes were made by this audit. Status labels are
-used as follows: **READY** means evidenced as working; **MANUAL PLAY CONSOLE
-ACTION (MANUAL)** means a check in the live Console; **MUST FIX** means a
-release-blocking defect; and **OPTIONAL** means extra assurance, not a release
-gate. Legacy **PDT** labels below refer only to additional device coverage that
-was not in the recorded Nothing A059P pass. They do not mean repeat the core
-device pass. Section 18 records the completed pass; Sections 20–21 state the
-current status and what actually remains.
+The technical Android audit did not change Android runtime behaviour or build
+configuration. This PR updates documentation and public privacy-policy copy;
+those source changes are not live until deployed and are not included in the
+already-uploaded AAB. Status labels are used as follows: **READY** means
+evidenced as working; **MANUAL PLAY CONSOLE ACTION (MANUAL)** means a check in
+the live Console; **MUST FIX** means a release-blocking defect; and **OPTIONAL**
+means extra assurance, not a release gate. Legacy **PDT** labels below refer
+only to additional device coverage that was not in the recorded Nothing A059P
+pass. They do not mean repeat the core device pass. Section 18 records the
+completed pass; Sections 20–21 state the current status and what actually
+remains.
 
 ## 1. Build / release pipeline
 
@@ -508,7 +511,10 @@ rotation, low-memory kill, French/Spanish system-TTS voice data, a
 Google-Play-distributed install, verified App Links, and upgrade install.
 This is a record of scope, not a requirement to rerun already-passed tests.
 Additional cases may be tested if broader assurance is wanted or a concrete
-risk makes a specific case necessary.
+risk makes a specific case necessary. If the revised privacy-policy wording in
+this PR is adopted, publish the website update and include the policy source
+changes in the next Android bundle so the web and in-app policies stay aligned;
+this PR has not built or uploaded a new AAB.
 
 ## 19. Cleanup checklist (do not remove yet)
 
@@ -542,7 +548,7 @@ risk makes a specific case necessary.
 | Battery/thermal | OPTIONAL EXTENDED QA | low-medium | brief 1-minute pass: 35.0 °C, thermal status 0 | 10-minute soak is optional additional coverage |
 | Accessibility (TalkBack/font scale) | FONT-SCALE PASS RECORDED; TALKBACK NOT CLAIMED | low-medium | 1.5x font pass 14 Sep 2026; web automations pass | TalkBack audit is optional additional coverage |
 | Real-device latency | CORE DEVICE PASS RECORDED; BENCHMARK OPTIONAL | low | real-device flow was exercised; emulator estimate ~2.4 s | no repeat required; benchmark only if needed |
-| Privacy/data flow | READY | — | no analytics, rounded coords, no text logs | feed into Data Safety |
+| App data-flow behaviour | CODE REVIEWED; PLAY DECLARATION PENDING | policy accuracy | no in-app analytics, rounded location requests, no transcript/location logging; speech providers may process data off-device | finish Data safety classification for location, speech input and browser/system TTS using current Play definitions; see §2, §10 and checklist |
 | Security (WebView/bridge/components) | READY | — | audit §12 | optional CSP hardening |
 | Licensing | READY | — | WTFPL cleared; permissive stack | note bm_fable provenance |
 | Dependencies | READY | — | prod audit clean, pinned versions | none |
