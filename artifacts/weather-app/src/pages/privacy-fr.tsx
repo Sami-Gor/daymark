@@ -195,9 +195,11 @@ export default function PrivacyFr() {
 
       <h2>Sécurité</h2>
       <p>
-        Daymark est servi via HTTPS et applique une politique de sécurité du contenu stricte.
-        L&rsquo;application est un ensemble de fichiers statiques, sans secrets ni backend ou serveur
-        d&rsquo;application exploité par Daymark.
+        La version web/PWA hébergée est servie via HTTPS et utilise la politique de sécurité du
+        contenu configurée sur le site. L’application Android installée charge des ressources locales
+        intégrées ; les en-têtes de sécurité HTTP du site ne s’appliquent pas dans sa WebView.
+        L’application est un ensemble de fichiers statiques, sans secrets ni backend ou serveur
+        d’application exploité par Daymark.
       </p>
 
       <h2>Traitement international</h2>
