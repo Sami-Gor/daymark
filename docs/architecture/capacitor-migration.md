@@ -99,7 +99,7 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 | Service worker | served by Chrome, active | redundant; disable inside native shell, keep for web |
 | Geolocation permission | Chrome handles | WebView `onGeolocationPermissionsShowPrompt` + app permission |
 | Microphone | Chrome | WebView `onPermissionRequest` + app permission (AskDaymark) |
-| Web Speech API | Chrome's speechSynthesis (system TTS) | WebView may lack speechSynthesis → native Kokoro path, else browser fallback |
+| Speech output | Chrome browser speech synthesis/system voice | Android English: local Kokoro only (shows an error if unavailable); French/Spanish: native Android system TTS plugin. Web/PWA continues to use browser speech synthesis |
 | External links | Chrome handles | Capacitor opens in external browser (`@capacitor/app`/browser config) |
 | Back button | browser history | Capacitor hardware back handling → `window.history.back()` |
 | App links | verified by Chrome via DAL | Android intent filters + optional `@capacitor/app` `openUrl` |
@@ -118,8 +118,10 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
   - Android implementation as a Gradle library module
     (`android/daymark-voice`) wrapping the validated `KokoroLocalTtsEngine`,
     the same Rust JNI cdylib, `model_quantized.onnx` and `bm_fable.bin`.
-  - Web implementation is a thin no-op; the React layer falls back to
-    `use-browser-speech` whenever the native engine is unavailable.
+  - Web implementation is a placeholder; the web UI uses browser speech APIs.
+    On Android, Kokoro is selected only for English when the native engine is
+    available; it does not fall back to system TTS for English. French/Spanish
+    use the Android `SystemSpeech` plugin.
 - Unified speech layer: `useDaymarkSpeech` selects
   `kokoro` only for Android native + English + healthy engine;
   `browser` for web/desktop, iOS, French, Spanish, and any native failure.
@@ -152,9 +154,11 @@ TypeScript (`src/lib/daymark-voice`, `src/lib/system-speech`):
 ```
 isAvailable(): Promise<{ available: boolean }>
 getStatus(): Promise<{ state: 'uninitialized'|'loading'|'ready'|'speaking'|'stopped'|'error' }>
-speak({ text, lang? }): Promise<void>
+speak({ text, lang?, segments? }): Promise<void>
 stop(): Promise<void>
 isSpeaking(): Promise<{ speaking: boolean }>
+addListener('stateChanged', listener): Promise<PluginListenerHandle>
+removeAllListeners(): Promise<void>
 ```
 
 Android implementation: Gradle module `android/daymark-voice` wrapping the
@@ -196,7 +200,7 @@ Engine selection (`src/lib/speech-engine.ts`):
 # Web (unchanged PWA deployment)
 cd artifacts/weather-app && pnpm build
 
-# Capacitor sync + Android builds (JDK 21)
+# Capacitor sync + Android builds (JDK 21; java_home command below is macOS-specific)
 cd artifacts/weather-app
 pnpm exec cap sync android
 cd android
@@ -212,10 +216,16 @@ gitignored.
 
 ## Validation results (API 36 arm64 emulator, release build)
 
-- Capacitor shell launches, bundled assets load from `https://localhost`.
-- Routing, hardware back (SPA history; root minimizes), cold/warm App Links
-  (`/privacy`, `/fr/privacy`), local storage, background/foreground and
-  force-stop/relaunch all work.
+This validation section is an emulator-only snapshot and predates the later
+physical-device pass recorded in `docs/release/android-production-readiness.md`
+§18. It must not be read as a statement that every production check is complete.
+
+- Capacitor shell launches; bundled assets load from `https://localhost`.
+- In-app URL routing, hardware back (SPA history; root minimizes), cold/warm
+  navigation to `/privacy` and `/fr/privacy`, local storage,
+  background/foreground and force-stop/relaunch worked in the emulator. These
+  emulator routing checks do **not** establish Android website-domain
+  verification through Digital Asset Links.
 - Kokoro: READY, `voice=bm_fable`, streamed narration, Stop
   (`stopped=true`), offline (airplane mode) and repeated narration all pass.
 - Web/PWA: typecheck, 236 unit tests, 153 e2e tests and the production Vite
