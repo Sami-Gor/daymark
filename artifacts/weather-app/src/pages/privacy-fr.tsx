@@ -3,7 +3,9 @@ import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
 /*
  * French privacy policy (/fr/privacy). Meaning-for-meaning translation of the
  * English policy: same data practices, same Daymark-vs-third-party
- * distinction, same voice-processing caveat. No stronger or weaker claims.
+ * distinction, same voice-processing caveat. Forecast loading includes the
+ * default place on app open; optional location and voice flows are separate.
+ * No stronger or weaker claims.
  */
 
 export default function PrivacyFr() {
