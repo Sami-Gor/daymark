@@ -42,7 +42,7 @@ export default function PrivacyFr() {
           À l’ouverture de l’application, Daymark charge une prévision pour son lieu par défaut.
           Lorsque vous recherchez un autre lieu, actualisez les conditions ou utilisez la localisation
           de l’appareil, les requêtes météo ou de recherche correspondantes sont envoyées directement
-          depuis votre navigateur à Open-Meteo, un service météo tiers.
+          depuis votre navigateur ou votre application installée vers Open-Meteo, un service météo tiers.
         </li>
         <li>
           Les fonctions vocales facultatives reposent sur les capacités vocales de votre navigateur ou
@@ -100,7 +100,8 @@ export default function PrivacyFr() {
         Les prévisions, les données de qualité de l&rsquo;air et la recherche de lieux proviennent
         d&rsquo;
         <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>. Les requêtes
-        sont envoyées directement depuis votre navigateur vers les serveurs d&rsquo;Open-Meteo :
+        sont envoyées directement depuis votre navigateur ou votre application installée vers les
+        serveurs d&rsquo;Open-Meteo :
       </p>
       <ul>
         <li><code>api.open-meteo.com</code> — prévisions</li>
@@ -204,9 +205,10 @@ export default function PrivacyFr() {
 
       <h2>Traitement international</h2>
       <p>
-        Open-Meteo et les services vocaux de votre navigateur ou de votre appareil peuvent traiter des
-        données sur des serveurs situés dans différents pays. Leurs propres politiques décrivent où et
-        comment cela se produit.
+        Open-Meteo traite les requêtes météo et de recherche sur ses propres serveurs. Les services
+        vocaux de votre navigateur ou de votre appareil peuvent également traiter l’audio ou le texte
+        de narration à distance, selon le fournisseur et les réglages. Les politiques de ces fournisseurs
+        décrivent où et comment ce traitement a lieu.
       </p>
 
       <h2>Confidentialité des enfants</h2>
