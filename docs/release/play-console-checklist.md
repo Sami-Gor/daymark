@@ -47,6 +47,7 @@ pnpm install              # fresh clone only
 pnpm build
 pnpm exec cap sync android
 cd android
+# macOS + Homebrew example; on other systems, set JAVA_HOME to your JDK 21 path
 JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:bundleRelease
 # → app/build/outputs/bundle/release/app-release.aab
 ```
@@ -184,20 +185,14 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 ## 8. Closed testing — COMPLETE (maintainer-confirmed)
 
 - [x] The maintainer confirms the closed-testing phase is complete
-      (11 October 2026); the live track history and tester metrics have not been
+      (11 October 2026); live track history and tester metrics were not
       independently checked here.
 - [x] The maintainer reports **Apply for production is available** in Play Console
-      (11 October 2026). This establishes eligibility to open the application,
-      not that the application was submitted or approved.
-- [x] The maintainer reports that **Apply for production is available**. Do not
-      treat the 12-testers / 14-continuous-days period as still waiting by default;
-      if Play Console itself shows a testing-eligibility warning, follow that
-      specific warning rather than repeating completed testing.
-- [ ] Complete or continue the production-access application in Play Console
-      using actual tester engagement, feedback and changes made in response.
-      Keep evidence factual; do not invent metrics or feedback.
-- [ ] If another bundle is required, increment `versionCode`; do not reuse a
-      code already uploaded for this app.
+      (11 October 2026). This means the Console allows the application flow to
+      be opened; it does not mean the application was submitted or approved.
+- [x] Do not treat the 12-testers / 14-continuous-days period as still waiting
+      by default. Follow an eligibility warning only if the live Console
+      explicitly shows one; do not repeat the completed testing period.
 
 ## 9. Production access and rollout — APPLICATION DECISION NOT VERIFIED
 
@@ -208,7 +203,8 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       testing. The available button does not establish submission or approval.
 - [ ] If the application has not been submitted, complete it in Play Console
       using truthful tester feedback, engagement and readiness evidence. Do not
-      invent tester feedback, engagement or install estimates.
+      invent tester feedback, engagement or install estimates. Keep these answers
+      in Play Console, not in a separate public worksheet.
 - [ ] Reconcile Data safety for location, voice input and browser/system TTS
       output, then verify all Console declarations match the app and privacy
       policy.
