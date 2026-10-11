@@ -164,9 +164,12 @@ The expected JSON structure for `https://daymark-weather.pages.dev/.well-known/a
 ```
 
 `use_as_origin` is not needed (that relation existed for TWA postMessage, which
-is retired). Keep the upload fingerprint for sideloaded builds. Verify after
-deploy with `adb shell pm verify-app-links --re-verify io.github.sami_gor.daymark`
-and Play's App Links checker, then re-test cold/warm links (PDT).
+is retired). Keep the upload fingerprint for sideloaded builds. After the
+endpoint is confirmed correct, check Android domain verification with
+`adb shell pm verify-app-links --re-verify io.github.sami_gor.daymark` and Play's
+App Links checker. Only test cold/warm opens if verified App Links have not
+already been verified or the website's association file changes. This is a
+specific App Links check, not a repeat of core device testing.
 
 ## 4. Permissions
 
