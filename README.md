@@ -168,7 +168,7 @@ scripts/                  workspace tooling
 - Unit preference (°C/°F) is not persisted across reloads (the language preference is)
 - The regional comparison uses the UKV model and is hidden where that model is not valid
 - Severe-weather risks are forecast-derived Daymark estimates, **not** official warnings
-- Voice input/output require browser Web Speech support and matching platform voices; unsupported browsers hide those controls
+- Voice input requires browser/platform speech-recognition support. Web narration uses browser speech synthesis; Android English narration uses bundled Kokoro, while French/Spanish use Android system TTS with matching voice data. Unsupported input controls may be hidden; unavailable Android narration is reported as an error.
 - On Android, English narration uses the bundled local Kokoro voice (offline); French/Spanish use the device TTS engine, which needs the matching voice data installed
 - The Android shell currently bundles the arm64-v8a Kokoro library only
 - Air-quality "nearby sensor" comparison is not yet wired to a sensor network; the regional forecast is shown
