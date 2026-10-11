@@ -5,13 +5,14 @@ Companion to [`android-production-readiness.md`](android-production-readiness.md
 sequence).
 
 **Status (11 October 2026):** The maintainer confirms the closed-testing phase is
-complete. The website is already deployed. Remaining work: confirm the
-production-access application status, capture the Play app-signing SHA-256,
-verify the existing `/.well-known/assetlinks.json` endpoint (make a website
-change only if that file is missing or wrong), and review Data safety answers
-for speech input. Core physical-device testing is already complete and does not
-need to be repeated. The readiness audit's wider test matrix is optional
-additional QA, not a blanket production-release blocker.
+complete. The website is already deployed. The maintainer reports that
+**Apply for production is available** in Play Console; whether the application
+has been submitted or decided is not verified. Other follow-up: capture the
+Play app-signing SHA-256, verify the existing `/.well-known/assetlinks.json`
+endpoint (change the site only if that file is missing or wrong), and review
+Data safety answers for location, speech input and speech-output provider
+flows. Core physical-device testing is already complete and does not need to
+be repeated. The wider matrix is optional additional QA, not a blanket blocker.
 
 Package: `io.github.sami_gor.daymark` · versionCode `1` / versionName `1.0.0`
 · minSdk `24` / targetSdk `36`
@@ -70,16 +71,18 @@ Play Console → **Policy and programs → App content**. All rows completed:
 - [x] Content rating questionnaire (weather utility, no user content, no ads).
 - [x] Target audience completed.
 - [x] Government apps: No · Financial features: No · Health: No · News: No.
-- [x] Data safety form was previously reported complete. **Recheck the
-      existing answers before production**, particularly speech input: Daymark
-      does not persist audio, but the Android/browser speech service may process
-      it remotely. Use current Play definitions and the actual production flow;
-      do not infer the answer from the absence of app-side storage alone.
+- [x] Data safety form was previously reported complete. **Recheck the existing
+      answers before production** for user-initiated location, WebView speech
+      input and the browser/system TTS output path. Providers may process data
+      off-device even though Daymark does not store it. Use current Play
+      definitions and the actual production flow; do not infer the answer from
+      the absence of app-side storage alone.
 
 | Data type / flow | Current repo evidence | Console follow-up |
 |---|---|---|
 | Location | User-initiated device location; coordinates rounded to 2 decimals before the weather request | Confirm collection/sharing answers accurately describe the provider transfer and any applicable ephemeral-processing exception |
-| Voice-input audio | Daymark does not store recordings; the Android/browser speech service may process audio remotely | **Unresolved policy check:** determine whether this WebView speech path must be reported as collected/shared under current Data safety rules |
+| Voice-input audio | Daymark does not store recordings; the WebView/browser speech service may process audio remotely | **Unresolved policy check:** determine the required collection/sharing answer for this controlled WebView speech path under current Data safety rules | 
+| Voice-output text | Android English uses bundled local Kokoro; web and Android French/Spanish use browser/system speech APIs | Check whether the chosen browser/system service sends or retains utterance text and whether that flow changes the Data safety response |
 | App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
 | Analytics / crash logs | No in-app analytics/crash SDK found in repo | Confirm existing answers remain accurate |
 
@@ -179,26 +182,32 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       the live Play Console.
 - [x] The repository records an Alpha track, first AAB submission, Google Group
       `daymark-testers@googlegroups.com`, and all available countries/regions.
-- [x] The closed-test phase is reported complete. For a personal account
-      created after 13 November 2023, confirm Play Console recognises the
-      required tester count and continuous opt-in period as satisfied.
-- [ ] Prepare production-access responses in Play Console using actual tester
-      engagement, feedback, and changes made in response. Keep evidence factual;
-      do not invent metrics or feedback.
+- [x] The maintainer reports the closed-test phase complete.
+- [x] The maintainer reports **Apply for production is available** in Play Console
+      (11 October 2026). This does not establish that the application was
+      submitted or approved.
+- [ ] If the account is a personal account created after 13 November 2023, confirm
+      Play Console recognises the required tester count and continuous opt-in
+      period as satisfied; do not infer this solely from local notes.
+- [ ] Complete or continue the production-access application in Play Console
+      using actual tester engagement, feedback and changes made in response.
+      Keep evidence factual; do not invent metrics or feedback.
 - [ ] If another bundle is required, increment `versionCode`; do not reuse a
       code already uploaded for this app.
 
-## 9. Production access and rollout — STATUS NOT VERIFIED
+## 9. Production access and rollout — APPLICATION DECISION NOT VERIFIED
 
-- [ ] In the Play Console Dashboard, confirm whether production access is
-      available to request, already submitted, approved, or returned for more
-      testing. Closed testing is reported complete; production access is a
-      separate decision.
-- [ ] If not already submitted, prepare the application in Play Console.
-      Use truthful evidence; do not invent tester feedback, engagement or
-      install estimates.
-- [ ] Reconcile the speech-input Data safety declaration and verify all Console
-      policy declarations still match the app and privacy policy.
+- [x] **Apply for production was reported available** by the maintainer on
+      11 October 2026.
+- [ ] In the Play Console Dashboard, record the current application state:
+      available to apply, submitted/in review, approved, or returned for more
+      testing. The available button does not establish submission or approval.
+- [ ] If the application has not been submitted, complete it in Play Console
+      using truthful tester feedback, engagement and readiness evidence. Do not
+      invent tester feedback, engagement or install estimates.
+- [ ] Reconcile Data safety for location, voice input and browser/system TTS
+      output, then verify all Console declarations match the app and privacy
+      policy.
 - [ ] Check the existing website's Digital Asset Links endpoint as described
       in steps 5–7; publish an updated site only if the JSON is absent or wrong.
       This is an App Links task separate from AAB acceptance.
@@ -211,10 +220,12 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 
 ## 10. Follow-ups (non-blocking)
 
-- [ ] Native debug symbols were **not** uploaded with the first AAB (the Play
-      upload warning is expected). Configure/upload them for the **next**
-      Android release — e.g. set the release `ndk.debugSymbolLevel` (or upload
-      the symbols archive). This does not block the current closed test.
+- [ ] Native debug symbols were **not** uploaded with the first AAB; the upload
+      warning was recorded as expected and non-blocking for that submission.
+      Configure/upload them for the **next** Android release (for example, set
+      the release `ndk.debugSymbolLevel` or upload the symbols archive). Check
+      the current Console message before a new submission; this note does not
+      replace any release-specific requirement shown there.
 - [ ] Every update: rebuild the AAB, bump `versionCode` in
       `artifacts/weather-app/android/app/build.gradle`, re-upload.
 - [ ] Never remove fingerprints from `assetlinks.json` (sideload verification
