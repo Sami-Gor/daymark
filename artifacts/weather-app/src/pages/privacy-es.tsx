@@ -15,7 +15,7 @@ export default function PrivacyEs() {
       brandNote="Política de privacidad"
       backLabel="← Volver al tiempo"
       switcherLabel="Idioma de la política"
-      effectiveText="Fecha de entrada en vigor: 11 de septiembre de 2026"
+      effectiveText="Fecha de entrada en vigor: 11 de octubre de 2026"
       tagline="Daymark — el tiempo, de forma sencilla"
     >
       <p>
@@ -117,17 +117,22 @@ export default function PrivacyEs() {
 
       <h2>Salida de voz (Hear today)</h2>
       <p>
-        «Hear today» lee el pronóstico en voz alta mediante la síntesis de voz integrada en tu
-        navegador o dispositivo. El texto del boletín lo procesa esa capacidad de la plataforma, no un
-        servicio de voz operado por Daymark.
+        «Hear today» lee el boletín en voz alta. En la aplicación Android, la narración en inglés
+        se genera en el dispositivo mediante el modelo Kokoro integrado; el francés y el español usan
+        la síntesis de voz del sistema Android. En la versión web, la narración utiliza la API de
+        síntesis de voz del navegador. El tratamiento por los proveedores de voz del navegador o del
+        sistema depende del dispositivo, la configuración y la voz elegida. Daymark no opera un
+        servidor de voz ni almacena el texto de la narración.
       </p>
 
       <h2>Información almacenada en tu dispositivo</h2>
       <p>
         Daymark guarda tu preferencia de idioma (inglés, francés o español) en el almacenamiento local
-        de tu navegador con la clave <code>daymark.locale</code>. Es el único valor persistente de la
-        aplicación que Daymark almacena intencionadamente. Permanece hasta que lo cambies o borres el
-        almacenamiento de tu navegador o del sitio.
+        de tu navegador con la clave <code>daymark.locale</code>. Es la única preferencia de usuario
+        persistente que Daymark almacena intencionadamente. Permanece hasta que la cambies o borres el
+        almacenamiento del navegador o del sitio. Por separado, el service worker guarda en Cache
+        Storage los archivos de la aplicación y el conjunto de datos de localidades para permitir el uso
+        sin conexión; son recursos de la aplicación, no un historial de tus ubicaciones o del tiempo.
       </p>
       <p>
         Daymark no usa cookies, no usa el almacenamiento de sesión del navegador ni IndexedDB, y no
@@ -155,8 +160,9 @@ export default function PrivacyEs() {
         usados bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0).
       </p>
       <p>
-        Daymark no utiliza analíticas, publicidad, píxeles de seguimiento ni ningún otro servicio
-        externo.
+        Daymark no utiliza servicios externos de analítica, publicidad, píxeles de seguimiento ni
+        rastreo. Open-Meteo y las funciones de voz del navegador/dispositivo son servicios externos
+        utilizados para las funciones descritas arriba.
       </p>
 
       <h2>Analíticas, publicidad y seguimiento</h2>
