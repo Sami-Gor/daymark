@@ -8,7 +8,7 @@ A calm, privacy-conscious weather app for the web (PWA) and Android, built with 
 
 ## Overview
 
-Daymark answers one question well — *what's the sky doing?* — without dashboards, accounts, ads, or tracking. It is a fully client-side app on the web and in the Android WebView: the client talks directly to the free Open-Meteo API, nothing is stored on any server, and location is only used when you ask for it.
+Daymark answers one question well — *what's the sky doing?* — without dashboards, accounts, ads, or tracking. It is a client-side app on the web and in the Android WebView, with no Daymark-operated backend or database. It calls Open-Meteo directly for weather and place search; Open-Meteo's own handling is governed by its policies. Device location is only requested when you ask for it.
 
 ## Features
 
@@ -74,14 +74,14 @@ All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifact
 
 - **Geolocation is never requested on load.** The app opens on a default location (London) and only touches the Geolocation API when you press *Use my location*
 - **Coordinates are rounded to 2 decimals (~1 km) before leaving your device**, then sent only to Open-Meteo endpoints
-- **Nothing else is persisted** — only your language preference (`daymark.locale`) is kept locally; no location, queries, transcripts, cookies, IndexedDB or other storage
+- **No user history is persisted by Daymark** — the language preference (`daymark.locale`) is stored in localStorage. The service worker separately caches app-shell files and the locality dataset in Cache Storage; the app does not persist location history, search history, transcripts or weather responses
 - **Public privacy policy** — a full policy is part of the app at `/privacy` (English), `/fr/privacy` (French) and `/es/privacy` (Spanish); the footer links to the version matching the interface language. It documents the actual data flows, local-storage behavior and third-party services described above
 - **No analytics or third-party trackers** — weather and location-search data go only to the Open-Meteo API hosts (plus the attribution link in the footer); optional voice input is handled by your browser or device and may use its speech service, but Daymark itself never stores transcripts
 - Fonts are self-hosted; no CDN font requests
 
 ## Weather data source
 
-All forecast, air-quality, and geocoding data comes from [Open-Meteo](https://open-meteo.com) — free for non-commercial use, no API key required. Daymark requests only what it renders and caches nothing on disk.
+All forecast, air-quality, and geocoding data comes from [Open-Meteo](https://open-meteo.com) — free for non-commercial use, no API key required. Daymark requests the fields needed by its interface; weather and air-quality responses are not cached on disk by the app/service worker. The app shell and locality dataset may be cached locally for offline operation.
 
 ## PWA / offline behavior
 
@@ -135,7 +135,7 @@ The e2e suite runs against a production build served by `vite preview`, mocks Op
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for the web/PWA and Android posture. In short: minimal attack surface (12 runtime dependencies), every external response runtime-validated, a strict CSP (`default-src 'none'`, `script-src 'self'`), a native voice engine that runs fully on-device, and no secrets anywhere in the client — there are none to leak.
+See [SECURITY.md](SECURITY.md) for the web/PWA and Android posture. In short: minimal attack surface (12 runtime dependencies), every external response runtime-validated, a strict CSP (`default-src 'none'`, `script-src 'self'`), Android English narration generated on-device by the bundled Kokoro engine, and no secrets in the client.
 
 ## Project structure
 
