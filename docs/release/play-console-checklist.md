@@ -182,8 +182,8 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 - [x] The maintainer confirms the closed-testing phase is complete
       (11 October 2026). This status has not been independently checked against
       the live Play Console.
-- [x] The repository records an Alpha track, first AAB submission, Google Group
-      `daymark-testers@googlegroups.com`, and all available countries/regions.
+- [x] The repository records an Alpha track and first AAB submission; current
+      track details and tester metrics must be confirmed in Play Console.
 - [x] The maintainer reports the closed-test phase complete.
 - [x] The maintainer reports **Apply for production is available** in Play Console
       (11 October 2026). This does not establish that the application was
