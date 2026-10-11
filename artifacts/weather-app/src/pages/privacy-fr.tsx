@@ -39,9 +39,10 @@ export default function PrivacyFr() {
           l&rsquo;historique météo.
         </li>
         <li>
-          Pour fonctionner, Daymark envoie les requêtes que vous déclenchez — par exemple une
-          prévision pour un lieu que vous avez choisi — directement depuis votre navigateur à
-          Open-Meteo, un service météo tiers.
+          À l’ouverture de l’application, Daymark charge une prévision pour son lieu par défaut.
+          Lorsque vous recherchez un autre lieu, actualisez les conditions ou utilisez la localisation
+          de l’appareil, les requêtes météo ou de recherche correspondantes sont envoyées directement
+          depuis votre navigateur à Open-Meteo, un service météo tiers.
         </li>
         <li>
           Les fonctions vocales facultatives reposent sur les capacités vocales de votre navigateur ou
