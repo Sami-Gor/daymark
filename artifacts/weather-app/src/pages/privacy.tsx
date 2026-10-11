@@ -39,7 +39,7 @@ export default function Privacy() {
         <li>
           Daymark loads a forecast for its default place when the app opens. When you search for another
           place, refresh conditions, or use device location, the corresponding weather or place-search
-          requests are sent directly from your browser to Open-Meteo, a third-party weather service.
+          requests are sent directly from your browser or installed app to Open-Meteo, a third-party weather service.
         </li>
         <li>Optional voice features rely on your browser&rsquo;s or device&rsquo;s own speech capabilities.</li>
       </ul>
@@ -87,7 +87,7 @@ export default function Privacy() {
       <p>
         Forecasts, air-quality data, and place search come from{' '}
         <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>. Requests go
-        directly from your browser to Open-Meteo&rsquo;s servers:
+        directly from your browser or installed app to Open-Meteo&rsquo;s servers:
       </p>
       <ul>
         <li><code>api.open-meteo.com</code> — forecasts</li>
@@ -183,8 +183,10 @@ export default function Privacy() {
 
       <h2>International processing</h2>
       <p>
-        Open-Meteo and your browser&rsquo;s or device&rsquo;s speech services may process data on
-        servers in various countries. Their own policies describe where and how this happens.
+        Open-Meteo processes weather and search requests on its own servers. Browser or device
+        speech services may also process voice input or narration remotely, depending on the
+        provider and settings. Those providers&rsquo; own policies describe where and how such
+        processing happens.
       </p>
 
       <h2>Children&rsquo;s privacy</h2>
