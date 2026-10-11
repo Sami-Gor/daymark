@@ -59,6 +59,7 @@ android/kokoro-poc/scripts/fetch-kokoro-assets.sh
 
 # 2. Rust JNI library (clones pguso/kokoro at the pinned commit, cross-compiles,
 #    copies libs into both the rollback TWA project and the Capacitor plugin)
+# Adjust this machine-specific NDK location if your Android NDK is installed elsewhere.
 ANDROID_NDK_HOME=$HOME/.bubblewrap/android_sdk/ndk/29.0.14206865 \
   android/kokoro-poc/scripts/build-kokoro-android.sh
 
@@ -67,7 +68,8 @@ cd artifacts/weather-app
 pnpm build
 pnpm exec cap sync android
 
-# 4. Android builds (signing requires android/keystore.properties + keystore)
+# 4. Android builds (signing requires artifacts/weather-app/android/keystore.properties
+#    plus the upload keystore path configured there; neither local signing file is committed)
 cd android
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
@@ -527,7 +529,9 @@ this PR has not built or uploaded a new AAB.
   production (the unified hook uses `lib/voice-browser` directly).
 - `KokoroTtsTestActivity` (TWA project only) — diagnostic, not in the
   Capacitor build.
-- Sherpa archives on `poc/local-tts` (tag/branch) — keep as history.
+- Keep any local Sherpa POC archives as historical material. Old notes refer
+  to `poc/local-tts`, but verify that branch/tag exists before relying on it
+  from a fresh clone; local-only refs are not available through GitHub.
 - Verbose release logging (chunk timing, PSS) — optional reduction to
   warn/error plus a single init/READY line.
 - `sw.js` in the bundled native assets — harmless but unused inside Capacitor.
@@ -536,7 +540,7 @@ this PR has not built or uploaded a new AAB.
 
 | Area | Status | Severity | Evidence | Required action |
 |---|---|---|---|---|
-| Build/signing/versioning | READY | — | builds pass, AAB verified, hashes match | none |
+| Existing AAB build/signing/versioning | EXISTING AAB VERIFIED; POLICY COPY NOT PACKAGED | release consistency | uploaded versionCode 1 AAB signature/hash were verified in the prior artifact audit; this PR changes privacy-page source text but not the existing bundle | if adopting the policy changes, deploy the web version and build/validate a new AAB with the next unused versionCode; then smoke-test a Play-signed install |
 | Play App Signing fingerprint | PENDING (manual) | blocks App Links | signing enrolled on first upload; app-signing SHA-256 not yet recorded | copy from Play Console → App integrity |
 | Digital Asset Links endpoint | NEEDS LIVE RECHECK | blocks verified App Links | Last recorded check returned SPA fallback; site is deployed, but this branch has no actual `.well-known/assetlinks.json` file | check live endpoint; if incorrect, publish only the JSON asset with the Play app-signing SHA-256 |
 | Data Safety declaration | RECHECK BEFORE PRODUCTION (manual) | policy accuracy | Previously marked complete; location is sent to Open-Meteo after rounding; speech input may be processed off-device; browser/system TTS also receives narration text | review current Play definitions, actual flows, existing Console answers, and privacy policy; see §10 and the checklist |
@@ -560,9 +564,12 @@ this PR has not built or uploaded a new AAB.
 | CSP in native shell | OPTIONAL | low | no CSP headers native | consider meta CSP later |
 
 ### A. CODE/PACKAGING GATE
-No release-blocking code or packaging defect was identified in this audit.
-That does not mean every external release check is complete: Play Console/Data
-safety and verified App Links still need their own checks.
+The prior artifact audit found no release-blocking Android runtime or packaging
+defect in the uploaded AAB. This PR adds privacy-policy source edits; those edits
+are not in that AAB. If adopted, successful CI, a new Android bundle with the
+next unused versionCode, and a Play-signed smoke test are needed before the
+revised in-app policy wording is live. Data safety and App Links checks remain
+separate.
 
 ### B. PHYSICAL-DEVICE VALIDATION — CORE PASS COMPLETE
 A real-device pass was completed on a Nothing A059P running Android 16 (§18).
@@ -604,18 +611,22 @@ with the upstream voice source.
    WebView data flows and off-device transmission must be considered; do not
    infer answers solely from lack of app-side storage. See
    https://support.google.com/googleplay/android-developer/answer/10787469.
-4. Verify the existing website's `/.well-known/assetlinks.json` endpoint
-   and the Digital Asset Links statement response. Publish/update that JSON
-   asset only if missing or incorrect, using the Play app-signing and upload
-   fingerprints. Then verify with the Play link checker and
-   `pm verify-app-links`; confirm cold/warm links open in the app.
-5. Check the Play Console Dashboard and submit or verify the production-access
+4. Check the Play Console Dashboard and submit or verify the production-access
    application using actual tester feedback and engagement data; do not reuse
-   invented or assumed metrics.
-6. After access is approved, use the current Play Console Production workflow
-   with the approved/tested release. If another AAB is required, increment
-   versionCode, validate its bundle/signature, smoke-test a Play-signed install,
-   then stage rollout (e.g. 10% → 50% → 100%) and monitor Android vitals.
+   invented or assumed metrics. The maintainer reports Apply for production is
+   available; the submission/decision state must be read from Console.
+5. Digital Asset Links is a separate app-link check, not a prerequisite for
+   applying for production access. Verify the existing website's
+   `/.well-known/assetlinks.json` endpoint and the Digital Asset Links statement.
+   Publish/update that JSON asset only if missing or incorrect, using the Play
+   app-signing and upload fingerprints; then verify with the Play link checker
+   and `pm verify-app-links` if verified App Links are needed for launch.
+6. After access is approved, use the current Play Console Production workflow.
+   If adopting the privacy-policy source edits in this PR, deploy the revised web
+   policy and build a matching Android AAB with the next unused versionCode
+   (expected 2 if versionCode 1 remains latest); validate its bundle/signature,
+   smoke-test the Play-signed install, then stage rollout (e.g. 10% → 50% → 100%)
+   and monitor Android vitals.
 7. Keep the local TWA rollback reference until the production rollout is stable.
    The tag `pre-capacitor-daymark` is not published to GitHub; the reachable
    rollback commit is `ff496996fcf9b47d9524d81ac300e69c2974c805`.
