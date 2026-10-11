@@ -28,7 +28,7 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
 | versionCode / versionName | `1` / `1.0.0` |
 | minSdk / targetSdk / compileSdk | `24` / `36` / `36` |
 | Signing | `android/daymark-upload.keystore`, alias `daymark-upload`, SHA-256 `34:6B:BE:…:FA:7E` (rotated 2026-09-13; earlier `3C:60:AD:…:20:57` retired) |
-| Play metadata | package `io.github.sami_gor.daymark`; AAB versionCode 1; closed testing submitted; assetlinks pending the Play app-signing SHA-256 |
+| Play metadata (state at this pre-migration snapshot) | package `io.github.sami_gor.daymark`; AAB versionCode 1; closed testing had been submitted; App Links association still depended on the Play app-signing SHA-256 |
 | Deep links | `https://daymark-weather.pages.dev` intent filter, `autoVerify`, fallback Custom Tabs |
 | Manifest permissions (TWA) | none declared (web APIs: geolocation, microphone) |
 | Release AAB | 84,011,698 B (Kokoro bm_fable) |
@@ -75,10 +75,14 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
 - Manifest metadata: `asset_statements`, `web_manifest_url`, splash screen,
   status/nav bar colors, `FALLBACK_STRATEGY=customtabs`, `SCREEN_ORIENTATION`,
   file provider, `autoVerify` https intent filter for the production host.
-- Digital Asset Links: template only (`asset-links/assetlinks.template.json`
-  with `__PLAY_APP_SIGNING_SHA256__`); production `/.well-known/assetlinks.json`
-  is not deployed (serves the SPA fallback), so the app currently runs in
-  Custom Tabs fallback mode.
+- **Historical TWA state:** this legacy project had only the template
+  (`asset-links/assetlinks.template.json` with
+  `__PLAY_APP_SIGNING_SHA256__`), and the last recorded endpoint check returned
+  the SPA fallback, so the TWA used Custom Tabs fallback mode. This is not a
+  fresh live check of the website. For the current Capacitor app's HTTPS App
+  Links, check the live association endpoint using
+  `docs/release/play-console-checklist.md`; do not assume its current state
+  from this historical TWA audit.
 - Icons/splash under `android/app/src/main/res/`.
 - Kokoro POC: native-only `KokoroTtsTestActivity` + `KokoroLocalTtsEngine`
   (Java) over a Rust JNI cdylib with the bundled model/voice, plus
@@ -132,7 +136,7 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
 | Capacitor | 8.5.1 (`@capacitor/core`, `@capacitor/cli`, `@capacitor/android`, `@capacitor/app`) |
 | Android Gradle Plugin / Gradle | 8.13.0 / 8.14.3 |
 | JDK | 21 (required by Capacitor 8; TWA used 17) |
-| Node / pnpm | 26.8.2 / 12.3.4 |
+| Node / pnpm | Node 24 is used by current CI (Node 26.8.2 was used for this migration validation) / pnpm 12.3.4 |
 | package id | `io.github.sami_gor.daymark` (unchanged) |
 | minSdk | 24 (Capacitor 8 minimum; TWA supported 23) |
 | targetSdk / compileSdk | 36 / 36 (unchanged) |
