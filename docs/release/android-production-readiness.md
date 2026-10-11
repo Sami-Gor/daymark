@@ -608,4 +608,6 @@ with the upstream voice source.
    with the approved/tested release. If another AAB is required, increment
    versionCode, validate its bundle/signature, smoke-test a Play-signed install,
    then stage rollout (e.g. 10% → 50% → 100%) and monitor Android vitals.
-7. Keep the TWA rollback tag until the production rollout is stable.
+7. Keep the local TWA rollback reference until the production rollout is stable.
+   The tag `pre-capacitor-daymark` is not published to GitHub; the reachable
+   rollback commit is `ff496996fcf9b47d9524d81ac300e69c2974c805`.
