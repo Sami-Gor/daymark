@@ -189,9 +189,10 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 - [x] The maintainer reports **Apply for production is available** in Play Console
       (11 October 2026). This establishes eligibility to open the application,
       not that the application was submitted or approved.
-- [ ] If the account is a personal account created after 13 November 2023, confirm
-      Play Console recognises the required tester count and continuous opt-in
-      period as satisfied; do not infer this solely from local notes.
+- [x] The maintainer reports that **Apply for production is available**. Do not
+      treat the 12-testers / 14-continuous-days period as still waiting by default;
+      if Play Console itself shows a testing-eligibility warning, follow that
+      specific warning rather than repeating completed testing.
 - [ ] Complete or continue the production-access application in Play Console
       using actual tester engagement, feedback and changes made in response.
       Keep evidence factual; do not invent metrics or feedback.
@@ -213,7 +214,9 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       policy.
 - [ ] Check the existing website's Digital Asset Links endpoint as described
       in steps 5–7; publish an updated site only if the JSON is absent or wrong.
-      This is an App Links task separate from AAB acceptance.
+      This is separate from the production-access application and AAB acceptance.
+      It affects automatic verified-link opening, not permission to submit the
+      production-access form.
 - [ ] Once access is approved, create the Production release using the tested
       bundle through the current Console workflow. If a new AAB is required,
       increment versionCode and validate the new build.
@@ -233,13 +236,16 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       the current Console message before a new submission; this note does not
       replace any release-specific requirement shown there.
 - [ ] Every new Android bundle: rebuild the AAB and increment `versionCode`
-      in `artifacts/weather-app/android/app/build.gradle`; do not reuse a
-      previously uploaded version code.
-- [ ] The privacy-policy source pages are also edited in this PR. Those source
-      changes are **not yet deployed** by this documentation branch and do not
-      alter the already-uploaded AAB. Before relying on the revised policy, publish
-      the web update, rebuild/release the Android bundle so its bundled policy
-      matches, and set the policy effective date to the actual publication date.
+      in `artifacts/weather-app/android/app/build.gradle`; verify the next
+      unused value in Play Console rather than assuming the prior value.
+- [ ] **Privacy-policy publication sync:** the policy source pages are edited in
+      this PR, but the changes are not live and are not in the already-uploaded
+      AAB. Before using this revised wording, deploy the web build and rebuild
+      the Android bundle so the bundled policy matches. Increment `versionCode`
+      to the next unused value (expected `2` if `1` is still the latest upload),
+      confirm the three policy pages match and set the effective date to the
+      actual publication date. Do not claim the revised wording is live before
+      the website deployment and Android release are complete.
 - [ ] Never remove fingerprints from `assetlinks.json` (sideload verification
       breaks); replace only if you rotate a key.
 - [ ] If the origin changes, update the intent filter host in
