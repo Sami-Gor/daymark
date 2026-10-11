@@ -39,9 +39,10 @@ export default function PrivacyEs() {
           tiempo.
         </li>
         <li>
-          Para funcionar, Daymark envía las solicitudes que tú activas —por ejemplo, el pronóstico de
-          un lugar que has elegido— directamente desde tu navegador a Open-Meteo, un servicio
-          meteorológico externo.
+          Al abrir la aplicación, Daymark carga un pronóstico para su ubicación predeterminada. Cuando
+          buscas otro lugar, actualizas las condiciones o utilizas la ubicación del dispositivo, las
+          solicitudes meteorológicas o de búsqueda correspondientes se envían directamente desde tu
+          navegador a Open-Meteo, un servicio meteorológico externo.
         </li>
         <li>
           Las funciones de voz opcionales dependen de las capacidades de voz de tu navegador o
