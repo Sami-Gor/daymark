@@ -53,6 +53,7 @@ narration voice; `bm_george` was the initial pick and is no longer bundled.
 android/kokoro-poc/scripts/fetch-kokoro-assets.sh
 
 # 2. native library (clones the pinned crate into .build/, cross-compiles with the NDK)
+# Adjust this machine-specific NDK location if your Android NDK is installed elsewhere.
 ANDROID_NDK_HOME=$HOME/.bubblewrap/android_sdk/ndk/29.0.14206865 \
   android/kokoro-poc/scripts/build-kokoro-android.sh
 
