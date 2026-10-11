@@ -34,10 +34,11 @@ First submitted artifact: `app-release.aab` — SHA-256
       longer signs builds.
 - [ ] Keep the offline keystore + password backup confirmed in safe storage.
       Losing them requires a Play key-reset request.
-- [ ] Record whether the developer account is personal or organisation. The
-      maintainer reports closed testing is complete; for personal accounts
-      created after 13 November 2023, confirm Play Console recognises the
-      12-testers / 14-continuous-days gate as satisfied.
+- [ ] Record whether the developer account is personal or organisation only
+      if relevant to the Console application. The maintainer reports that Apply
+      for production is available, so do not treat the 12-testers / 14-continuous-
+      days period as a pending task unless the live Console explicitly shows an
+      eligibility warning.
 - [x] AAB built from merged `main` and uploaded (metadata above). Rebuild
       command kept for reference:
 
