@@ -42,7 +42,7 @@ export default function PrivacyEs() {
           Al abrir la aplicación, Daymark carga un pronóstico para su ubicación predeterminada. Cuando
           buscas otro lugar, actualizas las condiciones o utilizas la ubicación del dispositivo, las
           solicitudes meteorológicas o de búsqueda correspondientes se envían directamente desde tu
-          navegador a Open-Meteo, un servicio meteorológico externo.
+          navegador o aplicación instalada a Open-Meteo, un servicio meteorológico externo.
         </li>
         <li>
           Las funciones de voz opcionales dependen de las capacidades de voz de tu navegador o
@@ -96,7 +96,8 @@ export default function PrivacyEs() {
       <p>
         Los pronósticos, los datos de calidad del aire y la búsqueda de lugares provienen de{' '}
         <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>. Las
-        solicitudes van directamente desde tu navegador a los servidores de Open-Meteo:
+        solicitudes van directamente desde tu navegador o aplicación instalada a los servidores de
+        Open-Meteo:
       </p>
       <ul>
         <li><code>api.open-meteo.com</code> — pronósticos</li>
@@ -198,8 +199,10 @@ export default function PrivacyEs() {
 
       <h2>Tratamiento internacional</h2>
       <p>
-        Open-Meteo y los servicios de voz de tu navegador o dispositivo pueden procesar datos en
-        servidores situados en distintos países. Sus propias políticas describen dónde y cómo ocurre.
+        Open-Meteo procesa las solicitudes meteorológicas y de búsqueda en sus propios servidores.
+        Los servicios de voz de tu navegador o dispositivo también pueden procesar la entrada de voz
+        o el texto de la narración de forma remota, según el proveedor y la configuración. Las políticas
+        de esos proveedores describen dónde y cómo se realiza ese procesamiento.
       </p>
 
       <h2>Privacidad de los niños</h2>
