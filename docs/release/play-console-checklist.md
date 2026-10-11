@@ -5,10 +5,12 @@ Companion to [`android-production-readiness.md`](android-production-readiness.md
 sequence).
 
 **Status (11 October 2026):** The maintainer confirms the closed-testing phase is
-complete. This repository cannot verify live Play Console state. Remaining
-work: confirm the production-access application status, capture the Play
-app-signing SHA-256, deploy and verify `assetlinks.json`, review Data safety
-answers for speech input, and close outstanding device validation.
+complete. The website is already deployed. Remaining work: confirm the
+production-access application status, capture the Play app-signing SHA-256,
+check whether the existing `/.well-known/assetlinks.json` endpoint serves the
+correct JSON (publish that asset only if needed), and review Data safety answers
+for speech input. A physical-device pass is already documented; only the
+additional test gaps listed in the readiness audit remain.
 
 Package: `io.github.sami_gor.daymark` · versionCode `1` / versionName `1.0.0`
 · minSdk `24` / targetSdk `36`
@@ -109,7 +111,24 @@ Play Console → **Policy and programs → App content**. All rows completed:
       (`34:6B:BE:…:FA:7E`) for the app-signing fingerprint in `assetlinks.json`.
       They are different keys with different roles.
 
-## 6. Deploy `assetlinks.json` — BLOCKED on step 5
+## 6. Confirm Digital Asset Links on the existing website
+
+The website at `https://daymark-weather.pages.dev` is already deployed; this
+step is **not** asking you to deploy a website from scratch. First check the
+specific endpoint. The last result recorded in the audit was an HTML fallback,
+but that live result has not been independently rechecked in this session.
+
+- [ ] Check the current response and content:
+
+```bash
+curl -sI https://daymark-weather.pages.dev/.well-known/assetlinks.json | head -5
+curl -s https://daymark-weather.pages.dev/.well-known/assetlinks.json
+```
+
+It must return HTTP 200, JSON (not the app HTML), the package
+`io.github.sami_gor.daymark`, and the correct **Play app-signing SHA-256**.
+If it is already correct, no website change/deploy is needed. If it is absent,
+returns HTML, or has the wrong fingerprint:
 
 - [ ] Copy `docs/release/assetlinks.template.json` to
       `artifacts/weather-app/public/.well-known/assetlinks.json` and replace
@@ -123,21 +142,19 @@ Play Console → **Policy and programs → App content**. All rows completed:
   Content-Type: application/json
 ```
 
-- [ ] `pnpm build` and deploy `dist/` to Cloudflare Pages (static assets are
-      served before the SPA fallback, so the path will return JSON instead of
-      the app HTML).
+- [ ] Build and publish the resulting site update through the existing Cloudflare
+      Pages deployment workflow. This is a normal update to the deployed site,
+      not an initial deployment.
 
-## 7. Verify App Links — PENDING (after step 6)
+## 7. Verify App Links — PENDING until the endpoint is correct
 
-- [ ] Served correctly:
+- [ ] Query Google's Digital Asset Links statement API:
 
 ```bash
-curl -sI https://daymark-weather.pages.dev/.well-known/assetlinks.json | head -5
-# expect: HTTP/2 200 and content-type: application/json
-
 curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://daymark-weather.pages.dev&relation=delegate_permission/common.handle_all_urls"
-# expect: the package + fingerprints from the file
 ```
+
+Confirm it returns this package and the expected fingerprints.
 
 - [ ] On a device with a build signed by one of the listed keys (Play-signed
       install, or the repo's release APK signed with the upload key):
@@ -149,7 +166,10 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pages.dev/fr/privacy"
 ```
 
-- [ ] Confirm links open in the app cold and warm (readiness §3).
+- [ ] Once Digital Asset Links is valid, verify Android's **verified App Links**
+      on device, including cold/warm opens. This is a separate test from the
+      already-completed core device pass; the previous emulator routing test
+      verified in-app handling, not Android domain verification.
 
 ## 8. Closed testing — COMPLETE (maintainer-confirmed)
 
@@ -178,9 +198,9 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       install estimates.
 - [ ] Reconcile the speech-input Data safety declaration and verify all Console
       policy declarations still match the app and privacy policy.
-- [ ] Copy the Play app-signing SHA-256 from App integrity, deploy
-      `assetlinks.json`, and verify it as described in steps 5–7. This is an
-      App Links task separate from AAB acceptance.
+- [ ] Check the existing website's Digital Asset Links endpoint as described
+      in steps 5–7; publish an updated site only if the JSON is absent or wrong.
+      This is an App Links task separate from AAB acceptance.
 - [ ] Once access is approved, create the Production release using the tested
       bundle through the current Console workflow. If a new AAB is required,
       increment versionCode and validate the new build.
