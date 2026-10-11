@@ -98,12 +98,13 @@ Play Console status (manual, cannot be verified from the repo):
 1. Play App Signing enrolled via the first upload; the **app signing key**
    SHA-256 still needs to be copied from Play Console → App integrity.
 2. Data safety was previously reported complete, but must be rechecked before
-   production. Assess the user-initiated location request, WebView speech input,
-   and speech-output handoff to browser/system TTS. Do not infer “not collected”
-   solely because Daymark itself stores none of these values: controlled WebView
-   flows and any off-device provider processing must be assessed under current
-   Play guidance, including the conditions for ephemeral processing. See
-   [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469).
+   production. Assess user-initiated location, WebView speech input, and the
+   browser/system TTS output path. Google Play defines collection as
+   transmitting data off-device and includes controlled WebViews. Transmitted
+   data processed ephemerally still needs the correct form response, although
+   qualifying ephemeral processing may not appear in the public Data safety
+   section. Do not infer “not collected” solely from lack of app-side storage.
+   See [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469).
 3. Content rating, target audience, ads (no ads; advertising ID = No),
    government/financial/health, app access and AI asset declarations were
    previously marked complete in the checklist; verify their current Console
@@ -548,7 +549,7 @@ this PR has not built or uploaded a new AAB.
 | Battery/thermal | OPTIONAL EXTENDED QA | low-medium | brief 1-minute pass: 35.0 °C, thermal status 0 | 10-minute soak is optional additional coverage |
 | Accessibility (TalkBack/font scale) | FONT-SCALE PASS RECORDED; TALKBACK NOT CLAIMED | low-medium | 1.5x font pass 14 Sep 2026; web automations pass | TalkBack audit is optional additional coverage |
 | Real-device latency | CORE DEVICE PASS RECORDED; BENCHMARK OPTIONAL | low | real-device flow was exercised; emulator estimate ~2.4 s | no repeat required; benchmark only if needed |
-| App data-flow behaviour | CODE REVIEWED; PLAY DECLARATION PENDING | policy accuracy | no in-app analytics, rounded location requests, no transcript/location logging; speech providers may process data off-device | finish Data safety classification for location, speech input and browser/system TTS using current Play definitions; see §2, §10 and checklist |
+| App data-flow behaviour | CODE REVIEWED; PLAY DECLARATION PENDING | policy accuracy | no in-app analytics, rounded location requests, no transcript/location logging; speech providers may process data off-device | decide whether the transmitted rounded coordinates meet Play's precise or approximate definition, assess ephemeral processing, and reconcile voice-input/output provider flows; see §2, §10 and checklist |
 | Security (WebView/bridge/components) | READY | — | audit §12 | optional CSP hardening |
 | Licensing | READY | — | WTFPL cleared; permissive stack | note bm_fable provenance |
 | Dependencies | READY | — | prod audit clean, pinned versions | none |
@@ -593,9 +594,10 @@ with the upstream voice source.
    coverage listed in §20B is optional and can be added only if justified by a
    specific risk or by a desire for broader compatibility evidence.
 2. In Play Console, check App Signing and record the **app-signing** fingerprint.
-   Confirm Data Safety, content rating, app access, ads, target audience, AI
+   Confirm Data safety, content rating, app access, ads, target audience, AI
    asset and other applicable declarations. The maintainer reports closed
-   testing complete; production-access application status remains unverified.
+   testing complete and **Apply for production available**; whether the
+   production-access application has been submitted or decided remains unverified.
 3. Reconcile Data safety for the user-initiated location request, controlled
    WebView speech-recognition path, and browser/system TTS handoff against
    current Play policy and actual provider behaviour. Google says controlled
