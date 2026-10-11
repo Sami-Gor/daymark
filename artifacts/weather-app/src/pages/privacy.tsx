@@ -108,17 +108,21 @@ export default function Privacy() {
 
       <h2>Voice output (Hear today)</h2>
       <p>
-        &ldquo;Hear today&rdquo; reads the forecast aloud using your browser&rsquo;s or device&rsquo;s
-        built-in speech synthesis. The briefing text is processed by that platform capability, not by
-        a Daymark-operated speech backend.
+        &ldquo;Hear today&rdquo; reads the briefing aloud. In the Android app, English narration is
+        generated on-device by the bundled Kokoro model; French and Spanish use Android system text-to-speech.
+        In the web app, narration uses the browser&rsquo;s speech-synthesis API. Browser and system speech
+        providers manage their own processing and voice data, which may vary by device, settings, and
+        selected voice. Daymark does not operate a speech backend or store narration text.
       </p>
 
       <h2>Information stored on your device</h2>
       <p>
         Daymark stores your language preference (English, French, or Spanish) in your browser&rsquo;s
-        local storage under the key <code>daymark.locale</code>. That is the only persistent
-        application value Daymark intentionally stores. It remains until you change it or clear your
-        browser or site storage.
+        local storage under the key <code>daymark.locale</code>. This is the only persistent user
+        preference Daymark intentionally stores. It remains until you change it or clear your browser
+        or site storage. Separately, the service worker caches app-shell files and the locality dataset
+        in Cache Storage to support offline use; these caches are application resources, not a history
+        of your locations or weather.
       </p>
       <p>
         Daymark does not use cookies, does not use browser session storage or IndexedDB, and does not
@@ -144,8 +148,9 @@ export default function Privacy() {
         used under the Creative Commons Attribution 4.0 licence (CC BY 4.0).
       </p>
       <p>
-        Daymark does not use analytics, advertising, tracking pixels, or any other third-party
-        service.
+        Daymark does not use third-party analytics, advertising, tracking pixels, or tracking
+        services. Open-Meteo and browser/device speech capabilities are third-party services used for
+        the features described above.
       </p>
 
       <h2>Analytics, advertising, and tracking</h2>
