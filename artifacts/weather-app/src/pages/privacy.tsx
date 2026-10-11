@@ -175,8 +175,10 @@ export default function Privacy() {
 
       <h2>Security</h2>
       <p>
-        Daymark is served over HTTPS and enforces a strict content security policy. The app is a
-        static bundle with no secrets and no backend or application server operated by Daymark.
+        The hosted web/PWA version is served over HTTPS and uses the site's configured content
+        security policy. The installed Android app loads bundled local assets; the website's HTTP
+        security headers do not apply inside its WebView. The app is a static bundle with no secrets
+        and no backend or application server operated by Daymark.
       </p>
 
       <h2>International processing</h2>
