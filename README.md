@@ -74,14 +74,14 @@ All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifact
 
 - **Geolocation is never requested on load.** The app opens on a default location (London) and only touches the Geolocation API when you press *Use my location*
 - **Coordinates are rounded to 2 decimals (~1 km) before leaving your device**, then sent only to Open-Meteo endpoints
-- **No user history is persisted by Daymark** — the language preference (`daymark.locale`) is stored in localStorage. The service worker separately caches app-shell files and the locality dataset in Cache Storage; the app does not persist location history, search history, transcripts or weather responses
+- **No user history is persisted by Daymark** — the language preference (`daymark.locale`) is stored in localStorage. The web/PWA service worker caches app-shell files; app code separately caches the locality dataset in Cache Storage. The Android app loads its locality dataset from bundled assets. The app does not persist location history, search history, transcripts or weather responses
 - **Public privacy policy** — a full policy is part of the app at `/privacy` (English), `/fr/privacy` (French) and `/es/privacy` (Spanish); the footer links to the version matching the interface language. It documents the actual data flows, local-storage behavior and third-party services described above
 - **No analytics or third-party trackers** — weather and location-search data go only to the Open-Meteo API hosts (plus the attribution link in the footer); optional voice input is handled by your browser or device and may use its speech service, but Daymark itself never stores transcripts
 - Fonts are self-hosted; no CDN font requests
 
 ## Weather data source
 
-All forecast, air-quality, and geocoding data comes from [Open-Meteo](https://open-meteo.com) — free for non-commercial use, no API key required. Daymark requests the fields needed by its interface; weather and air-quality responses are not cached on disk by the app/service worker. The app shell and locality dataset may be cached locally for offline operation.
+All forecast, air-quality, and geocoding data comes from [Open-Meteo](https://open-meteo.com) — free for non-commercial use, no API key required. Daymark requests the fields needed by its interface; weather and air-quality responses are not cached by the app/service worker. The web/PWA service worker caches the app shell, and the locality dataset is cached separately by app code for offline lookup. The Android app includes the locality dataset in its bundled assets.
 
 ## PWA / offline behavior
 
