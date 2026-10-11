@@ -14,8 +14,10 @@ A Capacitor shell keeps the exact same React/Vite app and PWA deployment, adds a
 supported JavaScript-to-native bridge, and gives us lifecycle, audio-focus and
 packaging control for the native voice path. It also keeps an iOS path open.
 
-The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
-(branch `poc/kokoro-local-tts`, commit `ff49699`).
+The TWA project is preserved at `android/` in this repository. The migration-era
+tag `pre-capacitor-daymark` and branch `poc/kokoro-local-tts` are local/unpublished,
+not available by those names from a fresh GitHub clone. The rollback commit is
+publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 
 ## Migration state record (pre-migration)
 
@@ -252,6 +254,9 @@ Candidates once the Capacitor shell is released:
 
 ## Rollback
 
-`git checkout pre-capacitor-daymark` (or the `poc/kokoro-local-tts` branch at
-`ff49699`) restores the validated TWA/Kokoro state, including the root
-`android/` project, which is never modified by this migration.
+`git switch --detach ff496996fcf9b47d9524d81ac300e69c2974c805` checks out the
+TWA/Kokoro rollback state. The `pre-capacitor-daymark` tag and
+`poc/kokoro-local-tts` branch from migration-era notes are local/unpublished and
+are not available by those names from a fresh GitHub clone. The root `android/`
+project is the legacy rollback project; it is not used for current Capacitor
+production builds.
