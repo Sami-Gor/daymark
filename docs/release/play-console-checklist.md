@@ -80,7 +80,7 @@ Play Console → **Policy and programs → App content**. All rows completed:
 
 | Data type / flow | Current repo evidence | Console follow-up |
 |---|---|---|
-| Location | User-initiated device location; coordinates rounded to 2 decimals before the weather request | Confirm collection/sharing answers accurately describe the provider transfer and any applicable ephemeral-processing exception |
+| Location | User-initiated device location; coordinates are rounded to 2 decimal places (~1 km) before the Open-Meteo weather request | **Do not assume that rounding makes this “approximate location”.** Play defines approximate as an area ≥3 km² and precise as <3 km²; the rounded representation may still be precise by that definition. Assess the actual coordinates/resolution and ephemeral-processing exception using current Play guidance. |
 | Voice-input audio | Daymark does not store recordings; the WebView/browser speech service may process audio remotely | **Unresolved policy check:** determine the required collection/sharing answer for this controlled WebView speech path under current Data safety rules | 
 | Voice-output text | Android English uses bundled local Kokoro; web and Android French/Spanish use browser/system speech APIs | Check whether the chosen browser/system service sends or retains utterance text and whether that flow changes the Data safety response |
 | App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
@@ -134,6 +134,8 @@ It must return HTTP 200, JSON (not the app HTML), the package
 If it is already correct, no website change/deploy is needed. If it is absent,
 returns HTML, or has the wrong fingerprint:
 
+- [ ] Create the destination directory if it does not exist:
+      `mkdir -p artifacts/weather-app/public/.well-known`.
 - [ ] Copy `docs/release/assetlinks.template.json` to
       `artifacts/weather-app/public/.well-known/assetlinks.json` and replace
       `__PLAY_APP_SIGNING_SHA256__` with the fingerprint from step 5. Keep the
@@ -165,7 +167,7 @@ Confirm it returns this package and the expected fingerprints.
 
 ```bash
 adb shell pm verify-app-links --re-verify io.github.sami_gor.daymark
-adb shell pm get-app-links io.github.sami_gor.daymark     # both hosts: verified
+adb shell pm get-app-links io.github.sami_gor.daymark     # check daymark-weather.pages.dev
 adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pages.dev/privacy"
 adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pages.dev/fr/privacy"
 ```
@@ -229,8 +231,14 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       the release `ndk.debugSymbolLevel` or upload the symbols archive). Check
       the current Console message before a new submission; this note does not
       replace any release-specific requirement shown there.
-- [ ] Every update: rebuild the AAB, bump `versionCode` in
-      `artifacts/weather-app/android/app/build.gradle`, re-upload.
+- [ ] Every new Android bundle: rebuild the AAB and increment `versionCode`
+      in `artifacts/weather-app/android/app/build.gradle`; do not reuse a
+      previously uploaded version code.
+- [ ] The privacy-policy source pages are also edited in this PR. Those source
+      changes are **not yet deployed** by this documentation branch and do not
+      alter the already-uploaded AAB. Before relying on the revised policy, publish
+      the web update, rebuild/release the Android bundle so its bundled policy
+      matches, and set the policy effective date to the actual publication date.
 - [ ] Never remove fingerprints from `assetlinks.json` (sideload verification
       breaks); replace only if you rotate a key.
 - [ ] If the origin changes, update the intent filter host in
