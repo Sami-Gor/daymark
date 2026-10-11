@@ -130,7 +130,9 @@ Play Console status (manual, cannot be verified from the repo):
   `MainActivity` (only this host).
 - Runtime routing: `resolveDeepLink()` accepts only
   `daymark-weather.pages.dev`/`localhost` and routes through the SPA; cold and
-  warm links verified on the emulator (`/privacy`, `/fr/privacy`).
+  warm **in-app URL routing** were tested on the emulator (`/privacy`,
+  `/fr/privacy`). This did not establish Android's website-domain verification,
+  which depends on the separate Digital Asset Links association file.
 - The Daymark website itself is already deployed at
   `https://daymark-weather.pages.dev`.
 - The last result recorded by this repo's audit was that the separate
