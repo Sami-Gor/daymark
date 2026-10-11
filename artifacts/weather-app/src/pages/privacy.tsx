@@ -17,7 +17,7 @@ export default function Privacy() {
       brandNote="Privacy Policy"
       backLabel="← Back to weather"
       switcherLabel="Policy language"
-      effectiveText="Effective date: September 11, 2026"
+      effectiveText="Effective date: October 11, 2026"
       tagline="Daymark — weather, simply"
     >
       <p>
