@@ -71,6 +71,7 @@ pnpm exec cap sync android
 # 4. Android builds (signing requires artifacts/weather-app/android/keystore.properties
 #    plus the upload keystore path configured there; neither local signing file is committed)
 cd android
+# macOS example; on other systems use the equivalent path to the installed JDK 21.
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
 ```
