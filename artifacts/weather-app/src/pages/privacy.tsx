@@ -37,8 +37,9 @@ export default function Privacy() {
         <li>Daymark does not use analytics, advertising, or tracking.</li>
         <li>Daymark itself does not store your location, searches, voice, or weather history.</li>
         <li>
-          To work, Daymark sends the requests you trigger — such as a forecast for a place you chose —
-          directly from your browser to Open-Meteo, a third-party weather service.
+          Daymark loads a forecast for its default place when the app opens. When you search for another
+          place, refresh conditions, or use device location, the corresponding weather or place-search
+          requests are sent directly from your browser to Open-Meteo, a third-party weather service.
         </li>
         <li>Optional voice features rely on your browser&rsquo;s or device&rsquo;s own speech capabilities.</li>
       </ul>
