@@ -11,7 +11,7 @@ it as evidence of the live website's current state. The current endpoint must be
 checked using the Capacitor release checklist; the live endpoint could not be
 verified from this audit environment.
 
-## What Step 9B requires
+## Historical TWA-era steps (reference only)
 
 1. Historical TWA-era step: the final HTTPS origin was selected as
    `https://daymark-weather.pages.dev` (Cloudflare Pages). The website is
