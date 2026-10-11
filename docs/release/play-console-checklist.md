@@ -73,14 +73,18 @@ Play Console → **Policy and programs → App content**. All rows completed:
 - [x] Government apps: No · Financial features: No · Health: No · News: No.
 - [x] Data safety form was previously reported complete. **Recheck the existing
       answers before production** for user-initiated location, WebView speech
-      input and the browser/system TTS output path. Providers may process data
-      off-device even though Daymark does not store it. Use current Play
-      definitions and the actual production flow; do not infer the answer from
-      the absence of app-side storage alone.
+      input and browser/system TTS output. Providers may process data off-device
+      even though Daymark does not store it. Google Play defines collection as
+      transmitting data off-device; controlled WebViews are included. Data
+      transmitted off-device but processed ephemerally still needs the correct
+      form response, although qualifying ephemeral processing may not appear in
+      the public Data safety section. Use the current
+      [Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469)
+      and actual production flow.
 
 | Data type / flow | Current repo evidence | Console follow-up |
 |---|---|---|
-| Location | User-initiated device location; coordinates are rounded to 2 decimal places (~1 km) before the Open-Meteo weather request | **Do not assume that rounding makes this “approximate location”.** Play defines approximate as an area ≥3 km² and precise as <3 km²; the rounded representation may still be precise by that definition. Assess the actual coordinates/resolution and ephemeral-processing exception using current Play guidance. |
+| Location | User-initiated device location; coordinates are rounded to 2 decimal places (~1 km) before the Open-Meteo weather request | **Do not assume that rounding makes this “approximate location”.** Play defines approximate location as an area ≥3 km² and precise location as <3 km². Assess the effective location resolution, the fact that the coordinates are transmitted off-device, and the ephemeral-processing rule using [current Play guidance](https://support.google.com/googleplay/android-developer/answer/10787469). Ephemeral handling can affect public disclosure, but is not a reason to omit required form answers. |
 | Voice-input audio | Daymark does not store recordings; the WebView/browser speech service may process audio remotely | **Unresolved policy check:** determine the required collection/sharing answer for this controlled WebView speech path under current Data safety rules | 
 | Voice-output text | Android English uses bundled local Kokoro; web and Android French/Spanish use browser/system speech APIs | Check whether the chosen browser/system service sends or retains utterance text and whether that flow changes the Data safety response |
 | App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
@@ -180,14 +184,11 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 ## 8. Closed testing — COMPLETE (maintainer-confirmed)
 
 - [x] The maintainer confirms the closed-testing phase is complete
-      (11 October 2026). This status has not been independently checked against
-      the live Play Console.
-- [x] The repository records an Alpha track and first AAB submission; current
-      track details and tester metrics must be confirmed in Play Console.
-- [x] The maintainer reports the closed-test phase complete.
+      (11 October 2026); the live track history and tester metrics have not been
+      independently checked here.
 - [x] The maintainer reports **Apply for production is available** in Play Console
-      (11 October 2026). This does not establish that the application was
-      submitted or approved.
+      (11 October 2026). This establishes eligibility to open the application,
+      not that the application was submitted or approved.
 - [ ] If the account is a personal account created after 13 November 2023, confirm
       Play Console recognises the required tester count and continuous opt-in
       period as satisfied; do not infer this solely from local notes.
