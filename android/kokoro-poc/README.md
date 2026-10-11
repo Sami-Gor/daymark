@@ -56,8 +56,10 @@ android/kokoro-poc/scripts/fetch-kokoro-assets.sh
 ANDROID_NDK_HOME=$HOME/.bubblewrap/android_sdk/ndk/29.0.14206865 \
   android/kokoro-poc/scripts/build-kokoro-android.sh
 
-# 3. Android app
-cd android && ./gradlew :app:assembleDebug   # or :app:assembleRelease
+# 3. Production Capacitor Android app (the root android/ directory is TWA rollback only)
+cd artifacts/weather-app/android
+./gradlew :app:assembleDebug
+# For a signed production bundle, use :app:bundleRelease with the release keystore config.
 ```
 
 `android/kokoro-poc/.build/`, `android/.cargo/`, the fetched assets and the
@@ -67,6 +69,9 @@ The scripts populate two shells: the original TWA test app (`android/app`) and
 the production Capacitor plugin module
 (`artifacts/weather-app/android/daymark-voice`), which packages the same
 `libkokoro_jni.so`, model and `bm_fable` voice for the DaymarkVoice plugin.
+For Google Play releases, build from `artifacts/weather-app/android/`; the
+repo-root `android/` project is historical rollback material, not the current
+production app.
 
 ## G2P path (no eSpeak)
 
