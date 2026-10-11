@@ -216,7 +216,10 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       increment versionCode and validate the new build.
 - [ ] Roll out in stages (for example 10% → 50% → 100%) and monitor Android
       vitals for ANRs/crashes, especially memory-related kills on low-RAM devices.
-- [ ] Keep the `pre-capacitor-daymark` TWA rollback tag until rollout is stable.
+- [ ] Keep the local TWA rollback reference until rollout is stable. The tag
+      `pre-capacitor-daymark` is not published to GitHub; a fresh clone can use
+      the reachable rollback commit
+      `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 
 ## 10. Follow-ups (non-blocking)
 
