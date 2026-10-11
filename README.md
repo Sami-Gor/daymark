@@ -122,7 +122,7 @@ cd android
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
 ```
 
-Release: package `io.github.sami_gor.daymark` (versionCode 1 / versionName 1.0.0), currently in Google Play closed testing. See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
+Release: package `io.github.sami_gor.daymark` (versionCode 1 / versionName 1.0.0). The maintainer confirms the closed-testing phase is complete; production-access and final release status must be checked in Play Console. See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
 
 ## Test
 
