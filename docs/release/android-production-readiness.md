@@ -561,9 +561,11 @@ with the upstream voice source.
    Google says controlled WebView data flows and off-device transmission must
    be considered in the form; do not infer answers solely from lack of app-side
    storage. See https://support.google.com/googleplay/android-developer/answer/10787469.
-4. Deploy `assetlinks.json` with the Play app-signing and upload fingerprints;
-   verify using the Digital Asset Links endpoint, Play link checker, and
-   `pm verify-app-links`; re-test cold/warm links.
+4. Verify the existing website's `/.well-known/assetlinks.json` endpoint
+   and the Digital Asset Links statement response. Publish/update that JSON
+   asset only if missing or incorrect, using the Play app-signing and upload
+   fingerprints. Then verify with the Play link checker and
+   `pm verify-app-links`; confirm cold/warm links open in the app.
 5. Check the Play Console Dashboard and submit or verify the production-access
    application using actual tester feedback and engagement data; do not reuse
    invented or assumed metrics.
