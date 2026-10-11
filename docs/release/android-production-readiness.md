@@ -89,19 +89,30 @@ Play Console status (manual, cannot be verified from the repo):
 
 1. Play App Signing enrolled via the first upload; the **app signing key**
    SHA-256 still needs to be copied from Play Console → App integrity.
-2. Data Safety completed (mapping in §10: location approximate/precise sent to
-   Open-Meteo; audio not stored by the app; no analytics/crash logs).
+2. Data Safety was previously reported complete, but must be rechecked before
+   production. In particular, do not infer “not collected” for voice recordings
+   just because Daymark does not persist them: controlled WebView data flows
+   and any off-device speech-service processing must be assessed against current
+   Play guidance. Also verify how the user-initiated, rounded location request
+   should be answered under the current ephemeral-processing rules. See
+   [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469).
 3. Content rating, target audience, ads (no ads; advertising ID = No),
-   government/financial/health, app access and AI asset declarations completed.
-4. Store listing / default store listing completed (graphics outside this
-   audit).
-5. Closed-testing (Alpha) release submitted with the first AAB
-   (`309abe94…`, 96,463,981 bytes); review pending. Tester mechanism: Google
-   Group `daymark-testers@googlegroups.com`; all countries/regions selected.
-6. Production access remains gated by Google's closed-test requirement
-   (12 testers / 14 continuous days for personal accounts, if applicable).
-7. `assetlinks.json` still to be deployed once the Play app-signing SHA-256 is
-   recorded (the upload-key fingerprint must not be substituted).
+   government/financial/health, app access and AI asset declarations were
+   previously marked complete in the checklist; verify their current Console
+   status and confirm the declarations still match the shipped version.
+4. The store listing/default listing was previously marked complete. Verify
+   status and listed assets in Console before production.
+5. Closed testing is **reported complete by the maintainer (11 October 2026)**.
+   Repository notes record the first AAB (`309abe94…`, 96,463,981 bytes), the
+   Google Group `daymark-testers@googlegroups.com`, and all countries/regions.
+   The live track and tester metrics are not independently verifiable here.
+6. **Production-access application status is not verified.** Check the Console
+   Dashboard to see whether the request is available, submitted, approved, or
+   returned for additional testing. The account-type-specific testing gate, if
+   applicable, must be shown as satisfied in Console.
+7. `assetlinks.json` still needs the Play app-signing SHA-256 before deployment
+   and verification; do not substitute the upload-key fingerprint. This
+   primarily blocks verified App Links, not basic AAB file upload.
 
 ## 3. Digital Asset Links / App Links
 
@@ -471,8 +482,9 @@ asset-links validation, upgrade install.
 | Build/signing/versioning | READY | — | builds pass, AAB verified, hashes match | none |
 | Play App Signing fingerprint | PENDING (manual) | blocks App Links | signing enrolled on first upload; app-signing SHA-256 not yet recorded | copy from Play Console → App integrity |
 | assetlinks.json deployment | PENDING (manual) | blocks App Links | SPA fallback served at path | deploy exact JSON from §3 once the app-signing fingerprint is known |
-| Data Safety / content rating / store forms | DONE (manual) | release gate | declared in Play Console | none |
-| Closed testing (personal account) | IN REVIEW (manual) | release gate | Alpha submitted; Google Group testers; all regions | await review, then 12 testers / 14 days if required |
+| Data Safety declaration | RECHECK BEFORE PRODUCTION (manual) | policy accuracy | Previously marked complete; speech input may be processed off-device through controlled WebView speech recognition; location requests are sent to Open-Meteo | review current Play definitions, actual flows, existing Console answers, and privacy policy; see §10 and the checklist |
+| Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
+| Closed testing phase | COMPLETE (maintainer-confirmed; live Console not independently checked) | production-access prerequisite if applicable | Maintainer says closed testing is complete; existing repo has older in-review status | confirm Console recognises relevant tester threshold/period; check or complete the production-access application |
 | Location behavior | PARTIAL (brief) | medium | brief pass 14 Sep 2026 (A059P); emulator cannot provide fix | full matrix #3–#4 |
 | Speech recognition | PARTIAL (brief) | medium | brief pass 14 Sep 2026 (A059P); WebView API depends on platform service | full matrix #12 |
 | Audio focus/BT/calls | PARTIAL (brief) | medium | Home lifecycle passed 14 Sep 2026; BT/calls not testable on emulator | device matrix #8–#11 |
@@ -518,16 +530,27 @@ with the upstream voice source.
 
 ## 21. Release sequence
 
-1. Complete physical-device validation (matrix #1–#22 on at least one A and one
-   B device; C best effort). A brief merge-confidence pass on a Nothing A059P
-   (Android 16) completed 14 September 2026; the extended and multi-device runs
-   listed in §18 remain outstanding.
-2. Play Console: enable App Signing, copy fingerprints, complete Data Safety,
-   content rating, app access, ads declaration.
-3. Deploy `assetlinks.json` with Play + upload fingerprints; verify with Play
-   link checker and `pm verify-app-links`; re-test cold/warm links.
-4. Upload the AAB to internal/closed testing; smoke test the Play-signed install.
-5. Run the closed-testing gate if required by the account type.
-6. Staged production rollout (e.g. 10% → 50% → 100%) while watching vitals for
-   ANRs/crashes, especially memory-related kills.
+1. Review the physical-device matrix in §18. A brief merge-confidence pass on a
+   Nothing A059P (Android 16) completed on 14 September 2026; the extended and
+   multi-device checks listed there remain outstanding unless they have since
+   been completed. Update this audit with real results.
+2. In Play Console, check App Signing and record the **app-signing** fingerprint.
+   Confirm Data Safety, content rating, app access, ads, target audience, AI
+   asset and other applicable declarations. The maintainer reports closed
+   testing complete; production-access application status remains unverified.
+3. Reconcile Data Safety for the controlled WebView speech-recognition path and
+   user-initiated location flow against current Play policy and actual behaviour.
+   Google says controlled WebView data flows and off-device transmission must
+   be considered in the form; do not infer answers solely from lack of app-side
+   storage. See https://support.google.com/googleplay/android-developer/answer/10787469.
+4. Deploy `assetlinks.json` with the Play app-signing and upload fingerprints;
+   verify using the Digital Asset Links endpoint, Play link checker, and
+   `pm verify-app-links`; re-test cold/warm links.
+5. Check the Play Console Dashboard and submit or verify the production-access
+   application using `production-access-application.md`. Use actual tester
+   feedback and engagement data; do not reuse invented or assumed metrics.
+6. After access is approved, use the current Play Console Production workflow
+   with the approved/tested release. If another AAB is required, increment
+   versionCode, validate its bundle/signature, smoke-test a Play-signed install,
+   then stage rollout (e.g. 10% → 50% → 100%) and monitor Android vitals.
 7. Keep the TWA rollback tag until the production rollout is stable.
