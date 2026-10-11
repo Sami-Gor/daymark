@@ -5,9 +5,14 @@ at `24b2b5e`; later commits resolved the minor findings below). The migration
 is now merged into `main` (PR #15).
 Method: repository/static inspection, artifact inspection of the signed release
 APK/AAB, emulator runtime checks from the migration and performance passes.
-No code or configuration changes were made by this audit. Findings are
-classified per item as **READY**, **PHYSICAL DEVICE TEST REQUIRED (PDT)**,
-**MANUAL PLAY CONSOLE ACTION (MANUAL)**, **MUST FIX**, or **OPTIONAL**.
+No code or configuration changes were made by this audit. Status labels are
+used as follows: **READY** means evidenced as working; **MANUAL PLAY CONSOLE
+ACTION (MANUAL)** means a check in the live Console; **MUST FIX** means a
+release-blocking defect; and **OPTIONAL** means extra assurance, not a release
+gate. Legacy **PDT** labels below refer only to additional device coverage that
+was not in the recorded Nothing A059P pass. They do not mean repeat the core
+device pass. Section 18 records the completed pass; Sections 20–21 state the
+current status and what actually remains.
 
 ## 1. Build / release pipeline
 
@@ -172,7 +177,7 @@ Merged release manifest contains exactly:
 | `INTERNET` | weather APIs + WebView | no | non-issue | READY |
 | `ACCESS_COARSE_LOCATION` | "Use my location" (WebView geolocation) | yes (Capacitor prompts for both) | friendly toast (`locationDenied`) | READY |
 | `ACCESS_FINE_LOCATION` | precise fix for the same flow | yes | same | READY |
-| `RECORD_AUDIO` | AskDaymark speech recognition | yes (Capacitor WebView permission handler) | UI error state, no crash | PDT |
+| `RECORD_AUDIO` | AskDaymark speech recognition | yes (Capacitor WebView permission handler) | UI error state, no crash | Core voice-input flow passed on device (§18); denial/retry edge cases are optional extra coverage |
 | `MODIFY_AUDIO_SETTINGS` | required by Capacitor alongside `RECORD_AUDIO` for WebView capture | no (normal) | n/a | READY |
 | `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | AndroidX auto-added, app-private | no | n/a | READY |
 
@@ -191,11 +196,13 @@ Error mapping: unsupported API, `PERMISSION_DENIED` (code 1), `POSITION_UNAVAILA
 (code 2), `TIMEOUT` (code 3), each with distinct copy; errors dismiss on retry.
 No background location, no continuous tracking, nothing persisted.
 
-**PDT:** first-fix latency, permission prompt UX, "don't ask again"/permanent
-denial, approximate-only grant, provider-off/GPS-off, denial then settings
-change, call/background interruption. The emulator has no fresh fused fix and
-blocks mock providers, so no on-device location behavior is proven by this
-audit.
+**Already tested on a physical device:** the user-initiated location flow
+resolved the locality and refreshed the weather successfully (§18). The
+emulator limitation explains why that emulator could not supplement the real
+device result; it does not negate the recorded physical-device pass.
+Additional edge cases—permanent denial, approximate-only grant, provider/GPS
+off, denial then settings change, and call/background interruption—were not part
+of that pass and are optional extra coverage.
 
 ## 6. Microphone / speech recognition
 
@@ -212,9 +219,12 @@ recognition is handled by your browser or device and may use its speech
 service." If the WebView delegates to the Google speech service, audio may
 leave the device; this must be disclosed in Data Safety.
 
-**PDT:** real recognition availability on AOSP vs Google-certified builds,
-permission denial/retry, offline behavior, microphone conflict while Kokoro
-plays, lifecycle interruption, and failure copy.
+**Already tested on a physical device:** AskDaymark received a transcript and
+displayed an answer (§18). Additional compatibility and edge-case coverage—
+AOSP versus Google-certified builds, denial/retry, offline recognition,
+microphone conflict during narration, lifecycle interruption, and failure copy—
+was not all covered in the recorded pass. This is optional extra coverage, not
+a requirement to repeat the successful core voice-input test.
 
 ## 7. Local TTS / Kokoro
 
@@ -245,8 +255,11 @@ Notes:
   as a residual risk covered by device testing.
 - Bluetooth/headphone routing relies on default AudioTrack routing; untested.
 
-**PDT:** headphones/Bluetooth, music/navigation interruption, phone call
-interruption, long narration thermal behavior, real-device latency.
+**Core narration already tested on a physical device:** playback, Stop,
+restart without overlap, and basic lifecycle handling passed (§18).
+Headphones/Bluetooth, music/navigation and call interruption, a long thermal
+soak, and formal latency benchmarking were not covered in that brief pass and
+are optional extended QA.
 
 ## 8. Memory / performance
 
@@ -261,11 +274,12 @@ Emulator (API 36, 4 GB AVD) values, not device guarantees:
 | Steady PSS | ~626–629 MB peak (Kokoro ~470 MB + WebView/app) |
 | Repeated narration | stable, no native growth |
 
-The ~600 MB peak is the main device-risk item: it is acceptable on modern
-flagships but must be validated on 4 GB mid-range and lower-memory devices,
-including background process death and recovery. No low-memory callbacks are
-implemented beyond the platform default; Android may kill the process while
-backgrounded, and the app cold-starts again (acceptable, but confirm UX).
+The ~600 MB emulator peak is the main remaining compatibility uncertainty for
+lower-memory devices. The recorded Nothing A059P check was a short stability
+pass, not a low-memory soak. Testing on 4 GB mid-range/lower-memory devices and
+checking background process death/recovery would add assurance, but are optional
+broader-compatibility tests—not a reason to repeat the core device test. Android
+may kill the process while backgrounded; the app is expected to cold-start again.
 
 ## 9. Battery / thermal
 
@@ -273,9 +287,11 @@ Expected costs (not yet measured on hardware): one-off model load CPU burst;
 per-narration CPU at roughly real-time synthesis on the emulator (real devices
 expected faster); GPS radio only during "Use my location"; microphone only
 during recognition; no background services, no wake locks, no analytics.
-PDT: battery drain per 10 minutes of narration, device temperature, throttled
-performance after sustained narration, and cold-start after low-power mode.
-No speculative claims are made here.
+Optional extended hardware QA: battery drain over 10 minutes of narration,
+device temperature, throttled performance after sustained narration, and
+cold-start after low-power mode. The recorded device session included a short
+stability/temperature observation, not a 10-minute thermal soak. No claim is
+made that the extended soak was completed; it is not a blanket release gate.
 
 ## 10. Privacy / data flow map
 
@@ -383,10 +399,12 @@ start/stop, `aria-pressed` reflects state, buttons are real `<button>` elements,
 touch targets follow the 44 px minimum, `prefers-reduced-motion` is honoured,
 and error/loading copy is text-based.
 
-PDT (Android-specific): TalkBack focus order and announcements for the voice
-button state, system font scaling at 200%, display size changes, keyboard
-navigation inside the WebView, and colour-contrast verification on device
-profiles. No code defects found in static review.
+The recorded physical-device pass verified layout readability at 1.5× font
+scale. Additional Android-specific accessibility checks—TalkBack focus order
+and announcements, 200% system font scaling, display size changes, keyboard
+navigation and on-device contrast—were not all claimed as completed. Treat
+these as optional accessibility QA rather than a reason to repeat the tested
+font-scale flow. No code defects were found in static review.
 
 ## 16. Offline / network failure
 
@@ -401,11 +419,11 @@ responses by design.
 
 | Failure | Handling |
 |---|---|
-| No location permission / unavailable / timeout | distinct friendly copy, retryable, no crash (PDT for prompt flows) |
+| No location permission / unavailable / timeout | distinct friendly copy, retryable, no crash (denial/timeout edge-case tests are additional coverage) |
 | Network unavailable / API timeout / malformed response | validated response → retry UI, no infinite loading |
 | Kokoro init failure | English surfaces the narration error (no system fallback); fr/es keep their system-TTS path |
 | Kokoro synth/playback failure | error state, listener notified, no crash |
-| Microphone denied / recognition unavailable | UI error; no crash (PDT) |
+| Microphone denied / recognition unavailable | UI error; no crash (denial/unavailable edge-case tests are additional coverage) |
 | System TTS unavailable | speak rejection surfaces as a state reset; no crash |
 | Unsupported language | fr/es use system TTS; if unavailable the narration error is shown |
 | Low memory / process restart | cold start; engine re-initializes; in-memory briefing regenerated |
@@ -414,9 +432,12 @@ responses by design.
 
 Device classes: **A** recent flagship (e.g. Pixel 9/10 class), **B** mid-range
 (4–6 GB, e.g. Pixel a-series / Galaxy A), **C** older supported (Android 7–9,
-3–4 GB, arm64). The ✓ marks indicate test applicability to each device class,
-not previously completed execution; a brief subset was executed on one device
-on 14 September 2026 (details in the section below).
+3–4 GB, arm64). This is a reference matrix for broader coverage across device classes; ✓ marks
+applicability, not a claim that every row was executed. The completed Nothing
+A059P pass is documented below. **The full matrix is not a blanket release
+gate**: do not repeat the core flows already marked as passed in §18 and §20.
+Rows not covered in the recorded pass are additional QA unless a specific
+release risk makes one necessary.
 
 | # | Test | A | B | C | Pass criteria |
 |---|---|---|---|---|---|
@@ -469,10 +490,13 @@ merge-confidence pass.
 | Signer verification | PASS (`apksigner verify --print-certs`) |
 | Bluetooth routing | NOT RETESTED IN BRIEF SESSION (no device connected) |
 
-Not covered by this brief pass: the full matrix above across classes A/B/C,
-TalkBack, 10-minute thermal soak, call/music interruption, screen lock, rotation,
-low-memory kill, fr/es system-TTS voice data, Play-distributed install and
-asset-links validation, upgrade install.
+Not covered by this brief pass: broader coverage across classes A/B/C,
+TalkBack, a 10-minute thermal soak, call/music interruption, screen lock,
+rotation, low-memory kill, French/Spanish system-TTS voice data, a
+Google-Play-distributed install, verified App Links, and upgrade install.
+This is a record of scope, not a requirement to rerun already-passed tests.
+Additional cases may be tested if broader assurance is wanted or a concrete
+risk makes a specific case necessary.
 
 ## 19. Cleanup checklist (do not remove yet)
 
