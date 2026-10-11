@@ -7,8 +7,8 @@ sequence).
 **Status (11 October 2026):** The maintainer confirms the closed-testing phase is
 complete. The website is already deployed. Remaining work: confirm the
 production-access application status, capture the Play app-signing SHA-256,
-check whether the existing `/.well-known/assetlinks.json` endpoint serves the
-correct JSON (publish that asset only if needed), and review Data safety answers
+verify the existing `/.well-known/assetlinks.json` endpoint (make a website
+change only if that file is missing or wrong), and review Data safety answers
 for speech input. A physical-device pass is already documented; only the
 additional test gaps listed in the readiness audit remain.
 
