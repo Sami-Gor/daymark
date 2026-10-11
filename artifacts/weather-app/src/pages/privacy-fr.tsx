@@ -123,18 +123,23 @@ export default function PrivacyFr() {
 
       <h2>Sortie vocale (Hear today)</h2>
       <p>
-        « Hear today » lit les prévisions à voix haute à l&rsquo;aide de la synthèse vocale intégrée à
-        votre navigateur ou à votre appareil. Le texte du bulletin est traité par cette capacité de la
-        plateforme, et non par un service vocal exploité par Daymark.
+        « Hear today » lit le bulletin à voix haute. Dans l’application Android, la narration en anglais
+        est générée sur l’appareil par le modèle Kokoro intégré ; le français et l’espagnol utilisent la
+        synthèse vocale du système Android. Dans la version web, la narration utilise l’API de synthèse
+        vocale du navigateur. Le traitement des fournisseurs vocaux du navigateur ou du système dépend
+        de l’appareil, des réglages et de la voix choisie. Daymark n’exploite aucun serveur vocal et ne
+        stocke pas le texte de la narration.
       </p>
 
       <h2>Informations stockées sur votre appareil</h2>
       <p>
         Daymark stocke votre préférence de langue (anglais, français ou espagnol) dans le stockage
-        local de votre navigateur sous la clé <code>daymark.locale</code>. Il s&rsquo;agit de la seule
-        valeur applicative persistante que Daymark conserve intentionnellement. Elle reste enregistrée
-        jusqu&rsquo;à ce que vous la modifiiez ou que vous effaciez le stockage de votre navigateur ou
-        du site.
+        local de votre navigateur sous la clé <code>daymark.locale</code>. C’est la seule préférence
+        utilisateur persistante que Daymark stocke intentionnellement. Elle reste jusqu’à ce que vous la
+        modifiiez ou effaciez le stockage du navigateur ou du site. Séparément, le service worker met en
+        cache les fichiers de l’application et le jeu de données des localités dans Cache Storage pour
+        permettre l’utilisation hors ligne ; ces caches sont des ressources de l’application, pas un
+        historique de vos localisations ou de la météo.
       </p>
       <p>
         Daymark n&rsquo;utilise pas de cookies, n&rsquo;utilise pas le stockage de session du
@@ -163,8 +168,9 @@ export default function PrivacyFr() {
         utilisées sous licence Creative Commons Attribution 4.0 (CC BY 4.0).
       </p>
       <p>
-        Daymark n&rsquo;utilise ni analyse d&rsquo;audience, ni publicité, ni pixels de suivi, ni aucun
-        autre service tiers.
+        Daymark n’utilise pas de services tiers d’analyse d’audience, de publicité, de pixels de
+        suivi ou de traçage. Open-Meteo et les fonctions vocales du navigateur/de l’appareil sont des
+        services tiers utilisés pour les fonctionnalités décrites ci-dessus.
       </p>
 
       <h2>Analyse d&rsquo;audience, publicité et suivi</h2>
