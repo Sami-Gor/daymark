@@ -39,11 +39,12 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-- **Security headers are not applied by this repo.** `artifacts/weather-app/public/_headers`
-  (Cloudflare Pages/Netlify format) ships with the build and carries the canonical
-  CSP / HSTS / Permissions-Policy set. Replit static hosting ignores it — before
-  public deployment, configure those exact headers at the serving platform
-  (or deploy the `dist/public` folder to a host that reads `_headers`).
+- **Replit hosting does not automatically apply the repo's security headers.**
+  `artifacts/weather-app/public/_headers` (Cloudflare Pages/Netlify format) ships
+  with the build and carries the canonical CSP / HSTS / Permissions-Policy set.
+  Replit static hosting ignores it — before deploying via Replit, configure those
+  exact headers at the serving platform (or deploy `dist/public` to a host that
+  reads `_headers`).
 - Local/preview builds default to `PORT=5173 BASE_PATH=/` when env vars are absent (Replit injects its own values)
 - `pnpm audit` may still report advisories in dev-only tooling (e.g. esbuild via vite); none of these packages ship in the production bundle
 
