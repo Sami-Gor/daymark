@@ -81,7 +81,7 @@ All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifact
 
 ## Weather data source
 
-All forecast, air-quality, and geocoding data comes from [Open-Meteo](https://open-meteo.com) — free for non-commercial use, no API key required. Daymark requests the fields needed by its interface; weather and air-quality responses are not cached by the app/service worker. The web/PWA service worker caches the app shell, and the locality dataset is cached separately by app code for offline lookup. The Android app includes the locality dataset in its bundled assets.
+Live forecasts, air-quality data and place-search suggestions come from [Open-Meteo](https://open-meteo.com) — free for non-commercial use, no API key required. Device-location locality labels are resolved locally from GeoNames: the web/PWA downloads and caches the dataset for offline lookup, while Android includes it in bundled assets. Weather and air-quality responses are not cached by the app or service worker.
 
 ## PWA / offline behavior
 
@@ -136,7 +136,7 @@ The e2e suite runs against a production build served by `vite preview`, mocks Op
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for the web/PWA and Android posture. In short: minimal attack surface (12 runtime dependencies), every external response runtime-validated, a strict CSP (`default-src 'none'`, `script-src 'self'`), Android English narration generated on-device by the bundled Kokoro engine, and no secrets in the client.
+See [SECURITY.md](SECURITY.md) for the web/PWA and Android posture. In short: minimal attack surface (12 runtime dependencies), API responses runtime-validated at the network boundary, a strict CSP for the hosted web/PWA (`default-src 'none'`, `script-src 'self'`), Android English narration generated on-device by the bundled Kokoro engine, and no secrets in the client. The installed Android WebView does not inherit the hosted site's HTTP security headers.
 
 ## Project structure
 
