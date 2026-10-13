@@ -108,10 +108,12 @@ Play Console / release status: Daymark has moved to production (maintainer-confi
    and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms).
 3. Content rating, target audience, ads (no ads; advertising ID = No),
    government/financial/health, app access and AI asset declarations were
-   previously marked complete in the checklist; verify their current Console
-   status and confirm the declarations still match the shipped version.
-4. The store listing/default listing was previously marked complete. Verify
-   status and listed assets in Console before production.
+   previously marked complete in the checklist. No production-status check is
+   required by this audit; change these declarations only if they no longer
+   describe the released app.
+4. The store listing/default listing was previously marked complete. No extra
+   status check is required; update its assets or text only if the live listing
+   no longer matches the released app or any revised privacy-policy publication.
 5. Closed testing is complete and Daymark has moved to production
    (maintainer-confirmed, 13 October 2026). Do not retain the old "Apply for
    production available" wording as the current release state.
