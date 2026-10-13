@@ -107,10 +107,12 @@ export default function PrivacyEs() {
         <li><code>geocoding-api.open-meteo.com</code> — búsqueda de lugares</li>
       </ul>
       <p>
-        Como estas solicitudes las gestiona Open-Meteo, su tratamiento —incluida cualquier forma de
-        registro o conservación— se rige por las políticas propias de Open-Meteo. Daymark no controla
-        esas prácticas; consulta la información de privacidad y los términos de Open-Meteo en su
-        sitio web.
+        Las condiciones publicadas de Open-Meteo para su API gratuita no comercial indican que los
+        registros del servidor utilizados para resolver problemas pueden contener información sensible,
+        como coordenadas geográficas, y que los archivos de registro se eliminan después de 90 días.
+        Esta conservación depende de Open-Meteo, no de Daymark. Consulta las
+        <a href="https://open-meteo.com/en/terms" target="_blank" rel="noreferrer">condiciones y la política de privacidad de Open-Meteo</a>
+        para más detalles.
       </p>
 
       <h2>Entrada de voz (Ask Daymark)</h2>
