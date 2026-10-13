@@ -61,7 +61,7 @@ On a clean clone, run the Kokoro JNI + asset steps from
       language English (US), type App, Free.
 - [x] Accept the developer program policies.
 
-## 2. App content declarations — PREVIOUSLY REPORTED DONE; RECHECK BEFORE PRODUCTION
+## 2. App content declarations — PREVIOUSLY REPORTED DONE; POST-RELEASE ACCURACY CHECK
 
 Play Console → **Policy and programs → App content**. All rows completed:
 
