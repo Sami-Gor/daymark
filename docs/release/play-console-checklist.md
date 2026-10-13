@@ -72,20 +72,18 @@ Play Console → **Policy and programs → App content**. All rows completed:
 - [x] Content rating questionnaire (weather utility, no user content, no ads).
 - [x] Target audience completed.
 - [x] Government apps: No · Financial features: No · Health: No · News: No.
-- [x] Data safety form was previously reported complete. **Recheck the existing
-      answers before production** for user-initiated location, WebView speech
-      input and browser/system TTS output. Providers may process data off-device
-      even though Daymark does not store it. Google Play defines collection as
-      transmitting data off-device; controlled WebViews are included. Data
-      transmitted off-device but processed ephemerally still needs the correct
-      form response, although qualifying ephemeral processing may not appear in
-      the public Data safety section. Use the current
-      [Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469)
-      and actual production flow.
+- [x] Data safety form was previously reported complete. **Post-release action:**
+      compare the saved answers with the shipped behaviour for location, WebView
+      speech input and browser/system TTS. Google Play includes app-controlled
+      WebViews in its data-flow rules and defines collection as transmission
+      off-device. Open-Meteo says its free-API server logs may contain geographic
+      coordinates and are deleted after 90 days, so do **not** mark location
+      processing as ephemeral. Sources: [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469)
+      and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms).
 
 | Data type / flow | Current repo evidence | Console follow-up |
 |---|---|---|
-| Location | User-initiated device location; coordinates are rounded to 2 decimal places (~1 km) before the Open-Meteo weather request | **Do not assume that rounding makes this “approximate location”.** Play defines approximate location as an area ≥3 km² and precise location as <3 km². Assess the effective location resolution, the fact that the coordinates are transmitted off-device, and the ephemeral-processing rule using [current Play guidance](https://support.google.com/googleplay/android-developer/answer/10787469). Ephemeral handling can affect public disclosure, but is not a reason to omit required form answers. |
+| Location | The user taps “Use my location”; coordinates are rounded to 2 decimal places and sent to Open-Meteo over HTTPS. Open-Meteo says free-API server logs may contain geographic coordinates and are deleted after 90 days. | Select **Precise location** (the sent grid is under 3 km² by Google's definition). In Data usage and handling: **Collected = Yes**; **Optional = Yes**; purpose **App functionality**; **Ephemeral = No** because provider logs may retain coordinates for 90 days. Treat **Shared** as Yes unless you have established and documented that the service-provider exception applies to Open-Meteo. Encryption in transit: Yes for this HTTPS flow. See [Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469) and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms). |
 | Voice-input audio | Daymark does not store recordings; the WebView/browser speech service may process audio remotely | **Unresolved policy check:** determine the required collection/sharing answer for this controlled WebView speech path under current Data safety rules | 
 | Voice-output text | Android English uses bundled local Kokoro; web uses browser speech synthesis; Android French/Spanish use native Android system TTS | Check whether the selected browser/system provider sends or retains utterance text and whether that flow changes the Data safety response |
 | App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
