@@ -98,14 +98,14 @@ Play Console / release status: Daymark has moved to production (maintainer-confi
 
 1. Play App Signing enrolled via the first upload; the **app signing key**
    SHA-256 still needs to be copied from Play Console → App integrity.
-2. Data safety was previously reported complete, but must be rechecked before
-   production. Assess user-initiated location, WebView speech input, and the
-   browser/system TTS output path. Google Play defines collection as
-   transmitting data off-device and includes controlled WebViews. Transmitted
-   data processed ephemerally still needs the correct form response, although
-   qualifying ephemeral processing may not appear in the public Data safety
-   section. Do not infer “not collected” solely from lack of app-side storage.
-   See [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469).
+2. Data safety was previously reported complete. As post-release housekeeping,
+   reconcile user-initiated location, controlled-WebView speech input and
+   browser/system TTS output with the saved form. Google Play defines collection
+   as off-device transmission and includes controlled WebViews. Open-Meteo's
+   free-API terms say server logs may contain coordinates and are deleted after
+   90 days, so the transmitted location must not be labelled ephemeral merely
+   because Daymark itself does not store it. See [Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469)
+   and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms).
 3. Content rating, target audience, ads (no ads; advertising ID = No),
    government/financial/health, app access and AI asset declarations were
    previously marked complete in the checklist; verify their current Console
@@ -536,7 +536,7 @@ this PR has not built or uploaded a new AAB.
 | Existing AAB build/signing/versioning | EXISTING AAB VERIFIED; POLICY COPY NOT PACKAGED | release consistency | uploaded versionCode 1 AAB signature/hash were verified in the prior artifact audit; this PR changes privacy-page source text but not the existing bundle | if adopting the policy changes, deploy the web version and build/validate a new AAB with the next unused versionCode; then smoke-test a Play-signed install |
 | Play App Signing fingerprint | PENDING (manual) | blocks App Links | signing enrolled on first upload; app-signing SHA-256 not yet recorded | copy from Play Console → App integrity |
 | Digital Asset Links endpoint | NEEDS LIVE RECHECK | blocks verified App Links | Last recorded check returned SPA fallback; site is deployed, but this branch has no actual `.well-known/assetlinks.json` file | check live endpoint; if incorrect, publish only the JSON asset with the Play app-signing SHA-256 |
-| Data Safety declaration | RECHECK BEFORE PRODUCTION (manual) | policy accuracy | Previously marked complete; location is sent to Open-Meteo after rounding; speech input may be processed off-device; browser/system TTS also receives narration text | review current Play definitions, actual flows, existing Console answers, and privacy policy; see §10 and the checklist |
+| Data safety declaration | POST-RELEASE POLICY ACCURACY CHECK | policy accuracy | Previously marked complete; rounded location is sent to Open-Meteo, whose free-API policy says logs may contain coordinates for up to 90 days; speech-provider processing varies | reconcile saved form; classify the rounded location as precise, collected, optional, for app functionality and not ephemeral; review sharing against Play's service-provider definition and confirm speech-provider flows; see §10 and checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
 | Production release | PRODUCTION (maintainer-confirmed, 13 October 2026) | current release state | Maintainer says Daymark has moved to production | no further status verification required for this paperwork |
 | Location behavior | CORE DEVICE PASS RECORDED | medium | real-device location use passed in brief validation | no need to repeat the completed location path; extended denial/permanent-denial cases are optional coverage |
