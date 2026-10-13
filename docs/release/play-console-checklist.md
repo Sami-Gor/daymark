@@ -89,9 +89,12 @@ Play Console → **Policy and programs → App content**. All rows completed:
 | App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
 | Analytics / crash logs | No in-app analytics/crash SDK found in repo | Confirm existing answers remain accurate |
 
-- [x] Data deletion form previously reported complete. Daymark offers no accounts
-      and has no server-side user-data store; only a language preference is
-      stored locally.
+- [x] Account-deletion requirement: not applicable because Daymark has no
+      account-creation flow.
+- [ ] Separately answer Data safety's "deletion request mechanism" question
+      based on the actual support process. Do not imply Daymark can erase
+      Open-Meteo's logs on demand; the provider's published terms say its free-API
+      logs may contain coordinates and are deleted after 90 days.
 - [x] AI asset declaration completed.
 
 ## 3. Store listing — DONE (default store listing)
