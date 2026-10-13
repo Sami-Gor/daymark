@@ -3,8 +3,8 @@
 > **Not the current release procedure.** For the Capacitor release, use
 > [`docs/release/play-console-checklist.md`](../../docs/release/play-console-checklist.md)
 > and `docs/release/assetlinks.template.json`. This directory is retained only
-> with the legacy TWA rollback project; the key table below is historical except
-> where explicitly labelled as the current upload certificate.
+> with the legacy TWA rollback project. **Every fingerprint below is historical
+> TWA-era data; do not use it for the current Capacitor release.**
 
 The template in this directory belongs to the old TWA-era workflow. Do not use
 it as evidence of the live website's current state. The current endpoint must be
