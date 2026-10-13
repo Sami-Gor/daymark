@@ -94,7 +94,7 @@ Repository-side readiness:
 | Foreground services | none |
 | Storage permissions | none |
 
-Play Console status (manual, cannot be verified from the repo):
+Play Console / release status: Daymark has moved to production (maintainer-confirmed, 13 October 2026). No further verification of production status is required for this documentation update. The remaining Console notes below concern data declarations and optional link-association configuration, not whether the app is in production.
 
 1. Play App Signing enrolled via the first upload; the **app signing key**
    SHA-256 still needs to be copied from Play Console → App integrity.
@@ -112,15 +112,9 @@ Play Console status (manual, cannot be verified from the repo):
    status and confirm the declarations still match the shipped version.
 4. The store listing/default listing was previously marked complete. Verify
    status and listed assets in Console before production.
-5. Closed testing is **reported complete by the maintainer (11 October 2026)**.
-   Repository notes record the first AAB (`309abe94…`, 96,463,981 bytes) and
-   the closed-testing track. The live track and tester metrics are not
-   independently verifiable here.
-6. **Production-access application status is partly known.** The maintainer
-   confirmed that **Apply for production is available** in Play Console on
-   11 October 2026. Whether the form has since been submitted, approved, or
-   returned for additional testing is not verified here. Record the actual live
-   state before following the next step.
+5. Closed testing is complete and Daymark has moved to production
+   (maintainer-confirmed, 13 October 2026). Do not retain the old "Apply for
+   production available" wording as the current release state.
 7. The Daymark website is already deployed. The separate
    `/.well-known/assetlinks.json` endpoint needs a fresh live check: the last
    recorded check returned the SPA HTML fallback, and the JSON file is absent
@@ -544,7 +538,7 @@ this PR has not built or uploaded a new AAB.
 | Digital Asset Links endpoint | NEEDS LIVE RECHECK | blocks verified App Links | Last recorded check returned SPA fallback; site is deployed, but this branch has no actual `.well-known/assetlinks.json` file | check live endpoint; if incorrect, publish only the JSON asset with the Play app-signing SHA-256 |
 | Data Safety declaration | RECHECK BEFORE PRODUCTION (manual) | policy accuracy | Previously marked complete; location is sent to Open-Meteo after rounding; speech input may be processed off-device; browser/system TTS also receives narration text | review current Play definitions, actual flows, existing Console answers, and privacy policy; see §10 and the checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
-| Closed testing / production-access | CLOSED TEST COMPLETE (maintainer-confirmed); Apply for production reported available | production-access prerequisite if applicable | Maintainer reports closed-test phase complete and Apply for production available; submission/decision status not verified | inspect current Console application status and record whether submitted/approved/returned |
+| Production release | PRODUCTION (maintainer-confirmed, 13 October 2026) | current release state | Maintainer says Daymark has moved to production | no further status verification required for this paperwork |
 | Location behavior | CORE DEVICE PASS RECORDED | medium | real-device location use passed in brief validation | no need to repeat the completed location path; extended denial/permanent-denial cases are optional coverage |
 | Speech recognition | CORE DEVICE PASS RECORDED | medium | real-device voice input and transcript passed; platform service can vary | no need to repeat the completed voice-input path; service/permission edge cases are optional coverage |
 | Audio focus/BT/calls | CORE LIFECYCLE PASS; EXTENDED CASES NOT CLAIMED | medium | Home lifecycle passed; Bluetooth/call/music interruption not included in the recorded brief pass | optional extended QA only, unless you specifically want those cases covered |
@@ -602,30 +596,27 @@ with the upstream voice source.
 2. In Play Console, check App Signing and record the **app-signing** fingerprint.
    Confirm Data safety, content rating, app access, ads, target audience, AI
    asset and other applicable declarations. The maintainer reports closed
-   testing complete and **Apply for production available**; whether the
-   production-access application has been submitted or decided remains unverified.
+   testing complete and Daymark moved to production (maintainer-confirmed,
+   13 October 2026). The release status is accepted as confirmed for this audit.
 3. Reconcile Data safety for the user-initiated location request, controlled
    WebView speech-recognition path, and browser/system TTS handoff against
    current Play policy and actual provider behaviour. Google says controlled
    WebView data flows and off-device transmission must be considered; do not
    infer answers solely from lack of app-side storage. See
    https://support.google.com/googleplay/android-developer/answer/10787469.
-4. Check the Play Console Dashboard and submit or verify the production-access
-   application using actual tester feedback and engagement data; do not reuse
-   invented or assumed metrics. The maintainer reports Apply for production is
-   available; the submission/decision state must be read from Console.
+4. Production is recorded as live, per maintainer confirmation. No further
+   production-status check is required for this paperwork.
 5. Digital Asset Links is a separate app-link check, not a prerequisite for
    applying for production access. Verify the existing website's
    `/.well-known/assetlinks.json` endpoint and the Digital Asset Links statement.
    Publish/update that JSON asset only if missing or incorrect, using the Play
    app-signing and upload fingerprints; then verify with the Play link checker
    and `pm verify-app-links` if verified App Links are needed for launch.
-6. After access is approved, use the current Play Console Production workflow.
-   If adopting the privacy-policy source edits in this PR, deploy the revised web
-   policy and build a matching Android AAB with the next unused versionCode
-   (expected 2 if versionCode 1 remains latest); validate its bundle/signature,
-   smoke-test the Play-signed install, then stage rollout (e.g. 10% → 50% → 100%)
-   and monitor Android vitals.
+6. As post-release follow-up, if adopting the privacy-policy source edits in
+   this PR, deploy the revised web policy and build a matching Android AAB with
+   the next unused versionCode (expected 2 if versionCode 1 remains latest);
+   validate its bundle/signature and smoke-test the Play-signed install. Monitor
+   Android vitals after the production release.
 7. Keep the local TWA rollback reference until the production rollout is stable.
    The tag `pre-capacitor-daymark` is not published to GitHub; the reachable
    rollback commit is `ff496996fcf9b47d9524d81ac300e69c2974c805`.
