@@ -302,13 +302,13 @@ made that the extended soak was completed; it is not a blanket release gate.
 
 | Data | Origin | Stored | Sent externally | Recipient | Retained |
 |---|---|---|---|---|---|
-| Precise location | Device GPS | No (in-memory) | Rounded to 2 decimals before send | Open-Meteo (forecast) | No |
-| Weather query | App | No | Yes: rounded coordinates + options | `api.open-meteo.com`, `air-quality-api.open-meteo.com` | Provider-side per their policy |
+| Precise location | Device GPS after user action | Not stored by Daymark after request | Rounded to 2 decimals before sending | Open-Meteo (forecast) | Open-Meteo says free-API server logs may contain coordinates and are deleted after 90 days; not ephemeral |
+| Weather query | App | No | Yes: rounded coordinates + options | `api.open-meteo.com`, `air-quality-api.open-meteo.com` | Provider-side logging/retention follows Open-Meteo policy; free-API logs deleted after 90 days |
 | Location search text | User input | No | Yes, when searching | `geocoding-api.open-meteo.com` | Provider-side |
 | Locality name lookup | `localities-v1.json` | Bundled + Cache Storage | No | — | On device |
 | Microphone audio | User gesture | No | Depending on platform speech service (possibly Google) | OS/browser speech service | Outside app control |
 | Recognition transcript | Speech service | No | No (in-memory only) | — | No |
-| TTS narration text | Intent layer | No | Android English: no, local Kokoro; web and Android fr/es: handed to browser/system speech API, whose processing depends on provider/voice configuration | Browser speech service or Android system TTS for relevant paths | Daymark does not retain it; provider-side processing/retention depends on service |
+| TTS narration text | Intent layer | No | Android English: no, local Kokoro; web: browser speech synthesis; Android French/Spanish: native Android system TTS. Remote processing depends on the selected voice/provider | Browser speech service (web) or Android system TTS (French/Spanish) | Daymark does not retain it; provider-side processing/retention depends on service |
 | Preferences | App | `localStorage` (`daymark.locale`) | No | — | Until cleared |
 | Analytics | none | — | — | — | — |
 | Crash reports | none in-app | — | — | — | — |
@@ -546,7 +546,7 @@ this PR has not built or uploaded a new AAB.
 | Battery/thermal | OPTIONAL EXTENDED QA | low-medium | brief 1-minute pass: 35.0 °C, thermal status 0 | 10-minute soak is optional additional coverage |
 | Accessibility (TalkBack/font scale) | FONT-SCALE PASS RECORDED; TALKBACK NOT CLAIMED | low-medium | 1.5x font pass 14 Sep 2026; web automations pass | TalkBack audit is optional additional coverage |
 | Real-device latency | CORE DEVICE PASS RECORDED; BENCHMARK OPTIONAL | low | real-device flow was exercised; emulator estimate ~2.4 s | no repeat required; benchmark only if needed |
-| App data-flow behaviour | CODE REVIEWED; PLAY DECLARATION PENDING | policy accuracy | no in-app analytics, rounded location requests, no transcript/location logging; speech providers may process data off-device | decide whether the transmitted rounded coordinates meet Play's precise or approximate definition, assess ephemeral processing, and reconcile voice-input/output provider flows; see §2, §10 and checklist |
+| App data-flow behaviour | POST-RELEASE DATA SAFETY RECONCILIATION | policy accuracy | no in-app analytics, rounded location requests, no transcript/location logging; Open-Meteo logs may retain coordinates for up to 90 days; speech providers may process data off-device | update the saved form where needed: precise location, collected, optional, app functionality, not ephemeral; resolve sharing using Play's service-provider definition and confirm voice-provider flows; see §2, §10 and checklist |
 | Security (WebView/bridge/components) | READY | — | audit §12 | optional CSP hardening |
 | Licensing | READY | — | WTFPL cleared; permissive stack | note bm_fable provenance |
 | Dependencies | READY | — | prod audit clean, pinned versions | none |
