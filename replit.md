@@ -15,7 +15,7 @@ A client-side weather app: current conditions, hourly/daily forecast, UV, air qu
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - Frontend: React 19 + Vite 7 + Tailwind CSS 4, wouter router, TanStack Query provider
 - Data: Open-Meteo APIs (forecast, air quality, geocoding) — direct browser calls, no key required
-- i18n: typed EN/FR/ES dictionaries in `src/locales/` (no i18n dependency); voice via the browser Web Speech APIs
+- i18n: typed EN/FR/ES dictionaries in `src/locales/` (no i18n dependency); web voice uses browser Web Speech APIs, while Android uses local Kokoro for English output and system TTS for French/Spanish
 - Optional env (documented, not yet consumed): `VITE_PURPLEAIR_API_KEY`
 
 ## Where things live
