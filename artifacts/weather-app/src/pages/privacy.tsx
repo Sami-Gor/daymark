@@ -96,9 +96,11 @@ export default function Privacy() {
         <li><code>geocoding-api.open-meteo.com</code> — place search</li>
       </ul>
       <p>
-        Because these requests are handled by Open-Meteo, their processing — including any logging or
-        retention — is governed by Open-Meteo&rsquo;s own policies. Daymark does not control those
-        practices; please review Open-Meteo&rsquo;s privacy and terms information on their website.
+        Open-Meteo&rsquo;s published terms for its free non-commercial API say that troubleshooting
+        server logs may contain sensitive information such as geographic coordinates and that log files
+        are deleted after 90 days. This retention is controlled by Open-Meteo, not Daymark. Please check
+        Open-Meteo&rsquo;s current <a href="https://open-meteo.com/en/terms" target="_blank" rel="noreferrer">Terms &amp; Privacy</a>
+        for details.
       </p>
 
       <h2>Voice input (Ask Daymark)</h2>
