@@ -11,11 +11,9 @@ those source changes are not live until deployed and are not included in the
 already-uploaded AAB. Status labels are used as follows: **READY** means
 evidenced as working; **MANUAL PLAY CONSOLE ACTION (MANUAL)** means a check in
 the live Console; **MUST FIX** means a release-blocking defect; and **OPTIONAL**
-means extra assurance, not a release gate. Legacy **PDT** labels below refer
-only to additional device coverage that was not in the recorded Nothing A059P
-pass. They do not mean repeat the core device pass. Section 18 records the
-completed pass; Sections 20–21 state the current status and what actually
-remains.
+means extra assurance, not a release gate. Section 18 records the completed
+physical-device pass; Sections 20–21 state the current status and what
+actually remains.
 
 ## 1. Build / release pipeline
 
