@@ -111,10 +111,12 @@ export default function PrivacyFr() {
         <li><code>geocoding-api.open-meteo.com</code> — recherche de lieux</li>
       </ul>
       <p>
-        Ces requêtes étant traitées par Open-Meteo, leur traitement — y compris toute journalisation
-        ou conservation — relève des politiques propres à Open-Meteo. Daymark ne contrôle pas ces
-        pratiques ; veuillez consulter les informations de confidentialité et les conditions
-        d&rsquo;Open-Meteo sur son site.
+        Les conditions publiées par Open-Meteo pour son API gratuite à usage non commercial indiquent
+        que les journaux techniques peuvent contenir des informations sensibles, notamment des
+        coordonnées géographiques, et que les fichiers journaux sont supprimés après 90 jours. Cette
+        conservation relève d’Open-Meteo, pas de Daymark. Consultez les
+        <a href="https://open-meteo.com/en/terms" target="_blank" rel="noreferrer">conditions et la politique de confidentialité d’Open-Meteo</a>
+        pour plus de détails.
       </p>
 
       <h2>Entrée vocale (Ask Daymark)</h2>
