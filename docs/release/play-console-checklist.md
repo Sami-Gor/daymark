@@ -4,15 +4,14 @@ Companion to [`android-production-readiness.md`](android-production-readiness.md
 (§2 Play requirements, §3 Asset Links, §10 data map, §20 matrix, §21 release
 sequence).
 
-**Status (11 October 2026):** The maintainer confirms the closed-testing phase is
-complete. The website is already deployed. The maintainer reports that
-**Apply for production is available** in Play Console; whether the application
-has been submitted or decided is not verified. Other follow-up: capture the
-Play app-signing SHA-256, verify the existing `/.well-known/assetlinks.json`
-endpoint (change the site only if that file is missing or wrong), and review
-Data safety answers for location, speech input and speech-output provider
-flows. Core physical-device testing is already complete and does not need to
-be repeated. The wider matrix is optional additional QA, not a blanket blocker.
+**Status (13 October 2026):** The maintainer confirms Daymark has moved to
+production. For this documentation update, production status is accepted as
+confirmed; no further Console-status check is required. The website is already
+deployed. Remaining work in this checklist is post-release housekeeping: correct
+the Data safety declaration if it does not describe the shipped behaviour, and
+check the existing Digital Asset Links endpoint if verified website links are
+expected to open the app. Core physical-device testing is already complete;
+the wider matrix is optional additional QA, not a requirement to repeat it.
 
 Package: `io.github.sami_gor.daymark` · versionCode `1` / versionName `1.0.0`
 · minSdk `24` / targetSdk `36`
@@ -183,45 +182,32 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       opens. This is a distinct check from the completed core device pass and
       is only outstanding if you have not already verified it.
 
-## 8. Closed testing — COMPLETE (maintainer-confirmed)
+## 8. Closed testing — COMPLETE; production — MAINTAINER CONFIRMED
 
-- [x] The maintainer confirms the closed-testing phase is complete
-      (11 October 2026); live track history and tester metrics were not
-      independently checked here.
-- [x] The maintainer reports **Apply for production is available** in Play Console
-      (11 October 2026). This means the Console allows the application flow to
-      be opened; it does not mean the application was submitted or approved.
-- [x] Do not treat the 12-testers / 14-continuous-days period as still waiting
-      by default. Follow an eligibility warning only if the live Console
-      explicitly shows one; do not repeat the completed testing period.
+- [x] Closed-testing phase complete.
+- [x] Daymark has moved to production (maintainer-confirmed, 13 October 2026).
+- [x] No further production-status verification is required for this document.
 
-## 9. Production access and rollout — APPLICATION DECISION NOT VERIFIED
+## 9. Post-release housekeeping
 
-- [x] **Apply for production was reported available** by the maintainer on
-      11 October 2026.
-- [ ] In the Play Console Dashboard, record the current application state:
-      available to apply, submitted/in review, approved, or returned for more
-      testing. The available button does not establish submission or approval.
-- [ ] If the application has not been submitted, complete it in Play Console
-      using truthful tester feedback, engagement and readiness evidence. Do not
-      invent tester feedback, engagement or install estimates. Keep these answers
-      in Play Console, not in a separate public worksheet.
-- [ ] Reconcile Data safety for location, voice input and browser/system TTS
-      output, then verify all Console declarations match the app and privacy
-      policy.
-- [ ] Check the existing website's Digital Asset Links endpoint as described
-      in steps 5–7; publish an updated site only if the JSON is absent or wrong.
-      This is separate from the production-access application and AAB acceptance.
-      It affects automatic verified-link opening, not permission to submit the
-      production-access form.
-- [ ] Once access is approved, create the Production release using the tested
-      bundle through the current Console workflow. If a new AAB is required,
-      increment versionCode and validate the new build.
-- [ ] Roll out in stages (for example 10% → 50% → 100%) and monitor Android
-      vitals for ANRs/crashes, especially memory-related kills on low-RAM devices.
-- [ ] Keep the local TWA rollback reference until rollout is stable. The tag
-      `pre-capacitor-daymark` is not published to GitHub; a fresh clone can use
-      the reachable rollback commit
+- [ ] Reconcile Data safety for the shipped location and voice-input behaviour.
+      Correct the form if it does not match what the app transmits and what
+      third-party providers retain. Follow the guidance in §2 and the official
+      [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469?hl=en-GB).
+- [ ] Check the existing website's Digital Asset Links endpoint using steps 5–7.
+      The website is already deployed: update only the JSON asset if missing or
+      incorrect. This affects verified website links opening in the app, not
+      the fact that Daymark is in production.
+- [ ] If adopting the revised privacy-page text in this PR, deploy the web build,
+      publish the same policy in a new Android bundle, and set the effective date
+      to the actual publication date. The already-uploaded AAB does not contain
+      these source edits.
+- [ ] Monitor Android vitals for ANRs/crashes, especially memory-related kills
+      on lower-RAM devices. Additional device-matrix tests are optional QA, not
+      a requirement to repeat the completed core device pass.
+- [ ] Keep the local TWA rollback reference until the production rollout is
+      stable. The tag `pre-capacitor-daymark` is not published to GitHub; a
+      fresh clone can use reachable rollback commit
       `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 
 ## 10. Follow-ups (non-blocking)
