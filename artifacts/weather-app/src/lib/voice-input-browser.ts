@@ -88,6 +88,9 @@ export function describeRecognitionError(error: string | null | undefined, local
       return translate(locale, 'ask.error.audio');
     case 'network':
       return translate(locale, 'ask.error.network');
+    case 'offline-unavailable':
+    case 'api-unsupported':
+      return translate(locale, 'ask.error.offlineUnavailable');
     case 'aborted':
       return translate(locale, 'ask.error.aborted');
     default:
