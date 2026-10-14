@@ -192,6 +192,7 @@ const en = {
   'ask.error.noSpeech': "I didn't catch that. Tap Ask Daymark and try again.",
   'ask.error.audio': 'No microphone was found on this device.',
   'ask.error.network': 'Speech recognition needs a network connection right now.',
+  'ask.error.offlineUnavailable': 'Offline voice input is not available on this device. You can still use Daymark without voice input.'
   'ask.error.aborted': 'Voice input stopped.',
   'ask.error.unknown': 'Voice input stopped unexpectedly. Tap Ask Daymark to try again.',
 
