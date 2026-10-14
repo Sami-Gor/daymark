@@ -112,6 +112,7 @@ export function createOnDeviceRecognitionController(): OnDeviceRecognitionContro
         const previous = activeSessionId;
         activeSessionId = null;
         activeHandlers = null;
+        clearRecognitionTimeout();
         void NativeRecognizer.cancel({ sessionId: previous }).catch(() => undefined);
       }
 
