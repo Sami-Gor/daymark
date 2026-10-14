@@ -1,12 +1,16 @@
 /**
- * Coarsens the device-derived location before any network request.
+ * Coarsens device-derived coordinates on platforms that do not expose
+ * Android's approximate-location permission contract to Daymark.
  *
- * A tenth of a degree is roughly 11 km north/south and 7 km east/west in the
- * UK. This is deliberately much coarser than a two-decimal coordinate while
- * retaining a useful regional forecast location. Search-selected place
- * coordinates remain governed by the place-search flow, not this helper.
+ * A 0.025-degree cell is roughly 2.8 km north/south and 1.7 km east/west
+ * around London (about 4.8 km²). Android instead relies on the operating
+ * system's approximate location because the Android manifest deliberately
+ * declares ACCESS_COARSE_LOCATION without ACCESS_FINE_LOCATION.
+ *
+ * Search-selected place coordinates are governed by the place-search flow,
+ * not this helper.
  */
-export const DEVICE_LOCATION_DECIMAL_PLACES = 1;
+export const DEVICE_LOCATION_GRID_DEGREES = 0.025;
 
 export function roundDeviceLocation(latitude: number, longitude: number): {
   latitude: number;
@@ -19,8 +23,11 @@ export function roundDeviceLocation(latitude: number, longitude: number): {
     throw new RangeError('longitude must be a finite value between -180 and 180');
   }
 
+  const roundToGrid = (coordinate: number) =>
+    Number((Math.round(coordinate / DEVICE_LOCATION_GRID_DEGREES) * DEVICE_LOCATION_GRID_DEGREES).toFixed(3));
+
   return {
-    latitude: Number(latitude.toFixed(DEVICE_LOCATION_DECIMAL_PLACES)),
-    longitude: Number(longitude.toFixed(DEVICE_LOCATION_DECIMAL_PLACES)),
+    latitude: roundToGrid(latitude),
+    longitude: roundToGrid(longitude),
   };
 }
