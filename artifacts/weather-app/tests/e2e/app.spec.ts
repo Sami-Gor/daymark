@@ -93,7 +93,7 @@ test.describe('functional', () => {
     await expect.poll(() => page.evaluate(() => window.__geoCalls)).toBe(0);
   });
 
-  test('granted geolocation loads weather from rounded coordinates without reverse geocoding', async ({ browser }) => {
+  test('granted web geolocation loads weather from grid-rounded coordinates without reverse geocoding', async ({ browser }) => {
     const context = await browser.newContext({
       permissions: ['geolocation'],
       geolocation: { latitude: 51.5074567, longitude: -0.12789012 },
@@ -111,8 +111,8 @@ test.describe('functional', () => {
     const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
     expect(forecasts.length).toBeGreaterThan(0);
     for (const url of forecasts) {
-      expect(url).toContain('latitude=51.51');
-      expect(url).toContain('longitude=-0.13');
+      expect(url).toContain('latitude=51.5');
+      expect(url).toContain('longitude=-0.125');
       expect(url).not.toContain('5074567');
     }
     expect(requests.filter((url) => new URL(url).hostname === 'geocoding-api.open-meteo.com')).toEqual([]);
@@ -2061,17 +2061,17 @@ test.describe('privacy policy page', () => {
   test('states the verified data practices in every language', async ({ page }) => {
     const expectations = {
       en: {
-        location: 'rounded to two decimal places',
+        location: 'requests approximate location only',
         speech: 'does not record or store your voice audio or speech transcripts',
         audience: 'general-audience weather utility',
       },
       fr: {
-        location: 'arrondies à deux décimales',
+        location: 'demande uniquement une localisation approximative',
         speech: 'n’enregistre ni ne conserve votre audio vocal ni vos transcriptions vocales',
         audience: 'grand public',
       },
       es: {
-        location: 'se redondean a dos decimales',
+        location: 'solicita únicamente ubicación aproximada',
         speech: 'no graba ni almacena tu audio de voz ni tus transcripciones',
         audience: 'público general',
       },
