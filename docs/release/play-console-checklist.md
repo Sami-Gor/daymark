@@ -109,67 +109,81 @@ Play Console → **Policy and programs → App content**. All rows completed:
 - [x] AAB uploaded (`309abe94…`, 96,463,981 bytes); versionCode `1` for the
       first upload (bump for every later upload).
 - [x] Play App Signing enrollment completed on this first upload (Play
-      generated the app signing key; its fingerprint is not yet recorded — see
-      step 5).
+      generated the app signing key). Its fingerprint is recorded in step 5
+      and is live in the production association file.
 
-## 5. Copy the Play app-signing fingerprint — PENDING
+## 5. Copy the Play app-signing fingerprint — DONE (recorded, live)
 
-- [ ] Play Console → **Test and release → Setup → App integrity → Play app
-      signing → App signing key certificate** → copy the **SHA-256** (the key
-      Play uses to re-sign the AAB, *not* the upload key).
-- [ ] Do not substitute the upload-key fingerprint
-      (`34:6B:BE:…:FA:7E`) for the app-signing fingerprint in `assetlinks.json`.
-      They are different keys with different roles.
+- [x] Play Console → **Test and release → Setup → App integrity → Play app
+      signing → App signing key certificate** → **SHA-256**
+      `04:3C:41:E1:C9:EC:F5:B5:2C:17:6C:5D:AE:1C:28:8A:10:B0:F8:67:95:6F:6F:C9:F5:3D:98:73:08:5E:9F:FA`
+      (the key Play uses to re-sign the AAB, *not* the upload key).
+- [x] Do not substitute the upload-key fingerprint
+      (`34:6B:BE:F3:43:8C:6F:E8:1E:89:F6:3F:C0:A0:FF:29:E9:6D:A1:98:98:74:E6:BA:18:7A:9E:52:C3:AA:FA:7E`)
+      for the app-signing fingerprint in `assetlinks.json`.
+      They are different keys with different roles. Both fingerprints are
+      present in the live file (Play signing first, upload second for
+      sideloaded builds).
 
-## 6. Confirm Digital Asset Links on the existing website
+## 6. Confirm Digital Asset Links on the existing website — DONE (live, verified)
 
 The website at `https://daymark-weather.pages.dev` is already deployed; this
-step is **not** asking you to deploy a website from scratch. First check the
-specific endpoint. The last result recorded in the audit was an HTML fallback,
-but that live result has not been independently rechecked in this session.
+step is **not** asking you to deploy a website from scratch. The production
+endpoint is live and verified:
 
-- [ ] Check the current response and content:
+- URL: `https://daymark-weather.pages.dev/.well-known/assetlinks.json`
+- HTTP status: `200`
+- Content-Type: `application/json` (not the app HTML fallback)
+- Package: `io.github.sami_gor.daymark`
+- Fingerprints: Play app-signing
+  `04:3C:41:E1:C9:EC:F5:B5:2C:17:6C:5D:AE:1C:28:8A:10:B0:F8:67:95:6F:6F:C9:F5:3D:98:73:08:5E:9F:FA`
+  plus upload-key
+  `34:6B:BE:F3:43:8C:6F:E8:1E:89:F6:3F:C0:A0:FF:29:E9:6D:A1:98:98:74:E6:BA:18:7A:9E:52:C3:AA:FA:7E`.
+- The fix was preserved in PR #35, merged into `main` (merge commit
+  `8f85a96610703b43a5131f8841e2d490913851de`).
+
+- [x] Live response and content verified (HTTP 200, `application/json`,
+      correct package and both fingerprints). No further website change is
+      needed for this fix.
+
+For future verification and troubleshooting (website already deployed; do not
+redeploy from scratch):
 
 ```bash
 curl -sI https://daymark-weather.pages.dev/.well-known/assetlinks.json | head -5
 curl -s https://daymark-weather.pages.dev/.well-known/assetlinks.json
 ```
 
-It must return HTTP 200, JSON (not the app HTML), the package
-`io.github.sami_gor.daymark`, and the correct **Play app-signing SHA-256**.
-If it is already correct, no website change/deploy is needed. If it is absent,
-returns HTML, or has the wrong fingerprint:
-
-- [ ] Create the destination directory if it does not exist:
-      `mkdir -p artifacts/weather-app/public/.well-known`.
-- [ ] Copy `docs/release/assetlinks.template.json` to
-      `artifacts/weather-app/public/.well-known/assetlinks.json` and replace
-      `__PLAY_APP_SIGNING_SHA256__` with the fingerprint from step 5. Keep the
-      upload-key entry as the second element so sideloaded release builds still
-      verify. Both entries must stay in the same JSON array.
-- [ ] Optional hardening — add to `artifacts/weather-app/public/_headers`:
+Historical record of how the file was created (already done; retained for
+reference, not as a pending task): the `artifacts/weather-app/public/.well-known`
+directory was created, `docs/release/assetlinks.template.json` was copied to
+`artifacts/weather-app/public/.well-known/assetlinks.json` with
+`__PLAY_APP_SIGNING_SHA256__` replaced by the step-5 fingerprint (upload-key
+entry kept second for sideloaded builds), and
+`artifacts/weather-app/public/_headers` gained:
 
 ```
 /.well-known/assetlinks.json
   Content-Type: application/json
 ```
 
-- [ ] Build and publish the resulting site update through the existing Cloudflare
-      Pages deployment workflow. This is a normal update to the deployed site,
-      not an initial deployment.
+That site update went through the normal Cloudflare Pages deployment workflow.
 
-## 7. Verify App Links — PENDING until the endpoint is correct
+## 7. Verify App Links — website side DONE; on-device domain verification NOT TESTED (optional)
 
-- [ ] Query Google's Digital Asset Links statement API:
+- [x] Google's Digital Asset Links statement API returned the expected
+      association statements for this package and both fingerprints:
 
 ```bash
 curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://daymark-weather.pages.dev&relation=delegate_permission/common.handle_all_urls"
 ```
 
-Confirm it returns this package and the expected fingerprints.
-
-- [ ] On a device with a build signed by one of the listed keys (Play-signed
-      install, or the repo's release APK signed with the upload key):
+- [ ] **Android on-device domain verification has not been independently
+      tested and is not claimed as complete.** It is optional additional
+      verification, distinct from the completed core physical-device test pass.
+      If wanted, on a device with a build signed by one of the listed keys
+      (Play-signed install, or the repo's release APK signed with the upload
+      key):
 
 ```bash
 adb shell pm verify-app-links --re-verify io.github.sami_gor.daymark
@@ -178,10 +192,8 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pages.dev/fr/privacy"
 ```
 
-- [ ] If Android's verified App Links have not already been checked, test the
-      domain-verification behaviour on a suitable install, including cold/warm
-      opens. This is a distinct check from the completed core device pass and
-      is only outstanding if you have not already verified it.
+      Cold/warm opens likewise remain optional additional coverage, not a
+      repeat of the completed core device pass.
 
 ## 8. Closed testing — COMPLETE; production — MAINTAINER CONFIRMED
 
@@ -195,10 +207,13 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       Correct the form if it does not match what the app transmits and what
       third-party providers retain. Follow the guidance in §2 and the official
       [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469?hl=en-GB).
-- [ ] Check the existing website's Digital Asset Links endpoint using steps 5–7.
-      The website is already deployed: update only the JSON asset if missing or
-      incorrect. This affects verified website links opening in the app, not
-      the fact that Daymark is in production.
+- [x] Website Digital Asset Links endpoint verified live per steps 5–7
+      (HTTP 200, `application/json`, correct package and both fingerprints;
+      DAL API returns the expected statements; fix preserved in PR #35 merge
+      `8f85a96610703b43a5131f8841e2d490913851de`). This affects verified
+      website links opening in the app, not the fact that Daymark is in
+      production. On-device domain verification remains optional and untested
+      (see §7).
 - [ ] If adopting the revised privacy-page text in this PR, deploy the web build,
       publish the same policy in a new Android bundle, and set the effective date
       to the actual publication date. The already-uploaded AAB does not contain

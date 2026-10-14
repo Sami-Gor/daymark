@@ -97,7 +97,13 @@ Repository-side readiness:
 Play Console / release status: Daymark has moved to production (maintainer-confirmed, 13 October 2026). No further verification of production status is required for this documentation update. The remaining Console notes below concern data declarations and optional link-association configuration, not whether the app is in production.
 
 1. Play App Signing enrolled via the first upload; the **app signing key**
-   SHA-256 still needs to be copied from Play Console → App integrity.
+   SHA-256 is recorded and live:
+   `04:3C:41:E1:C9:EC:F5:B5:2C:17:6C:5D:AE:1C:28:8A:10:B0:F8:67:95:6F:6F:C9:F5:3D:98:73:08:5E:9F:FA`
+   (Play Console → App integrity → App signing key certificate). The live
+   association file also retains the upload key
+   `34:6B:BE:F3:43:8C:6F:E8:1E:89:F6:3F:C0:A0:FF:29:E9:6D:A1:98:98:74:E6:BA:18:7A:9E:52:C3:AA:FA:7E`
+   for sideloaded builds. Fix preserved in PR #35 (merge
+   `8f85a96610703b43a5131f8841e2d490913851de`).
 2. Data safety was previously reported complete. As post-release housekeeping,
    reconcile user-initiated location, controlled-WebView speech input and
    browser/system TTS output with the saved form. Google Play defines collection
@@ -117,13 +123,14 @@ Play Console / release status: Daymark has moved to production (maintainer-confi
 5. Closed testing is complete and Daymark has moved to production
    (maintainer-confirmed, 13 October 2026). Do not retain the old "Apply for
    production available" wording as the current release state.
-7. The Daymark website is already deployed. The separate
-   `/.well-known/assetlinks.json` endpoint needs a fresh live check: the last
-   recorded check returned the SPA HTML fallback, and the JSON file is absent
-   from this branch. Do not redeploy the site from scratch. If the endpoint is
-   still incorrect, add/publish that single JSON asset after obtaining the Play
-   app-signing SHA-256; do not substitute the upload-key fingerprint. This
-   affects verified App Links, not basic AAB file upload.
+7. The Daymark website is already deployed and the separate
+   `/.well-known/assetlinks.json` endpoint is live and verified: HTTP `200`,
+   content-type `application/json`, package `io.github.sami_gor.daymark`,
+   with the Play app-signing fingerprint above plus the upload-key
+   fingerprint. The DAL statement API returns the expected association
+   statements. Do not redeploy the site from scratch. This affects verified
+   App Links, not basic AAB file upload. On-device domain verification
+   remains optional and untested (see §3).
 
 ## 3. Digital Asset Links / App Links
 
@@ -136,19 +143,21 @@ Play Console / release status: Daymark has moved to production (maintainer-confi
   which depends on the separate Digital Asset Links association file.
 - The Daymark website itself is already deployed at
   `https://daymark-weather.pages.dev`.
-- The last result recorded by this repo's audit was that the separate
-  `/.well-known/assetlinks.json` path returned the SPA HTML fallback. The
-  actual JSON file is also absent from this branch. I could not independently
-  recheck the live endpoint in this session, so treat that as the last recorded
-  result, not a new live verification.
-- **Action:** check the endpoint first. If it already serves valid JSON with
-  the correct package and Play app-signing SHA-256, no deployment is needed.
-  If not, publish the missing/corrected JSON asset through the existing
-  website deployment workflow; this is an update to the deployed site, not an
-  initial website deployment.
+- The previous recorded result was that the separate
+  `/.well-known/assetlinks.json` path returned the SPA HTML fallback. That is
+  superseded: the production endpoint is now live and verified (HTTP `200`,
+  `application/json`, correct package and both fingerprints; DAL statement API
+  returns the expected statements). The file is published at
+  `artifacts/weather-app/public/.well-known/assetlinks.json` (preserved in
+  PR #35, merge `8f85a96610703b43a5131f8841e2d490913851de`) and served through
+  the normal Cloudflare Pages deployment with a
+  `Content-Type: application/json` `_headers` rule.
+- **No further website action is needed for this fix.** The former
+  create-from-scratch instructions are retained only as history: the
+  `.well-known` directory was created, the template was copied with the real
+  Play fingerprint, and the `_headers` rule was added.
 
-**Manual dependency:** the Play App Signing fingerprint is required.
-The expected JSON structure for `https://daymark-weather.pages.dev/.well-known/assetlinks.json`
+The live JSON at `https://daymark-weather.pages.dev/.well-known/assetlinks.json`
 (content-type `application/json`) is:
 
 ```json
@@ -159,7 +168,7 @@ The expected JSON structure for `https://daymark-weather.pages.dev/.well-known/a
       "namespace": "android_app",
       "package_name": "io.github.sami_gor.daymark",
       "sha256_cert_fingerprints": [
-        "<PLAY_APP_SIGNING_SHA256>",
+        "04:3C:41:E1:C9:EC:F5:B5:2C:17:6C:5D:AE:1C:28:8A:10:B0:F8:67:95:6F:6F:C9:F5:3D:98:73:08:5E:9F:FA",
         "34:6B:BE:F3:43:8C:6F:E8:1E:89:F6:3F:C0:A0:FF:29:E9:6D:A1:98:98:74:E6:BA:18:7A:9E:52:C3:AA:FA:7E"
       ]
     }
@@ -168,12 +177,13 @@ The expected JSON structure for `https://daymark-weather.pages.dev/.well-known/a
 ```
 
 `use_as_origin` is not needed (that relation existed for TWA postMessage, which
-is retired). Keep the upload fingerprint for sideloaded builds. After the
-endpoint is confirmed correct, check Android domain verification with
-`adb shell pm verify-app-links --re-verify io.github.sami_gor.daymark` and Play's
-App Links checker. Only test cold/warm opens if verified App Links have not
-already been verified or the website's association file changes. This is a
-specific App Links check, not a repeat of core device testing.
+is retired). The upload fingerprint is kept for sideloaded builds.
+**Android on-device domain verification has not been independently tested and
+is not claimed as complete**; it is optional additional verification. If
+wanted, use `adb shell pm verify-app-links --re-verify
+io.github.sami_gor.daymark` and Play's App Links checker. Cold/warm opens
+likewise remain optional. This is a specific App Links check, not a repeat of
+the completed core device testing.
 
 ## 4. Permissions
 
@@ -536,8 +546,8 @@ this PR has not built or uploaded a new AAB.
 | Area | Status | Severity | Evidence | Required action |
 |---|---|---|---|---|
 | Existing AAB build/signing/versioning | EXISTING AAB VERIFIED; POLICY COPY NOT PACKAGED | release consistency | uploaded versionCode 1 AAB signature/hash were verified in the prior artifact audit; this PR changes privacy-page source text but not the existing bundle | if adopting the policy changes, deploy the web version and build/validate a new AAB with the next unused versionCode; then smoke-test a Play-signed install |
-| Play App Signing fingerprint | PENDING (manual) | blocks App Links | signing enrolled on first upload; app-signing SHA-256 not yet recorded | copy from Play Console → App integrity |
-| Digital Asset Links endpoint | NEEDS LIVE RECHECK | blocks verified App Links | Last recorded check returned SPA fallback; site is deployed, but this branch has no actual `.well-known/assetlinks.json` file | check live endpoint; if incorrect, publish only the JSON asset with the Play app-signing SHA-256 |
+| Play App Signing fingerprint | DONE (recorded, live) | App Links website side | signing enrolled on first upload; app-signing SHA-256 `04:3C:41:…:9F:FA` recorded from Play Console → App integrity; live file also keeps upload `34:6B:BE:…:FA:7E`; preserved in PR #35 (`8f85a96`) | none for this fix |
+| Digital Asset Links endpoint | DONE (live, verified) | verified App Links (website side) | Production endpoint returns HTTP 200 + `application/json` with the correct package and both fingerprints; DAL statement API returns the expected statements | none; on-device domain verification remains optional and untested |
 | Data safety declaration | POST-RELEASE POLICY ACCURACY CHECK | policy accuracy | Previously marked complete; rounded location is sent to Open-Meteo, whose free-API policy says logs may contain coordinates for up to 90 days; speech-provider processing varies | reconcile saved form; classify the rounded location as precise, collected, optional, for app functionality and not ephemeral; review sharing against Play's service-provider definition and confirm speech-provider flows; see §10 and checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
 | Production release | PRODUCTION (maintainer-confirmed, 13 October 2026) | current release state | Maintainer says Daymark has moved to production | no further status verification required for this paperwork |
@@ -595,7 +605,8 @@ with the upstream voice source.
    Do not make a second device-testing round a release prerequisite. The extra
    coverage listed in §20B is optional and can be added only if justified by a
    specific risk or by a desire for broader compatibility evidence.
-2. In Play Console, check App Signing and record the **app-signing** fingerprint.
+2. In Play Console, the **app-signing** fingerprint is recorded
+   (`04:3C:41:…:9F:FA`; upload `34:6B:BE:…:FA:7E` retained second).
    Confirm Data safety, content rating, app access, ads, target audience, AI
    asset and other applicable declarations. The maintainer reports closed
    testing complete and Daymark moved to production (maintainer-confirmed,
@@ -609,11 +620,12 @@ with the upstream voice source.
 4. Production is recorded as live, per maintainer confirmation. No further
    production-status check is required for this paperwork.
 5. Digital Asset Links is a separate app-link check, not a prerequisite for
-   applying for production access. Verify the existing website's
-   `/.well-known/assetlinks.json` endpoint and the Digital Asset Links statement.
-   Publish/update that JSON asset only if missing or incorrect, using the Play
-   app-signing and upload fingerprints; then verify with the Play link checker
-   and `pm verify-app-links` if verified App Links are needed for launch.
+   applying for production access. The existing website's
+   `/.well-known/assetlinks.json` endpoint and the Digital Asset Links statement
+   are verified live (HTTP 200, `application/json`, correct package and both
+   fingerprints; fix preserved in PR #35 merge `8f85a96`). No further website
+   change is needed for this fix. On-device domain verification with the Play
+   link checker and `pm verify-app-links` remains optional and untested.
 6. As post-release follow-up, if adopting the privacy-policy source edits in
    this PR, deploy the revised web policy and build a matching Android AAB with
    the next unused versionCode (expected 2 if versionCode 1 remains latest);
