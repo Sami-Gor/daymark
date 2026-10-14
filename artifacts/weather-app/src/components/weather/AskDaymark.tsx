@@ -49,6 +49,7 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
 
   if (!recognition.supportResolved) return null;
   if (!recognition.supported) {
+    if (!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android')) return null;
     return (
       <p className="ask-error" role="status" data-testid="ask-unavailable">
         {t('ask.error.offlineUnavailable')}
