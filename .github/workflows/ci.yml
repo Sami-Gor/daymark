@@ -37,6 +37,11 @@ jobs:
       - name: Unit tests
         run: pnpm --filter @workspace/weather-app run test
 
+      # Generate the Capacitor-managed Android files that are not committed
+      # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
+      - name: Sync Capacitor Android project
+        run: pnpm --filter @workspace/weather-app exec cap sync android
+
       # Compile the native Android modules as well as the web layer. This
       # catches Java/API/manifest regressions in Capacitor plugin changes.
       - name: Android debug build
