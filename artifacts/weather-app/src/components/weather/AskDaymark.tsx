@@ -46,7 +46,14 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
     speak(text, SPEECH_LANGS[locale]);
   }, [recognition.isListening, speak, locale]);
 
-  if (!recognition.supported) return null;
+  if (!recognition.supportResolved) return null;
+  if (!recognition.supported) {
+    return (
+      <p className="ask-error" role="status" data-testid="ask-unavailable">
+        {t('ask.error.offlineUnavailable')}
+      </p>
+    );
+  }
 
   const ask = () => {
     stopSpeech(); // never compete with the "Hear today" playback
