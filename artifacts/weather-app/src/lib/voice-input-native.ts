@@ -21,6 +21,7 @@ interface OnDeviceSpeechRecognitionPlugin {
 }
 
 const NativeRecognizer = registerPlugin<OnDeviceSpeechRecognitionPlugin>('OnDeviceSpeechRecognition');
+const RECOGNITION_TIMEOUT_MS = 30_000;
 
 export type OnDeviceRecognitionController = {
   readonly supported: boolean;
@@ -38,13 +39,22 @@ export function createOnDeviceRecognitionController(): OnDeviceRecognitionContro
   let sessionSequence = 0;
   let activeSessionId: number | null = null;
   let activeHandlers: OnDeviceRecognitionHandlers | null = null;
+  let recognitionTimeout: ReturnType<typeof setTimeout> | null = null;
   const listeners: PluginListenerHandle[] = [];
+
+  const clearRecognitionTimeout = () => {
+    if (recognitionTimeout !== null) {
+      clearTimeout(recognitionTimeout);
+      recognitionTimeout = null;
+    }
+  };
 
   const detachSession = (sessionId: number) => {
     if (activeSessionId !== sessionId) return null;
     const handlers = activeHandlers;
     activeSessionId = null;
     activeHandlers = null;
+    clearRecognitionTimeout();
     return handlers;
   };
 
@@ -108,6 +118,12 @@ export function createOnDeviceRecognitionController(): OnDeviceRecognitionContro
       const sessionId = ++sessionSequence;
       activeSessionId = sessionId;
       activeHandlers = handlers;
+      recognitionTimeout = setTimeout(() => {
+        if (!handlesEvent(sessionId)) return;
+        void NativeRecognizer.cancel({ sessionId }).catch(() => undefined);
+        const timedOut = detachSession(sessionId);
+        timedOut?.onError?.('timeout');
+      }, RECOGNITION_TIMEOUT_MS);
       void NativeRecognizer.start({ sessionId, lang: lang?.trim() || 'en-GB' }).then(() => {
         if (handlesEvent(sessionId)) handlers.onStart?.();
       }).catch((error: unknown) => {
@@ -127,6 +143,7 @@ export function createOnDeviceRecognitionController(): OnDeviceRecognitionContro
       const sessionId = activeSessionId;
       activeSessionId = null;
       activeHandlers = null;
+      clearRecognitionTimeout();
       void NativeRecognizer.cancel({ sessionId }).catch(() => undefined);
     },
     dispose() {
@@ -136,6 +153,7 @@ export function createOnDeviceRecognitionController(): OnDeviceRecognitionContro
         const sessionId = activeSessionId;
         activeSessionId = null;
         activeHandlers = null;
+        clearRecognitionTimeout();
         void NativeRecognizer.cancel({ sessionId }).catch(() => undefined);
       }
       for (const listener of listeners.splice(0)) {
