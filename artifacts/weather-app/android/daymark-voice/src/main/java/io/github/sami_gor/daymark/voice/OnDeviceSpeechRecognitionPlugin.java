@@ -239,7 +239,11 @@ public class OnDeviceSpeechRecognitionPlugin extends Plugin {
             case SpeechRecognizer.ERROR_NETWORK:
             case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
             case SpeechRecognizer.ERROR_SERVER:
-                // No retry is attempted. An on-device recognizer error is terminal.
+            case SpeechRecognizer.ERROR_SERVER_DISCONNECTED:
+            case SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED:
+            case SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE:
+            case SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT:
+                // A local service/model error is terminal. Never retry through a generic recognizer.
                 return "offline-unavailable";
             default:
                 return "unknown";
