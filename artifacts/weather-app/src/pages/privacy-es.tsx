@@ -74,10 +74,14 @@ export default function PrivacyEs() {
         pulsas «Usar mi ubicación» y concedes el permiso.
       </p>
       <p>
-        En ese caso, tus coordenadas se redondean a dos decimales (aproximadamente 1 km) en tu
-        dispositivo antes de enviarse a Open-Meteo para buscar tu pronóstico local. Daymark no guarda
-        tu ubicación; no se conserva entre visitas y la aplicación vuelve a su ubicación
-        predeterminada cuando la recargas o vuelves a abrirla.
+        En la aplicación Android instalada, Daymark solicita únicamente ubicación aproximada:
+        declara el permiso Android ACCESS_COARSE_LOCATION y no declara ACCESS_FINE_LOCATION.
+        Daymark utiliza la estimación aproximada que devuelve Android sin redondearla más. En la versión
+        web/PWA, la ubicación del dispositivo que devuelve el navegador se ajusta en el propio dispositivo
+        a una cuadrícula de 0,025 grados (unos 2,8 km norte/sur y 1,7 km este/oeste cerca de Londres)
+        antes de enviarse a Open-Meteo. Esto reduce la precisión, pero no anonimiza la solicitud.
+        Daymark no guarda tu ubicación y la aplicación vuelve a su ubicación predeterminada cuando la
+        recargas o vuelves a abrirla.
       </p>
       <p>
         Cuando usas la ubicación del dispositivo, Daymark también resuelve un nombre de localidad
