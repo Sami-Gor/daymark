@@ -170,6 +170,7 @@ const es: Record<TranslationKey, string> = {
   'ask.listening': 'Escuchando…',
   'ask.srListening': 'Escuchando tu pregunta meteorológica.',
   'ask.privacyNote': 'El reconocimiento de voz lo gestiona tu navegador o dispositivo y puede usar su servicio de voz.',
+  'ask.privacyNoteAndroid': 'En Android, el reconocimiento de voz se realiza en el dispositivo. La entrada de voz no estará disponible si no se admite el reconocimiento local.',
   'ask.youAsked': 'Tu pregunta:',
   'ask.daymark': 'Daymark:',
   'ask.unknown': 'Puedo ayudar con el tiempo de hoy, la lluvia, el UV, la calidad del aire, las próximas horas o mañana.',
