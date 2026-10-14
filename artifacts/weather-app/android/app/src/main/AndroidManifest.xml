@@ -59,7 +59,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- "Use my location" (geolocation in the WebView). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Ask Daymark native on-device speech recognition; no online recognizer fallback. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Bundled Kokoro narration requests audio focus through AudioManager. -->
