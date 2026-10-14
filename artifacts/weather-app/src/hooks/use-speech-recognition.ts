@@ -64,15 +64,16 @@ export function useSpeechRecognition() {
       controller.stop();
       setIsListening(false);
     };
+    const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
     const onVisibilityChange = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      if (isAndroidNative && typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         cancelIfBackgrounded();
       }
     };
-    if (typeof document !== 'undefined') {
+    if (isAndroidNative && typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', onVisibilityChange);
     }
-    if (Capacitor.isNativePlatform()) {
+    if (isAndroidNative) {
       void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
         if (!isActive) cancelIfBackgrounded();
       }).then((handle) => {
@@ -83,7 +84,7 @@ export function useSpeechRecognition() {
 
     return () => {
       active = false;
-      if (typeof document !== 'undefined') {
+      if (isAndroidNative && typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onVisibilityChange);
       }
       if (appStateHandle) void appStateHandle.remove();
