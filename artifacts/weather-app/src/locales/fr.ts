@@ -188,6 +188,7 @@ const fr: Record<TranslationKey, string> = {
   'voice.preparing': 'Préparation de la voix…',
   'voice.ariaPreparing': 'Préparation de la voix. Appuyez pour annuler.',
   'voice.error.unavailable': "La lecture vocale n'est pas disponible pour le moment. Réessayez.",
+  'voice.error.offlineUnavailable': "Aucune voix hors ligne installée n'est disponible pour cette langue. Installez une voix hors ligne dans les paramètres Android, puis réessayez."
   'dayCue.sun': 'Temps ensoleillé aujourd’hui',
   'dayCue.rain': 'Pluie attendue aujourd’hui',
   'dayCue.mixed': 'Soleil et pluie attendus aujourd’hui',
