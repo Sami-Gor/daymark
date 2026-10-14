@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
@@ -100,17 +101,21 @@ function Home() {
     // improves the place label and never delays weather (see below).
     void ensureLocalityIndex();
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
-      // Coordinates are rounded to ~1 km before leaving the device
-      // (DAYMARK-SEC-002): every Daymark feature works at neighbourhood
-      // precision, so precise coordinates are never transmitted.
-      const latitude = Number(coords.latitude.toFixed(2));
-      const longitude = Number(coords.longitude.toFixed(2));
+      // Android requests only ACCESS_COARSE_LOCATION, so the operating
+      // system supplies an approximate fix. Do not round it again: doing so
+      // compounds the loss of accuracy for regional forecasts.
+      // Browsers without an approximate-permission contract snap the fix to
+      // a roughly 3–5 km² grid before any coordinates leave the device.
+      const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+      const { latitude, longitude } = isAndroidNative
+        ? { latitude: coords.latitude, longitude: coords.longitude }
+        : roundDeviceLocation(coords.latitude, coords.longitude);
       try {
         // A newer search or location interaction wins over this older one.
         if (id !== selectionId.current) return;
         clearLocationToast();
         const fallbackName = t('current.yourLocation');
-        // Weather starts immediately from the rounded coordinates; naming is
+        // Weather starts immediately from the privacy-filtered coordinates; naming is
         // enhancement-only and is resolved locally while weather loads.
         const loaded = await loadWeather({ name: fallbackName, latitude, longitude });
         if (!loaded || id !== selectionId.current) return;
