@@ -5,6 +5,7 @@ import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 import io.github.sami_gor.daymark.voice.DaymarkVoicePlugin;
+import io.github.sami_gor.daymark.voice.OnDeviceSpeechRecognitionPlugin;
 import io.github.sami_gor.daymark.voice.SystemSpeechPlugin;
 
 public class MainActivity extends BridgeActivity {
@@ -18,6 +19,7 @@ public class MainActivity extends BridgeActivity {
             return;
         }
         registerPlugin(DaymarkVoicePlugin.class);
+        registerPlugin(OnDeviceSpeechRecognitionPlugin.class);
         registerPlugin(SystemSpeechPlugin.class);
         super.onCreate(savedInstanceState);
     }
