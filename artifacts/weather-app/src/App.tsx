@@ -32,6 +32,7 @@ import { UVForecast } from '@/components/weather/UVForecast';
 import { AirQualityForecast } from '@/components/weather/AirQualityForecast';
 import { WeatherAlerts } from '@/components/weather/WeatherAlerts';
 import { deriveDayCue } from '@/lib/day-cue';
+import { roundDeviceLocation } from '@/lib/location-privacy';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
 import { useLocale } from '@/hooks/use-locale';
 
