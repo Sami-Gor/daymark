@@ -30,7 +30,14 @@ export function useDaymarkSpeech() {
       speak: (text, handlers, lang) => {
         SystemSpeech.speak({ text, lang })
           .then(() => handlers?.onEnd?.())
-          .catch(() => handlers?.onError?.());
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error ?? '');
+            handlers?.onError?.(
+              message.includes('system-tts-offline-unavailable')
+                ? 'offline-voice-unavailable'
+                : 'system-tts-failed',
+            );
+          });
         return true;
       },
       stop: () => {
@@ -71,6 +78,7 @@ export function useDaymarkSpeech() {
 
   const [ui, dispatch] = useReducer(reduceSpeechUi, initialSpeechUiState);
   const [engine, setEngine] = useState<SpeechEngine | null>(null);
+  const [errorCode, setErrorCode] = useState('');
 
   // The native engine reports when synthesis actually starts, which moves the
   // UI out of the "Preparing voice…" state.
@@ -99,13 +107,17 @@ export function useDaymarkSpeech() {
     (text: string, lang?: string) => {
       const spoken = text?.trim();
       if (!spoken) return false;
+      setErrorCode('');
       void router.speak(spoken, lang, {
         onEngine: (selection) => {
           setEngine(selection.engine);
           dispatch({ type: 'speakStarted', engine: selection.engine });
         },
         onEnd: () => dispatch({ type: 'finished' }),
-        onError: () => dispatch({ type: 'failed' }),
+        onError: (reason) => {
+          setErrorCode(reason ?? '');
+          dispatch({ type: 'failed' });
+        },
       });
       return true;
     },
@@ -114,6 +126,7 @@ export function useDaymarkSpeech() {
 
   const stop = useCallback(() => {
     router.stop();
+    setErrorCode('');
     dispatch({ type: 'stopped' });
   }, [router]);
 
@@ -121,6 +134,7 @@ export function useDaymarkSpeech() {
     supported: router.supported(),
     status: ui.status,
     error: ui.error,
+    errorCode,
     isSpeaking: ui.status === 'speaking',
     isPreparing: ui.status === 'preparing',
     isActive: ui.status !== 'idle',

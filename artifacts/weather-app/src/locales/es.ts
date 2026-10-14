@@ -170,6 +170,7 @@ const es: Record<TranslationKey, string> = {
   'ask.listening': 'Escuchando…',
   'ask.srListening': 'Escuchando tu pregunta meteorológica.',
   'ask.privacyNote': 'El reconocimiento de voz lo gestiona tu navegador o dispositivo y puede usar su servicio de voz.',
+  'ask.privacyNoteAndroid': 'En Android, el reconocimiento de voz se realiza en el dispositivo. La entrada de voz no estará disponible si no se admite el reconocimiento local.',
   'ask.youAsked': 'Tu pregunta:',
   'ask.daymark': 'Daymark:',
   'ask.unknown': 'Puedo ayudar con el tiempo de hoy, la lluvia, el UV, la calidad del aire, las próximas horas o mañana.',
@@ -177,6 +178,7 @@ const es: Record<TranslationKey, string> = {
   'ask.error.noSpeech': 'No lo he entendido. Toca Preguntar a Daymark e inténtalo otra vez.',
   'ask.error.audio': 'No se encontró ningún micrófono en este dispositivo.',
   'ask.error.network': 'El reconocimiento de voz necesita conexión de red ahora mismo.',
+  'ask.error.offlineUnavailable': 'La entrada de voz sin conexión no está disponible en este dispositivo. Puedes seguir usando Daymark sin voz.',
   'ask.error.aborted': 'La entrada de voz se detuvo.',
   'ask.error.unknown': 'La entrada de voz se detuvo inesperadamente. Inténtalo de nuevo.',
 
@@ -187,6 +189,7 @@ const es: Record<TranslationKey, string> = {
   'voice.preparing': 'Preparando la voz…',
   'voice.ariaPreparing': 'Preparando la voz. Toca para cancelar.',
   'voice.error.unavailable': 'La reproducción de voz no está disponible ahora mismo. Inténtalo de nuevo.',
+  'voice.error.offlineUnavailable': 'No hay una voz sin conexión instalada para este idioma. Instala una voz sin conexión en los ajustes de Android e inténtalo de nuevo.',
   'dayCue.sun': 'Condiciones soleadas hoy',
   'dayCue.rain': 'Se espera lluvia hoy',
   'dayCue.mixed': 'Sol y lluvia previstos hoy',

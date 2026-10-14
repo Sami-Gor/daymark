@@ -185,6 +185,7 @@ const en = {
   'ask.listening': 'Listening…',
   'ask.srListening': 'Listening for your weather question.',
   'ask.privacyNote': 'Voice recognition is handled by your browser or device and may use its speech service.',
+  'ask.privacyNoteAndroid': 'Android uses on-device speech recognition. Voice input is unavailable if local recognition is not supported.',
   'ask.youAsked': 'You asked:',
   'ask.daymark': 'Daymark:',
   'ask.unknown': "I can help with today's weather, rain, UV, air quality, the next few hours, or tomorrow.",
@@ -192,6 +193,7 @@ const en = {
   'ask.error.noSpeech': "I didn't catch that. Tap Ask Daymark and try again.",
   'ask.error.audio': 'No microphone was found on this device.',
   'ask.error.network': 'Speech recognition needs a network connection right now.',
+  'ask.error.offlineUnavailable': 'Offline voice input is not available on this device. You can still use Daymark without voice input.',
   'ask.error.aborted': 'Voice input stopped.',
   'ask.error.unknown': 'Voice input stopped unexpectedly. Tap Ask Daymark to try again.',
 
@@ -203,6 +205,7 @@ const en = {
   'voice.preparing': 'Preparing voice…',
   'voice.ariaPreparing': 'Preparing voice. Tap to cancel.',
   'voice.error.unavailable': "Voice playback isn't available right now. Try again.",
+  'voice.error.offlineUnavailable': 'No installed offline voice is available for this language. Download an offline voice in Android settings, then try again.',
   'dayCue.sun': 'Sunny conditions today',
   'dayCue.rain': 'Rain expected today',
   'dayCue.mixed': 'Sunshine and rain expected today',
