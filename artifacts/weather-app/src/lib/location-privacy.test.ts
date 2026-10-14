@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEVICE_LOCATION_DECIMAL_PLACES, roundDeviceLocation } from './location-privacy';
+import { DEVICE_LOCATION_GRID_DEGREES, roundDeviceLocation } from './location-privacy';
 
 describe('roundDeviceLocation', () => {
-  it('rounds device location to the coarser one-decimal grid', () => {
-    expect(DEVICE_LOCATION_DECIMAL_PLACES).toBe(1);
+  it('rounds device location to a grid of approximately 3 km² or more', () => {
+    expect(DEVICE_LOCATION_GRID_DEGREES).toBe(0.025);
     expect(roundDeviceLocation(51.5074, -0.1278)).toEqual({
       latitude: 51.5,
-      longitude: -0.1,
+      longitude: -0.125,
     });
   });
 
-  it('preserves coordinates that are already on the grid', () => {
+  it('preserves coordinates that already fall on the grid', () => {
     expect(roundDeviceLocation(40.7, -74.0)).toEqual({
       latitude: 40.7,
       longitude: -74,
