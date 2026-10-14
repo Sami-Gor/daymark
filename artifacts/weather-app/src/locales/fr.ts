@@ -177,7 +177,7 @@ const fr: Record<TranslationKey, string> = {
   'ask.error.noSpeech': "Je n'ai pas compris. Touchez Demander à Daymark et réessayez.",
   'ask.error.audio': 'Aucun microphone détecté sur cet appareil.',
   'ask.error.network': 'La reconnaissance vocale nécessite une connexion réseau.',
-  'ask.error.offlineUnavailable': "La saisie vocale hors ligne n'est pas disponible sur cet appareil. Vous pouvez toujours utiliser Daymark sans la voix."
+  'ask.error.offlineUnavailable': "La saisie vocale hors ligne n'est pas disponible sur cet appareil. Vous pouvez toujours utiliser Daymark sans la voix.",
   'ask.error.aborted': "L'écoute s'est arrêtée.",
   'ask.error.unknown': "L'écoute s'est arrêtée de façon inattendue. Réessayez.",
 
@@ -188,7 +188,7 @@ const fr: Record<TranslationKey, string> = {
   'voice.preparing': 'Préparation de la voix…',
   'voice.ariaPreparing': 'Préparation de la voix. Appuyez pour annuler.',
   'voice.error.unavailable': "La lecture vocale n'est pas disponible pour le moment. Réessayez.",
-  'voice.error.offlineUnavailable': "Aucune voix hors ligne installée n'est disponible pour cette langue. Installez une voix hors ligne dans les paramètres Android, puis réessayez."
+  'voice.error.offlineUnavailable': "Aucune voix hors ligne installée n'est disponible pour cette langue. Installez une voix hors ligne dans les paramètres Android, puis réessayez.",
   'dayCue.sun': 'Temps ensoleillé aujourd’hui',
   'dayCue.rain': 'Pluie attendue aujourd’hui',
   'dayCue.mixed': 'Soleil et pluie attendus aujourd’hui',
