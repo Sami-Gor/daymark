@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Mic, Square } from 'lucide-react';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useLocale } from '@/hooks/use-locale';
@@ -91,7 +92,7 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
         {listening ? <Square size={11} /> : <Mic size={13} />}
         {listening ? t('ask.stop') : t('ask.button')}
       </button>
-      <p className="ask-privacy" data-testid="ask-privacy">{t('ask.privacyNote')}</p>
+      <p className="ask-privacy" data-testid="ask-privacy">{Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' ? t('ask.privacyNoteAndroid') : t('ask.privacyNote')}</p>
       <span className="sr-only" role="status" aria-live="polite">
         {listening ? t('ask.srListening') : ''}
       </span>
