@@ -75,10 +75,14 @@ export default function PrivacyFr() {
         l&rsquo;autorisation.
       </p>
       <p>
-        Dans ce cas, vos coordonnées sont arrondies à deux décimales (environ 1 km) sur votre appareil
-        avant d&rsquo;être envoyées à Open-Meteo pour rechercher votre prévision locale. Daymark
-        n&rsquo;enregistre pas votre localisation ; elle n&rsquo;est pas conservée entre les visites et
-        l&rsquo;application revient à son lieu par défaut lorsque vous la rechargez ou la rouvrez.
+        Dans l’application Android installée, Daymark demande uniquement une localisation approximative :
+        l’application déclare la permission Android ACCESS_COARSE_LOCATION et ne déclare pas
+        ACCESS_FINE_LOCATION. Daymark utilise l’estimation approximative fournie par Android sans
+        l’arrondir davantage. Dans la version web/PWA, la position fournie par le navigateur est arrondie
+        sur l’appareil à une grille de 0,025 degré (environ 2,8 km nord/sud et 1,7 km est/ouest près de
+        Londres) avant son envoi à Open-Meteo. Cela réduit la précision sans anonymiser la requête.
+        Daymark n’enregistre pas votre localisation et l’application revient à son lieu par défaut
+        lorsque vous la rechargez ou la rouvrez.
       </p>
       <p>
         Lorsque vous utilisez la position de l’appareil, Daymark détermine aussi un nom de localité
