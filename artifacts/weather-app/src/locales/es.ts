@@ -188,6 +188,7 @@ const es: Record<TranslationKey, string> = {
   'voice.preparing': 'Preparando la voz…',
   'voice.ariaPreparing': 'Preparando la voz. Toca para cancelar.',
   'voice.error.unavailable': 'La reproducción de voz no está disponible ahora mismo. Inténtalo de nuevo.',
+  'voice.error.offlineUnavailable': 'No hay una voz sin conexión instalada para este idioma. Instala una voz sin conexión en los ajustes de Android e inténtalo de nuevo.'
   'dayCue.sun': 'Condiciones soleadas hoy',
   'dayCue.rain': 'Se espera lluvia hoy',
   'dayCue.mixed': 'Sol y lluvia previstos hoy',
