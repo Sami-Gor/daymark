@@ -14,8 +14,10 @@ A Capacitor shell keeps the exact same React/Vite app and PWA deployment, adds a
 supported JavaScript-to-native bridge, and gives us lifecycle, audio-focus and
 packaging control for the native voice path. It also keeps an iOS path open.
 
-The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
-(branch `poc/kokoro-local-tts`, commit `ff49699`).
+The TWA project is preserved at `android/` in this repository. The migration-era
+tag `pre-capacitor-daymark` and branch `poc/kokoro-local-tts` are local/unpublished,
+not available by those names from a fresh GitHub clone. The rollback commit is
+publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 
 ## Migration state record (pre-migration)
 
@@ -28,7 +30,7 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
 | versionCode / versionName | `1` / `1.0.0` |
 | minSdk / targetSdk / compileSdk | `24` / `36` / `36` |
 | Signing | `android/daymark-upload.keystore`, alias `daymark-upload`, SHA-256 `34:6B:BE:…:FA:7E` (rotated 2026-09-13; earlier `3C:60:AD:…:20:57` retired) |
-| Play metadata | package `io.github.sami_gor.daymark`; AAB versionCode 1; closed testing submitted; assetlinks pending the Play app-signing SHA-256 |
+| Play metadata (state at this pre-migration snapshot) | package `io.github.sami_gor.daymark`; AAB versionCode 1; closed testing had been submitted; App Links association still depended on the Play app-signing SHA-256 |
 | Deep links | `https://daymark-weather.pages.dev` intent filter, `autoVerify`, fallback Custom Tabs |
 | Manifest permissions (TWA) | none declared (web APIs: geolocation, microphone) |
 | Release AAB | 84,011,698 B (Kokoro bm_fable) |
@@ -75,10 +77,14 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
 - Manifest metadata: `asset_statements`, `web_manifest_url`, splash screen,
   status/nav bar colors, `FALLBACK_STRATEGY=customtabs`, `SCREEN_ORIENTATION`,
   file provider, `autoVerify` https intent filter for the production host.
-- Digital Asset Links: template only (`asset-links/assetlinks.template.json`
-  with `__PLAY_APP_SIGNING_SHA256__`); production `/.well-known/assetlinks.json`
-  is not deployed (serves the SPA fallback), so the app currently runs in
-  Custom Tabs fallback mode.
+- **Historical TWA state:** this legacy project had only the template
+  (`asset-links/assetlinks.template.json` with
+  `__PLAY_APP_SIGNING_SHA256__`), and the last recorded endpoint check returned
+  the SPA fallback, so the TWA used Custom Tabs fallback mode. This is not a
+  fresh live check of the website. For the current Capacitor app's HTTPS App
+  Links, check the live association endpoint using
+  `docs/release/play-console-checklist.md`; do not assume its current state
+  from this historical TWA audit.
 - Icons/splash under `android/app/src/main/res/`.
 - Kokoro POC: native-only `KokoroTtsTestActivity` + `KokoroLocalTtsEngine`
   (Java) over a Rust JNI cdylib with the bundled model/voice, plus
@@ -93,7 +99,7 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
 | Service worker | served by Chrome, active | redundant; disable inside native shell, keep for web |
 | Geolocation permission | Chrome handles | WebView `onGeolocationPermissionsShowPrompt` + app permission |
 | Microphone | Chrome | WebView `onPermissionRequest` + app permission (AskDaymark) |
-| Web Speech API | Chrome's speechSynthesis (system TTS) | WebView may lack speechSynthesis → native Kokoro path, else browser fallback |
+| Speech output | Chrome browser speech synthesis/system voice | Android English: local Kokoro only (shows an error if unavailable); French/Spanish: native Android system TTS plugin. Web/PWA continues to use browser speech synthesis |
 | External links | Chrome handles | Capacitor opens in external browser (`@capacitor/app`/browser config) |
 | Back button | browser history | Capacitor hardware back handling → `window.history.back()` |
 | App links | verified by Chrome via DAL | Android intent filters + optional `@capacitor/app` `openUrl` |
@@ -112,11 +118,16 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
   - Android implementation as a Gradle library module
     (`android/daymark-voice`) wrapping the validated `KokoroLocalTtsEngine`,
     the same Rust JNI cdylib, `model_quantized.onnx` and `bm_fable.bin`.
-  - Web implementation is a thin no-op; the React layer falls back to
-    `use-browser-speech` whenever the native engine is unavailable.
+  - Web implementation is a placeholder; the web UI uses browser speech APIs.
+    On Android, Kokoro is selected only for English when the native engine is
+    available; it does not fall back to system TTS for English. French/Spanish
+    use the Android `SystemSpeech` plugin.
 - Unified speech layer: `useDaymarkSpeech` selects
   `kokoro` only for Android native + English + healthy engine;
-  `browser` for web/desktop, iOS, French, Spanish, and any native failure.
+  `browser` for web/desktop and iOS. French/Spanish on Android use the
+  `SystemSpeech` plugin. If Android's native English engine is unavailable,
+  the app surfaces a narration error; it does not fall back to browser/system
+  speech for English.
 - Lifecycle: engine initializes once per process, asynchronously, when the
   plugin loads; `speak()` waits for readiness (bounded), Stop cancels
   immediately; audio focus is requested per utterance and abandoned on stop or
@@ -132,7 +143,7 @@ The TWA project is preserved at `android/` and tagged `pre-capacitor-daymark`
 | Capacitor | 8.5.1 (`@capacitor/core`, `@capacitor/cli`, `@capacitor/android`, `@capacitor/app`) |
 | Android Gradle Plugin / Gradle | 8.13.0 / 8.14.3 |
 | JDK | 21 (required by Capacitor 8; TWA used 17) |
-| Node / pnpm | 26.8.2 / 12.3.4 |
+| Node / pnpm | Node 24 is used by current CI (Node 26.8.2 was used for this migration validation) / pnpm 12.3.4 |
 | package id | `io.github.sami_gor.daymark` (unchanged) |
 | minSdk | 24 (Capacitor 8 minimum; TWA supported 23) |
 | targetSdk / compileSdk | 36 / 36 (unchanged) |
@@ -146,9 +157,11 @@ TypeScript (`src/lib/daymark-voice`, `src/lib/system-speech`):
 ```
 isAvailable(): Promise<{ available: boolean }>
 getStatus(): Promise<{ state: 'uninitialized'|'loading'|'ready'|'speaking'|'stopped'|'error' }>
-speak({ text, lang? }): Promise<void>
+speak({ text, lang?, segments? }): Promise<void>
 stop(): Promise<void>
 isSpeaking(): Promise<{ speaking: boolean }>
+addListener('stateChanged', listener): Promise<PluginListenerHandle>
+removeAllListeners(): Promise<void>
 ```
 
 Android implementation: Gradle module `android/daymark-voice` wrapping the
@@ -190,7 +203,7 @@ Engine selection (`src/lib/speech-engine.ts`):
 # Web (unchanged PWA deployment)
 cd artifacts/weather-app && pnpm build
 
-# Capacitor sync + Android builds (JDK 21)
+# Capacitor sync + Android builds (JDK 21; java_home command below is macOS-specific)
 cd artifacts/weather-app
 pnpm exec cap sync android
 cd android
@@ -206,10 +219,16 @@ gitignored.
 
 ## Validation results (API 36 arm64 emulator, release build)
 
-- Capacitor shell launches, bundled assets load from `https://localhost`.
-- Routing, hardware back (SPA history; root minimizes), cold/warm App Links
-  (`/privacy`, `/fr/privacy`), local storage, background/foreground and
-  force-stop/relaunch all work.
+This validation section is an emulator-only snapshot and predates the later
+physical-device pass recorded in `docs/release/android-production-readiness.md`
+§18. It must not be read as a statement that every production check is complete.
+
+- Capacitor shell launches; bundled assets load from `https://localhost`.
+- In-app URL routing, hardware back (SPA history; root minimizes), cold/warm
+  navigation to `/privacy` and `/fr/privacy`, local storage,
+  background/foreground and force-stop/relaunch worked in the emulator. These
+  emulator routing checks do **not** establish Android website-domain
+  verification through Digital Asset Links.
 - Kokoro: READY, `voice=bm_fable`, streamed narration, Stop
   (`stopped=true`), offline (airplane mode) and repeated narration all pass.
 - Web/PWA: typecheck, 236 unit tests, 153 e2e tests and the production Vite
@@ -239,15 +258,19 @@ Keep for rollback: the whole root `android/` TWA project, `twa-manifest.json`,
 `asset-links/`, `androidbrowserhelper` dependency (only referenced by the TWA
 project).
 
-Candidates once the Capacitor shell is released:
+Post-rollout cleanup candidates (do not execute before the Capacitor production rollout is stable):
 
 - `src/hooks/use-browser-speech.ts` — no production usages left (the unified
   hook talks to `lib/voice-browser` directly).
-- The root TWA project can be moved to a tag/archive branch; it is not part of
-  any production build.
+- The root TWA project can be moved to an archive branch only after the
+  Capacitor production rollout is stable; it is not part of the current
+  production build and remains the documented rollback path until then.
 
 ## Rollback
 
-`git checkout pre-capacitor-daymark` (or the `poc/kokoro-local-tts` branch at
-`ff49699`) restores the validated TWA/Kokoro state, including the root
-`android/` project, which is never modified by this migration.
+`git switch --detach ff496996fcf9b47d9524d81ac300e69c2974c805` checks out the
+TWA/Kokoro rollback state. The `pre-capacitor-daymark` tag and
+`poc/kokoro-local-tts` branch from migration-era notes are local/unpublished and
+are not available by those names from a fresh GitHub clone. The root `android/`
+project is the legacy rollback project; it is not used for current Capacitor
+production builds.

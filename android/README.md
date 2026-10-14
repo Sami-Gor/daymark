@@ -16,7 +16,8 @@ production Android app and must not be used for current Android work.
 - `KokoroTtsTestActivity` exists only here, as a diagnostic for the legacy
   shell; the production launch path is the Capacitor app.
 
-Rollback material is intentionally retained until the Capacitor release has
-completed device validation and a stable Play rollout. See
-`docs/architecture/capacitor-migration.md` for the migration and rollback
-details.
+The core physical-device pass for the Capacitor release is already recorded in
+`docs/release/android-production-readiness.md` §18. Keep this legacy project as
+rollback material until the production rollout is stable; broader device-matrix
+checks are optional additional QA, not a reason to repeat the core pass. See
+`docs/architecture/capacitor-migration.md` for migration and rollback details.

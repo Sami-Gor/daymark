@@ -3,7 +3,9 @@ import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
 /*
  * Spanish privacy policy (/es/privacy). Meaning-for-meaning translation of the
  * English policy: same data practices, same Daymark-vs-third-party
- * distinction, same voice-processing caveat. No stronger or weaker claims.
+ * distinction, same voice-processing caveat. Forecast loading includes the
+ * default place on app open; optional location and voice flows are separate.
+ * No stronger or weaker claims.
  */
 
 export default function PrivacyEs() {
@@ -15,7 +17,7 @@ export default function PrivacyEs() {
       brandNote="Política de privacidad"
       backLabel="← Volver al tiempo"
       switcherLabel="Idioma de la política"
-      effectiveText="Fecha de entrada en vigor: 11 de septiembre de 2026"
+      effectiveText="Fecha de entrada en vigor: 11 de octubre de 2026"
       tagline="Daymark — el tiempo, de forma sencilla"
     >
       <p>
@@ -39,9 +41,10 @@ export default function PrivacyEs() {
           tiempo.
         </li>
         <li>
-          Para funcionar, Daymark envía las solicitudes que tú activas —por ejemplo, el pronóstico de
-          un lugar que has elegido— directamente desde tu navegador a Open-Meteo, un servicio
-          meteorológico externo.
+          Al abrir la aplicación, Daymark carga un pronóstico para su ubicación predeterminada. Cuando
+          buscas otro lugar, actualizas las condiciones o utilizas la ubicación del dispositivo, las
+          solicitudes meteorológicas o de búsqueda correspondientes se envían directamente desde tu
+          navegador o aplicación instalada a Open-Meteo, un servicio meteorológico externo.
         </li>
         <li>
           Las funciones de voz opcionales dependen de las capacidades de voz de tu navegador o
@@ -53,14 +56,16 @@ export default function PrivacyEs() {
       <p>Para mostrar el tiempo, Daymark procesa:</p>
       <ul>
         <li>
-          el lugar que eliges (mediante la búsqueda o la ubicación de tu dispositivo si lo autorizas);
+          la ubicación predeterminada que se muestra al abrir la aplicación (Londres), el lugar que
+          buscas o la ubicación de tu dispositivo si la autorizas;
         </li>
         <li>las respuestas meteorológicas, de calidad del aire y de búsqueda de lugares que devuelve Open-Meteo;</li>
         <li>tus preferencias guardadas en el dispositivo, como el idioma.</li>
       </ul>
       <p>
-        Esta información existe en tu navegador mientras usas la aplicación. No se envía a ningún
-        backend ni servidor de aplicaciones operado por Daymark, porque Daymark no tiene ninguno.
+        Esta información se procesa en tu navegador o en la aplicación instalada mientras usas Daymark.
+        No se envía a ningún backend ni servidor de aplicaciones operado por Daymark, porque Daymark
+        no tiene ninguno.
       </p>
 
       <h2>Datos de ubicación</h2>
@@ -76,10 +81,11 @@ export default function PrivacyEs() {
       </p>
       <p>
         Cuando usas la ubicación del dispositivo, Daymark también resuelve un nombre de localidad
-        cercano (por ejemplo, un pueblo) completamente en tu navegador, a partir de un conjunto de
-        datos GeoNames estático servido por Daymark y guardado en caché en tu dispositivo tras el
-        primer uso. Ningún servicio de geocodificación inversa —incluido GeoNames— recibe tus
-        coordenadas, y el resultado permanece en tu dispositivo.
+        cercano (por ejemplo, un pueblo) localmente a partir de un conjunto de datos GeoNames estático.
+        En la versión web/PWA, el conjunto de datos se descarga desde el sitio de Daymark y se guarda
+        localmente en Cache Storage después del primer uso. En la aplicación Android instalada, se
+        incluye en los recursos integrados de la aplicación. Ningún servicio de geocodificación inversa
+        —incluido GeoNames— recibe tus coordenadas, y el resultado permanece en tu dispositivo.
       </p>
 
       <h2>Búsqueda de lugares</h2>
@@ -92,7 +98,8 @@ export default function PrivacyEs() {
       <p>
         Los pronósticos, los datos de calidad del aire y la búsqueda de lugares provienen de{' '}
         <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>. Las
-        solicitudes van directamente desde tu navegador a los servidores de Open-Meteo:
+        solicitudes van directamente desde tu navegador o aplicación instalada a los servidores de
+        Open-Meteo:
       </p>
       <ul>
         <li><code>api.open-meteo.com</code> — pronósticos</li>
@@ -100,10 +107,12 @@ export default function PrivacyEs() {
         <li><code>geocoding-api.open-meteo.com</code> — búsqueda de lugares</li>
       </ul>
       <p>
-        Como estas solicitudes las gestiona Open-Meteo, su tratamiento —incluida cualquier forma de
-        registro o conservación— se rige por las políticas propias de Open-Meteo. Daymark no controla
-        esas prácticas; consulta la información de privacidad y los términos de Open-Meteo en su
-        sitio web.
+        Las condiciones publicadas de Open-Meteo para su API gratuita no comercial indican que los
+        registros del servidor utilizados para resolver problemas pueden contener información sensible,
+        como coordenadas geográficas, y que los archivos de registro se eliminan después de 90 días.
+        Esta conservación depende de Open-Meteo, no de Daymark. Consulta las
+        <a href="https://open-meteo.com/en/terms" target="_blank" rel="noreferrer">condiciones y la política de privacidad de Open-Meteo</a>
+        para más detalles.
       </p>
 
       <h2>Entrada de voz (Ask Daymark)</h2>
@@ -117,33 +126,41 @@ export default function PrivacyEs() {
 
       <h2>Salida de voz (Hear today)</h2>
       <p>
-        «Hear today» lee el pronóstico en voz alta mediante la síntesis de voz integrada en tu
-        navegador o dispositivo. El texto del boletín lo procesa esa capacidad de la plataforma, no un
-        servicio de voz operado por Daymark.
+        «Hear today» lee el boletín en voz alta. En la aplicación Android, la narración en inglés
+        se genera en el dispositivo mediante el modelo Kokoro integrado; el francés y el español usan
+        la síntesis de voz del sistema Android. En la versión web, la narración utiliza la API de
+        síntesis de voz del navegador. El tratamiento por los proveedores de voz del navegador o del
+        sistema depende del dispositivo, la configuración y la voz elegida. Daymark no opera un
+        servidor de voz ni almacena el texto de la narración.
       </p>
 
       <h2>Información almacenada en tu dispositivo</h2>
       <p>
         Daymark guarda tu preferencia de idioma (inglés, francés o español) en el almacenamiento local
-        de tu navegador con la clave <code>daymark.locale</code>. Es el único valor persistente de la
-        aplicación que Daymark almacena intencionadamente. Permanece hasta que lo cambies o borres el
-        almacenamiento de tu navegador o del sitio.
+        de tu navegador con la clave <code>daymark.locale</code>. Es la única preferencia de usuario
+        persistente que Daymark almacena intencionadamente. Permanece hasta que la cambies o borres el
+        almacenamiento del navegador o del sitio. En la versión web/PWA, Daymark guarda el conjunto de
+        datos estático de localidades en Cache Storage para consultas sin conexión; el service worker
+        guarda por separado los archivos de la aplicación. La aplicación Android instalada utiliza el
+        conjunto de datos incluido en sus recursos. Son recursos de la aplicación, no un historial de
+        tus ubicaciones o del tiempo.
       </p>
       <p>
         Daymark no usa cookies, no usa el almacenamiento de sesión del navegador ni IndexedDB, y no
-        conserva ningún historial de ubicaciones, búsquedas, transcripciones o del tiempo. El service
-        worker de Daymark almacena en caché los archivos de la propia aplicación (HTML, scripts,
-        estilos, iconos y fuentes) para que la aplicación pueda abrirse sin conexión; no almacena en
-        caché las respuestas del tiempo ni de calidad del aire.
+        conserva ningún historial de ubicaciones, búsquedas, transcripciones o del tiempo. En la versión
+        web/PWA, el service worker guarda en caché los archivos de la aplicación (HTML, scripts, estilos,
+        iconos y fuentes) para que pueda abrirse sin conexión; no guarda en caché las respuestas
+        meteorológicas ni las de calidad del aire.
       </p>
 
       <h2>Servicios de terceros</h2>
       <ul>
         <li>Open-Meteo — tiempo, calidad del aire y búsqueda de lugares, como se describe arriba.</li>
         <li>
-          GeoNames — nombres de localidades para la ubicación del dispositivo. El conjunto de datos
-          se descarga desde el propio sitio de Daymark y la búsqueda se ejecuta en tu dispositivo; no
-          se envían coordenadas a GeoNames.
+          GeoNames — nombres de localidades para la ubicación del dispositivo. En la versión web/PWA,
+          el conjunto de datos estático se descarga desde el sitio de Daymark; en la aplicación Android
+          instalada, se incluye en los recursos de la aplicación. La búsqueda se ejecuta en tu
+          dispositivo; no se envían coordenadas a GeoNames.
         </li>
         <li>
           Los servicios de voz de tu navegador o dispositivo — solo cuando utilizas las funciones de
@@ -155,8 +172,9 @@ export default function PrivacyEs() {
         usados bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0).
       </p>
       <p>
-        Daymark no utiliza analíticas, publicidad, píxeles de seguimiento ni ningún otro servicio
-        externo.
+        Daymark no utiliza servicios externos de analítica, publicidad, píxeles de seguimiento ni
+        rastreo. Open-Meteo y las funciones de voz del navegador/dispositivo son servicios externos
+        utilizados para las funciones descritas arriba.
       </p>
 
       <h2>Analíticas, publicidad y seguimiento</h2>
@@ -176,15 +194,19 @@ export default function PrivacyEs() {
 
       <h2>Seguridad</h2>
       <p>
-        Daymark se sirve a través de HTTPS y aplica una política de seguridad de contenido estricta.
+        La versión web/PWA alojada se sirve mediante HTTPS y utiliza la política de seguridad de
+        contenido configurada en el sitio. La aplicación Android instalada carga recursos locales
+        integrados; las cabeceras de seguridad HTTP del sitio no se aplican dentro de su WebView.
         La aplicación es un conjunto de archivos estáticos, sin secretos ni backend o servidor de
         aplicaciones operado por Daymark.
       </p>
 
       <h2>Tratamiento internacional</h2>
       <p>
-        Open-Meteo y los servicios de voz de tu navegador o dispositivo pueden procesar datos en
-        servidores situados en distintos países. Sus propias políticas describen dónde y cómo ocurre.
+        Open-Meteo procesa las solicitudes meteorológicas y de búsqueda en sus propios servidores.
+        Los servicios de voz de tu navegador o dispositivo también pueden procesar la entrada de voz
+        o el texto de la narración de forma remota, según el proveedor y la configuración. Las políticas
+        de esos proveedores describen dónde y cómo se realiza ese procesamiento.
       </p>
 
       <h2>Privacidad de los niños</h2>
