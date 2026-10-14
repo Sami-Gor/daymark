@@ -40,7 +40,10 @@ beforeEach(() => {
   native.addListener.mockClear();
 });
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.clearAllMocks();
+});
 
 describe('createOnDeviceRecognitionController', () => {
   it('refuses to start when local recognition is unavailable', async () => {
@@ -85,6 +88,24 @@ describe('createOnDeviceRecognitionController', () => {
     events.result[0]?.({ sessionId: 1, transcript: 'should not appear' });
     expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
     expect(onResult).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('cancels and clears a recognition session when its timeout expires', async () => {
+    vi.useFakeTimers();
+    native.isAvailable.mockResolvedValue({ available: true });
+    const controller = createOnDeviceRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    expect(controller.isListening()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
+    expect(onError).toHaveBeenCalledWith('timeout');
     expect(controller.isListening()).toBe(false);
   });
 
