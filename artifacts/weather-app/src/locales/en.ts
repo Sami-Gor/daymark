@@ -185,7 +185,7 @@ const en = {
   'ask.listening': 'Listening…',
   'ask.srListening': 'Listening for your weather question.',
   'ask.privacyNote': 'Voice recognition is handled by your browser or device and may use its speech service.',
-  'ask.privacyNoteAndroid': 'Android uses on-device speech recognition. Voice input is unavailable if local recognition is not supported.'
+  'ask.privacyNoteAndroid': 'Android uses on-device speech recognition. Voice input is unavailable if local recognition is not supported.',
   'ask.youAsked': 'You asked:',
   'ask.daymark': 'Daymark:',
   'ask.unknown': "I can help with today's weather, rain, UV, air quality, the next few hours, or tomorrow.",
