@@ -204,6 +204,7 @@ const en = {
   'voice.preparing': 'Preparing voice…',
   'voice.ariaPreparing': 'Preparing voice. Tap to cancel.',
   'voice.error.unavailable': "Voice playback isn't available right now. Try again.",
+  'voice.error.offlineUnavailable': 'No installed offline voice is available for this language. Download an offline voice in Android settings, then try again.'
   'dayCue.sun': 'Sunny conditions today',
   'dayCue.rain': 'Rain expected today',
   'dayCue.mixed': 'Sunshine and rain expected today',
