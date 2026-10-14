@@ -51,7 +51,7 @@
     <!-- "Use my location" (geolocation in the WebView). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- AskDaymark voice input (Web Speech Recognition in the WebView). -->
+    <!-- Ask Daymark native on-device speech recognition; no online recognizer fallback. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Capacitor requests this alongside RECORD_AUDIO for WebView capture. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
