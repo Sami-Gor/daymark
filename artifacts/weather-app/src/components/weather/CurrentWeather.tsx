@@ -71,7 +71,7 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
           <span className="sr-only" role="status" aria-live="polite" data-testid="voice-preparing-status">{t('voice.preparing')}</span>
         )}
         {speech.error && (
-          <p className="voice-error" role="alert" data-testid="voice-error">{t('voice.error.unavailable')}</p>
+          <p className="voice-error" role="alert" data-testid="voice-error">{speech.errorCode === 'offline-voice-unavailable' ? t('voice.error.offlineUnavailable') : t('voice.error.unavailable')}</p>
         )}
       </div>
 
