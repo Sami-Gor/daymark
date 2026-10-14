@@ -177,6 +177,7 @@ const es: Record<TranslationKey, string> = {
   'ask.error.noSpeech': 'No lo he entendido. Toca Preguntar a Daymark e inténtalo otra vez.',
   'ask.error.audio': 'No se encontró ningún micrófono en este dispositivo.',
   'ask.error.network': 'El reconocimiento de voz necesita conexión de red ahora mismo.',
+  'ask.error.offlineUnavailable': 'La entrada de voz sin conexión no está disponible en este dispositivo. Puedes seguir usando Daymark sin voz.'
   'ask.error.aborted': 'La entrada de voz se detuvo.',
   'ask.error.unknown': 'La entrada de voz se detuvo inesperadamente. Inténtalo de nuevo.',
 
