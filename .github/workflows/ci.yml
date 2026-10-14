@@ -37,6 +37,12 @@ jobs:
       - name: Unit tests
         run: pnpm --filter @workspace/weather-app run test
 
+      # Compile the native Android modules as well as the web layer. This
+      # catches Java/API/manifest regressions in Capacitor plugin changes.
+      - name: Android debug build
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:assembleDebug
+
       - name: Install Playwright browser
         run: pnpm --filter @workspace/weather-app exec playwright install chromium --with-deps
 
