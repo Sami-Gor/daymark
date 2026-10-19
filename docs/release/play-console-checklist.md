@@ -4,10 +4,13 @@ Companion to [`android-production-readiness.md`](android-production-readiness.md
 (§2 Play requirements, §3 Asset Links, §10 data map, §20 matrix, §21 release
 sequence).
 
-**Status (13 October 2026):** The maintainer confirms Daymark has moved to
-production. For this documentation update, production status is accepted as
-confirmed; no further Console-status check is required. The website is already
-deployed. Remaining work in this checklist is post-release housekeeping: correct
+**Status (13 October 2026):** The maintainer reports that Daymark has moved to
+production. That production status is **maintainer-reported**: this repository
+holds no Play Console export, rollout record or store-listing capture that
+independently verifies it, and the assertions below about completed Console
+actions carry the same status. The website deployment, by contrast, is
+independently verifiable — see §6. When the Console is next checked, record the
+result and date here so the status stops being an assertion. Remaining work in this checklist is post-release housekeeping: correct
 the Data safety declaration if it does not describe the shipped behaviour, and
 check the existing Digital Asset Links endpoint if verified website links are
 expected to open the app. Core physical-device testing is already complete;
@@ -21,6 +24,13 @@ the repo-root `android/` is the frozen TWA rollback/history project)
 First submitted artifact: `app-release.aab` — SHA-256
 `309abe94f4c4f572fe1a478e5b517e76e17c1e49a2e45e9cb90d4571747b89b5`,
 96,463,981 bytes.
+
+**Document scope.** This checklist describes the **released v1.0.0** build. The
+`v2/privacy-hardened-voice` branch changes the location permission, the
+coordinate precision and the Android speech path, so the answers a future
+candidate would give differ for location and voice input. Those differences are
+stated inline below. The v2 candidate is not released, and the Data safety
+declaration must continue to describe the build that is actually distributed.
 
 ## 0. Pre-flight (local)
 
@@ -83,12 +93,21 @@ Play Console → **Policy and programs → App content**. All rows completed:
 
 | Data type / flow | Current repo evidence | Console follow-up |
 |---|---|---|
-| Location | The user taps “Use my location”; coordinates are rounded to 2 decimal places and sent to Open-Meteo over HTTPS. Open-Meteo says free-API server logs may contain geographic coordinates and are deleted after 90 days. | Select **Precise location** (the sent grid is under 3 km² by Google's definition). In Data usage and handling: **Collected = Yes**; **Optional = Yes**; purpose **App functionality**; **Ephemeral = No** because provider logs may retain coordinates for 90 days. For **Shared**, Google provides exceptions for transfers to a qualifying service provider and for a specific user-initiated action the user reasonably expects. The explicit “Use my location” action may qualify for the latter; apply it only if the actual UI and disclosure support that conclusion, otherwise select Shared = Yes. Encryption in transit: Yes for this HTTPS flow. See [Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469) and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms). |
-| Voice-input audio | Ask Daymark uses browser/platform speech recognition; the app does not save audio or transcripts, but the speech provider may process audio remotely. | In Data types, account for **Audio files → Voice or sound recordings** if audio is transmitted off-device. Collection and any sharing depend on the actual provider path; do not mark ephemeral unless that provider's documentation confirms memory-only real-time processing with no longer retention. | 
+| Location | The user taps “Use my location”; coordinates are rounded to 2 decimal places and sent to Open-Meteo over HTTPS. Open-Meteo says free-API server logs may contain geographic coordinates and are deleted after 90 days. | **Released v1.0.0:** select **Precise location** (the sent grid is under 3 km² by Google's definition). **v2 candidate:** the app declares `ACCESS_COARSE_LOCATION` only and sends the OS-provided approximate fix unmodified on Android, so the Android answer becomes **Approximate location**; the web/PWA grid cell is roughly 4.8 km² at the example latitude, which also qualifies as Approximate. The cell area shrinks with latitude, so re-derive the answer from the build actually being submitted rather than reusing either value. In Data usage and handling: **Collected = Yes**; **Optional = Yes**; purpose **App functionality**; **Ephemeral = No** because provider logs may retain coordinates for 90 days. For **Shared**, Google provides exceptions for transfers to a qualifying service provider and for a specific user-initiated action the user reasonably expects. The explicit “Use my location” action may qualify for the latter; apply it only if the actual UI and disclosure support that conclusion, otherwise select Shared = Yes. Encryption in transit: Yes for this HTTPS flow. See [Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469) and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms). |
+| Voice-input audio | Released v1.0.0: Ask Daymark uses browser/platform speech recognition; the app does not save audio or transcripts, but the speech provider may process audio remotely. v2 candidate: on Android, recognition uses the platform's on-device recogniser with no online fallback. | **Released v1.0.0:** in Data types, account for **Audio files → Voice or sound recordings** if audio is transmitted off-device. Collection and any sharing depend on the actual provider path; do not mark ephemeral unless that provider's documentation confirms memory-only real-time processing with no longer retention. **v2 candidate:** for the Android build the answer becomes “not collected” once the on-device path is device-verified; the web path is unchanged. The two platforms must be answered separately. |
+| In-app search history | The user types a place name; the query is sent to Open-Meteo forward geocoding. The app keeps no search history of its own. | Google Play's *App activity* category includes in-app search history. Account for the typed place query as app activity with the same provider retention caveat as location; answer it separately from app interactions. |
 | Voice-output text | Android English uses bundled local Kokoro; web uses browser speech synthesis; Android French/Spanish use native Android system TTS | Keep English Android output local. For web and Android French/Spanish, check the actual selected speech provider. If forecast/location text is transmitted off-device, include the affected data type and purpose; do not assume provider processing is ephemeral without evidence. |
 | App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
 | Analytics / crash logs | No in-app analytics/crash SDK found in repo | Confirm existing answers remain accurate |
 
+- [ ] **Multi-version rule.** Play's Data safety section describes the **sum**
+      of an app's data collection and sharing across **all versions currently
+      distributed** on Google Play. While v1.0.0 — which declares
+      `ACCESS_FINE_LOCATION` and transmits a two-decimal fix — remains
+      distributed, declaring Approximate location only would be inaccurate.
+      Either withdraw v1.0.0 from Play, or declare both location types until it
+      is gone. Do not change the declaration for a candidate while the older
+      build is still live.
 - [x] Account-deletion requirement: not applicable because Daymark has no
       account-creation flow.
 - [ ] Separately answer Data safety's "deletion request mechanism" question
@@ -239,7 +258,10 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       unused value in Play Console rather than assuming the prior value.
 - [ ] **Privacy-policy publication sync:** the policy source pages are edited in
       this PR, but the changes are not live and are not in the already-uploaded
-      AAB. Before using this revised wording, deploy the web build and rebuild
+      AAB. Publication waits until the three policy pages state the Android
+      on-device voice path and the French/Spanish offline-voice constraint, and
+      until the checklist records that the pages match the build being shipped.
+      Before using this revised wording, deploy the web build and rebuild
       the Android bundle so the bundled policy matches. Increment `versionCode`
       to the next unused value (expected `2` if `1` is still the latest upload),
       confirm the three policy pages match and set the effective date to the

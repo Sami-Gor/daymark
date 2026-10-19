@@ -193,7 +193,7 @@ work, not part of this pass.
 the remaining open question is the per-voice training-data provenance of
 `bm_fable`, which upstream does not document.
 
-## Comparison with the Sherpa POC (`poc/local-tts`)
+## Comparison with the Sherpa POC (`poc/local-tts` — a local, unpublished branch; the figures below come from local notes and are not reproducible from a fresh clone)
 
 | | Sherpa POC | Kokoro POC |
 |---|---|---|
