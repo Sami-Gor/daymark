@@ -616,10 +616,11 @@ this PR has not built or uploaded a new AAB.
 | Real-device latency | CORE DEVICE PASS RECORDED; BENCHMARK OPTIONAL | low | real-device flow was exercised; emulator estimate ~2.4 s | no repeat required; benchmark only if needed |
 | App data-flow behaviour | POST-RELEASE DATA SAFETY RECONCILIATION | policy accuracy | no in-app analytics, rounded location requests, no transcript/location logging; Open-Meteo logs may retain coordinates for up to 90 days; speech providers may process data off-device | update the saved form where needed: precise location, collected, optional, app functionality, not ephemeral; resolve sharing using Play's service-provider definition and confirm voice-provider flows; see §2, §10 and checklist |
 | Security (WebView/bridge/components) | READY | — | audit §12 | optional CSP hardening |
-| Licensing | READY | — | WTFPL cleared; permissive stack | note bm_fable provenance |
+| Licensing | READY | — | WTFPL cleared; permissive stack; GeoNames dataset credited | note bm_fable provenance; a candidate that bundles an ASR model must add its Apache-2.0 / MIT / CC-BY-4.0 attribution (§14) |
 | Dependencies | READY | — | prod audit clean, pinned versions | none |
 | Offline behavior | READY | — | airplane-mode checks | none |
 | Error states | READY | — | code audit + e2e | device polish |
+| V2 candidate (`v2/privacy-hardened-voice`) | NOT RELEASED — candidate gates open | release gate | `docs/release/version-2-privacy-hardening.md`; the branch changes the location permission, the coordinate precision and the Android speech path | complete the open gates, bump `versionCode`, rebuild and sign, then submit through closed testing. The shared documents above still describe v1.0.0 by design. |
 | Release logging | OPTIONAL | low | no user content | reduce verbosity later |
 | Resource shrinking | OPTIONAL | low | not enabled | consider post-launch |
 | CSP in native shell | OPTIONAL | low | no CSP headers native | consider meta CSP later |
