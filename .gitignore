@@ -96,10 +96,13 @@ android/*.aab
 
 # Local V2 test-build assets. These are large binary model payloads and
 # recorded test audio and must never reach the public repository.
-# Source code for the experiment lives in .../src/v2test/ and is tracked
-# separately; only the payload directories are excluded here.
+# The v2test source set is a local-only experiment and is not tracked in any
+# branch; only the payload directories are excluded here, so that any source
+# under src/v2test/ can still be committed deliberately if it is ever
+# published deliberately.
 /artifacts/weather-app/android/app/src/v2test/assets/
 /artifacts/weather-app/android/app/libs/
+/android/app/libs/
 
 # Store-listing artwork held locally outside the tracked documentation tree.
 /Images/

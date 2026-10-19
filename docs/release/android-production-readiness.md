@@ -43,7 +43,8 @@ commit each was verified against is named in §18.
 | Model integrity | APK asset SHA-256 matches documented values (`model_quantized.onnx` `fbae9257…`, `bm_fable.bin` `f8890831…`) |
 | Tracked secrets | none (`git ls-files` has no keystores/properties) |
 | Production runtime config | bundled assets, no `server.url`, no dev-server dependency |
-| Dependency audit | CI enforces `pnpm audit --audit-level critical`; no critical advisories |
+| Dependency audit (released v1.0.0) | `pnpm audit --prod` — no known vulnerabilities |
+| Dependency audit (CI, current) | CI enforces `pnpm audit --audit-level critical`; no critical advisories. High and moderate advisories are reported but do not fail the pipeline. |
 | R8 keep rules | Kokoro JNI + Capacitor plugin rules present; release smoke test passed |
 
 Notes:
@@ -105,7 +106,7 @@ Repository-side readiness:
 | Foreground services | none |
 | Storage permissions | none |
 
-Play Console / release status: Daymark has moved to production (maintainer-confirmed, 13 October 2026). No further verification of production status is required for this documentation update. The remaining Console notes below concern data declarations and optional link-association configuration, not whether the app is in production.
+Play Console / release status: Daymark has moved to production (maintainer-confirmed, 13 October 2026). This repository holds no Console export, rollout record or store-listing capture that independently verifies it, so the status is recorded as maintainer-reported; re-check the production track when the Console is next reviewed and record the result and date here. The remaining Console notes below concern data declarations and optional link-association configuration, not whether the app is in production.
 
 1. Play App Signing enrolled via the first upload; the **app signing key**
    SHA-256 is recorded and live:
@@ -375,6 +376,16 @@ recognition service and may be processed remotely. Assess these provider flows
 against current Data safety definitions rather than treating “not stored by
 Daymark” as equivalent to “not transmitted off device.”
 
+**v2 candidate:** the same map applies with three changes. The Android app
+requests `ACCESS_COARSE_LOCATION` only and sends the OS-provided approximate
+fix unmodified, so the transmitted location is the OS approximation rather
+than a two-decimal rounding of a precise fix; the web/PWA path snaps
+device-derived coordinates to a 0.025-degree grid on the device; and on
+Android the microphone audio and the recognition transcript stay on the
+device, because recognition uses the platform's on-device recogniser with no
+online fallback. The web speech path is unchanged. The `INTERNET` permission
+remains for weather and WebView traffic and is not used by the voice path.
+
 ## 11. Logging / debugging
 
 - No `spokenText`, transcript or coordinates in any log statement (audited).
@@ -420,7 +431,8 @@ OPTIONAL hardening:
 ## 13. Dependency / supply chain
 
 - npm/pnpm: exact Capacitor versions (`8.5.1`, `@capacitor/app 8.1.1`), pnpm
-  lockfile committed; `pnpm audit --prod` clean.
+  lockfile committed; the released v1.0.0 audit recorded `pnpm audit --prod`
+  clean, and CI now enforces `pnpm audit --audit-level critical`.
 - Gradle: AGP 8.13.0, Gradle 8.14.3, JDK 21 required; Capacitor/AndroidX from
   Google Maven; no unexpected repositories.
 - Rust: `Cargo.lock` committed; `ort 2.0.0-rc.13` + ONNX Runtime 1.28.2
@@ -606,7 +618,7 @@ this PR has not built or uploaded a new AAB.
 | Digital Asset Links endpoint | DONE (live, verified) | verified App Links (website side) | Production endpoint returns HTTP 200 + `application/json` with the correct package and both fingerprints; DAL statement API returns the expected statements | none; on-device domain verification remains optional and untested |
 | Data safety declaration | POST-RELEASE POLICY ACCURACY CHECK | policy accuracy | Previously marked complete; rounded location is sent to Open-Meteo, whose free-API policy says logs may contain coordinates for up to 90 days; speech-provider processing varies | reconcile saved form; classify the rounded location as precise, collected, optional, for app functionality and not ephemeral; review sharing against Play's service-provider definition and confirm speech-provider flows; see §10 and checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
-| Production release | PRODUCTION (maintainer-confirmed, 13 October 2026) | current release state | Maintainer says Daymark has moved to production | no further status verification required for this paperwork |
+| Production release | PRODUCTION (maintainer-confirmed, 13 October 2026) | current release state | Maintainer says Daymark has moved to production; the live Console state is not independently verified in this repository | re-check the production track and record the result and date here |
 | Location behavior | CORE DEVICE PASS RECORDED | medium | real-device location use passed in brief validation | no need to repeat the completed location path; extended denial/permanent-denial cases are optional coverage |
 | Speech recognition | CORE DEVICE PASS RECORDED | medium | real-device voice input and transcript passed; platform service can vary | no need to repeat the completed voice-input path; service/permission edge cases are optional coverage |
 | Audio focus/BT/calls | CORE LIFECYCLE PASS; EXTENDED CASES NOT CLAIMED | medium | Home lifecycle passed; Bluetooth/call/music interruption not included in the recorded brief pass | optional extended QA only, unless you specifically want those cases covered |
@@ -620,7 +632,7 @@ this PR has not built or uploaded a new AAB.
 | Dependencies | READY | — | prod audit clean, pinned versions | none |
 | Offline behavior | READY | — | airplane-mode checks | none |
 | Error states | READY | — | code audit + e2e | device polish |
-| V2 candidate (`v2/privacy-hardened-voice`) | NOT RELEASED — candidate gates open | release gate | `docs/release/version-2-privacy-hardening.md`; the branch changes the location permission, the coordinate precision and the Android speech path | complete the open gates, bump `versionCode`, rebuild and sign, then submit through closed testing. The shared documents above still describe v1.0.0 by design. |
+| V2 candidate (`v2/privacy-hardened-voice`) | OPTIONAL — candidate gates open; not released | release gate | `docs/release/version-2-privacy-hardening.md`; the branch changes the location permission, the coordinate precision and the Android speech path | complete the open gates, bump `versionCode`, rebuild and sign, then submit through closed testing. The shared documents above still describe v1.0.0 by design. |
 | Release logging | OPTIONAL | low | no user content | reduce verbosity later |
 | Resource shrinking | OPTIONAL | low | not enabled | consider post-launch |
 | CSP in native shell | OPTIONAL | low | no CSP headers native | consider meta CSP later |
@@ -652,7 +664,7 @@ production web build, privacy policy URL.
 
 ### D. OPTIONAL POST-LAUNCH
 Reduce release log verbosity, add a native-shell CSP meta tag, enable resource
-shrinking, remove the unused browser-speech hook, archive the TWA project,
+shrinking, archive the TWA project,
 consider a low-memory/trim listener, evaluate per-voice provenance documentation
 with the upstream voice source.
 
@@ -674,8 +686,9 @@ with the upstream voice source.
    WebView data flows and off-device transmission must be considered; do not
    infer answers solely from lack of app-side storage. See
    https://support.google.com/googleplay/android-developer/answer/10787469.
-4. Production is recorded as live, per maintainer confirmation. No further
-   production-status check is required for this paperwork.
+4. Production is recorded as live, per maintainer confirmation. The live
+   Console state is not independently verified in this repository; re-check it
+   when the Console is next reviewed and record the result here.
 5. Digital Asset Links is a separate app-link check, not a prerequisite for
    applying for production access. The existing website's
    `/.well-known/assetlinks.json` endpoint and the Digital Asset Links statement

@@ -65,7 +65,7 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:bundleRelease
 On a clean clone, run the Kokoro JNI + asset steps from
 `android-production-readiness.md` §1 first.
 
-## 1. Create the app — DONE
+## 1. Create the app — DONE (maintainer-reported)
 
 - [x] Play Console → **All apps → Create app**: name `Daymark`, default
       language English (US), type App, Free.
@@ -116,14 +116,14 @@ Play Console → **Policy and programs → App content**. All rows completed:
       logs may contain coordinates and are deleted after 90 days.
 - [x] AI asset declaration completed.
 
-## 3. Store listing — DONE (default store listing)
+## 3. Store listing — DONE (maintainer-reported; default store listing)
 
 - [x] App name, short description, full description, graphics (512×512 icon,
       1024×500 feature graphic), phone screenshots, category (Weather), contact
       email.
 - [x] Default store listing completed.
 
-## 4. First upload — DONE
+## 4. First upload — DONE (maintainer-reported)
 
 - [x] AAB uploaded (`309abe94…`, 96,463,981 bytes); versionCode `1` for the
       first upload (bump for every later upload).
@@ -131,7 +131,7 @@ Play Console → **Policy and programs → App content**. All rows completed:
       generated the app signing key). Its fingerprint is recorded in step 5
       and is live in the production association file.
 
-## 5. Copy the Play app-signing fingerprint — DONE (recorded, live)
+## 5. Copy the Play app-signing fingerprint — DONE (recorded; Console-side state not independently verified)
 
 - [x] Play Console → **Test and release → Setup → App integrity → Play app
       signing → App signing key certificate** → **SHA-256**
@@ -214,11 +214,14 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       Cold/warm opens likewise remain optional additional coverage, not a
       repeat of the completed core device pass.
 
-## 8. Closed testing — COMPLETE; production — MAINTAINER CONFIRMED
+## 8. Closed testing — COMPLETE (maintainer-reported); production — MAINTAINER CONFIRMED
 
-- [x] Closed-testing phase complete.
+- [x] Closed-testing phase complete (maintainer-reported).
 - [x] Daymark has moved to production (maintainer-confirmed, 13 October 2026).
-- [x] No further production-status verification is required for this document.
+- [ ] Record the next Console verification — the date, the release status and
+      who checked it — in this document, so the production status stops being
+      an assertion. The live Console state is not independently verified in
+      this repository.
 
 ## 9. Post-release housekeeping
 
@@ -256,9 +259,9 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 - [ ] Every new Android bundle: rebuild the AAB and increment `versionCode`
       in `artifacts/weather-app/android/app/build.gradle`; verify the next
       unused value in Play Console rather than assuming the prior value.
-- [ ] **Privacy-policy publication sync:** the policy source pages are edited in
-      this PR, but the changes are not live and are not in the already-uploaded
-      AAB. Publication waits until the three policy pages state the Android
+- [ ] **Privacy-policy publication sync:** the policy source pages are edited on
+      the v2 branch, but the changes are not live and are not in the
+      already-uploaded AAB. Publication waits until the three policy pages state the Android
       on-device voice path and the French/Spanish offline-voice constraint, and
       until the checklist records that the pages match the build being shipped.
       Before using this revised wording, deploy the web build and rebuild

@@ -55,9 +55,10 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
   (Chrome granted it).
 - **Microphone / speech input:** `use-speech-recognition.ts` + AskDaymark use
   `SpeechRecognition`/`webkitSpeechRecognition` (browser), no `getUserMedia`.
-- **Speech output:** `use-browser-speech.ts` + `lib/voice-browser.ts` wrap
-  `window.speechSynthesis` with `SPEECH_LANGS` (en/fr/es) and single-utterance
-  semantics (`speak` cancels current first, `stop` = cancel).
+- **Speech output:** `use-browser-speech.ts` (removed in `332adba`) +
+  `lib/voice-browser.ts` wrap `window.speechSynthesis` with `SPEECH_LANGS`
+  (en/fr/es) and single-utterance semantics (`speak` cancels current first,
+  `stop` = cancel).
 - **Network:** Open-Meteo weather/air-quality/geocoding APIs; CSP whitelists
   those hosts in `public/_headers` and `vite.config.ts` preview headers.
 - **Offline:** SW app-shell precache + locality Cache Storage; weather needs
