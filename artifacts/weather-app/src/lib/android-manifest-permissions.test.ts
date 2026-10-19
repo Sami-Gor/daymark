@@ -31,13 +31,15 @@ const APPROVED_PERMISSIONS = [
   'android.permission.RECORD_AUDIO',
 ];
 
-function stripComments(manifest: string): string {
-  return manifest.replace(/<!--[\s\S]*?-->/g, '');
-}
-
-/** Permission names declared by the manifest, in document order. */
+/**
+ * Permission names declared by the manifest, in document order.
+ *
+ * Comments are deliberately NOT stripped: a commented-out permission is
+ * still counted, so a precise permission that someone disables rather
+ * than deletes fails this test instead of passing unnoticed.
+ */
 function declaredPermissions(manifest: string): string[] {
-  const tags = stripComments(manifest).match(/<uses-permission(?:-sdk-\d+)?\b[^>]*>/g) ?? [];
+  const tags = manifest.match(/<uses-permission(?:-sdk-\d+)?\b[^>]*>/g) ?? [];
   return tags.map((tag) => {
     const name = tag.match(/android:name=["']([^"']+)["']/);
     if (!name) throw new Error(`uses-permission without an android:name: ${tag}`);
