@@ -31,3 +31,28 @@ export function roundDeviceLocation(latitude: number, longitude: number): {
     longitude: roundToGrid(longitude),
   };
 }
+
+/**
+ * Decides which device-derived coordinates Daymark is allowed to send.
+ *
+ * On Android the manifest declares ACCESS_COARSE_LOCATION and deliberately
+ * does not declare ACCESS_FINE_LOCATION, so the operating system already
+ * supplies an approximate fix. That fix is used unchanged, because rounding
+ * it again would compound the loss of accuracy the permission already
+ * introduced and would undo the regional forecast detail the approximate
+ * location is there to preserve.
+ *
+ * Every other platform has no such permission contract, so the fix is snapped
+ * to the privacy grid before it leaves the device.
+ */
+export function resolveDeviceLocation(
+  latitude: number,
+  longitude: number,
+  isAndroidNative: boolean,
+): {
+  latitude: number;
+  longitude: number;
+} {
+  if (isAndroidNative) return { latitude, longitude };
+  return roundDeviceLocation(latitude, longitude);
+}

@@ -33,7 +33,7 @@ import { UVForecast } from '@/components/weather/UVForecast';
 import { AirQualityForecast } from '@/components/weather/AirQualityForecast';
 import { WeatherAlerts } from '@/components/weather/WeatherAlerts';
 import { deriveDayCue } from '@/lib/day-cue';
-import { roundDeviceLocation } from '@/lib/location-privacy';
+import { resolveDeviceLocation } from '@/lib/location-privacy';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
 import { useLocale } from '@/hooks/use-locale';
 
@@ -107,9 +107,11 @@ function Home() {
       // Browsers without an approximate-permission contract snap the fix to
       // a roughly 3–5 km² grid before any coordinates leave the device.
       const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-      const { latitude, longitude } = isAndroidNative
-        ? { latitude: coords.latitude, longitude: coords.longitude }
-        : roundDeviceLocation(coords.latitude, coords.longitude);
+      const { latitude, longitude } = resolveDeviceLocation(
+        coords.latitude,
+        coords.longitude,
+        isAndroidNative,
+      );
       try {
         // A newer search or location interaction wins over this older one.
         if (id !== selectionId.current) return;
