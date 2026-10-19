@@ -7,9 +7,14 @@ on:
   schedule:
     - cron: '0 4 * * 1'
 
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       security-events: write
       contents: read
@@ -17,6 +22,34 @@ jobs:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v4
         with:
-          languages: javascript-typescript
+          # `actions` is interpreted, so it needs no build mode and scans
+          # the workflow files, which carry the secret references and the
+          # shell that touches the mirror credentials.
+          languages: javascript-typescript,actions
       - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
+
+  # The Capacitor native plugins are the security-critical code in this
+  # repository — the on-device speech recogniser and the offline narration
+  # engine — and until now CodeQL analysed only JavaScript/TypeScript.
+  #
+  # `build-mode: none` is used deliberately. `autobuild` runs Gradle, and the
+  # production Gradle root cannot be configured without `pnpm install` and
+  # `cap sync android`, neither of which `autobuild` performs; worse, if it
+  # picked the legacy `android/` TWA root instead the build would succeed and
+  # the analysis would silently cover only the frozen rollback project. This
+  # job analyses the Java sources directly instead of pretending to build.
+  analyze-java:
+    name: analyze-java
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: java-kotlin
+          build-mode: none
       - uses: github/codeql-action/analyze@v4
