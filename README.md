@@ -22,7 +22,7 @@ Daymark answers one question well — *what's the sky doing?* — without dashbo
 - **Dew point & comfort** — alongside humidity, because dew point is what your skin actually feels
 - **Location search** — switch to any city or town using Open-Meteo geocoding, with region/country disambiguation
 - **Severe weather risk** — forecast-derived wind, rain, snow, thunderstorm, heat and cold risks, clearly labelled as *not* official warnings
-- **Voice** — *Hear today* uses bundled local Kokoro for English on Android, Android system TTS for French/Spanish, and browser speech synthesis on the web. *Ask Daymark* uses browser/platform speech recognition, which may process audio remotely; Daymark itself stores no transcripts
+- **Voice** — *Hear today* uses bundled local Kokoro for English on Android, Android system TTS for French/Spanish, and browser speech synthesis on the web. *Ask Daymark* uses browser/platform speech recognition, which may process audio remotely; Daymark itself stores no transcripts. **In the v2 development branch, Android voice input instead uses the platform's on-device recogniser, with no generic or online fallback, and reports itself unavailable on Android 11 and below**
 - **English, French and Spanish** — locale-aware UI, guidance, alerts and voice, defaulting to the browser language
 - **°C / °F toggle**, graceful offline shell, and installable as an app (PWA)
 
@@ -72,11 +72,18 @@ All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifact
 
 ## Privacy approach
 
+The bullets below describe the **released v1.0.0** build, which is what the
+shipped Google Play release and the deployed website run. The
+`v2/privacy-hardened-voice` branch changes the location and voice behaviour;
+those changes are called out inline and documented in full in
+[docs/release/version-2-privacy-hardening.md](docs/release/version-2-privacy-hardening.md).
+The v2 branch is not released.
+
 - **Geolocation is never requested on load.** The app opens on a default location (London) and only touches the Geolocation API when you press *Use my location*
-- **Coordinates are rounded to 2 decimals (~1 km) before leaving your device**, then sent only to Open-Meteo endpoints
+- **Coordinates are rounded to 2 decimals (~1 km) before leaving your device**, then sent only to Open-Meteo endpoints. **In the v2 development branch, the installed Android app requests approximate location only (`ACCESS_COARSE_LOCATION`; `ACCESS_FINE_LOCATION` is not declared) and sends the estimate Android returns without further rounding, while the web/PWA build snaps device coordinates to a 0.025-degree grid on the device**
 - **No user history is persisted by Daymark** — the language preference (`daymark.locale`) is stored in localStorage. The web/PWA service worker caches app-shell files; app code separately caches the locality dataset in Cache Storage. The Android app loads its locality dataset from bundled assets. The app does not persist location history, search history, transcripts or weather responses
 - **Public privacy policy** — a full policy is part of the app at `/privacy` (English), `/fr/privacy` (French) and `/es/privacy` (Spanish); the footer links to the version matching the interface language. It documents the actual data flows, local-storage behavior and third-party services described above
-- **No analytics or third-party trackers** — weather and location-search requests go to Open-Meteo; optional voice input uses browser/platform speech recognition and may be processed remotely. Web narration uses browser speech synthesis, and Android French/Spanish narration uses system TTS; provider handling depends on the browser, device, settings and selected voice. Daymark does not store transcripts or narration text
+- **No analytics or third-party trackers** — weather and location-search requests go to Open-Meteo; optional voice input uses browser/platform speech recognition and may be processed remotely. Web narration uses browser speech synthesis, and Android French/Spanish narration uses system TTS; provider handling depends on the browser, device, settings and selected voice. Daymark does not store transcripts or narration text. **In the v2 development branch, Android voice input is on-device only and Android French/Spanish narration refuses network-dependent voices rather than switching engines**
 - Fonts are self-hosted; no CDN font requests
 
 ## Weather data source
@@ -116,6 +123,13 @@ the browser build keeps Web Speech. The legacy TWA project is preserved at
 `android/` as the rollback point.
 
 ```bash
+# One-time native prerequisites. Their outputs are gitignored, so a fresh clone
+# does not contain them: see android/kokoro-poc/README.md for the toolchain.
+#   Rust 1.98.1 with the aarch64-linux-android target, Android NDK 29.0.14206865
+android/kokoro-poc/scripts/fetch-kokoro-assets.sh    # Kokoro model + bm_fable voice
+ANDROID_NDK_HOME=$ANDROID_NDK_HOME \
+  android/kokoro-poc/scripts/build-kokoro-android.sh  # libkokoro_jni.so (arm64-v8a)
+
 cd artifacts/weather-app
 pnpm exec cap sync android
 cd android
@@ -123,12 +137,16 @@ cd android
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
 ```
 
+A signed release build additionally needs `artifacts/weather-app/android/keystore.properties`,
+which is gitignored and must never be committed. Without the two Kokoro steps the
+app still builds, but English narration is unavailable at runtime.
+
 Release: package `io.github.sami_gor.daymark` (versionCode 1 / versionName 1.0.0). See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
 
 ## Test
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (236 tests)
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (244 tests on this branch; 236 on main)
 pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (153 tests)
 ```
 
@@ -171,13 +189,14 @@ scripts/                  workspace tooling
 - Severe-weather risks are forecast-derived Daymark estimates, **not** official warnings
 - Voice input requires browser/platform speech-recognition support. Web narration uses browser speech synthesis; Android English narration uses bundled Kokoro, while French/Spanish use Android system TTS with matching voice data. Unsupported input controls may be hidden; unavailable Android narration is reported as an error.
 - On Android, English narration uses the bundled local Kokoro voice (offline); French/Spanish use the device TTS engine, which needs the matching voice data installed
+- **In the v2 development branch**, Android voice input uses the platform's on-device recogniser and therefore needs Android 12 (API 31) or newer; on Android 11 and below the control reports itself as unavailable. Android French/Spanish narration additionally refuses network-dependent voices instead of switching engines
 - The Android shell currently bundles the arm64-v8a Kokoro library only
 - Air-quality "nearby sensor" comparison is not yet wired to a sensor network; the regional forecast is shown
 - The very first reload immediately after a service-worker update may briefly miss the offline shell (self-heals on the next reload)
 
 ## License
 
-Daymark's source is [MIT](LICENSE). Bundled third-party components keep their own upstream licences and are **not** relicensed by MIT: the self-hosted fonts (SIL OFL 1.1, see [`artifacts/weather-app/src/fonts/LICENSE.md`](artifacts/weather-app/src/fonts/LICENSE.md)); the Kokoro runtime, model and `bm_fable` voice assets (see the licensing matrix in [`android/kokoro-poc/README.md`](android/kokoro-poc/README.md)); other native components retain the licences listed in that matrix. Weather data by [Open-Meteo](https://open-meteo.com) (CC BY 4.0 attribution requested for non-commercial use).
+Daymark's source is [MIT](LICENSE). Bundled third-party components keep their own upstream licences and are **not** relicensed by MIT: the self-hosted fonts (SIL OFL 1.1, see [`artifacts/weather-app/src/fonts/LICENSE.md`](artifacts/weather-app/src/fonts/LICENSE.md)); the Kokoro runtime, model and `bm_fable` voice assets (see the licensing matrix in [`android/kokoro-poc/README.md`](android/kokoro-poc/README.md)); other native components retain the licences listed in that matrix. The bundled locality dataset is [GeoNames](https://www.geonames.org/) data under CC BY 4.0, credited in the in-app privacy policy. Weather data by [Open-Meteo](https://open-meteo.com) (CC BY 4.0 attribution requested for non-commercial use).
 
 ## Contributing
 

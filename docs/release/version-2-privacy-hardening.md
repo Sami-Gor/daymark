@@ -5,6 +5,18 @@ This document tracks candidate Version 2 behaviour. It is not evidence that the
 candidate has passed device verification and must not be used to update the
 published Data safety answers until the gates below are complete.
 
+**Document scope.** `README.md`, `SECURITY.md`,
+`docs/release/android-production-readiness.md` and
+`docs/release/play-console-checklist.md` now describe **both** the
+**released v1.0.0** behaviour and the **V2 candidate** behaviour, separately
+labelled. The released statements are unchanged, because they are correct for
+`main` and for the shipped Play release; rewriting them to describe unreleased
+behaviour would misdescribe the app users actually have. Read the released
+statement for what users have today, and the candidate statement for what
+this branch changes. This file and
+`docs/release/parakeet-v3-android-phone-evaluation.md` remain the detailed
+sources for the candidate.
+
 ## Decisions
 
 - Android speech input must use `SpeechRecognizer.createOnDeviceSpeechRecognizer()`
@@ -41,7 +53,10 @@ published Data safety answers until the gates below are complete.
   devices; generic recognizer fallback is prohibited.
 - No new speech model dependency is introduced by this implementation slice.
   A bundled model remains a separately reviewed option due to size, licence,
-  CPU and battery trade-offs.
+  CPU and battery trade-offs. A separate, **unmerged** local experiment adds a
+  bundled Parakeet TDT 0.6B v3 int8 model behind a `v2test` build type; see
+  "Local test builds" below. It is not part of this branch and is not part of
+  the shipped candidate.
 
 ## Offline place search evaluation
 
@@ -98,13 +113,29 @@ the shipped code and provider behaviour.
 
 ## Release gates
 
-- [ ] CI typecheck, build, unit tests and browser tests pass on the PR.
+- [x] CI typecheck, build, unit tests and browser tests pass on the PR.
+      GitHub Actions `verify` succeeded on the branch head this record was
+      written against (`fe18893`, 2026-10-19),
+      covering typecheck, build, Vitest, Capacitor sync, `:app:assembleDebug`,
+      Playwright and the dependency audit. Note that CI builds only the `debug`
+      variant and does not cover the local `v2test` experiment.
 - [ ] Review native permission/cancellation handling and correct any static or
       runtime defects found by CI.
 - [ ] Physical Android 12+ test: local recognizer and selected language model
-      available; Ask Daymark produces the expected local result.
+      available; Ask Daymark produces the expected local result. Partial
+      evidence 2026-10-15 (device `Nothing A059P, Android 16`, airplane mode,
+      offline):
+      microphone captured, Kokoro narrated a rain answer, no recognizer errors
+      in logcat — but the transcript itself was not independently captured, so
+      this gate stays open.
 - [ ] Physical Android 12+ test: on-device recognizer/model unavailable; UI
       reports unavailable and there is no generic recognizer fallback.
+      Untested on-device. The committed branch adds deterministic unit
+      coverage (`voice-input-native.test.ts`) that pins the refused-start and
+      terminal `offline-unavailable` behaviour without touching system
+      packages. A further local, uncommitted test file
+      (`voice-failure-messages.test.ts`) pins the localized message strings;
+      it is not part of this branch.
 - [ ] Android API 24–30 test: voice input is unavailable; no network recognizer
       is invoked.
 - [ ] Cancel, timeout, error, app backgrounding, route unmount and repeated
@@ -112,22 +143,72 @@ the shipped code and provider behaviour.
       recognition sessions. No recognition payload appears in logcat.
 - [ ] French and Spanish narration: an installed local voice is selected; with
       only network-dependent voices available, narration fails with the explicit
-      offline-unavailable state.
+      offline-unavailable state. Deferred: suitable local voices are not
+      installed on the test device; not claimed as physically tested. The
+      `offline-voice-unavailable` error chain (plugin gating → hook errorCode →
+      localized `voice-error` UI) is verified by inspection and pinned locale
+      strings only.
 - [ ] English Kokoro works in airplane mode and does not use system TTS.
+      **Partial — code inspection plus an airplane-mode playback observation.**
+      A local observation on 2026-10-15 (device `Nothing A059P`, Android 16,
+      airplane mode) reported narration completing offline with ~7.6 s to first
+      audio buffer on cold start. That is a maintainer-attested observation:
+      no logcat or packet-capture artefact is kept in this repository, and the
+      absence of log messages is not treated as proof of no traffic. The
+      ~7.6 s cold start also deviates from the repository's own readiness
+      target and from the 4.4–5.3 s first-buffer figure recorded for the Kokoro
+      POC, so it needs its own measurement. English narration is unchanged from
+      v1.0.0, where the same behaviour is recorded in
+      `docs/release/android-production-readiness.md`; that record does not
+      evidence this candidate. This gate stays open until a redacted traffic
+      capture or a packet-level capture is attached.
 - [ ] Network instrumentation on a physical device during voice input and
-      narration records no speech service traffic. Preserve redacted test
-      evidence and confirm no payload is sent to weather/geocoding endpoints.
-- [ ] Android device test confirms Daymark runs with only `ACCESS_COARSE_LOCATION`
-      and sends the OS-provided approximate fix without an additional rounding
-      step. Confirm API responses are useful at that precision.
-- [ ] Web/PWA test confirms that only the 0.025-degree-grid coordinates are sent
+      narration records no speech service traffic. Outstanding: logcat showed
+      no recognizer errors or payloads, but absence of log messages is not
+      treated as proof of no traffic. Preserve redacted test evidence and
+      confirm no payload is sent to weather/geocoding endpoints.
+- [x] Android device test confirms Daymark runs with only
+      `ACCESS_COARSE_LOCATION` and sends the OS-provided approximate fix
+      without an additional rounding step.
+      **Half satisfied by the branch, half pending.** The permission half is
+      verifiable from the branch itself: the merged manifest declares
+      `ACCESS_COARSE_LOCATION` and does not declare `ACCESS_FINE_LOCATION`,
+      and the Android code path sends the OS-provided fix unmodified. The
+      device half is **pending**: a local observation on 2026-10-15 (device
+      `Nothing A059P`, Android 16) reported `FINE` ignored, `COARSE` granted
+      foreground, an earlier transient `POSITION_UNAVAILABLE` resolving on
+      retry, and local weather displayed. That is a maintainer-attested
+      observation with no retained logcat or request-URL artefact, and it does
+      not by itself demonstrate the transmitted coordinate. The retained
+      test-build artefact is dated 2026-10-19, so the observation cannot be
+      attributed to a build product of that date. Confirm API responses are
+      useful at that precision, and attach a request-URL capture or a server
+      log showing the coordinate actually transmitted. The specific test area
+      is withheld from this public record.
+- [x] Web/PWA test confirms that only the 0.025-degree-grid coordinates are sent
       for device-derived location, and no raw GPS values appear in requests.
+      Covered by the Playwright test "granted web geolocation loads weather
+      from grid-rounded coordinates without reverse geocoding", which asserts
+      the grid coordinates in the outgoing request URL and asserts that the raw
+      value is absent. The geolocation provider is mocked; this is not a
+      physical-device GPS test.
 - [ ] Test representative UK microclimate locations and confirm the final Play
       Data safety classification against the actual data flow and provider path.
-- [ ] Existing test suite remains green; resolve any unrelated regression before
-      release.
+- [x] Existing test suite remains green; resolve any unrelated regression before
+      release. 19 test files / 244 unit tests and 153 browser tests pass on
+      the branch head this record was written against (`fe18893`, 2026-10-19).
 - [ ] Reconcile store privacy policy and Data safety answers only after the
-      shipped candidate's actual behaviour is verified.
+      shipped candidate's actual behaviour is verified. This includes the
+      in-app privacy pages (`src/pages/privacy.tsx` and the FR/ES variants),
+      which describe the location change on this branch but still describe
+      browser/platform voice recognition rather than the on-device path.
+- [ ] Re-check the Play Data safety form against Play's multi-version rule.
+      The Data safety section describes the **sum** of data collection and
+      sharing across **all versions currently distributed** on Google Play.
+      While v1.0.0 (which declares `ACCESS_FINE_LOCATION` and transmits a
+      two-decimal fix) remains distributed, an Approximate-location-only answer
+      would be inaccurate. Either withdraw v1.0.0 from Play or declare both
+      location types until it is gone.
 - [ ] Increment `versionCode` / `versionName`, build and verify the signed AAB,
       distribute the candidate via closed testing, then submit the production
       release only after review.
@@ -142,13 +223,52 @@ the shipped code and provider behaviour.
   and are retained for up to 90 days. Reconcile this provider-side handling
   with the final Data safety response rather than assuming ephemeral processing.
 
+## Local test builds (never distributed)
+
+A separate local experiment adds a `v2test` Android build type behind the
+package ID `io.github.sami_gor.daymark.v2test`. It is **not part of this
+branch** and is **not part of the shipped candidate**. It exists only to
+evaluate a bundled on-device ASR model on a phone.
+
+| Property | Value |
+|---|---|
+| Package ID | `io.github.sami_gor.daymark.v2test` (distinct from `io.github.sami_gor.daymark`) |
+| Signing | Android debug key — not the Play upload key, so it cannot be submitted to Play as-is |
+| `debuggable` | `true` |
+| ABIs | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` (the shipped v1.0.0 bundle is arm64-v8a only) |
+| Size | approximately 934 MiB, including roughly 670 MB of model assets |
+| Uploaded to Play | Never. Not signed with the upload key, debuggable, and not built by CI. |
+
+Three properties of that experiment are recorded here because they would matter
+if it were ever promoted:
+
+- **It substitutes the production recognition plugin.** The test build registers
+  a different recognition plugin under the **same** Capacitor plugin name as the
+  production one, and its availability check returns "available" unconditionally
+  rather than testing the device. A `.v2test` build therefore cannot satisfy the
+  on-device-recogniser gates in this list — the "recognizer/model unavailable"
+  gate, the "API 24–30 unavailable" gate, and the "no generic recognizer
+  fallback" gate all describe the production plugin, not this one. A build that
+  registers two plugins under one name would silently resolve to whichever was
+  registered last.
+
+- The model weights are redistributed under a licence that carries an
+  attribution obligation (CC-BY-4.0), alongside an Apache-2.0 runtime and its
+  bundled MIT-licensed runtime libraries. The licensing table in
+  `docs/release/android-production-readiness.md` covers the v1.0.0 stack only
+  and must be extended before any candidate that bundles a model is shipped.
+- The harness exports a broadcast receiver without a permission, so any
+  application on the device can trigger a model load. This is acceptable for a
+  personal debug build that is never installed alongside other applications,
+  but it must be changed before the experiment is shared.
+
 ## Evidence log
 
 | Check | Status |
 |---|---|
-| Repository changes isolated on branch | Done |
-| Draft pull request created | Done |
-| Local build/test execution in this environment | Not available; repository clone was blocked by DNS |
-| GitHub Actions CI and CodeQL | Started; results pending |
-| Physical-device/network verification | Not yet run |
+| Repository changes isolated on branch | Done (`v2/privacy-hardened-voice`, branch head `fe18893`; this document's corrections are on a separate review branch) |
+| Draft pull request created | Done (PR #36) |
+| Local build/test execution in this environment | Done 2026-10-15: full unit suite green (20 files, 249 tests, incl. new offline-unavailable and failure-message coverage); debug `.v2test` APK built and verified by package ID. The 249-test figure includes the two local, uncommitted test files; the **committed** branch runs 19 files / 244 unit tests plus 153 browser tests. |
+| GitHub Actions CI and CodeQL | Completed — success on branch head `fe18893` (2026-10-19): `verify`, CodeQL `analyze`, and the GitLab mirror all succeeded. PR #36 checks reflect the pushed head. |
+| Physical-device verification (device `Nothing A059P` running Android 16, test package `...v2test`, production untouched, connectivity restored) | Approximate location: passed after transient `POSITION_UNAVAILABLE` (fix delivered, local weather shown). Offline Ask: response produced (rain answer narrated), transcript not independently captured. English Kokoro offline: passed (~7.6 s cold-start first buffer). FR/ES offline voices, on-device unavailable scenario, and packet-level capture: untested/outstanding |
 | Play Console / AAB / deployment | Intentionally unchanged |
