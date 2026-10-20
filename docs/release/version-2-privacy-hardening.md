@@ -113,6 +113,49 @@ the shipped code and provider behaviour.
 
 ## Release gates
 
+Every gate below is classified by **how it is proved**, because the three
+classes are not interchangeable and a green pipeline says nothing about a
+physical device or about the Play Console:
+
+- **Automated** — proved by a check that runs in CI on every commit.
+- **Physical device** — requires a real device and, for the network-privacy
+  gates, a packet capture. A logcat transcript is not sufficient: absence of log
+  messages is not evidence of absence of traffic.
+- **Play Console** — requires the live Console. It cannot be proved from this
+  repository at all, and no gate in that class may be marked complete without a
+  recorded, dated Console check.
+- **Documentation** — a text change that this repository can evidence.
+
+| # | Gate | Class | Evidence required | Status |
+|---|---|---|---|---|
+| G1 | CI typecheck, build, unit tests and browser tests pass on the PR | Automated | A green `verify` run on the branch head | **MET** — `verify` succeeded on `fe18893` (2026-10-19) |
+| G2 | Native permission and cancellation handling reviewed; defects found by CI corrected | Documentation | A review record naming the reviewed files, plus green CI | **OPEN** — the review was performed and CI is green, but no review record is attached |
+| G3 | Physical Android 12+: local recogniser and language model available; Ask Daymark produces the expected local result | Physical device | A redacted transcript capture and a screen record | **PARTIAL** — maintainer-attested observation only; the transcript was never independently captured |
+| G4 | Physical Android 12+: recogniser/model unavailable; UI reports unavailable and there is no generic recogniser fallback | Physical device | A screen record of the unavailable state plus a redacted logcat | **OPEN** — unit coverage only; no device run |
+| G5 | Android API 24–30: voice input unavailable and no network recogniser invoked | Physical device | A device on API ≤ 30 with a screen record | **OPEN** |
+| G6 | Cancel, timeout, error, backgrounding, route unmount and repeated attempts invalidate sessions; no recognition payload in logcat | Physical device | A redacted logcat covering all six triggers | **OPEN** |
+| G7 | French and Spanish narration select an installed local voice; with only network-dependent voices, narration fails with the explicit offline-unavailable state | Physical device | A screen record and logcat on a device that has only network-dependent voices | **OPEN** — deferred; the error chain is verified by inspection and pinned locale strings only |
+| G8 | English Kokoro works in airplane mode and does not use system TTS | Physical device | A **packet capture**, not a logcat | **PARTIAL** — maintainer-attested playback observation; no capture retained |
+| G9 | Network instrumentation records no speech-service traffic during voice input and narration | Physical device | A packet capture, plus a request log for the weather/geocoding endpoints | **OPEN** |
+| G10 | The app runs with only `ACCESS_COARSE_LOCATION` and sends the OS-provided approximate fix without extra rounding | Automated **and** Physical device | The merged manifest proves the permission half; a request-URL capture proves the transmitted coordinate | **PARTIAL** — permission half met by the branch; the transmitted coordinate is unproven |
+| G11 | Web/PWA: only 0.025-degree-grid coordinates are sent and no raw GPS appears in requests | Automated | The browser test that inspects the outgoing request URL | **MET** — asserted by the Playwright suite on `fe18893` |
+| G12 | Representative UK microclimate locations tested and the final Play Data safety classification confirmed | Physical device **and** Play Console | A location sample, then the recorded Console answers | **OPEN** |
+| G13 | The existing test suite remains green | Automated | A green `verify` run | **MET** — 19 files / 244 unit tests and 153 browser tests on `fe18893` |
+| G14 | Store privacy policy and Data safety answers reconciled against the shipped candidate's verified behaviour, including the in-app policy pages | Documentation **and** Play Console | Updated EN/FR/ES policy copy, then the recorded Console answers | **OPEN** |
+| G15 | Play's multi-version Data safety rule re-checked | Play Console | A recorded Console check | **OPEN** — requires Console access |
+| G16 | `versionCode`/`versionName` incremented, signed AAB built and verified, closed test, then production submission | Release | The signed artefact and the recorded Console state | **OPEN** — the candidate still reads `versionCode 1` |
+
+**Release readiness is blocked.** Three gates are met by automated evidence
+(G1, G11, G13) and one is half met by automated evidence (G10). Every remaining
+gate needs a physical device, the Play Console, or a documented review record.
+No gate in the *Physical device* or *Play Console* classes may be closed by
+CI output, by a logcat excerpt, or by a claim in a document.
+
+The device procedures and the evidence each one needs are specified in
+[`device-pass-2026-10-20.md`](device-pass-2026-10-20.md). The Console items
+and their exact questions are specified in
+[`play-console-review-2026-10-20.md`](play-console-review-2026-10-20.md).
+
 - [x] CI typecheck, build, unit tests and browser tests pass on the PR.
       GitHub Actions `verify` succeeded on the branch head this record was
       written against (`fe18893`, 2026-10-19),

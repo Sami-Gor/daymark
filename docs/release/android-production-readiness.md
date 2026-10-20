@@ -24,6 +24,26 @@ inline as **v2 candidate** behaviour and are specified in full in
 and the v1.0.0 statements below remain accurate for the app users actually
 have. Where the two differ, both are stated.
 
+## 0. How the evidence in this document is classified
+
+This audit mixes three kinds of evidence, and they are not interchangeable. Every
+status in this document belongs to one of them, and a status from one class
+never supports a conclusion in another:
+
+| Class | What proves it | What it cannot prove |
+|---|---|---|
+| **Automated** | A check that runs in CI on every commit: typecheck, the production build, the Vitest suite, the browser suite, the Android debug build, the JVM unit tests, and Android Lint. | Anything about a physical device, the Play Console, or the network. |
+| **Physical device** | A real device, and for the network-privacy questions a **packet capture**. A logcat excerpt is not sufficient: absence of log messages is not evidence of absence of traffic. | The Play Console's state. |
+| **Play Console** | A dated, recorded check of the live Console. | Anything in this repository. The repository holds no Console export, rollout record, store-listing capture or tagged release, so every Console statement here is maintainer-reported. |
+
+**A status of READY in this document means "evidenced as working" within the
+class that applies to it.** It does not mean the release is approved.
+
+The physical-device procedures and the evidence each one needs are specified in
+[`device-pass-2026-10-20.md`](device-pass-2026-10-20.md). The Console items and
+their exact questions are specified in
+[`play-console-review-2026-10-20.md`](play-console-review-2026-10-20.md).
+
 ## 1. Build / release pipeline
 
 Verified against the released v1.0.0 artefacts (the signed AAB and release APK
@@ -633,6 +653,7 @@ this PR has not built or uploaded a new AAB.
 | Offline behavior | READY | — | airplane-mode checks | none |
 | Error states | READY | — | code audit + e2e | device polish |
 | V2 candidate (`v2/privacy-hardened-voice`) | OPTIONAL — candidate gates open; not released | release gate | `docs/release/version-2-privacy-hardening.md`; the branch changes the location permission, the coordinate precision and the Android speech path | complete the open gates, bump `versionCode`, rebuild and sign, then submit through closed testing. The shared documents above still describe v1.0.0 by design. |
+| Physical-device evidence for the candidate | OPEN — no gate closed | physical device | `docs/release/device-pass-2026-10-20.md` | run the recorded procedures and attach the redacted evidence; three gates are partly evidenced by maintainer attestation only |
 | Release logging | OPTIONAL | low | no user content | reduce verbosity later |
 | Resource shrinking | OPTIONAL | low | not enabled | consider post-launch |
 | CSP in native shell | OPTIONAL | low | no CSP headers native | consider meta CSP later |
