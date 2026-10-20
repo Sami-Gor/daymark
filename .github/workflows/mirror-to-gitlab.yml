@@ -42,6 +42,22 @@ jobs:
 
           DEST="https://oauth2:${GITLAB_TOKEN}@gitlab.com/Sami-Gor/${REPO_NAME}.git"
 
+          # Current behaviour, kept deliberately unchanged pending an owner
+          # decision (see the note below):
+          #   - every branch is published, on every push and on the hourly
+          #     schedule, so the GitLab project is a second public copy of the
+          #     whole repository, not a release-only publication;
+          #   - the push is NOT a force push, so if a branch on the GitLab
+          #     side is moved ahead of GitHub the push is rejected as
+          #     non-fast-forward and this job keeps failing on every later
+          #     push until the divergence is resolved by hand;
+          #   - deleted branches are not pruned, so a branch removed on GitHub
+          #     stays on GitLab;
+          #   - the `if:` guard above skips dependabot *pushes*, but the
+          #     hourly schedule re-publishes dependabot branches anyway.
+          # Narrowing this to an allow-list, adding --prune, or allowing a
+          # force push each change what is published or published over, so
+          # they need an explicit decision rather than a cleanup commit.
           git push "$DEST" 'refs/heads/*:refs/heads/*'
           git push "$DEST" 'refs/tags/*:refs/tags/*'
 

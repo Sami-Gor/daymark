@@ -1,0 +1,85 @@
+name: Android CI
+
+# `main` builds the web layer in the `CI` workflow but does not compile or
+# test the native Android modules, so a Java, resource or manifest regression
+# on the release branch would merge green.
+#
+# This is a separate workflow rather than extra steps in `CI` on purpose: `CI`
+# runs the `verify` job, which is the only required status check on the
+# protected `main` branch. Coupling the Android toolchain to `verify` would
+# let a runner-side SDK problem block every merge to the release branch. A
+# separate job reports the result without becoming a merge gate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'artifacts/weather-app/android/**'
+      - 'artifacts/weather-app/package.json'
+      - 'artifacts/weather-app/capacitor.config.ts'
+      - 'artifacts/weather-app/public/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/android-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # SHA-pinned third-party action; b906aff is the v4 tag commit.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Capacitor 8's Android modules compile with Java 21.
+      - name: Set up Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # `cap sync` reads the built web assets (webDir = dist/public), so the
+      # web build has to run first.
+      - name: Build web assets
+        run: pnpm --filter @workspace/weather-app run build
+        env:
+          PORT: 5173
+          BASE_PATH: /
+
+      # Generate the Capacitor-managed Android files that are not committed
+      # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
+      - name: Sync Capacitor Android project
+        run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      # The committed JVM unit tests guard the minimum-WebView gate that
+      # decides whether the WebView loads the bundle at all.
+      - name: Android unit tests
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:testDebugUnitTest
+
+      - name: Android debug build
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      # Android Lint. `warningsAsErrors` stays off: the project has warnings
+      # today, and the gate is there to catch new *errors*.
+      - name: Android lint
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:lintDebug
