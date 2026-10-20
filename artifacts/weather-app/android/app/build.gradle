@@ -3,6 +3,7 @@ apply plugin: 'com.android.application'
 android {
     namespace = "io.github.sami_gor.daymark"
     compileSdk = rootProject.ext.compileSdkVersion
+    ndkVersion rootProject.ext.ndkVersion
     defaultConfig {
         applicationId "io.github.sami_gor.daymark"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -34,6 +35,13 @@ android {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
+            // Ship native debug symbols with the App Bundle so Google Play can
+            // symbolicate native crash and ANR stack traces. SYMBOL_TABLE keeps
+            // function names without the extra size of FULL file-and-line
+            // information.
+            ndk {
+                debugSymbolLevel 'SYMBOL_TABLE'
+            }
         }
     }
     androidResources {
