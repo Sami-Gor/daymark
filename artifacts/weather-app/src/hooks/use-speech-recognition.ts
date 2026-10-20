@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { createBrowserRecognitionController, describeRecognitionError } from '@/lib/voice-input-browser';
-import { createOnDeviceRecognitionController } from '@/lib/voice-input-native';
+import { createParakeetRecognitionController } from '@/lib/voice-input-native';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
 type RecognitionHandlers = {
@@ -29,7 +29,7 @@ type RecognitionController = {
 export function useSpeechRecognition() {
   const controller = useMemo<RecognitionController>(() => {
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-      return createOnDeviceRecognitionController();
+      return createParakeetRecognitionController();
     }
     return createBrowserRecognitionController();
   }, []);

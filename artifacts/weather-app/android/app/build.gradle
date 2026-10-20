@@ -4,6 +4,10 @@ android {
     namespace = "io.github.sami_gor.daymark"
     compileSdk = rootProject.ext.compileSdkVersion
     ndkVersion rootProject.ext.ndkVersion
+    // The Parakeet speech model is delivered as an install-time Play asset
+    // pack, because it does not fit in the base module's size limit.
+    assetPacks = [":parakeet-assets"]
+
     defaultConfig {
         applicationId "io.github.sami_gor.daymark"
         minSdkVersion rootProject.ext.minSdkVersion

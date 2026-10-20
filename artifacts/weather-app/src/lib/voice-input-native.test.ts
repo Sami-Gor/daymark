@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { events, native } = vi.hoisted(() => {
+const { events, native, registered, registrationOrder } = vi.hoisted(() => {
   const events: Record<string, Array<(payload: any) => void>> = {
     result: [],
     error: [],
     end: [],
   };
+  const registered: string[] = [];
+  const registrationOrder: string[] = [];
   const native = {
     isAvailable: vi.fn(),
     start: vi.fn(),
@@ -15,7 +17,7 @@ const { events, native } = vi.hoisted(() => {
       return Promise.resolve({ remove: vi.fn() });
     }),
   };
-  return { events, native };
+  return { events, native, registered, registrationOrder };
 });
 
 vi.mock('@capacitor/core', () => ({
@@ -23,10 +25,14 @@ vi.mock('@capacitor/core', () => ({
     isNativePlatform: () => true,
     getPlatform: () => 'android',
   },
-  registerPlugin: () => native,
+  registerPlugin: (name: string) => {
+    registered.push(name);
+    registrationOrder.push(name);
+    return native;
+  },
 }));
 
-import { createOnDeviceRecognitionController } from './voice-input-native';
+import { createParakeetRecognitionController } from './voice-input-native';
 
 function resetEvents() {
   for (const key of Object.keys(events)) events[key] = [];
@@ -34,6 +40,7 @@ function resetEvents() {
 
 beforeEach(() => {
   resetEvents();
+  registered.length = 0;
   native.isAvailable.mockReset();
   native.start.mockReset().mockResolvedValue(undefined);
   native.cancel.mockReset().mockResolvedValue(undefined);
@@ -45,19 +52,48 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('createOnDeviceRecognitionController', () => {
-  it('refuses to start when local recognition is unavailable', async () => {
-    native.isAvailable.mockResolvedValue({ available: false, reason: 'offline-unavailable' });
-    const controller = createOnDeviceRecognitionController();
+describe('createParakeetRecognitionController', () => {
+  it('registers the Parakeet plugin, not an Android speech recogniser', () => {
+    // registerPlugin is called when the module is loaded, so the captured
+    // registration is checked before the per-test reset clears the spy.
+    expect(registrationOrder).toEqual(['ParakeetSpeechRecognition']);
+    expect(registrationOrder).not.toContain('OnDeviceSpeechRecognition');
+  });
+
+  it('refuses to start when the model is unavailable', async () => {
+    native.isAvailable.mockResolvedValue({ available: false, reason: 'model-missing' });
+    const controller = createParakeetRecognitionController();
 
     expect(await controller.initialize()).toBe(false);
     expect(controller.start({ onError: vi.fn() }, 'en-GB')).toBe(false);
     expect(native.start).not.toHaveBeenCalled();
   });
 
-  it('delivers a single result from the native local-recognition plugin', async () => {
-    native.isAvailable.mockResolvedValue({ available: true });
-    const controller = createOnDeviceRecognitionController();
+  it('does not wait for a reason that waiting cannot fix', async () => {
+    native.isAvailable.mockResolvedValue({ available: false, reason: 'model-missing' });
+    const controller = createParakeetRecognitionController();
+
+    expect(await controller.initialize()).toBe(false);
+    // One probe: a missing model is permanent, so it is not polled.
+    expect(native.isAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits while the model is still being prepared', async () => {
+    vi.useFakeTimers();
+    native.isAvailable
+      .mockResolvedValueOnce({ available: false, reason: 'model-preparing' })
+      .mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+
+    const pending = controller.initialize();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await pending).toBe(true);
+    expect(native.isAvailable).toHaveBeenCalledTimes(2);
+  });
+
+  it('delivers a single result from the native plugin', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
     await controller.initialize();
 
     const onResult = vi.fn();
@@ -76,8 +112,8 @@ describe('createOnDeviceRecognitionController', () => {
   });
 
   it('ignores stale results after cancellation and asks the native plugin to cancel', async () => {
-    native.isAvailable.mockResolvedValue({ available: true });
-    const controller = createOnDeviceRecognitionController();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
     await controller.initialize();
 
     const onResult = vi.fn();
@@ -93,8 +129,8 @@ describe('createOnDeviceRecognitionController', () => {
 
   it('cancels and clears a recognition session when its timeout expires', async () => {
     vi.useFakeTimers();
-    native.isAvailable.mockResolvedValue({ available: true });
-    const controller = createOnDeviceRecognitionController();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
     await controller.initialize();
 
     const onError = vi.fn();
@@ -110,8 +146,8 @@ describe('createOnDeviceRecognitionController', () => {
   });
 
   it('maps native service errors to a terminal error without any retry', async () => {
-    native.isAvailable.mockResolvedValue({ available: true });
-    const controller = createOnDeviceRecognitionController();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
     await controller.initialize();
 
     const onError = vi.fn();
@@ -122,5 +158,18 @@ describe('createOnDeviceRecognitionController', () => {
     expect(onError).toHaveBeenCalledWith('offline-unavailable');
     expect(native.start).toHaveBeenCalledTimes(1);
     expect(controller.isListening()).toBe(false);
+  });
+
+  it('maps a missing model to the offline-unavailable error code', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.error[0]?.({ sessionId: 1, code: 'model-missing' });
+
+    expect(onError).toHaveBeenCalledWith('model-missing');
   });
 });

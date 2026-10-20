@@ -263,11 +263,14 @@ leave the device; this must be disclosed in Data Safety.
 
 **v2 candidate:** on Android the path becomes
 `use-speech-recognition.ts` → `voice-input-native.ts` →
-`OnDeviceSpeechRecognitionPlugin` → `SpeechRecognizer.createOnDeviceSpeechRecognizer()`
-(API 31 and above). There is no generic recogniser, remote retry or silent
-online fallback, and network or server errors are mapped to a terminal
-`offline-unavailable` state. The web path is unchanged and remains the browser
-speech service. The candidate's classification for the **Android** build is
+`ParakeetSpeechRecognitionPlugin` → the **Parakeet TDT 0.6B v3 int8** model
+through the **sherpa-onnx** offline transducer, running on the device at 16 kHz
+with 80-dimensional features and greedy decoding, with a fresh stream per
+utterance and an energy-based endpoint so the user is answered when they stop
+speaking. `android.speech.SpeechRecognizer` is not used anywhere in the Android
+voice path, and there is no generic recogniser, remote retry or silent online
+fallback: a missing or unusable model reports an explicit error. The web path is
+unchanged and remains the browser speech service. The candidate's classification for the **Android** build is
 therefore "on-device", while the web path stays "potentially cloud-dependent";
 the two must not be merged in a Data safety answer.
 
@@ -353,7 +356,9 @@ made that the extended soak was completed; it is not a blanket release gate.
 | Weather query | App | No | Yes: rounded coordinates + options | `api.open-meteo.com`, `air-quality-api.open-meteo.com` | Provider-side logging/retention follows Open-Meteo policy; free-API logs deleted after 90 days |
 | Location search text | User input | No | Yes, when searching | `geocoding-api.open-meteo.com` | Provider-side |
 | Locality name lookup | `localities-v1.json` | Bundled + Cache Storage | No | — | On device |
-| Microphone audio | User gesture | No | Depending on platform speech service (possibly Google) | OS/browser speech service | Outside app control |
+| Microphone audio | User gesture | No | Depending on platform speech service (possibly Google) | OS/browser speech service |
+| Microphone audio (**v2 candidate**, Android) | User gesture | No | No — the bundled model transcribes on the device | — | No |
+| Recognition transcript (**v2 candidate**, Android) | On-device model | No | No (in-memory only) | — | No | Outside app control |
 | Recognition transcript | Speech service | No | No (in-memory only) | — | No |
 | TTS narration text | Intent layer | No | Android English: no, local Kokoro; web: browser speech synthesis; Android French/Spanish: native Android system TTS. Remote processing depends on the selected voice/provider | Browser speech service (web) or Android system TTS (French/Spanish) | Daymark does not retain it; provider-side processing/retention depends on service |
 | Preferences | App | `localStorage` (`daymark.locale`) | No | — | Until cleared |

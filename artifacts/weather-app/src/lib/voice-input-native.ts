@@ -11,7 +11,7 @@ type NativeResult = { sessionId: number; transcript: string };
 type NativeError = { sessionId: number; code: string };
 type NativeEnd = { sessionId: number };
 
-interface OnDeviceSpeechRecognitionPlugin {
+interface ParakeetSpeechRecognitionPlugin {
   isAvailable(): Promise<{ available: boolean; reason?: string }>;
   start(options: { sessionId: number; lang: string }): Promise<void>;
   cancel(options: { sessionId: number }): Promise<void>;
@@ -20,10 +20,22 @@ interface OnDeviceSpeechRecognitionPlugin {
   addListener(eventName: 'end', listenerFunc: (event: NativeEnd) => void): Promise<PluginListenerHandle>;
 }
 
-const NativeRecognizer = registerPlugin<OnDeviceSpeechRecognitionPlugin>('OnDeviceSpeechRecognition');
+/**
+ * The Android voice path runs Parakeet TDT 0.6B v3 (int8) through sherpa-onnx,
+ * entirely on the device. There is no Android `SpeechRecognizer` behind this
+ * plugin and no remote recogniser: if the model is missing or recognition
+ * fails, the session fails with an explicit error.
+ */
+const NativeRecognizer = registerPlugin<ParakeetSpeechRecognitionPlugin>('ParakeetSpeechRecognition');
 const RECOGNITION_TIMEOUT_MS = 30_000;
+/** How often the plugin is asked whether the model has become usable. */
+const MODEL_PREPARATION_POLL_MS = 500;
+/** How long the first run waits for the model to be materialised and loaded. */
+const MODEL_PREPARATION_WAIT_MS = 30_000;
+/** Reasons that will not change by waiting, so there is no point in polling. */
+const PERMANENT_UNAVAILABLE_REASONS = new Set(['model-missing', 'runtime-unavailable']);
 
-export type OnDeviceRecognitionController = {
+export type ParakeetRecognitionController = {
   readonly supported: boolean;
   initialize: () => Promise<boolean>;
   start: (handlers: OnDeviceRecognitionHandlers, lang?: string) => boolean;
@@ -32,7 +44,7 @@ export type OnDeviceRecognitionController = {
   isListening: () => boolean;
 };
 
-export function createOnDeviceRecognitionController(): OnDeviceRecognitionController {
+export function createParakeetRecognitionController(): ParakeetRecognitionController {
   let supported = false;
   let initialized = false;
   let disposed = false;
@@ -89,12 +101,32 @@ export function createOnDeviceRecognitionController(): OnDeviceRecognitionContro
       ]);
       listeners.push(...registered);
 
-      const result = await NativeRecognizer.isAvailable();
-      supported = result.available === true;
+      supported = await waitForModel();
     } catch {
       supported = false;
     }
     return supported;
+  };
+
+  /**
+   * Waits for the model to become usable.
+   *
+   * The model is materialised and the recogniser built the first time the app
+   * runs, which takes longer than a single call. The native side reports
+   * `model-preparing` while that is happening and a permanent reason such as
+   * `model-missing` when waiting cannot help, so this only waits when waiting
+   * can actually help.
+   */
+  const waitForModel = async () => {
+    const deadline = Date.now() + MODEL_PREPARATION_WAIT_MS;
+    for (;;) {
+      const result = await NativeRecognizer.isAvailable();
+      if (result.available === true) return true;
+      const reason = result.reason ?? '';
+      const canWait = reason !== '' && !PERMANENT_UNAVAILABLE_REASONS.has(reason);
+      if (!canWait || Date.now() >= deadline) return false;
+      await new Promise((resolve) => setTimeout(resolve, MODEL_PREPARATION_POLL_MS));
+    }
   };
 
   return {
@@ -132,7 +164,8 @@ export function createOnDeviceRecognitionController(): OnDeviceRecognitionContro
         const finished = detachSession(sessionId);
         const message = error instanceof Error ? error.message : String(error ?? '');
         const code = /permission/i.test(message) ? 'not-allowed'
-          : /offline-unavailable|api-unsupported/i.test(message) ? 'offline-unavailable'
+          : /offline-unavailable|api-unsupported|model-missing|model-preparing|runtime-unavailable/i.test(message)
+            ? 'offline-unavailable'
           : /cancel/i.test(message) ? 'aborted'
           : 'unknown';
         finished?.onError?.(code);

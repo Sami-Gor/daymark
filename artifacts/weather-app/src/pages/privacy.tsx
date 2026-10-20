@@ -109,11 +109,13 @@ export default function Privacy() {
       <h2>Voice input (Ask Daymark)</h2>
       <p>
         Ask Daymark is optional. It starts only when you press the microphone button and grant
-        permission. Voice recognition is handled by your browser or device and may use its speech
-        service. Depending on your browser, operating system, and configuration, audio may be
-        processed by the platform provider. Daymark does not record or store your voice audio or
-        speech transcripts, and there is no Daymark-operated backend or application server that
-        receives them.
+        permission. In the Android app, voice recognition runs entirely on your device: the
+        Parakeet TDT 0.6B v3 speech model, bundled with the app, transcribes your speech locally.
+        Your audio is not sent to a speech service and not to Daymark. Daymark does not record or
+        store your voice audio or speech transcripts. In the web app, voice recognition is handled
+        by your browser and may use its speech service, so depending on your browser, operating
+        system, and configuration, audio may be processed by the platform provider. There is no
+        Daymark-operated backend or application server that receives them.
       </p>
 
       <h2>Voice output (Hear today)</h2>
@@ -151,13 +153,23 @@ export default function Privacy() {
           app. The lookup runs on your device; no coordinates are sent to GeoNames.
         </li>
         <li>
-          Your browser&rsquo;s or device&rsquo;s speech services — only when you use the optional voice
-          features.
+          Your browser&rsquo;s speech service — only in the web app, and only when you use the
+          optional voice features. The Android app recognises speech on your device and does not
+          contact a speech service.
+        </li>
+        <li>
+          The Parakeet speech model and the sherpa-onnx runtime, bundled with the Android app and
+          used to recognise speech on your device.
         </li>
       </ul>
       <p>
         Locality data © <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>,
         used under the Creative Commons Attribution 4.0 licence (CC BY 4.0).
+      </p>
+      <p>
+        Speech model: <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3" target="_blank" rel="noreferrer">Parakeet TDT 0.6B v3</a> by
+        NVIDIA Corporation, used under the Creative Commons Attribution 4.0 International Licence
+        (CC BY 4.0). The published weights are quantised to int8 for on-device inference.
       </p>
       <p>
         Daymark does not use third-party analytics, advertising, tracking pixels, or tracking
