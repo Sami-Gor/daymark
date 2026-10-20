@@ -51,9 +51,13 @@ jobs:
 
       # Compile the native Android modules as well as the web layer. This
       # catches Java/API/manifest regressions in Capacitor plugin changes.
-      - name: Android debug build
+      # The committed JVM unit tests guard the minimum-WebView gate that
+      # decides whether the WebView loads the bundle at all. One Gradle
+      # invocation rather than a second step avoids a redundant
+      # configuration phase and keeps both tasks on one resolved classpath.
+      - name: Android build and unit tests
         working-directory: artifacts/weather-app/android
-        run: ./gradlew --no-daemon :app:assembleDebug
+        run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
 
       - name: Install Playwright browser
         run: pnpm --filter @workspace/weather-app exec playwright install chromium --with-deps

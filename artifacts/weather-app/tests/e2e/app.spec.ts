@@ -119,6 +119,45 @@ test.describe('functional', () => {
     await context.close();
   });
 
+  test('android native shell sends the OS approximate fix unchanged', async ({ browser }) => {
+    const context = await browser.newContext({
+      permissions: ['geolocation'],
+      geolocation: { latitude: 51.5074567, longitude: -0.12789012 },
+    });
+    const page = await context.newPage();
+    // Capacitor reports the platform as 'android' through its custom-platform
+    // hook. The app then takes the Android branch of the location flow (the
+    // manifest grants ACCESS_COARSE_LOCATION only, so the operating system
+    // supplies the approximate fix) while the JavaScript plugin
+    // implementations keep working.
+    await page.addInitScript(() => {
+      (window as unknown as { CapacitorCustomPlatform: { name: string } }).CapacitorCustomPlatform = {
+        name: 'android',
+      };
+    });
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await page.waitForLoadState('networkidle');
+    requests.length = 0;
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
+    const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
+    expect(forecasts.length).toBeGreaterThan(0);
+    for (const url of forecasts) {
+      // The approximate fix must leave the device untouched: rounding it
+      // again would compound the accuracy loss the OS permission already
+      // introduced.
+      expect(url).toContain('latitude=51.5074567');
+      expect(url).toContain('longitude=-0.12789012');
+      expect(url).not.toContain('latitude=51.51');
+      expect(url).not.toContain('longitude=-0.13');
+    }
+    await context.close();
+  });
+
   test('denied geolocation shows a toast and keeps the loaded weather', async ({ browser }) => {
     const context = await browser.newContext({ permissions: [] });
     const page = await context.newPage();
