@@ -3,6 +3,7 @@ apply plugin: 'com.android.library'
 android {
     namespace = "io.github.sami_gor.daymark.voice"
     compileSdk = rootProject.ext.compileSdkVersion
+    ndkVersion rootProject.ext.ndkVersion
 
     defaultConfig {
         minSdkVersion rootProject.ext.minSdkVersion
