@@ -96,22 +96,100 @@ This prerecorded result is reported separately. It is not directly interchangeab
 
 The live-microphone pairing above is the strongest audio-identity claim in this record: both models' run files carry the same eight SHA-256 values, and those values match the recordings still on disk. The prerecorded Set B corpus is linked by filename and reference text; its audio files hash-match the Set B files when recomputed, but the earlier Vosk, Moonshine Tiny and both Parakeet prerecorded run records do not carry per-run hashes, so those rows are not hash-proven in the same way as the four controlled-pilot rows.
 
+## Integration status and packaging measurements
+
+The Parakeet TDT 0.6B v3 int8 model is now the **production** Android
+speech-to-text engine in Daymark V2, not a separate experiment. The `v2test`
+build type and its unprotected test receiver are retired.
+
+The figures above come from the standalone model harness. **They are not a
+validation of the integrated application.** Every physical-device gate in
+`docs/release/version-2-privacy-hardening.md` remains open, and none of them may
+be closed by the standalone results.
+
+### What was reused from the earlier experiment
+
+| Reused | Notes |
+|---|---|
+| The model files and the evaluated configuration | Parakeet TDT 0.6B v3 int8, 16 kHz, 80-dimensional features, greedy decoding, CPU inference, a fresh stream per utterance. The evaluated configuration was kept unchanged. |
+| The sherpa-onnx 1.13.8 runtime | Obtained from the same upstream release; the archive is byte-identical to the copy the experiment used. |
+| The model and runtime checksums | Pinned in `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` and `fetch-sherpa-onnx.sh`, and recorded in `THIRD-PARTY-NOTICES.md`. |
+
+### What was changed, and why
+
+| Shortcoming of the experiment | Change |
+|---|---|
+| Availability was reported unconditionally, so the control claimed to work on a device with no model | Availability now reflects whether the model is present and the recogniser could be built. The reasons are `model-missing`, `model-preparing` and `runtime-unavailable`. |
+| A fixed 20-second capture window, so every request took the full window | An energy-based endpoint: the utterance ends after speech followed by a short quiet period, with a 15-second hard cap. |
+| The recogniser logged the recognised transcript | The log line carries timings and the outcome only. No audio or transcript is logged or written to storage. |
+| A stale transcript could still reach the interface after cancellation | The session is invalidated on cancel and on lifecycle exit, and the result is only delivered for the session that is still active. |
+| The recorder was not released on the error path | The recorder, the stream and the audio buffer are released on every path. |
+| An exported, unprotected broadcast receiver could trigger a model load from any app | The receiver is gone. The model is loaded by the plugin itself. |
+| Debug signing, `debuggable` and four-ABI packaging | The production package, the release signing configuration and the arm64-v8a ABI filter are used. |
+
+### Packaging and delivery measurements
+
+Measured with `bundletool` 1.18.1 on the release bundle of the V2 candidate,
+for an `arm64-v8a`, `xxhdpi`, API 36 device.
+
+| Quantity | Bytes | Play limit | Result |
+|---|---:|---:|---|
+| Base module download | 94,430,809 | 500 MB | **under** |
+| Install-time asset pack (`parakeet`) | 478,123,852 | 1.5 GB | **under** |
+| Total device download | 583,662,940 | 4 GB cumulative | **under** |
+
+Before the model was moved into an asset pack, the base module measured
+**565,211,990 – 583,702,351 bytes**, which exceeded Play's 500 MB base-module
+limit by 65–84 MB. The model is therefore delivered as an **install-time** asset
+pack: Google Play installs the pack together with the app, so the model is on
+the device and available offline once the install has finished. An on-demand or
+fast-follow pack was rejected because it would leave the model absent until the
+app downloaded it, which needs a network connection and would break offline
+voice input.
+
+### Consequences
+
+| Aspect | Effect |
+|---|---|
+| Installation | The download is about 557 MiB, up from about 92 MiB. Play shows users a non-blocking "large app" notice above 200 MB. |
+| Storage | The model is about 640 MiB on disk in the install-time pack, and about 640 MiB again once it is materialised into the app's private storage so ONNX Runtime can memory-map it. Peak device usage is therefore roughly 1.3 GiB. |
+| First-run latency | The first recognition on a device that has not yet materialised the model pays for the copy before it can start decoding. The copy is done in the background when the plugin loads, and the control reports the model as preparing until it is ready. |
+| Offline availability | Unchanged: once the install has completed, recognition never needs a network connection. |
+| Warm latency | Unchanged from the evaluation, because the recogniser is built once and reused. |
+
+**The storage and first-run cost is a product decision that is not settled by
+this branch.** The alternatives are to accept it, to keep the model out of the
+bundle and fetch it on first use (which breaks offline voice input), or to
+explore a smaller quantisation (which would be a different model and needs
+re-evaluation). The measurements above are the input to that decision.
+
 ## Daymark V2 integration status
 
-**The committed V2 branch does not contain a Parakeet integration.** The branch's Android voice-input path calls Android's own `SpeechRecognizer.createOnDeviceSpeechRecognizer()` through `OnDeviceSpeechRecognitionPlugin`, with no online fallback. There is no Parakeet model, no sherpa-onnx runtime and no `v2test` build type in this branch; `git log --all -- .../src/v2test` returns nothing.
+The V2 candidate now runs this model as its Android speech-to-text engine. The
+plugin is `ParakeetSpeechRecognitionPlugin` in the `daymark-voice` module, and
+the web layer calls it through the `ParakeetSpeechRecognition` Capacitor plugin
+name.
 
-The Parakeet evaluation below was performed with a **separate, local, unmerged** V2 test build: package ID `io.github.sami_gor.daymark.v2test`, application ID suffix `.v2test`, Android-debug signed, `debuggable`, four ABIs, approximately 934 MiB including roughly 640 MiB of model assets. The production package `io.github.sami_gor.daymark` was not modified or replaced by that test installation, and the test build has never been uploaded to Play.
+The V2 branch's Android voice path contains no `android.speech.SpeechRecognizer`
+call, no `RecognizerIntent`, and no reference to a remote speech service. That
+is enforced by a test that reads the Android sources from disk
+(`artifacts/weather-app/src/lib/android-voice-implementation.test.ts`), so a
+generic or online recogniser cannot be reintroduced without failing the build.
 
-Reported local checks for that local build:
+Checks recorded for the integrated branch:
 
 - TypeScript typecheck passed.
-- Automated test suite: **249 / 249 passed** — 20 files. That figure includes two local, uncommitted test files; the **committed** branch runs 19 files / 244 unit tests plus 153 browser tests, all green on branch head `fe18893`.
-- A known-WAV smoke test returned the expected transcript, with a native init-plus-decode time of **14,237 ms** (including model load; it is not comparable with the steady-state decode times above).
-- The model/runtime licence obligations that this build would carry are **Apache-2.0** (sherpa-onnx runtime), **MIT** (the ONNX Runtime shared libraries bundled inside it) and **CC-BY-4.0** (the Parakeet model weights, including an obligation to indicate the int8 quantisation).
+- Automated test suite: **20 files / 262 tests passed** on the integration branch
+  (19 files / 244 on the branch it is based on), plus the Android JVM unit tests
+  for the utterance endpoint detector.
+- The release bundle builds, is signed with the upload key, and carries the
+  native debug-symbol metadata introduced by PR #43.
 
-**Important limitation:** a live microphone test through the integrated Daymark V2 interface has not yet been completed. The live-microphone scores above come from the standalone model evaluation, not from the integrated Daymark V2 screen.
-
-The active V2 voice-input path has no cloud-ASR fallback configured. The shared voice dependency still imports the `android.speech.SpeechRecognizer` type, which a static APK scan can flag even though the code calls only `createOnDeviceSpeechRecognizer()` and never the generic recogniser; and the app retains its general `INTERNET` permission for existing weather/WebView features. These facts mean that the test does **not** establish that the entire app has no network access. Keep voice-path runtime/network verification as a separate privacy gate.
+**Important limitation:** a live microphone test through the integrated Daymark
+V2 interface has **not** been completed. The live-microphone scores above come
+from the standalone model harness, not from the Daymark screen. The accuracy
+figures are a baseline for the engine, not evidence about the application, and
+the named-place weakness recorded below still stands.
 
 ## Conclusion and next validation
 

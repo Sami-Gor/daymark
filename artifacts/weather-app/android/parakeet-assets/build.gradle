@@ -1,0 +1,46 @@
+apply plugin: 'com.android.asset-pack'
+
+// Play Asset Delivery pack for the on-device speech model.
+//
+// The Parakeet TDT 0.6B v3 int8 weights are about 456 MiB compressed, which
+// does not fit inside Google Play's 500 MB base-module limit together with the
+// rest of the app. They are delivered here as an install-time asset pack
+// instead: Google Play installs the pack together with the app, so the model
+// is on the device and available offline once the install has finished.
+//
+// An install-time pack is used deliberately. An on-demand or fast-follow pack
+// would leave the model absent until the app downloaded it, which would need a
+// network connection and would break the promise that voice input works
+// offline.
+
+assetPack {
+    packName = "parakeet"
+    dynamicDelivery {
+        deliveryType = "install-time"
+    }
+}
+
+// The model is not committed. Fail with an actionable message rather than an
+// obscure packaging error when it has not been fetched.
+//
+// The check runs only when a task from this module is actually going to run,
+// so the debug build - which does not package the model - is unaffected.
+def modelFiles = [
+    "encoder.int8.onnx",
+    "decoder.int8.onnx",
+    "joiner.int8.onnx",
+    "tokens.txt",
+]
+gradle.taskGraph.whenReady { graph ->
+    def packaging = graph.allTasks.any { it.project == project }
+    if (!packaging) {
+        return
+    }
+    def modelDirectory = file("src/main/assets/parakeet")
+    def missing = modelFiles.findAll { !new File(modelDirectory, it).isFile() }
+    if (!missing.isEmpty()) {
+        throw new GradleException(
+            "The Parakeet model is missing: ${missing.join(', ')}. " +
+            "Run android/kokoro-poc/scripts/fetch-parakeet-assets.sh before building.")
+    }
+}

@@ -19,14 +19,24 @@ sources for the candidate.
 
 ## Decisions
 
-- Android speech input must use `SpeechRecognizer.createOnDeviceSpeechRecognizer()`
-  on API 31+ only, after runtime availability checks. Android API 24–30 and API
-  31+ devices without a compatible local recognizer must show voice input as
-  unavailable. No generic Android `SpeechRecognizer`, Web Speech, remote
-  retry, or silent online fallback is permitted.
+- Android speech input must use the **Parakeet TDT 0.6B v3 int8** model
+  through the **sherpa-onnx** offline transducer, running on the device. This
+  replaces Android's `SpeechRecognizer`: the `android.speech.SpeechRecognizer`
+  API is not used anywhere in the Android voice path. No generic Android
+  `SpeechRecognizer`, Web Speech, remote retry, or silent online fallback is
+  permitted. If the model is missing, cannot be loaded, or recognition fails,
+  voice input reports an explicit error and nothing else is tried.
+- The model runs at the evaluated configuration: 16 kHz audio, 80-dimensional
+  features, greedy decoding, CPU inference, and a fresh recognition stream per
+  utterance. Each utterance ends on an energy-based endpoint so the user is
+  answered when they stop speaking, rather than after a fixed window.
 - A speech session is one-shot. Daymark does not write audio or transcript
   files, and must not log recognition payloads. Cancellation and lifecycle
-  exits must invalidate callbacks and destroy the recognizer.
+  exits must invalidate callbacks and release the microphone, the recognition
+  stream and the audio buffer.
+- The model is materialised into the app's private storage on first use so
+  ONNX Runtime can memory-map it, and the model is delivered to the device by
+  Google Play. Inference never requires a network connection.
 - English narration remains on the bundled local Kokoro engine.
 - French and Spanish Android narration must use an installed Android TTS voice
   for which `Voice.isNetworkConnectionRequired()` is false. If no such voice
@@ -46,17 +56,21 @@ sources for the candidate.
 ## Compatibility
 
 - Keep `minSdk 24`, `targetSdk 36`, and `compileSdk 36`.
-- Android API 24–30: voice input unavailable unless a separately approved
-  bundled offline model is implemented in a later change.
-- Android API 31+: runtime-check `isOnDeviceRecognitionAvailable()` and use
-  `createOnDeviceSpeechRecognizer()`. Model/language support must be tested on
-  devices; generic recognizer fallback is prohibited.
-- No new speech model dependency is introduced by this implementation slice.
-  A bundled model remains a separately reviewed option due to size, licence,
-  CPU and battery trade-offs. A separate, **unmerged** local experiment adds a
-  bundled Parakeet TDT 0.6B v3 int8 model behind a `v2test` build type; see
-  "Local test builds" below. It is not part of this branch and is not part of
-  the shipped candidate.
+- The bundled Parakeet TDT 0.6B v3 int8 model is introduced by this slice.
+  It is the speech-to-text engine for the Android app, not an experiment: the
+  earlier `v2test` build type and its unprotected test receiver are retired.
+- The model is redistributed under **CC BY 4.0**, with the attribution and the
+  indication of the int8 quantisation recorded in `THIRD-PARTY-NOTICES.md` and
+  in the app's privacy pages. The sherpa-onnx runtime is Apache-2.0 and the
+  ONNX Runtime libraries it bundles are MIT.
+- The model is a large payload. Its size, its delivery through Google Play and
+  the consequences for installation and first-run latency are recorded in
+  `docs/release/parakeet-v3-android-phone-evaluation.md`.
+- Because the model is bundled rather than provided by the operating system,
+  voice input is available on every supported Android version, not only on
+  API 31 and above. It must still be tested on the declared minimum version.
+- Model and language support must be tested on devices; a generic recogniser
+  fallback is prohibited.
 
 ## Offline place search evaluation
 
@@ -117,8 +131,9 @@ the shipped code and provider behaviour.
       GitHub Actions `verify` succeeded on the branch head this record was
       written against (`fe18893`, 2026-10-19),
       covering typecheck, build, Vitest, Capacitor sync, `:app:assembleDebug`,
-      Playwright and the dependency audit. Note that CI builds only the `debug`
-      variant and does not cover the local `v2test` experiment.
+      the Android JVM unit tests, Playwright and the dependency audit. Note that
+      CI builds only the `debug` variant: the release bundle, the model
+      packaging and the native debug symbols are not exercised by CI.
 - [ ] Review native permission/cancellation handling and correct any static or
       runtime defects found by CI.
 - [ ] Physical Android 12+ test: local recognizer and selected language model
@@ -128,16 +143,15 @@ the shipped code and provider behaviour.
       microphone captured, Kokoro narrated a rain answer, no recognizer errors
       in logcat — but the transcript itself was not independently captured, so
       this gate stays open.
-- [ ] Physical Android 12+ test: on-device recognizer/model unavailable; UI
-      reports unavailable and there is no generic recognizer fallback.
-      Untested on-device. The committed branch adds deterministic unit
-      coverage (`voice-input-native.test.ts`) that pins the refused-start and
-      terminal `offline-unavailable` behaviour without touching system
-      packages. A further local, uncommitted test file
-      (`voice-failure-messages.test.ts`) pins the localized message strings;
-      it is not part of this branch.
-- [ ] Android API 24–30 test: voice input is unavailable; no network recognizer
-      is invoked.
+- [ ] Physical Android 12+ test: the model is unavailable — not installed, or
+      corrupt — and the UI reports unavailable with no fallback to any other
+      recognizer. Untested on-device. The committed branch adds deterministic
+      unit coverage that pins the refused start and the terminal
+      `offline-unavailable` behaviour without touching system packages, and a
+      source-level check that the Android path contains no
+      `android.speech.SpeechRecognizer`.
+- [ ] Android API 24–30 test: voice input works with the bundled model, and no
+      network recognizer is invoked.
 - [ ] Cancel, timeout, error, app backgrounding, route unmount and repeated
       attempts invalidate sessions, clear transient handlers and destroy native
       recognition sessions. No recognition payload appears in logcat.
@@ -223,44 +237,37 @@ the shipped code and provider behaviour.
   and are retained for up to 90 days. Reconcile this provider-side handling
   with the final Data safety response rather than assuming ephemeral processing.
 
-## Local test builds (never distributed)
+## On-device speech model (integrated)
 
-A separate local experiment adds a `v2test` Android build type behind the
-package ID `io.github.sami_gor.daymark.v2test`. It is **not part of this
-branch** and is **not part of the shipped candidate**. It exists only to
-evaluate a bundled on-device ASR model on a phone.
+The Android app recognises speech with the **Parakeet TDT 0.6B v3 int8** model
+through the **sherpa-onnx** offline transducer. The earlier `v2test` experiment,
+its separate build type and its unprotected test receiver are retired; the model
+is now part of the production Android path.
 
 | Property | Value |
 |---|---|
-| Package ID | `io.github.sami_gor.daymark.v2test` (distinct from `io.github.sami_gor.daymark`) |
-| Signing | Android debug key — not the Play upload key, so it cannot be submitted to Play as-is |
-| `debuggable` | `true` |
-| ABIs | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` (the shipped v1.0.0 bundle is arm64-v8a only) |
-| Size | approximately 934 MiB, including roughly 670 MB of model assets |
-| Uploaded to Play | Never. Not signed with the upload key, debuggable, and not built by CI. |
+| Package | `io.github.sami_gor.daymark` — the production package |
+| Model | Parakeet TDT 0.6B v3, int8, CPU inference through sherpa-onnx 1.13.8 |
+| Audio | 16 kHz mono, 80-dimensional features, greedy decoding, a fresh stream per utterance |
+| Endpointing | energy-based: the utterance ends after speech followed by a short quiet period |
+| Fallback | none. No Android `SpeechRecognizer`, no Web Speech, no remote recogniser |
+| Model licence | CC BY 4.0, with the int8 quantisation indicated; see `THIRD-PARTY-NOTICES.md` |
+| Runtime licences | sherpa-onnx Apache-2.0, ONNX Runtime MIT |
 
-Three properties of that experiment are recorded here because they would matter
-if it were ever promoted:
+Two properties of the integration are recorded here because they shape what
+still has to be proved:
 
-- **It substitutes the production recognition plugin.** The test build registers
-  a different recognition plugin under the **same** Capacitor plugin name as the
-  production one, and its availability check returns "available" unconditionally
-  rather than testing the device. A `.v2test` build therefore cannot satisfy the
-  on-device-recogniser gates in this list — the "recognizer/model unavailable"
-  gate, the "API 24–30 unavailable" gate, and the "no generic recognizer
-  fallback" gate all describe the production plugin, not this one. A build that
-  registers two plugins under one name would silently resolve to whichever was
-  registered last.
-
-- The model weights are redistributed under a licence that carries an
-  attribution obligation (CC-BY-4.0), alongside an Apache-2.0 runtime and its
-  bundled MIT-licensed runtime libraries. The licensing table in
-  `docs/release/android-production-readiness.md` covers the v1.0.0 stack only
-  and must be extended before any candidate that bundles a model is shipped.
-- The harness exports a broadcast receiver without a permission, so any
-  application on the device can trigger a model load. This is acceptable for a
-  personal debug build that is never installed alongside other applications,
-  but it must be changed before the experiment is shared.
+- **The model is a large payload.** It is delivered to the device by Google Play
+  and materialised into the app's private storage on first use, so the resident
+  memory cost stays low but the installation grows. The measured sizes and the
+  delivery options are in
+  `docs/release/parakeet-v3-android-phone-evaluation.md`. That decision
+  affects installation size and first-run latency and is not settled by this
+  branch.
+- **The integrated app has not yet been validated on a device.** The recorded
+  accuracy and latency figures come from the standalone model harness, not from
+  the Daymark screen. Every physical-device gate in this list is still open, and
+  none of them may be closed by the standalone results.
 
 ## Evidence log
 

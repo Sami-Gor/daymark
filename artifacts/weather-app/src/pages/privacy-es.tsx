@@ -167,8 +167,13 @@ export default function PrivacyEs() {
           dispositivo; no se envían coordenadas a GeoNames.
         </li>
         <li>
-          Los servicios de voz de tu navegador o dispositivo — solo cuando utilizas las funciones de
-          voz opcionales.
+          El servicio de voz de tu navegador — solo en la aplicación web, y solo cuando utilizas las
+          funciones de voz opcionales. La aplicación Android reconoce el habla en tu dispositivo y no
+          contacta con ningún servicio de voz.
+        </li>
+        <li>
+          El modelo de voz Parakeet y el runtime sherpa-onnx, incluidos en la aplicación Android y
+          usados para reconocer el habla en tu dispositivo.
         </li>
       </ul>
       <p>
@@ -176,9 +181,15 @@ export default function PrivacyEs() {
         usados bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0).
       </p>
       <p>
+        Modelo de voz: <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3" target="_blank" rel="noreferrer">Parakeet TDT 0.6B v3</a> de
+        NVIDIA Corporation, usado bajo la licencia Creative Commons Attribution 4.0 International
+        (CC BY 4.0). Los pesos publicados se cuantizan a int8 para la inferencia en el dispositivo.
+      </p>
+      <p>
         Daymark no utiliza servicios externos de analítica, publicidad, píxeles de seguimiento ni
-        rastreo. Open-Meteo y las funciones de voz del navegador/dispositivo son servicios externos
-        utilizados para las funciones descritas arriba.
+        rastreo. Open-Meteo y el servicio de voz del navegador son servicios externos utilizados para
+        las funciones descritas arriba. En la aplicación Android, el reconocimiento de voz se ejecuta
+        en tu dispositivo.
       </p>
 
       <h2>Analíticas, publicidad y seguimiento</h2>
