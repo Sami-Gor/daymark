@@ -19,3 +19,28 @@ assetPack {
         deliveryType = "install-time"
     }
 }
+
+// The model is not committed. Fail with an actionable message rather than an
+// obscure packaging error when it has not been fetched.
+//
+// The check runs only when a task from this module is actually going to run,
+// so the debug build - which does not package the model - is unaffected.
+def modelFiles = [
+    "encoder.int8.onnx",
+    "decoder.int8.onnx",
+    "joiner.int8.onnx",
+    "tokens.txt",
+]
+gradle.taskGraph.whenReady { graph ->
+    def packaging = graph.allTasks.any { it.project == project }
+    if (!packaging) {
+        return
+    }
+    def modelDirectory = file("src/main/assets/parakeet")
+    def missing = modelFiles.findAll { !new File(modelDirectory, it).isFile() }
+    if (!missing.isEmpty()) {
+        throw new GradleException(
+            "The Parakeet model is missing: ${missing.join(', ')}. " +
+            "Run android/kokoro-poc/scripts/fetch-parakeet-assets.sh before building.")
+    }
+}

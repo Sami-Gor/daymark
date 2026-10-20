@@ -49,6 +49,13 @@ jobs:
       - name: Sync Capacitor Android project
         run: pnpm --filter @workspace/weather-app exec cap sync android
 
+      # The sherpa-onnx runtime is a compile-time dependency of the
+      # DaymarkVoice module: the Parakeet plugin imports its classes, so the
+      # build cannot compile without it. The runtime is not committed; it is
+      # fetched here and its checksum is verified by the script.
+      - name: Fetch the sherpa-onnx runtime
+        run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
+
       # Compile the native Android modules as well as the web layer. This
       # catches Java/API/manifest regressions in Capacitor plugin changes.
       # The committed JVM unit tests guard the minimum-WebView gate that
