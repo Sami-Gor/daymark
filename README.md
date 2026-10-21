@@ -136,7 +136,7 @@ The e2e suite runs against a production build served by `vite preview`, mocks Op
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for the web/PWA and Android posture. In short: minimal attack surface (12 runtime dependencies), API responses runtime-validated at the network boundary, a strict CSP for the hosted web/PWA (`default-src 'none'`, `script-src 'self'`), Android English narration generated on-device by the bundled Kokoro engine, and no secrets in the client. The installed Android WebView does not inherit the hosted site's HTTP security headers.
+See [SECURITY.md](SECURITY.md) for the web/PWA and Android posture, and [the weather-app security and privacy research](docs/security/README.md) for documented incidents, source links, and the controls they inform. In short: minimal attack surface (12 runtime dependencies), API responses runtime-validated at the network boundary, a strict CSP for the hosted web/PWA (`default-src 'none'`, `script-src 'self'`), Android English narration generated on-device by the bundled Kokoro engine, and no secrets in the client. The installed Android WebView does not inherit the hosted site's HTTP security headers.
 
 ## Project structure
 
