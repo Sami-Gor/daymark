@@ -28,6 +28,13 @@ Therefore:
 - Do not claim byte-identical output unless you have compared the files and
   accounted for this path dependency.
 
+> **Post-audit update (same day).** The two-build audit found that the app
+> bundle contained four ABIs because the prebuilt sherpa AAR was not filtered.
+> Commit `61e0d1f` adds an app-level `abiFilters "arm64-v8a"`. A final candidate
+> must contain **arm64-v8a only**; the four-ABI observations in section 7.3 are
+> the historical finding that led to that fix. The commit hashes in the example
+> commands identify the audited build; always build the current V2 head.
+
 ## 1. Clean-machine prerequisites
 
 Tested host: macOS 26.5.2 on Apple Silicon. The checked-in Kokoro build script
