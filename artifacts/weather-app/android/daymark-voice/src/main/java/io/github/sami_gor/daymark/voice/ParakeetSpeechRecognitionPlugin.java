@@ -15,7 +15,6 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
-import com.getcapacitor.annotation.PermissionCallback;
 
 import com.k2fsa.sherpa.onnx.FeatureConfig;
 import com.k2fsa.sherpa.onnx.HomophoneReplacerConfig;
@@ -53,6 +52,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 )
 public final class ParakeetSpeechRecognitionPlugin extends Plugin {
     private static final String TAG = "DaymarkParakeet";
+    private static final int MICROPHONE_REQUEST_CODE = 7311;
+    private static ParakeetSpeechRecognitionPlugin pendingPermissionPlugin;
+    private static PluginCall pendingPermissionCall;
 
     /** Sample rate the evaluated model was measured at. */
     private static final int SAMPLE_RATE = 16000;
@@ -61,7 +63,7 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
     /** 20 ms of audio per chunk. */
     private static final int CHUNK_SAMPLES = 320;
     /** Hard cap on a single utterance. */
-    private static final int MAX_CAPTURE_MS = 15000;
+    private static final int MAX_CAPTURE_MS = 30000;
     /** Root-mean-square amplitude at or above which a chunk counts as speech. */
     private static final float SPEECH_THRESHOLD = 0.02f;
     /** 60 ms of speech needed before the utterance is considered started. */
@@ -140,25 +142,45 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
         }
 
         if (getContext().checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionForAlias("microphone", call, "microphonePermissionsCallback");
+            requestMicrophonePermission(call);
             return;
         }
 
         beginCapture(call, sessionId);
     }
 
-    @PermissionCallback
-    private void microphonePermissionsCallback(PluginCall call) {
-        final int sessionId = call.getInt("sessionId", -1);
-        if (sessionId < 0) {
-            call.reject("invalid-session");
-            return;
-        }
-        if (getContext().checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+    private void requestMicrophonePermission(PluginCall call) {
+        android.app.Activity activity = (android.app.Activity) getContext();
+        if (activity == null) {
             call.reject("not-allowed");
             return;
         }
-        beginCapture(call, sessionId);
+        pendingPermissionPlugin = this;
+        pendingPermissionCall = call;
+        activity.requestPermissions(
+                new String[] { Manifest.permission.RECORD_AUDIO },
+                MICROPHONE_REQUEST_CODE);
+    }
+
+    /** Called from MainActivity's onRequestPermissionsResult. */
+    public static void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode != MICROPHONE_REQUEST_CODE) {
+            return;
+        }
+        ParakeetSpeechRecognitionPlugin plugin = pendingPermissionPlugin;
+        PluginCall call = pendingPermissionCall;
+        pendingPermissionPlugin = null;
+        pendingPermissionCall = null;
+        if (plugin == null || call == null) {
+            return;
+        }
+        if (grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            plugin.start(call);
+        } else {
+            call.reject("not-allowed");
+        }
     }
 
     @PluginMethod
@@ -514,6 +536,11 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        if (pendingPermissionCall != null) {
+            pendingPermissionCall.reject("offline-unavailable");
+            pendingPermissionCall = null;
+            pendingPermissionPlugin = null;
+        }
         synchronized (stateLock) {
             released = true;
         }

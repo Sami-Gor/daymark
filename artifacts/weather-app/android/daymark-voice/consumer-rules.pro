@@ -16,3 +16,11 @@
 -keepclassmembers class * extends com.getcapacitor.Plugin {
     @com.getcapacitor.PluginMethod <methods>;
 }
+
+# Capacitor dispatches permission results through a named @PermissionCallback
+# method. R8 must keep the callback's name and runtime annotation, or the
+# launcher lookup throws a NullPointerException when the permission is denied.
+-keepattributes *Annotation*
+-keepclassmembers class * extends com.getcapacitor.Plugin {
+    @com.getcapacitor.annotation.PermissionCallback <methods>;
+}
