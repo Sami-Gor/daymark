@@ -38,11 +38,13 @@ export function selectSpeechEngine({
   if (platform !== 'android') {
     return { engine: 'browser', reason: 'platform-not-android' };
   }
-  if (!nativeAvailable) {
-    return { engine: 'browser', reason: 'native-unavailable' };
-  }
+  // Non-English narration uses the platform TTS adapter, which is local-only;
+  // it must remain reachable even when the Kokoro engine failed to load.
   if (!isEnglish(lang)) {
     return { engine: 'browser', reason: 'non-english' };
+  }
+  if (!nativeAvailable) {
+    return { engine: 'browser', reason: 'native-unavailable' };
   }
   return { engine: 'kokoro', reason: 'native-english' };
 }

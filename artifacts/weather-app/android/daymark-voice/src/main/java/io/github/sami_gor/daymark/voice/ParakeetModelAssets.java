@@ -24,6 +24,14 @@ public final class ParakeetModelAssets {
         "tokens.txt",
     };
 
+    /** Exact byte lengths; a truncated or partial copy must be treated as corrupt. */
+    public static final long[] MODEL_FILE_SIZES = {
+        652184281L,
+        11845275L,
+        6355277L,
+        93939L,
+    };
+
     /** Directory inside the app's private files directory the model is materialised into. */
     public static final String MODEL_DIRECTORY = "parakeet-v3-model";
 

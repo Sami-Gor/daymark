@@ -121,6 +121,16 @@ public class SystemSpeechPlugin extends Plugin {
     }
 
     @Override
+    protected void handleOnPause() {
+        super.handleOnPause();
+        if (tts != null) {
+            tts.stop();
+        }
+        speaking = false;
+        resolvePending();
+    }
+
+    @Override
     protected void handleOnDestroy() {
         super.handleOnDestroy();
         resolvePending();

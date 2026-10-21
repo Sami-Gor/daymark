@@ -163,7 +163,7 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
         if (!handlesEvent(sessionId)) return;
         const finished = detachSession(sessionId);
         const message = error instanceof Error ? error.message : String(error ?? '');
-        const code = /permission/i.test(message) ? 'not-allowed'
+        const code = /permission|not-allowed/i.test(message) ? 'not-allowed'
           : /offline-unavailable|api-unsupported|model-missing|model-preparing|runtime-unavailable/i.test(message)
             ? 'offline-unavailable'
           : /cancel/i.test(message) ? 'aborted'

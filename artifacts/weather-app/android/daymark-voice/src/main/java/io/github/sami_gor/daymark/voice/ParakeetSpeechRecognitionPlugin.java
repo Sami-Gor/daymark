@@ -187,6 +187,10 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
                 call.reject("offline-unavailable");
                 return;
             }
+            if (activeSession != null) {
+                call.reject("session-busy");
+                return;
+            }
             activeSession = session;
         }
         // Resolve only once the microphone is actually running, so the interface
@@ -259,8 +263,9 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
             session.recorder = null;
 
             if (session.cancelled.get()) {
+                // cancel()/destroy already emitted the single aborted event for
+                // this session; do not emit a second, misleading error here.
                 samples.clear();
-                emitError(session.id, "aborted");
                 return;
             }
             if (!detector.hasSpeechStarted()) {
@@ -399,9 +404,10 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
 
     private boolean modelFilesPresent() {
         File directory = modelDirectory();
-        for (String fileName : ParakeetModelAssets.MODEL_FILE_NAMES) {
-            File file = new File(directory, fileName);
-            if (!file.isFile() || file.length() == 0L) {
+        for (int index = 0; index < ParakeetModelAssets.MODEL_FILE_NAMES.length; index++) {
+            File file = new File(directory, ParakeetModelAssets.MODEL_FILE_NAMES[index]);
+            if (!file.isFile()
+                    || file.length() != ParakeetModelAssets.MODEL_FILE_SIZES[index]) {
                 return false;
             }
         }
@@ -418,10 +424,15 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
             throw new IOException("cannot create the model directory");
         }
         AssetManager assets = getContext().getAssets();
-        for (String fileName : ParakeetModelAssets.MODEL_FILE_NAMES) {
+        for (int index = 0; index < ParakeetModelAssets.MODEL_FILE_NAMES.length; index++) {
+            String fileName = ParakeetModelAssets.MODEL_FILE_NAMES[index];
+            long expected = ParakeetModelAssets.MODEL_FILE_SIZES[index];
             File target = new File(directory, fileName);
-            if (target.isFile() && target.length() > 0L) {
+            if (target.isFile() && target.length() == expected) {
                 continue;
+            }
+            if (target.exists() && !target.delete()) {
+                throw new IOException("cannot remove a partial model file");
             }
             try (InputStream input = assets.open(ParakeetModelAssets.assetPath(fileName));
                  FileOutputStream output = new FileOutputStream(target)) {
@@ -430,6 +441,9 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
                 while ((read = input.read(buffer)) >= 0) {
                     output.write(buffer, 0, read);
                 }
+            }
+            if (target.length() != expected) {
+                throw new IOException("model file length mismatch after copy");
             }
         }
     }
