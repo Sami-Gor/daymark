@@ -9,7 +9,7 @@ android {
     assetPacks = [":parakeet-assets"]
 
     defaultConfig {
-        applicationId "io.github.sami_gor.daymark"
+        applicationId (project.findProperty("daymarkApplicationId") ?: "io.github.sami_gor.daymark")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

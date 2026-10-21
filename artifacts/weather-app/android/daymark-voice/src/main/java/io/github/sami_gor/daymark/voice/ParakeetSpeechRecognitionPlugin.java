@@ -1,14 +1,15 @@
 package io.github.sami_gor.daymark.voice;
 
 import android.Manifest;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.SystemClock;
+import android.util.Log;
 
 import com.getcapacitor.JSObject;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -23,6 +24,7 @@ import com.k2fsa.sherpa.onnx.OfflineRecognizer;
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig;
 import com.k2fsa.sherpa.onnx.OfflineStream;
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig;
+import com.k2fsa.sherpa.onnx.QnnConfig;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -50,6 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
     permissions = @Permission(alias = "microphone", strings = { Manifest.permission.RECORD_AUDIO })
 )
 public final class ParakeetSpeechRecognitionPlugin extends Plugin {
+    private static final String TAG = "DaymarkParakeet";
 
     /** Sample rate the evaluated model was measured at. */
     private static final int SAMPLE_RATE = 16000;
@@ -136,7 +139,7 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
             }
         }
 
-        if (getPermissionState("microphone") != PermissionState.GRANTED) {
+        if (getContext().checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissionForAlias("microphone", call, "microphonePermissionsCallback");
             return;
         }
@@ -151,7 +154,7 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
             call.reject("invalid-session");
             return;
         }
-        if (getPermissionState("microphone") != PermissionState.GRANTED) {
+        if (getContext().checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             call.reject("not-allowed");
             return;
         }
@@ -371,6 +374,7 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
                     unavailableReason = "";
                 }
             } catch (Throwable error) {
+                Log.e(TAG, "prepareModel failed", error);
                 synchronized (stateLock) {
                     modelReady = false;
                     unavailableReason = ParakeetModelAssets.REASON_RUNTIME_UNAVAILABLE;
@@ -436,7 +440,7 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
                 new File(directory, "encoder.int8.onnx").getAbsolutePath(),
                 new File(directory, "decoder.int8.onnx").getAbsolutePath(),
                 new File(directory, "joiner.int8.onnx").getAbsolutePath(),
-                null);
+                new QnnConfig());
 
         OfflineModelConfig model = new OfflineModelConfig();
         model.setTransducer(transducer);

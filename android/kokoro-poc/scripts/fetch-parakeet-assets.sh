@@ -14,7 +14,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$HERE/../../.."
-ASSETS="$REPO/artifacts/weather-app/android/app/src/main/assets/parakeet"
+ASSETS="$REPO/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet"
 
 ARCHIVE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
 ARCHIVE_SHA256="5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
