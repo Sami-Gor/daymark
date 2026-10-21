@@ -15,10 +15,15 @@ on:
     branches: [main]
   pull_request:
     paths:
+      # The Gradle project, including daymark-voice/, parakeet-assets/ and
+      # every module and wrapper Gradle file.
       - 'artifacts/weather-app/android/**'
       - 'artifacts/weather-app/package.json'
       - 'artifacts/weather-app/capacitor.config.ts'
       - 'artifacts/weather-app/public/**'
+      # The native runtime and Parakeet model are fetched, not committed, so
+      # a change to a fetch script or its pinned URL/checksum must rebuild.
+      - 'android/kokoro-poc/scripts/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/android-ci.yml'
 
