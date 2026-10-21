@@ -49,7 +49,7 @@ narration voice; `bm_george` was the initial pick and is no longer bundled.
 ## Build
 
 ```bash
-# 1. assets (build-time download only; the app never downloads)
+# 1. assets (build-time download only; the app never downloads the model or voice)
 android/kokoro-poc/scripts/fetch-kokoro-assets.sh
 
 # 2. native library (clones the pinned crate into .build/, cross-compiles with the NDK)

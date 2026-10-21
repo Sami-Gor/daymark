@@ -125,6 +125,32 @@ state that server logs can contain geographical coordinates and are kept up to
 coordinates are transmitted. Validate the final Data safety answers against
 the shipped code and provider behaviour.
 
+## Data safety reconciliation — 21 October 2026
+
+The Play Console dashboard was not accessible read-only from the audit
+environment; the public storefront and its Data safety page were readable. On
+21 October 2026 the public form declared **No data shared**, and listed
+**Approximate location**, **Voice or sound recordings** and **In-app search
+history**, all Optional / App functionality, with encryption in transit and
+"Data can't be deleted". It did not list Precise location.
+
+That does not match the released v1.0.0 code, which declares
+`ACCESS_FINE_LOCATION` and sends a two-decimal coordinate (below Play's 3 km²
+threshold). Either the live answer is wrong for the released build, or v1.0.0
+has been withdrawn from distribution; the public listing does not expose the
+track contents or the highest version code. The live form's "No data shared"
+answer also depends on Play's user-initiated-action exception for the
+Open-Meteo transfer; that analysis is not recorded in the Console export
+because no export is available. The field-by-field proposal, the full matrix
+and the open manual decisions are in
+[`data-safety-v1-v2.md`](data-safety-v1-v2.md).
+
+The live privacy page was also checked: on 21 October 2026 it still showed the
+11 September 2026 policy text, not the V2 wording in this branch. The source
+pages are therefore ahead of both the website and the shipped AAB. Do not
+describe the V2 policy as published until the website is deployed and a
+matching Android bundle is released.
+
 ## Release gates
 
 - [x] CI typecheck, build, unit tests and browser tests pass on the PR.
@@ -217,10 +243,11 @@ the shipped code and provider behaviour.
       which now state that Android speech input is transcribed on-device by the
       bundled Parakeet model, distinguish the Android app from the web/PWA
       browser-speech path, disclose that typed geocoding/weather requests and
-      approximate location are sent to Open-Meteo, and state the
-      installed-offline-voice constraint for French/Spanish narration. Those
-      source edits are not published and are not in a shipped AAB, so this gate
-      remains open.
+      approximate location are sent to Open-Meteo, state the
+      installed-offline-voice constraint for French/Spanish narration, and carry
+      a version note for 1.0.0 users. Those source edits are not published and
+      are not in a shipped AAB: the live page still showed the 11 September 2026
+      text on 21 October 2026. This gate remains open.
 - [ ] Re-check the Play Data safety form against Play's multi-version rule.
       The Data safety section describes the **sum** of data collection and
       sharing across **all versions currently distributed** on Google Play.
@@ -283,4 +310,5 @@ still has to be proved:
 | Local build/test execution in this environment | Done 2026-10-15: full unit suite green (20 files, 249 tests, incl. new offline-unavailable and failure-message coverage); debug `.v2test` APK built and verified by package ID. The 249-test figure includes the two local, uncommitted test files; the **committed** branch runs 19 files / 244 unit tests plus 153 browser tests. |
 | GitHub Actions CI and CodeQL | Completed — success on branch head `fe18893` (2026-10-19): `verify`, CodeQL `analyze`, and the GitLab mirror all succeeded. PR #36 checks reflect the pushed head. |
 | Physical-device verification (device `Nothing A059P` running Android 16, test package `...v2test`, production untouched, connectivity restored) | Approximate location: passed after transient `POSITION_UNAVAILABLE` (fix delivered, local weather shown). Offline Ask: response produced (rain answer narrated), transcript not independently captured. English Kokoro offline: passed (~7.6 s cold-start first buffer). FR/ES offline voices, on-device unavailable scenario, and packet-level capture: untested/outstanding |
+| Data safety / public Play audit (2026-10-21) | Public listing and Data safety page read; Console dashboard not accessible read-only; live `/privacy` still shows the 11 September 2026 text. The public form lists Approximate location only and says no data is shared; both need reconciliation against v1.0.0's two-decimal precise fix and Open-Meteo's independent-controller/90-day-log position. No Console or website changes were made. Details: `data-safety-v1-v2.md`. |
 | Play Console / AAB / deployment | Intentionally unchanged |

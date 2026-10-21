@@ -120,7 +120,7 @@ be closed by the standalone results.
 | Shortcoming of the experiment | Change |
 |---|---|
 | Availability was reported unconditionally, so the control claimed to work on a device with no model | Availability now reflects whether the model is present and the recogniser could be built. The reasons are `model-missing`, `model-preparing` and `runtime-unavailable`. |
-| A fixed 20-second capture window, so every request took the full window | An energy-based endpoint: the utterance ends after speech followed by a short quiet period, with a 15-second hard cap. |
+| A fixed 20-second capture window, so every request took the full window | An energy-based endpoint: the utterance ends after speech followed by a short quiet period, with a 30-second hard cap (`MAX_CAPTURE_MS` in `ParakeetSpeechRecognitionPlugin`). |
 | The recogniser logged the recognised transcript | No audio or transcript is logged or written to storage; the plugin emits no recognition-payload log line. |
 | A stale transcript could still reach the interface after cancellation | The session is invalidated on cancel and on lifecycle exit, and the result is only delivered for the session that is still active. |
 | The recorder was not released on the error path | The recorder, the stream and the audio buffer are released on every path. |

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Downloads the pinned Parakeet TDT 0.6B v3 (int8) model into the Android
-# app. Build-time only; the app itself never downloads anything.
+# app. Build-time only; the app itself never downloads the model or runtime
+# (weather and place-search requests are separate network flows).
 #
 # The model is what Daymark V2 uses for on-device speech-to-text, through
 # sherpa-onnx. It is the model that was evaluated on a physical device; see

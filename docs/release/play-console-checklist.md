@@ -4,14 +4,23 @@ Companion to [`android-production-readiness.md`](android-production-readiness.md
 (§2 Play requirements, §3 Asset Links, §10 data map, §20 matrix, §21 release
 sequence).
 
-**Status (13 October 2026):** The maintainer reports that Daymark has moved to
-production. That production status is **maintainer-reported**: this repository
-holds no Play Console export, rollout record or store-listing capture that
-independently verifies it, and the assertions below about completed Console
-actions carry the same status. The website deployment, by contrast, is
-independently verifiable — see §6. When the Console is next checked, record the
-result and date here so the status stops being an assertion. Remaining work in this checklist is post-release housekeeping: correct
-the Data safety declaration if it does not describe the shipped behaviour, and
+**Status (21 October 2026):** The maintainer reports that Daymark has moved to
+production. The public Play storefront was readable on this date, but the
+**Play Console dashboard was not accessible read-only** — `play.google.com/console`
+redirected to the public marketing page and no signed-in session was present.
+This repository therefore holds no Console export or rollout record. The public
+listing says "Updated on Oct 20, 2026", shows 10+ downloads and PEGI 3, and its
+Data safety page declares Approximate location, Voice or sound recordings and
+In-app search history, all Optional / App functionality, with **no data shared**
+and **data can't be deleted**. See
+[`data-safety-v1-v2.md`](data-safety-v1-v2.md) for the field-by-field
+reconciliation and the evidence that the released 1.0.0 sends a two-decimal
+coordinate that appears to qualify as **Precise location**. The highest uploaded
+version code is not visible on the public listing; record it from the Console
+when access is available. The website deployment, by contrast, is
+independently verifiable — see §6. Remaining work in this checklist is
+post-release housekeeping: correct the Data safety declaration if it does not
+describe the shipped behaviour, and
 check the existing Digital Asset Links endpoint if verified website links are
 expected to open the app. Core physical-device testing is already complete;
 the wider matrix is optional additional QA, not a requirement to repeat it.
@@ -99,6 +108,17 @@ Play Console → **Policy and programs → App content**. All rows completed:
 | Voice-output text | Android English uses bundled local Kokoro; web uses browser speech synthesis; Android French/Spanish use native Android system TTS, and the v2 candidate selects only an installed voice that does not require a network connection | Keep English Android output local. For the web, check the actual selected speech provider. For the v2 Android French/Spanish path, no network voice is selected and the narration fails explicitly if no offline voice is installed. If forecast/location text is transmitted off-device on the web, include the affected data type and purpose; do not assume provider processing is ephemeral without evidence. |
 | App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
 | Analytics / crash logs | No in-app analytics/crash SDK found in repo | Confirm existing answers remain accurate |
+
+**Live public form (21 October 2026):** the storefront Data safety page says
+**No data shared**, and declares **Approximate location**, **Voice or sound
+recordings** and **In-app search history**, all Optional / App functionality,
+encrypted in transit, and **data can't be deleted**. It does **not** declare
+Precise location. That is inconsistent with the released v1.0.0 evidence in the
+Location row above, which sends a two-decimal fix below Play's 3 km² threshold.
+The live form also needs a recorded user-initiated-action analysis for the
+Open-Meteo transfer before "No data shared" can be relied on. Do not change the
+Console until the current track contents and the legal position are confirmed;
+see [`data-safety-v1-v2.md`](data-safety-v1-v2.md).
 
 - [ ] **Multi-version rule.** Play's Data safety section describes the **sum**
       of an app's data collection and sharing across **all versions currently
@@ -262,15 +282,17 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 - [ ] **Privacy-policy publication sync:** the three policy source pages now state
       the Android on-device Parakeet path, distinguish it from the web/PWA
       browser-speech path, disclose that approximate location and typed
-      geocoding/weather requests are sent to Open-Meteo, and state the
-      French/Spanish installed-offline-voice constraint. Those edits are not
-      live and are not in the already-uploaded AAB. Before using this revised
-      wording, deploy the web build and rebuild the Android bundle so the
-      bundled policy matches. Increment `versionCode`
-      to the next unused value (expected `2` if `1` is still the latest upload),
-      confirm the three policy pages match and set the effective date to the
-      actual publication date. Do not claim the revised wording is live before
-      the website deployment and Android release are complete.
+      geocoding/weather requests are sent to Open-Meteo, state the
+      French/Spanish installed-offline-voice constraint, and carry a version
+      note for 1.0.0 users. Those edits are not live: the live `/privacy` page
+      still showed the 11 September 2026 text on 21 October 2026, and the edits
+      are not in the already-uploaded AAB. Before using this revised wording,
+      deploy the web build and rebuild the Android bundle so the bundled policy
+      matches. Increment `versionCode` to the next unused value (expected `2` if
+      `1` is still the latest upload), confirm the three policy pages match and
+      set the effective date (and the "last updated" date) to the actual
+      publication date. Do not claim the revised wording is live before the
+      website deployment and Android release are complete.
 - [ ] Never remove fingerprints from `assetlinks.json` (sideload verification
       breaks); replace only if you rotate a key.
 - [ ] If the origin changes, update the intent filter host in

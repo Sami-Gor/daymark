@@ -9,7 +9,7 @@ column is the `v2/privacy-hardened-voice` branch, which is **not released**.
 
 | Component | Version | Licence | Redistributed in | Notes |
 |---|---|---|---|---|
-| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. **Modified:** the published weights are quantised to int8 for on-device inference; the quantisation is Daymark's change. Attribution and licence link below. |
+| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (Android AAR) | 1.13.8 | **Apache-2.0** | V2 candidate (Android) | Fetched at build time by `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` from the [v1.13.8 release](https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar), SHA-256 `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96`. Contains the sherpa-onnx JNI libraries and, in turn, the ONNX Runtime libraries below. |
 | [ONNX Runtime](https://github.com/microsoft/onnxruntime) (bundled in the sherpa-onnx AAR) | 1.18.1 (as shipped in the AAR) | **MIT** | V2 candidate (Android) | `libonnxruntime.so` and the sherpa JNI libraries, arm64-v8a only. |
 | [pguso/kokoro](https://github.com/pguso/kokoro) runtime | `kokoro-en` 0.1.5, commit `b42bd5cf915163607cb51984cabf273dcf09755e` | Apache-2.0 | v1.0.0 and V2 candidate | `android/kokoro-poc/README.md` has the full build and licence matrix. |
@@ -26,13 +26,14 @@ column is the `v2/privacy-hardened-voice` branch, which is **not released**.
 ## Attribution required by CC BY 4.0
 
 The Parakeet model weights are redistributed under CC BY 4.0, which requires
-attribution, a licence link, and an indication of changes.
+attribution and a licence link; an indication of changes is also required if
+the redistributed weights are modified.
 
 > **Parakeet TDT 0.6B v3** — model weights by NVIDIA Corporation, licensed under
 > the [Creative Commons Attribution 4.0 International Licence](https://creativecommons.org/licenses/by/4.0/).
 > Source: <https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3>.
-> **Changes:** the published weights are quantised to int8 for on-device
-> inference, and are redistributed unmodified otherwise.
+> **Form:** the redistributed files are the pre-quantised int8 ONNX export
+> published by the sherpa-onnx project; Daymark does not modify the weights.
 > Used in Daymark for on-device speech-to-text through
 > [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache-2.0).
 

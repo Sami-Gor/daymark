@@ -65,7 +65,7 @@ The design is editorial rather than dashboard-like — a serif-led hero with a p
 Daymark is a **client-side single-page app + PWA**. There is:
 
 - **No backend, no database, no server code** — the repository ships static files only
-- **No user accounts, no ads, no analytics, no telemetry, no cookies**
+- **No user accounts, no ads, no in-app analytics or telemetry, no cookies**
 - One workspace package that matters: `artifacts/weather-app` (plus `artifacts/mockup-sandbox`, a local-only design tool that is never deployed)
 
 All weather logic lives in [`artifacts/weather-app/src/lib/weather.ts`](artifacts/weather-app/src/lib/weather.ts): typed Open-Meteo clients, permissive-but-strict Zod schemas at the network boundary, 10-second fetch timeouts, and the formatting/categorisation helpers. Building on that: `weather-alerts.ts` is a pure forecast-risk engine, `weather-intents.ts` is a language-independent intent/response layer shared by voice, `i18n.ts` + `locales/` hold the typed translations, and `voice-browser.ts` / `voice-input-browser.ts` are framework-free browser speech adapters. UI components live in `src/components/weather/`.
@@ -141,7 +141,7 @@ A signed release build additionally needs `artifacts/weather-app/android/keystor
 which is gitignored and must never be committed. Without the two Kokoro steps the
 app still builds, but English narration is unavailable at runtime.
 
-Release: package `io.github.sami_gor.daymark` (versionCode 1 / versionName 1.0.0). See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
+Release: package `io.github.sami_gor.daymark` (released v1.0.0: versionCode 1 / versionName 1.0.0; V2 candidate on this branch: versionCode 2 / versionName 2.0.0). See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
 
 ## Test
 

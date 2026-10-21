@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Downloads the pinned sherpa-onnx Android runtime into the DaymarkVoice plugin
-# module. Build-time only; the app itself never downloads anything.
+# module. Build-time only; the app itself never downloads the model or runtime
+# (weather and place-search requests are separate network flows).
 #
 # sherpa-onnx runs the Parakeet TDT 0.6B v3 int8 model on the device. The
 # runtime is not committed; the module's abiFilters keep only the arm64-v8a

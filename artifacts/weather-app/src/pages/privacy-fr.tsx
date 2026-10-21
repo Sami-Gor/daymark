@@ -2,10 +2,11 @@ import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
 
 /*
  * French privacy policy (/fr/privacy). Meaning-for-meaning translation of the
- * English policy: same data practices, same Daymark-vs-third-party
- * distinction, same platform-specific voice-processing caveat. Forecast loading
- * includes the default place on app open; optional location and voice flows are
- * separate. No stronger or weaker claims.
+ * English 2.0.0 policy, including its version note and its Daymark-vs-third-party
+ * distinction; platform-specific voice processing is stated explicitly.
+ * Forecast loading includes the default place on app open; optional location
+ * and voice flows are separate. No stronger or weaker claims than the English
+ * page.
  */
 
 export default function PrivacyFr() {
@@ -17,13 +18,26 @@ export default function PrivacyFr() {
       brandNote="Politique de confidentialité"
       backLabel="← Retour à la météo"
       switcherLabel="Langue de la politique"
-      effectiveText="Date d’entrée en vigueur : 11 octobre 2026"
+      effectiveText="Date d’entrée en vigueur : 11 octobre 2026 · Dernière mise à jour : 21 octobre 2026"
       tagline="Daymark — la météo, simplement"
     >
       <p>
         Daymark est une application météo qui fonctionne entièrement dans votre navigateur ou en tant
         qu&rsquo;application installée. Cette politique explique, en termes simples, quelles
         informations sont concernées lorsque vous l&rsquo;utilisez.
+      </p>
+
+      <h2>Versions de Daymark</h2>
+      <p>
+        Cette politique décrit Daymark 2.0.0 et la version web/PWA actuelle. Daymark 1.0.0, qui peut
+        encore être installée sur un appareil ou disponible jusqu&rsquo;à son remplacement, se
+        comporte différemment sur trois points. Sur Android, elle demandait la localisation précise
+        (<code>ACCESS_FINE_LOCATION</code> en plus d&rsquo;<code>ACCESS_COARSE_LOCATION</code>) et
+        arrondissait les coordonnées à deux décimales avant de les envoyer à Open-Meteo. Ask Daymark
+        utilisait la reconnaissance vocale du navigateur ou de la WebView décrite ci-dessous, et non
+        le modèle Parakeet intégré. Sur Android, la narration en français et en espagnol pouvait
+        utiliser la voix de synthèse par défaut de l&rsquo;appareil, qui peut nécessiter une connexion
+        réseau. Si vous utilisez Daymark 1.0.0, ces comportements s&rsquo;appliquent.
       </p>
 
       <h2>Qui exploite Daymark</h2>
@@ -35,7 +49,7 @@ export default function PrivacyFr() {
       <h2>L&rsquo;essentiel</h2>
       <ul>
         <li>Daymark n&rsquo;a ni comptes utilisateur ni base de données, et n&rsquo;exploite pas son propre backend ni serveur d&rsquo;application pour les comptes, l&rsquo;analyse d&rsquo;audience, le stockage ou l&rsquo;historique.</li>
-        <li>Daymark n&rsquo;utilise ni analyse d&rsquo;audience, ni publicité, ni suivi.</li>
+        <li>L&rsquo;application Daymark n&rsquo;intègre aucun SDK d&rsquo;analyse d&rsquo;audience, de publicité ou de suivi.</li>
         <li>
           Daymark ne conserve pas lui-même votre localisation, vos recherches, votre voix ou
           l&rsquo;historique météo.
@@ -144,8 +158,8 @@ export default function PrivacyFr() {
       <p>
         Dans l’application Android installée, la reconnaissance s’exécute entièrement sur votre
         appareil : le modèle vocal Parakeet TDT 0.6B v3, intégré à l’application, transcrit votre parole
-        localement via le runtime sherpa-onnx. Votre audio n’est envoyé ni à un service vocal ni à
-        Daymark. La transcription est conservée en mémoire uniquement ;
+        localement via le runtime sherpa-onnx. Daymark n’envoie pas votre audio à un service vocal ni à
+        un serveur Daymark. La transcription est conservée en mémoire uniquement ;
         Daymark n’enregistre ni ne conserve votre audio vocal ni vos transcriptions.
       </p>
       <p>
@@ -156,15 +170,17 @@ export default function PrivacyFr() {
         l’audio ; le navigateur lui transmet une transcription pour qu’il puisse répondre à la
         question, et Daymark la conserve en mémoire sans l’enregistrer. Le comportement de la saisie
         vocale diffère donc entre l’application Android et la version web/PWA, et cette politique
-        décrit les deux.
+        décrit les deux. Dans Daymark 1.0.0, l’application Android utilisait aussi ce parcours
+        navigateur/WebView ; la même mise en garde sur le fournisseur s’y appliquait.
       </p>
 
       <h2>Sortie vocale (Hear today)</h2>
       <p>
         « Hear today » lit le bulletin à voix haute. Dans l’application Android, la narration en anglais
         est générée sur l’appareil par le modèle Kokoro intégré. Le français et l’espagnol utilisent une
-        voix de synthèse vocale Android installée, mais uniquement une voix qui ne nécessite pas de
-        connexion réseau. Si aucune voix hors ligne de ce type n’est installée, Daymark signale que la
+        voix de synthèse vocale Android installée, et Daymark ne sélectionne qu’une voix qui ne nécessite
+        pas de connexion réseau ; le texte de narration est transmis à cette voix installée sur votre
+        appareil. Si aucune voix hors ligne de ce type n’est installée, Daymark signale que la
         narration est indisponible au lieu d’utiliser une voix réseau ou un autre service vocal. Dans la
         version web, la narration utilise l’API de synthèse vocale du navigateur, qui peut employer une
         voix locale ou distante selon le navigateur et les réglages. Daymark n’exploite aucun serveur
@@ -207,6 +223,13 @@ export default function PrivacyFr() {
           et espagnole sur Android utilise uniquement une voix système installée et disponible hors ligne.
         </li>
         <li>
+          Cloudflare Pages — hébergement statique de la version web/PWA. Cloudflare diffuse le site et
+          traite les métadonnées de requête standard, telles que l&rsquo;adresse IP, l&rsquo;URL
+          demandée et l&rsquo;agent utilisateur, pour la diffusion, la sécurité et la prévention des
+          abus, conformément à sa
+          <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noreferrer">politique de confidentialité</a>.
+        </li>
+        <li>
           Le modèle vocal Parakeet et le runtime sherpa-onnx, inclus dans l&rsquo;application Android
           et utilisés pour reconnaître la parole sur votre appareil.
         </li>
@@ -221,16 +244,19 @@ export default function PrivacyFr() {
         (CC BY 4.0). Les poids publiés sont quantifiés en int8 pour l&rsquo;inférence sur l&rsquo;appareil.
       </p>
       <p>
-        Daymark n’utilise pas de services tiers d’analyse d’audience, de publicité, de pixels de
-        suivi ou de traçage. Open-Meteo est utilisé pour la météo et la recherche de lieux ;
-        l&rsquo;application web utilise les fonctions vocales du navigateur, et la narration française
-        et espagnole sur Android utilise des voix Android installées et disponibles hors ligne.
+        L&rsquo;application Daymark n&rsquo;intègre pas de services tiers d&rsquo;analyse
+        d&rsquo;audience, de publicité, de pixels de suivi ni de SDK de traçage. Open-Meteo est utilisé
+        pour la météo et la recherche de lieux ; l&rsquo;application web utilise les fonctions vocales
+        du navigateur, et la narration française et espagnole sur Android utilise des voix Android
+        installées et disponibles hors ligne.
       </p>
 
       <h2>Analyse d&rsquo;audience, publicité et suivi</h2>
       <p>
-        Daymark n&rsquo;en contient aucun. Il n&rsquo;y a ni outils d&rsquo;analyse, ni publicité, ni
-        traqueurs, ni télémétrie.
+        L&rsquo;application Daymark n&rsquo;intègre ni outils d&rsquo;analyse, ni publicité, ni
+        traqueurs, ni SDK de télémétrie. L&rsquo;hébergeur de la version web/PWA traite les
+        métadonnées de requête standard pour la diffusion et la sécurité, comme décrit dans la section
+        Services tiers.
       </p>
 
       <h2>Durée de conservation</h2>
@@ -247,9 +273,10 @@ export default function PrivacyFr() {
       <p>
         La version web/PWA hébergée est servie via HTTPS et utilise la politique de sécurité du
         contenu configurée sur le site. L’application Android installée charge des ressources locales
-        intégrées ; les en-têtes de sécurité HTTP du site ne s’appliquent pas dans sa WebView.
-        L’application est un ensemble de fichiers statiques, sans secrets ni backend ou serveur
-        d’application exploité par Daymark.
+        intégrées ; les en-têtes de sécurité HTTP du site ne s’appliquent pas dans sa WebView, mais la
+        page intégrée contient une balise meta Content-Security-Policy équivalente. L’application est
+        un ensemble de fichiers statiques, sans secrets ni backend ou serveur d’application exploité
+        par Daymark.
       </p>
 
       <h2>Traitement international</h2>

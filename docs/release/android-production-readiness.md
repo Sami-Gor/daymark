@@ -370,6 +370,7 @@ made that the extended soak was completed; it is not a blanket release gate.
 | Analytics | none | — | — | — | — |
 | Crash reports | none in-app | — | — | — | — |
 | App logs | Instrumentation | logcat only | No | — | Device log buffer |
+| Web/PWA hosting metadata | Browser request | Cloudflare Pages (web/PWA only) | Deliver the static site and protect it | Cloudflare's own policy; not controlled by Daymark | Yes: IP address, requested URL and user agent | Web/PWA only; not a Play artifact |
 | Approximate device location (**v2 candidate**) | Android approximate fix after user action | Not stored by Daymark after request | Sent unmodified; no additional rounding | Open-Meteo (forecast, air quality) | Provider-side logging applies |
 | Grid-snapped device location (**v2 candidate**, web/PWA) | Device coordinates after user action | Not stored by Daymark after request | Snapped to a 0.025-degree grid on the device | Open-Meteo (forecast, air quality) | Provider-side logging applies |
 

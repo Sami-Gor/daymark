@@ -2108,6 +2108,8 @@ test.describe('privacy policy page', () => {
         leavesDevice: 'leave your device and are sent to Open-Meteo',
         offlineVoice: 'does not require a network connection',
         audience: 'general-audience weather utility',
+        versionNote: 'Daymark 1.0.0',
+        precisePermission: 'ACCESS_FINE_LOCATION',
       },
       fr: {
         location: 'demande uniquement une localisation approximative',
@@ -2118,6 +2120,8 @@ test.describe('privacy policy page', () => {
         leavesDevice: 'quittent votre appareil et sont envoyés à Open-Meteo',
         offlineVoice: 'ne nécessite pas de connexion réseau',
         audience: 'grand public',
+        versionNote: 'Daymark 1.0.0',
+        precisePermission: 'ACCESS_FINE_LOCATION',
       },
       es: {
         location: 'solicita únicamente ubicación aproximada',
@@ -2128,6 +2132,8 @@ test.describe('privacy policy page', () => {
         leavesDevice: 'salen de tu dispositivo y se envían a Open-Meteo',
         offlineVoice: 'no requiera conexión de red',
         audience: 'público general',
+        versionNote: 'Daymark 1.0.0',
+        precisePermission: 'ACCESS_FINE_LOCATION',
       },
     } as const;
     for (const policy of policies) {
@@ -2146,6 +2152,8 @@ test.describe('privacy policy page', () => {
       expect(text).toContain(expectations[policy.lang].leavesDevice);
       expect(text).toContain(expectations[policy.lang].offlineVoice);
       expect(text).toContain(expectations[policy.lang].audience);
+      expect(text).toContain(expectations[policy.lang].versionNote);
+      expect(text).toContain(expectations[policy.lang].precisePermission);
       expect(text).not.toMatch(/collects? no data/i);
     }
   });
