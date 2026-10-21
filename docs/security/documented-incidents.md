@@ -40,19 +40,23 @@ CERT Polska reported that version 7.0.0.037 of the pre-installed com.rlk.weather
 
 Source: [CERT Polska advisory for CVE-2024-12993](https://cert.pl/en/posts/2024/12/CVE-2024-12993/).
 
-## 4. AccuWeather and the Reveal Mobile SDK — location-data controversy
+## 4. AccuWeather and the Reveal Mobile SDK — location-data controversy and legal complaint
 
 **Classification:** Privacy and SDK data-handling controversy; not established as an external breach.
 
-In 2017, reporting on a researcher's analysis raised concerns about data transmitted by the AccuWeather iOS app and the Reveal Mobile SDK, including data that could be used to infer location. AccuWeather and Reveal Mobile disputed parts of the characterization and said that GPS coordinates were not collected or passed after a user opted out; Reveal said it would change its SDK behavior to avoid sending signals that could be used to infer location in that situation.
+In 2017, a researcher's analysis and media coverage raised concerns about data transmitted by the AccuWeather iOS app and the Reveal Mobile SDK, including Wi-Fi router identifiers and other signals that could be used to infer location. AccuWeather and Reveal Mobile disputed parts of the characterization and said that GPS coordinates were not collected or passed after a user opted out; Reveal said it would change SDK behavior to avoid sending signals that could be used to infer location in that situation.
 
-**What it shows:** A privacy review needs to examine SDK behavior and what data can be inferred—not just whether an app directly reads GPS coordinates.
+In March 2018, the Electronic Privacy Information Center (EPIC) filed a consumer-protection lawsuit against AccuWeather in DC Superior Court. **EPIC alleged** that the app tracked location despite users opting out and failed to disclose certain sharing of location data with third parties for advertising. These are allegations in a complaint, not a court finding reproduced here. In November 2019, EPIC reported that AccuWeather had changed its practices, including separating controls for app functionality from advertising and other non-functional uses.
 
-**Important qualification:** The reporting included responses disputing the initial interpretation. It should be described as a contested data-handling controversy, not a proven breach or settled finding of wrongdoing.
+**What it shows:** A privacy review needs to examine SDK behavior, Wi-Fi-derived location signals, and what data can be inferred—not just whether an app directly reads GPS coordinates. It also shows why allegations, company responses, and later changes should be recorded separately.
+
+**What it does not show:** This should not be described as an external hacker breaching AccuWeather, nor should EPIC's allegations be presented as a judicial finding.
 
 Sources:
 - [TechCrunch coverage and company response](https://techcrunch.com/2017/08/22/accuweather-revealmobile-ios/)
 - [9to5Mac coverage and company responses](https://9to5mac.com/2017/08/21/accuweather-app-sends-location-data-when-denied-access/)
+- [EPIC v. AccuWeather — case summary and complaint](https://epic.org/documents/epic-v-accuweather/)
+- [EPIC's 2019 account of changed tracking practices](https://epic.org/following-epic-suit-accuweather-changes-location-tracking-practices/)
 
 ## 5. Apple platform location disclosures — CVE identifiers need careful attribution
 
@@ -66,4 +70,4 @@ Sources:
 
 This page summarizes selected public sources, not an independent forensic examination. Before making stronger claims, verify the original advisory, affected versions, patch status, and the precise behavior described. Where a source is a company security vendor or media report rather than a regulator or software vendor, that distinction should remain visible.
 
-The defensible conclusion is limited: documented cases justify attention to location privacy, dependency behavior, component access control, and secure content handling. They do not justify blanket claims that weather apps are inherently dangerous or commonly used to take over phones.
+The absence of a public exploitation report is not proof that exploitation never occurred. The defensible conclusion is limited: documented cases justify attention to location privacy, dependency behavior, component access control, and secure content handling. They do not justify blanket claims that weather apps are inherently dangerous or commonly used to take over phones.
