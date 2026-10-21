@@ -15,6 +15,13 @@ android {
         versionCode 2
         versionName "2.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // The shipped native stack is arm64-only: Kokoro JNI is arm64-only, and
+        // the prebuilt sherpa AAR otherwise contributes armeabi-v7a/x86/x86_64
+        // libraries that cannot run the voice engine. Restrict every ABI here
+        // so the app bundle cannot install a partially native-compatible build.
+        ndk {
+            abiFilters "arm64-v8a"
+        }
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
