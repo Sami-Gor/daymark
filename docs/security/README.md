@@ -19,6 +19,12 @@ Daymark is a weather app, but weather apps can handle sensitive location data an
 - Pre-installed applications can have a different trust position from apps a user independently chooses to install.
 - The practical response is proportionate security engineering: collect less, request access only when needed, constrain components and network access, audit dependencies, and keep evidence for claims about the app's behavior.
 
+## Evidence labels and interpretation
+
+Read each case with its stated source type and confidence note. A vendor or national CSIRT advisory is strong evidence for what that advisory documents, but not automatically proof of exploitation in the wild or that every device is affected. A security-company report documents reported findings; unless independently reproduced, do not describe it as an independent forensic result. A lawsuit or complaint records allegations, not a court finding. Include company responses and documented follow-up where available. Do not infer patch status when a source does not say.
+
+A source can be reliable for one narrow statement and insufficient for a broader conclusion. Check the affected app/component and version, the exact behavior described, whether exploitation was reported, and whether a patch or practice change is documented.
+
 ## How to read this research
 
 The incident register is a curated starting point, not a census of all weather-app incidents. It intentionally avoids a headline incident count because the sample is small and cases vary in type and evidentiary strength. Each record links to a source and states the category so readers can distinguish technical vulnerabilities from privacy practices and reported malicious behavior.
