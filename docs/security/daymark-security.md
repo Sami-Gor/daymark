@@ -16,6 +16,16 @@ This page separates controls documented in the repository from recommendations t
 
 These are repository-documented statements. They should be kept aligned with the implementation as it changes. The hosted web security headers do not automatically apply to the Android WebView; the native shell must be assessed in its own context.
 
+## Daymark threat model and residual risks
+
+The research points to several relevant boundaries for Daymark:
+
+- **Location is sensitive even when rounded.** Rounding coordinates to two decimal places reduces precision but does not make a location anonymous in every context. Avoid collecting or transmitting location unless the user invokes the feature.
+- **Third-party processing is still processing.** Weather and geocoding requests go to Open-Meteo. Optional speech recognition may be handled by browser/platform providers; Android French/Spanish narration uses system TTS. Daymark's lack of its own backend does not establish that external providers retain no data. Describe these flows accurately and refer users to the providers' applicable policies.
+- **Android component boundaries matter.** Review exported activities, services, receivers, providers, and native bridge methods in the built package. Source-level intentions alone do not establish the final manifest or runtime behavior.
+- **Dependencies can change the data-flow picture.** Review direct and transitive dependency changes for new network origins, permissions, SDKs, telemetry, and unexpected behavior.
+- **A repository review is not a penetration test.** Build-time checks and browser tests do not, by themselves, prove the deployed site, Android package, platform services, or every supported device is secure.
+
 ## Prioritized review checklist
 
 Use this as a repeatable review, not as a claim that all checks have passed.
