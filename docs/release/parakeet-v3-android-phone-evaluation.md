@@ -121,7 +121,7 @@ be closed by the standalone results.
 |---|---|
 | Availability was reported unconditionally, so the control claimed to work on a device with no model | Availability now reflects whether the model is present and the recogniser could be built. The reasons are `model-missing`, `model-preparing` and `runtime-unavailable`. |
 | A fixed 20-second capture window, so every request took the full window | An energy-based endpoint: the utterance ends after speech followed by a short quiet period, with a 15-second hard cap. |
-| The recogniser logged the recognised transcript | The log line carries timings and the outcome only. No audio or transcript is logged or written to storage. |
+| The recogniser logged the recognised transcript | No audio or transcript is logged or written to storage; the plugin emits no recognition-payload log line. |
 | A stale transcript could still reach the interface after cancellation | The session is invalidated on cancel and on lifecycle exit, and the result is only delivered for the session that is still active. |
 | The recorder was not released on the error path | The recorder, the stream and the audio buffer are released on every path. |
 | An exported, unprotected broadcast receiver could trigger a model load from any app | The receiver is gone. The model is loaded by the plugin itself. |
@@ -179,11 +179,13 @@ generic or online recogniser cannot be reintroduced without failing the build.
 Checks recorded for the integrated branch:
 
 - TypeScript typecheck passed.
-- Automated test suite: **20 files / 262 tests passed** on the integration branch
-  (19 files / 244 on the branch it is based on), plus the Android JVM unit tests
-  for the utterance endpoint detector.
+- Automated test suite: **21 files / 262 tests passed** on the integration head
+  `2f1572d` (verified in the privacy-audit worktree), including the
+  source-level Android voice guard. The Android JVM endpoint-detector test was
+  not run in that worktree because the non-committed sherpa-onnx AAR was absent.
 - The release bundle builds, is signed with the upload key, and carries the
-  native debug-symbol metadata introduced by PR #43.
+  native debug-symbol metadata introduced by PR #43. This was recorded on the
+  earlier integration build; the audit worktree did not rebuild the bundle.
 
 **Important limitation:** a live microphone test through the integrated Daymark
 V2 interface has **not** been completed. The live-microphone scores above come

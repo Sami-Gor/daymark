@@ -12,9 +12,10 @@ type Exchange = { question: string; answer: string };
 /*
  * "Ask Daymark" microphone control (localized).
  *
- * Pipeline: SpeechRecognition adapter -> normalized transcript ->
- * deterministic intent resolver -> getIntentResponse(...) -> visible answer
- * (and optional spoken reply through the shared playback controller).
+ * Pipeline: recognition adapter (Parakeet on Android, browser elsewhere) ->
+ * normalized transcript -> deterministic intent resolver ->
+ * getIntentResponse(...) -> visible answer (and optional spoken reply through
+ * the shared playback controller).
  *
  * Only the latest exchange is kept in state — no history, no storage, no logs.
  */

@@ -310,6 +310,11 @@ Notes:
   as a residual risk covered by device testing.
 - Bluetooth/headphone routing relies on default AudioTrack routing; untested.
 
+**v2 candidate:** French/Spanish narration selects only an installed Android
+voice whose `isNetworkConnectionRequired()` is false. If none is installed, the
+plugin rejects with `system-tts-offline-unavailable` and the interface shows the
+offline-narration error; there is no network-voice or system-default fallback.
+
 **Core narration already tested on a physical device:** playback, Stop,
 restart without overlap, and basic lifecycle handling passed (§18).
 Headphones/Bluetooth, music/navigation and call interruption, a long thermal
@@ -356,19 +361,17 @@ made that the extended soak was completed; it is not a blanket release gate.
 | Weather query | App | No | Yes: rounded coordinates + options | `api.open-meteo.com`, `air-quality-api.open-meteo.com` | Provider-side logging/retention follows Open-Meteo policy; free-API logs deleted after 90 days |
 | Location search text | User input | No | Yes, when searching | `geocoding-api.open-meteo.com` | Provider-side |
 | Locality name lookup | `localities-v1.json` | Bundled + Cache Storage | No | — | On device |
-| Microphone audio | User gesture | No | Depending on platform speech service (possibly Google) | OS/browser speech service |
-| Microphone audio (**v2 candidate**, Android) | User gesture | No | No — the bundled model transcribes on the device | — | No |
-| Recognition transcript (**v2 candidate**, Android) | On-device model | No | No (in-memory only) | — | No | Outside app control |
+| Microphone audio | User gesture | No | Depending on platform speech service (possibly Google) | OS/browser speech service | Outside app control |
+| Microphone audio (**v2 candidate**, Android) | User gesture | No | No — the bundled Parakeet model transcribes on the device | — | No |
+| Recognition transcript (**v2 candidate**, Android) | Bundled Parakeet model | No | No (in-memory only) | — | No |
 | Recognition transcript | Speech service | No | No (in-memory only) | — | No |
-| TTS narration text | Intent layer | No | Android English: no, local Kokoro; web: browser speech synthesis; Android French/Spanish: native Android system TTS. Remote processing depends on the selected voice/provider | Browser speech service (web) or Android system TTS (French/Spanish) | Daymark does not retain it; provider-side processing/retention depends on service |
+| TTS narration text | Intent layer | No | Android English: no, local Kokoro; web: browser speech synthesis; Android French/Spanish: native Android system TTS (v2 candidate: only an installed voice that does not require a network connection). Remote processing depends on the selected voice/provider | Browser speech service (web) or Android system TTS (French/Spanish) | Daymark does not retain it; provider-side processing/retention depends on service |
 | Preferences | App | `localStorage` (`daymark.locale`) | No | — | Until cleared |
 | Analytics | none | — | — | — | — |
 | Crash reports | none in-app | — | — | — | — |
 | App logs | Instrumentation | logcat only | No | — | Device log buffer |
 | Approximate device location (**v2 candidate**) | Android approximate fix after user action | Not stored by Daymark after request | Sent unmodified; no additional rounding | Open-Meteo (forecast, air quality) | Provider-side logging applies |
 | Grid-snapped device location (**v2 candidate**, web/PWA) | Device coordinates after user action | Not stored by Daymark after request | Snapped to a 0.025-degree grid on the device | Open-Meteo (forecast, air quality) | Provider-side logging applies |
-| Microphone audio (**v2 candidate**, Android) | User gesture | No | No — on-device recogniser only | — | No |
-| Recognition transcript (**v2 candidate**, Android) | On-device recogniser | No | No (in-memory only) | — | No |
 
 Privacy summary (for policy/Data Safety review): Daymark sends user-initiated
 rounded coordinates and weather/search queries to Open-Meteo; locality naming
@@ -376,10 +379,11 @@ uses a bundled GeoNames dataset. Android English narration runs locally through
 the bundled Kokoro model. Web narration and Android French/Spanish narration are
 handed to browser/system speech APIs; their processing depends on the selected
 provider and voice. Daymark does not retain narration text or location history
-and has no backend; Ask Daymark input is handed to the browser/platform
-recognition service and may be processed remotely. Assess these provider flows
-against current Data safety definitions rather than treating “not stored by
-Daymark” as equivalent to “not transmitted off device.”
+and has no backend; in the released v1.0.0 and on the web, Ask Daymark input is
+handed to the browser/platform recognition service and may be processed
+remotely, while the v2 Android candidate transcribes it on the device. Assess
+these provider flows against current Data safety definitions rather than
+treating “not stored by Daymark” as equivalent to “not transmitted off device.”
 
 **v2 candidate:** the same map applies with three changes. The Android app
 requests `ACCESS_COARSE_LOCATION` only and sends the OS-provided approximate
@@ -387,8 +391,8 @@ fix unmodified, so the transmitted location is the OS approximation rather
 than a two-decimal rounding of a precise fix; the web/PWA path snaps
 device-derived coordinates to a 0.025-degree grid on the device; and on
 Android the microphone audio and the recognition transcript stay on the
-device, because recognition uses the platform's on-device recogniser with no
-online fallback. The web speech path is unchanged. The `INTERNET` permission
+device, because recognition uses the bundled Parakeet TDT 0.6B v3 model
+with no online fallback. The web speech path is unchanged. The `INTERNET` permission
 remains for weather and WebView traffic and is not used by the voice path.
 
 ## 11. Logging / debugging
@@ -473,19 +477,19 @@ the GeoNames attribution obligation.
 
 ### V2 candidate licensing
 
-The following would be redistributed by a candidate that bundles an on-device
-ASR model. None of it is in the released v1.0.0 binary, and none of it is in the
-current `v2/privacy-hardened-voice` branch. The table is recorded here so the
-attribution and notice obligations are known before such a candidate is built.
+The following is redistributed by the V2 candidate, which bundles an on-device
+ASR model. None of it is in the released v1.0.0 binary. The attribution and
+notice obligations are recorded in `THIRD-PARTY-NOTICES.md`; the table below
+summarises them.
 
 | Component | License | Redistributed | Notes |
 |---|---|---|---|
-| sherpa-onnx runtime and JNI | Apache-2.0 | candidate asset | retain the licence notice |
-| ONNX Runtime Android shared libraries (bundled inside the sherpa runtime) | MIT | candidate asset | retain the copyright notice; distinct from the build-time `ort` link above |
-| Bundled ASR model weights (e.g. Parakeet TDT 0.6B v3 int8) | CC-BY-4.0 | candidate asset | attribution plus an indication of the int8 quantisation |
+| sherpa-onnx runtime and JNI | Apache-2.0 | V2 candidate asset | Licence notice retained in `THIRD-PARTY-NOTICES.md` |
+| ONNX Runtime Android shared libraries (bundled inside the sherpa runtime) | MIT | V2 candidate asset | Copyright notice retained; distinct from the build-time `ort` link above |
+| Bundled ASR model weights (Parakeet TDT 0.6B v3 int8) | CC-BY-4.0 | V2 candidate asset | Attribution, licence link and an indication of the int8 quantisation in `THIRD-PARTY-NOTICES.md` |
 
-No candidate that bundles a model may ship until these obligations are
-discharged and recorded in the repository.
+These obligations are recorded in the repository. Verify them again against
+the final bundle before the V2 candidate ships.
 
 ## 15. Accessibility
 

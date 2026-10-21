@@ -96,7 +96,7 @@ Play Console → **Policy and programs → App content**. All rows completed:
 | Location | The user taps “Use my location”; coordinates are rounded to 2 decimal places and sent to Open-Meteo over HTTPS. Open-Meteo says free-API server logs may contain geographic coordinates and are deleted after 90 days. | **Released v1.0.0:** select **Precise location** (the sent grid is under 3 km² by Google's definition). **v2 candidate:** the app declares `ACCESS_COARSE_LOCATION` only and sends the OS-provided approximate fix unmodified on Android, so the Android answer becomes **Approximate location**; the web/PWA grid cell is roughly 4.8 km² at the example latitude, which also qualifies as Approximate. The cell area shrinks with latitude, so re-derive the answer from the build actually being submitted rather than reusing either value. In Data usage and handling: **Collected = Yes**; **Optional = Yes**; purpose **App functionality**; **Ephemeral = No** because provider logs may retain coordinates for 90 days. For **Shared**, Google provides exceptions for transfers to a qualifying service provider and for a specific user-initiated action the user reasonably expects. The explicit “Use my location” action may qualify for the latter; apply it only if the actual UI and disclosure support that conclusion, otherwise select Shared = Yes. Encryption in transit: Yes for this HTTPS flow. See [Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469) and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms). |
 | Voice-input audio | Released v1.0.0: Ask Daymark uses browser/platform speech recognition; the app does not save audio or transcripts, but the speech provider may process audio remotely. v2 candidate: on Android, recognition runs on the device using the bundled Parakeet model, so no audio is transmitted; the web build is unchanged. | **Released v1.0.0:** in Data types, account for **Audio files → Voice or sound recordings** if audio is transmitted off-device. Collection and any sharing depend on the actual provider path; do not mark ephemeral unless that provider's documentation confirms memory-only real-time processing with no longer retention. **v2 candidate:** for the Android build the answer becomes “not collected” once the on-device path is device-verified; the web path is unchanged. The two platforms must be answered separately. |
 | In-app search history | The user types a place name; the query is sent to Open-Meteo forward geocoding. The app keeps no search history of its own. | Google Play's *App activity* category includes in-app search history. Account for the typed place query as app activity with the same provider retention caveat as location; answer it separately from app interactions. |
-| Voice-output text | Android English uses bundled local Kokoro; web uses browser speech synthesis; Android French/Spanish use native Android system TTS | Keep English Android output local. For web and Android French/Spanish, check the actual selected speech provider. If forecast/location text is transmitted off-device, include the affected data type and purpose; do not assume provider processing is ephemeral without evidence. |
+| Voice-output text | Android English uses bundled local Kokoro; web uses browser speech synthesis; Android French/Spanish use native Android system TTS, and the v2 candidate selects only an installed voice that does not require a network connection | Keep English Android output local. For the web, check the actual selected speech provider. For the v2 Android French/Spanish path, no network voice is selected and the narration fails explicitly if no offline voice is installed. If forecast/location text is transmitted off-device on the web, include the affected data type and purpose; do not assume provider processing is ephemeral without evidence. |
 | App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
 | Analytics / crash logs | No in-app analytics/crash SDK found in repo | Confirm existing answers remain accurate |
 
@@ -259,13 +259,14 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
 - [ ] Every new Android bundle: rebuild the AAB and increment `versionCode`
       in `artifacts/weather-app/android/app/build.gradle`; verify the next
       unused value in Play Console rather than assuming the prior value.
-- [ ] **Privacy-policy publication sync:** the policy source pages are edited on
-      the v2 branch, but the changes are not live and are not in the
-      already-uploaded AAB. Publication waits until the three policy pages state the Android
-      on-device voice path and the French/Spanish offline-voice constraint, and
-      until the checklist records that the pages match the build being shipped.
-      Before using this revised wording, deploy the web build and rebuild
-      the Android bundle so the bundled policy matches. Increment `versionCode`
+- [ ] **Privacy-policy publication sync:** the three policy source pages now state
+      the Android on-device Parakeet path, distinguish it from the web/PWA
+      browser-speech path, disclose that approximate location and typed
+      geocoding/weather requests are sent to Open-Meteo, and state the
+      French/Spanish installed-offline-voice constraint. Those edits are not
+      live and are not in the already-uploaded AAB. Before using this revised
+      wording, deploy the web build and rebuild the Android bundle so the
+      bundled policy matches. Increment `versionCode`
       to the next unused value (expected `2` if `1` is still the latest upload),
       confirm the three policy pages match and set the effective date to the
       actual publication date. Do not claim the revised wording is live before

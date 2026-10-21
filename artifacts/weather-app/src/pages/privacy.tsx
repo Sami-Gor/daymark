@@ -5,8 +5,9 @@ import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
  * Daymark operates no backend or database of its own, so the important
  * distinction is between what Daymark itself stores (the language preference
  * plus non-user-history app resources) and what is transmitted to third-party
- * services (Open-Meteo, browser/device speech) during normal use, including the
- * default forecast request and optional location/voice features.
+ * services (Open-Meteo, browser speech in the web/PWA app, installed Android
+ * text-to-speech voices) during normal use, including the default forecast
+ * request and optional location/voice features.
  */
 
 export default function Privacy() {
@@ -41,8 +42,18 @@ export default function Privacy() {
           Daymark loads a forecast for its default place when the app opens. When you search for another
           place, refresh conditions, or use device location, the corresponding weather or place-search
           requests are sent directly from your browser or installed app to Open-Meteo, a third-party weather service.
+          This means your approximate location, when you choose to use it, and the text you type into place
+          search leave your device and are sent to Open-Meteo when you use those features.
         </li>
-        <li>Optional voice features rely on your browser&rsquo;s or device&rsquo;s own speech capabilities.</li>
+        <li>
+          In the installed Android app, Ask Daymark transcribes speech on your device with a speech model
+          bundled with the app. In the web/PWA app, voice input uses your browser&rsquo;s speech recognition,
+          which may send audio to your browser or operating-system provider.
+        </li>
+        <li>
+          Narration uses a bundled local voice for English on Android, an installed offline Android voice for
+          French and Spanish, and your browser&rsquo;s speech synthesis on the web.
+        </li>
       </ul>
 
       <h2>What information Daymark processes</h2>
@@ -55,7 +66,9 @@ export default function Privacy() {
       <p>
         This information is processed in your browser or installed app while you use Daymark. It is
         not sent to any backend or application server operated by Daymark, because Daymark does not
-        operate one.
+        operate one. Some of it is sent off your device to Open-Meteo: the approximate coordinates
+        used for a device-location forecast, and the text you type into place search. Those requests
+        are described below.
       </p>
 
       <h2>Location data</h2>
@@ -69,8 +82,9 @@ export default function Privacy() {
         Daymark uses the approximate estimate returned by Android without further rounding. In the
         web/PWA version, the browser&rsquo;s device location is snapped on your device to a 0.025-degree
         grid (about 2.8 km north/south and 1.7 km east/west near London) before it is sent to Open-Meteo.
-        This reduces precision; it does not anonymise the request. Daymark itself does not save your
-        location, and the app returns to its default location when you reload or reopen it.
+        This reduces precision; it does not anonymise the request. The approximate coordinates still
+        leave your device and are sent to Open-Meteo. Daymark itself does not save your location, and
+        the app returns to its default location when you reload or reopen it.
       </p>
       <p>
         When you use device location, Daymark also resolves a nearby locality name (for example, a
@@ -83,8 +97,9 @@ export default function Privacy() {
 
       <h2>Location search</h2>
       <p>
-        When you type in the search box, your search text is sent to Open-Meteo&rsquo;s geocoding
-        service to suggest matching places. Daymark does not save your searches.
+        When you type in the search box, the text you enter leaves your device and is sent to
+        Open-Meteo&rsquo;s geocoding service to suggest matching places. Daymark does not save your
+        searches.
       </p>
 
       <h2>Weather and air-quality services</h2>
@@ -109,22 +124,35 @@ export default function Privacy() {
       <h2>Voice input (Ask Daymark)</h2>
       <p>
         Ask Daymark is optional. It starts only when you press the microphone button and grant
-        permission. In the Android app, voice recognition runs entirely on your device: the
-        Parakeet TDT 0.6B v3 speech model, bundled with the app, transcribes your speech locally.
-        Your audio is not sent to a speech service and not to Daymark. Daymark does not record or
-        store your voice audio or speech transcripts. In the web app, voice recognition is handled
-        by your browser and may use its speech service, so depending on your browser, operating
-        system, and configuration, audio may be processed by the platform provider. There is no
-        Daymark-operated backend or application server that receives them.
+        permission.
+      </p>
+      <p>
+        In the installed Android app, recognition runs entirely on your device: the Parakeet
+        TDT 0.6B v3 speech model, bundled with the app, transcribes your speech locally through the
+        sherpa-onnx runtime. Your audio is not sent to a speech service and not to Daymark. The
+        transcript is held in memory only; Daymark does not record or store your voice audio or
+        speech transcripts.
+      </p>
+      <p>
+        In the web/PWA app, voice recognition is handled by your browser&rsquo;s SpeechRecognition or
+        webkitSpeechRecognition interface. Depending on your browser, operating system, and
+        configuration, that service may send your audio to the browser or platform provider for
+        processing, including a remote service. Daymark does not receive the audio; the browser
+        returns a transcript to Daymark so it can answer the question, and Daymark holds that
+        transcript in memory without storing it. The Android app and the web/PWA app therefore have
+        different voice-input behaviour, and this policy describes both.
       </p>
 
       <h2>Voice output (Hear today)</h2>
       <p>
         &ldquo;Hear today&rdquo; reads the briefing aloud. In the Android app, English narration is
-        generated on-device by the bundled Kokoro model; French and Spanish use Android system text-to-speech.
-        In the web app, narration uses the browser&rsquo;s speech-synthesis API. Browser and system speech
-        providers manage their own processing and voice data, which may vary by device, settings, and
-        selected voice. Daymark does not operate a speech backend or store narration text.
+        generated on your device by the bundled Kokoro model. French and Spanish use an installed Android
+        system text-to-speech voice, but only a voice that does not require a network connection. If no
+        such offline voice is installed, Daymark reports that narration is unavailable instead of using
+        a network voice or another speech service. In the web app, narration uses the browser&rsquo;s
+        speech-synthesis API, which may use a local or remote voice depending on your browser and
+        settings. Daymark does not operate a speech backend or store narration text. Browser,
+        operating-system, and voice providers manage their own processing and voice data.
       </p>
 
       <h2>Information stored on your device</h2>
@@ -155,7 +183,8 @@ export default function Privacy() {
         <li>
           Your browser&rsquo;s speech service — only in the web app, and only when you use the
           optional voice features. The Android app recognises speech on your device and does not
-          contact a speech service.
+          contact a speech service. Android French and Spanish narration uses only an installed
+          offline Android voice.
         </li>
         <li>
           The Parakeet speech model and the sherpa-onnx runtime, bundled with the Android app and
@@ -173,8 +202,8 @@ export default function Privacy() {
       </p>
       <p>
         Daymark does not use third-party analytics, advertising, tracking pixels, or tracking
-        services. Open-Meteo and browser/device speech capabilities are third-party services used for
-        the features described above.
+        services. Open-Meteo is used for weather and place search; the web app uses browser speech
+        capabilities, and Android French and Spanish narration uses installed offline Android voices.
       </p>
 
       <h2>Analytics, advertising, and tracking</h2>
@@ -201,10 +230,11 @@ export default function Privacy() {
 
       <h2>International processing</h2>
       <p>
-        Open-Meteo processes weather and search requests on its own servers. Browser or device
-        speech services may also process voice input or narration remotely, depending on the
-        provider and settings. Those providers&rsquo; own policies describe where and how such
-        processing happens.
+        Open-Meteo processes weather and search requests on its own servers. In the web app, browser
+        speech recognition and speech synthesis may process audio or narration remotely, depending on
+        the provider and settings. In the Android app, voice input and English narration are processed
+        on your device, and French or Spanish narration uses only an installed offline voice. Those
+        providers&rsquo; own policies describe where and how such processing happens.
       </p>
 
       <h2>Children&rsquo;s privacy</h2>

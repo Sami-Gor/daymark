@@ -3,9 +3,9 @@ import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
 /*
  * Spanish privacy policy (/es/privacy). Meaning-for-meaning translation of the
  * English policy: same data practices, same Daymark-vs-third-party
- * distinction, same voice-processing caveat. Forecast loading includes the
- * default place on app open; optional location and voice flows are separate.
- * No stronger or weaker claims.
+ * distinction, same platform-specific voice-processing caveat. Forecast loading
+ * includes the default place on app open; optional location and voice flows are
+ * separate. No stronger or weaker claims.
  */
 
 export default function PrivacyEs() {
@@ -44,11 +44,20 @@ export default function PrivacyEs() {
           Al abrir la aplicación, Daymark carga un pronóstico para su ubicación predeterminada. Cuando
           buscas otro lugar, actualizas las condiciones o utilizas la ubicación del dispositivo, las
           solicitudes meteorológicas o de búsqueda correspondientes se envían directamente desde tu
-          navegador o aplicación instalada a Open-Meteo, un servicio meteorológico externo.
+          navegador o aplicación instalada a Open-Meteo, un servicio meteorológico externo. Esto significa
+          que tu ubicación aproximada, cuando eliges usarla, y el texto que escribes en la búsqueda de
+          lugares salen de tu dispositivo y se envían a Open-Meteo cuando utilizas esas funciones.
         </li>
         <li>
-          Las funciones de voz opcionales dependen de las capacidades de voz de tu navegador o
-          dispositivo.
+          En la aplicación Android instalada, Ask Daymark transcribe el habla en tu dispositivo con un
+          modelo de voz integrado en la aplicación. En la versión web/PWA, la entrada de voz utiliza el
+          reconocimiento de voz de tu navegador, que puede enviar el audio al proveedor del navegador o
+          del sistema operativo.
+        </li>
+        <li>
+          La narración utiliza una voz local integrada para el inglés en Android, una voz Android
+          instalada y disponible sin conexión para el francés y el español, y la síntesis de voz del
+          navegador en la web.
         </li>
       </ul>
 
@@ -65,7 +74,9 @@ export default function PrivacyEs() {
       <p>
         Esta información se procesa en tu navegador o en la aplicación instalada mientras usas Daymark.
         No se envía a ningún backend ni servidor de aplicaciones operado por Daymark, porque Daymark
-        no tiene ninguno.
+        no tiene ninguno. Parte de ella sale de tu dispositivo y se envía a Open-Meteo: las coordenadas
+        aproximadas utilizadas para un pronóstico basado en la ubicación, y el texto que escribes en la
+        búsqueda de lugares. Esas solicitudes se describen a continuación.
       </p>
 
       <h2>Datos de ubicación</h2>
@@ -79,9 +90,9 @@ export default function PrivacyEs() {
         Daymark utiliza la estimación aproximada que devuelve Android sin redondearla más. En la versión
         web/PWA, la ubicación del dispositivo que devuelve el navegador se ajusta en el propio dispositivo
         a una cuadrícula de 0,025 grados (unos 2,8 km norte/sur y 1,7 km este/oeste cerca de Londres)
-        antes de enviarse a Open-Meteo. Esto reduce la precisión, pero no anonimiza la solicitud.
-        Daymark no guarda tu ubicación y la aplicación vuelve a su ubicación predeterminada cuando la
-        recargas o vuelves a abrirla.
+        antes de enviarse a Open-Meteo. Esto reduce la precisión, pero no anonimiza la solicitud: las
+        coordenadas aproximadas salen de tu dispositivo y se envían a Open-Meteo, aunque Daymark no las
+        guarde. La aplicación vuelve a su ubicación predeterminada cuando la recargas o vuelves a abrirla.
       </p>
       <p>
         Cuando usas la ubicación del dispositivo, Daymark también resuelve un nombre de localidad
@@ -94,8 +105,9 @@ export default function PrivacyEs() {
 
       <h2>Búsqueda de lugares</h2>
       <p>
-        Cuando escribes en el cuadro de búsqueda, tu texto se envía al servicio de geocodificación de
-        Open-Meteo para sugerir lugares coincidentes. Daymark no guarda tus búsquedas.
+        Cuando escribes en el cuadro de búsqueda, el texto que introduces sale de tu dispositivo y se
+        envía al servicio de geocodificación de Open-Meteo para sugerir lugares coincidentes. Daymark
+        no guarda tus búsquedas.
       </p>
 
       <h2>Servicios meteorológicos y de calidad del aire</h2>
@@ -122,20 +134,36 @@ export default function PrivacyEs() {
       <h2>Entrada de voz (Ask Daymark)</h2>
       <p>
         Ask Daymark es opcional. Solo se inicia cuando pulsas el botón del micrófono y concedes el
-        permiso. El reconocimiento de voz lo gestiona tu navegador o dispositivo y puede usar su
-        servicio de voz. Según tu navegador, sistema operativo y configuración, el audio puede ser
-        procesado por el proveedor de la plataforma. Daymark no graba ni almacena tu audio de voz ni
-        tus transcripciones, y ningún backend ni servidor de aplicaciones de Daymark las recibe.
+        permiso.
+      </p>
+      <p>
+        En la aplicación Android instalada, el reconocimiento se ejecuta por completo en tu dispositivo:
+        el modelo de voz Parakeet TDT 0.6B v3, integrado en la aplicación, transcribe tu habla localmente
+        mediante el runtime sherpa-onnx. Tu audio no se envía a ningún servicio de voz ni a Daymark. La
+        transcripción se mantiene en memoria únicamente; Daymark no graba ni almacena tu audio de voz
+        ni tus transcripciones.
+      </p>
+      <p>
+        En la versión web/PWA, el reconocimiento de voz lo gestiona la interfaz SpeechRecognition o
+        webkitSpeechRecognition de tu navegador. Según tu navegador, sistema operativo y configuración,
+        ese servicio puede enviar tu audio al proveedor del navegador o de la plataforma, incluido un
+        servicio remoto. Daymark no recibe el audio; el navegador le devuelve una transcripción para
+        que pueda responder a la pregunta, y Daymark la mantiene en memoria sin almacenarla. Por tanto,
+        la entrada de voz funciona de forma distinta en la aplicación Android y en la versión web/PWA,
+        y esta política describe ambas.
       </p>
 
       <h2>Salida de voz (Hear today)</h2>
       <p>
-        «Hear today» lee el boletín en voz alta. En la aplicación Android, la narración en inglés
-        se genera en el dispositivo mediante el modelo Kokoro integrado; el francés y el español usan
-        la síntesis de voz del sistema Android. En la versión web, la narración utiliza la API de
-        síntesis de voz del navegador. El tratamiento por los proveedores de voz del navegador o del
-        sistema depende del dispositivo, la configuración y la voz elegida. Daymark no opera un
-        servidor de voz ni almacena el texto de la narración.
+        «Hear today» lee el boletín en voz alta. En la aplicación Android, la narración en inglés se
+        genera en tu dispositivo mediante el modelo Kokoro integrado. El francés y el español usan una
+        voz de síntesis de Android instalada, pero solo una voz que no requiera conexión de red. Si
+        no hay instalada ninguna voz sin conexión de ese tipo, Daymark indica que la narración no está
+        disponible en lugar de usar una voz de red u otro servicio de voz. En la versión web, la narración
+        utiliza la API de síntesis de voz del navegador, que puede usar una voz local o remota según el
+        navegador y la configuración. Daymark no opera un servidor de voz ni almacena el texto de la
+        narración. Los proveedores de navegador, sistema operativo y voces gestionan su propio
+        procesamiento y sus propios datos de voz.
       </p>
 
       <h2>Información almacenada en tu dispositivo</h2>
@@ -168,8 +196,9 @@ export default function PrivacyEs() {
         </li>
         <li>
           El servicio de voz de tu navegador — solo en la aplicación web, y solo cuando utilizas las
-          funciones de voz opcionales. La aplicación Android reconoce el habla en tu dispositivo y no
-          contacta con ningún servicio de voz.
+          funciones de voz opcionales. La entrada de voz en Android se ejecuta en tu dispositivo y no
+          contacta con ningún servicio de voz. La narración francesa y española en Android utiliza
+          únicamente una voz del sistema instalada y disponible sin conexión.
         </li>
         <li>
           El modelo de voz Parakeet y el runtime sherpa-onnx, incluidos en la aplicación Android y
@@ -187,9 +216,9 @@ export default function PrivacyEs() {
       </p>
       <p>
         Daymark no utiliza servicios externos de analítica, publicidad, píxeles de seguimiento ni
-        rastreo. Open-Meteo y el servicio de voz del navegador son servicios externos utilizados para
-        las funciones descritas arriba. En la aplicación Android, el reconocimiento de voz se ejecuta
-        en tu dispositivo.
+        rastreo. Open-Meteo se utiliza para el tiempo y la búsqueda de lugares; la aplicación web usa
+        las funciones de voz del navegador, y la narración francesa y española en Android utiliza voces
+        Android instaladas y disponibles sin conexión.
       </p>
 
       <h2>Analíticas, publicidad y seguimiento</h2>
@@ -218,10 +247,12 @@ export default function PrivacyEs() {
 
       <h2>Tratamiento internacional</h2>
       <p>
-        Open-Meteo procesa las solicitudes meteorológicas y de búsqueda en sus propios servidores.
-        Los servicios de voz de tu navegador o dispositivo también pueden procesar la entrada de voz
-        o el texto de la narración de forma remota, según el proveedor y la configuración. Las políticas
-        de esos proveedores describen dónde y cómo se realiza ese procesamiento.
+        Open-Meteo procesa las solicitudes meteorológicas y de búsqueda en sus propios servidores. En la
+        aplicación web, el reconocimiento y la síntesis de voz del navegador pueden procesar el audio o
+        la narración de forma remota, según el proveedor y la configuración. En la aplicación Android, la
+        entrada de voz y la narración en inglés se procesan en tu dispositivo, y la narración francesa o
+        española utiliza únicamente una voz instalada y disponible sin conexión. Las políticas de esos
+        proveedores describen dónde y cómo se realiza ese procesamiento.
       </p>
 
       <h2>Privacidad de los niños</h2>

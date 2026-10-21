@@ -2101,17 +2101,32 @@ test.describe('privacy policy page', () => {
     const expectations = {
       en: {
         location: 'requests approximate location only',
-        speech: 'does not record or store your voice audio or speech transcripts',
+        speech: 'Parakeet TDT 0.6B v3',
+        localSpeech: 'transcribes your speech locally',
+        webSpeech: 'may send your audio to the browser or platform provider',
+        webTranscript: 'browser returns a transcript to Daymark',
+        leavesDevice: 'leave your device and are sent to Open-Meteo',
+        offlineVoice: 'does not require a network connection',
         audience: 'general-audience weather utility',
       },
       fr: {
         location: 'demande uniquement une localisation approximative',
-        speech: 'n’enregistre ni ne conserve votre audio vocal ni vos transcriptions vocales',
+        speech: 'Parakeet TDT 0.6B v3',
+        localSpeech: 'transcrit votre parole localement',
+        webSpeech: 'peut envoyer votre audio au fournisseur du navigateur ou de la plateforme',
+        webTranscript: 'le navigateur lui transmet une transcription',
+        leavesDevice: 'quittent votre appareil et sont envoyés à Open-Meteo',
+        offlineVoice: 'ne nécessite pas de connexion réseau',
         audience: 'grand public',
       },
       es: {
         location: 'solicita únicamente ubicación aproximada',
-        speech: 'no graba ni almacena tu audio de voz ni tus transcripciones',
+        speech: 'Parakeet TDT 0.6B v3',
+        localSpeech: 'transcribe tu habla localmente',
+        webSpeech: 'puede enviar tu audio al proveedor del navegador o de la plataforma',
+        webTranscript: 'el navegador le devuelve una transcripción',
+        leavesDevice: 'salen de tu dispositivo y se envían a Open-Meteo',
+        offlineVoice: 'no requiera conexión de red',
         audience: 'público general',
       },
     } as const;
@@ -2125,6 +2140,11 @@ test.describe('privacy policy page', () => {
       expect(text).toContain('daymark.locale');
       expect(text).toContain(expectations[policy.lang].location);
       expect(text).toContain(expectations[policy.lang].speech);
+      expect(text).toContain(expectations[policy.lang].localSpeech);
+      expect(text).toContain(expectations[policy.lang].webSpeech);
+      expect(text).toContain(expectations[policy.lang].webTranscript);
+      expect(text).toContain(expectations[policy.lang].leavesDevice);
+      expect(text).toContain(expectations[policy.lang].offlineVoice);
       expect(text).toContain(expectations[policy.lang].audience);
       expect(text).not.toMatch(/collects? no data/i);
     }

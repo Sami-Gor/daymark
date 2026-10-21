@@ -40,8 +40,8 @@ sources for the candidate.
 - English narration remains on the bundled local Kokoro engine.
 - French and Spanish Android narration must use an installed Android TTS voice
   for which `Voice.isNetworkConnectionRequired()` is false. If no such voice
-  exists, narration reports an offline-voice-unavailable error instead of
-  switching engines.
+  exists, the plugin rejects with `system-tts-offline-unavailable` (surfaced in
+  the interface as `offline-voice-unavailable`) instead of switching engines.
 - Android declares `ACCESS_COARSE_LOCATION` only and does not declare
   `ACCESS_FINE_LOCATION`. Use the approximate coordinate returned by Android
   without additional decimal rounding. On web/PWA platforms without the same
@@ -136,7 +136,7 @@ the shipped code and provider behaviour.
       packaging and the native debug symbols are not exercised by CI.
 - [ ] Review native permission/cancellation handling and correct any static or
       runtime defects found by CI.
-- [ ] Physical Android 12+ test: local recognizer and selected language model
+- [ ] Physical Android 12+ test: the bundled local recogniser and model are
       available; Ask Daymark produces the expected local result. Partial
       evidence 2026-10-15 (device `Nothing A059P, Android 16`, airplane mode,
       offline):
@@ -181,7 +181,7 @@ the shipped code and provider behaviour.
       no recognizer errors or payloads, but absence of log messages is not
       treated as proof of no traffic. Preserve redacted test evidence and
       confirm no payload is sent to weather/geocoding endpoints.
-- [x] Android device test confirms Daymark runs with only
+- [ ] Android device test confirms Daymark runs with only
       `ACCESS_COARSE_LOCATION` and sends the OS-provided approximate fix
       without an additional rounding step.
       **Half satisfied by the branch, half pending.** The permission half is
@@ -214,8 +214,13 @@ the shipped code and provider behaviour.
 - [ ] Reconcile store privacy policy and Data safety answers only after the
       shipped candidate's actual behaviour is verified. This includes the
       in-app privacy pages (`src/pages/privacy.tsx` and the FR/ES variants),
-      which describe the location change on this branch but still describe
-      browser/platform voice recognition rather than the on-device path.
+      which now state that Android speech input is transcribed on-device by the
+      bundled Parakeet model, distinguish the Android app from the web/PWA
+      browser-speech path, disclose that typed geocoding/weather requests and
+      approximate location are sent to Open-Meteo, and state the
+      installed-offline-voice constraint for French/Spanish narration. Those
+      source edits are not published and are not in a shipped AAB, so this gate
+      remains open.
 - [ ] Re-check the Play Data safety form against Play's multi-version rule.
       The Data safety section describes the **sum** of data collection and
       sharing across **all versions currently distributed** on Google Play.
