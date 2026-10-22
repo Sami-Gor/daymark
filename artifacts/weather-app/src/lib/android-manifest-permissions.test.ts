@@ -26,8 +26,10 @@ const appManifestPath = path.join(androidRoot, 'app', 'src', 'main', 'AndroidMan
 /** Every permission Daymark is allowed to request. */
 const APPROVED_PERMISSIONS = [
   'android.permission.ACCESS_COARSE_LOCATION',
+  'android.permission.ACCESS_NETWORK_STATE',
   'android.permission.INTERNET',
   'android.permission.MODIFY_AUDIO_SETTINGS',
+  'android.permission.RECEIVE_BOOT_COMPLETED',
   'android.permission.RECORD_AUDIO',
 ];
 
