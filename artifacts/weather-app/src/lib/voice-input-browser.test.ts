@@ -270,3 +270,66 @@ describe('describeRecognitionError', () => {
     expect(describeRecognitionError('weird')).toContain('unexpectedly');
   });
 });
+
+describe('describeRecognitionError reason coverage', () => {
+  /* Every code the native controller can surface, plus the browser codes. */
+  const REASONS = [
+    'not-allowed',
+    'service-not-allowed',
+    'permission-denied',
+    'permission-blocked',
+    'no-speech',
+    'audio-capture',
+    'network',
+    'timeout',
+    'offline-unavailable',
+    'api-unsupported',
+    'model-missing',
+    'model-corrupt',
+    'model-preparing',
+    'runtime-unavailable',
+    'session-busy',
+    'aborted',
+    'unknown',
+    '',
+  ];
+
+  it('returns non-empty copy instead of leaking a raw reason code', () => {
+    for (const reason of REASONS) {
+      for (const locale of ['en', 'fr', 'es'] as const) {
+        const message = describeRecognitionError(reason, locale);
+        expect(message.length, `${reason || '(empty)'} in ${locale}`).toBeGreaterThan(0);
+        expect(message).not.toContain('undefined');
+        if (reason) expect(message).not.toBe(reason);
+      }
+    }
+  });
+
+  it('treats null and undefined as the generic failure', () => {
+    expect(describeRecognitionError(null)).toBe(describeRecognitionError('unknown'));
+    expect(describeRecognitionError(undefined)).toBe(describeRecognitionError('unknown'));
+  });
+
+  it('maps a timeout to the no-speech copy', () => {
+    expect(describeRecognitionError('timeout')).toBe(describeRecognitionError('no-speech'));
+  });
+
+  it('uses the Android-specific blocked copy only for the Android permission codes', () => {
+    expect(describeRecognitionError('permission-blocked')).toContain('Android Settings');
+    expect(describeRecognitionError('permission-denied')).toContain('Android permission prompt');
+    expect(describeRecognitionError('not-allowed')).toContain('this site');
+  });
+
+  it('localizes microphone and offline messages', () => {
+    const enDenied = describeRecognitionError('permission-denied', 'en');
+    const frDenied = describeRecognitionError('permission-denied', 'fr');
+    const esDenied = describeRecognitionError('permission-denied', 'es');
+    expect(frDenied).not.toBe(enDenied);
+    expect(esDenied).not.toBe(enDenied);
+    expect(frDenied.toLowerCase()).toContain('micro');
+    expect(esDenied.toLowerCase()).toContain('micrófono');
+
+    expect(describeRecognitionError('offline-unavailable', 'fr').toLowerCase()).toContain('hors ligne');
+    expect(describeRecognitionError('offline-unavailable', 'es').toLowerCase()).toContain('sin conexión');
+  });
+});
