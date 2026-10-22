@@ -53,10 +53,40 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <receiver
+            android:name=".widget.WeatherWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/weather_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".widget.WeatherWidgetConfigureActivity"
+            android:exported="true"
+            android:label="@string/widget_name"
+            android:theme="@style/AppTheme.NoActionBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".widget.WidgetRefreshJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 
     <!-- Permissions needed by current Daymark features. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Network-constrained widget refresh jobs. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Persistent widget refresh job follows the user across reboots. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- "Use my location" (geolocation in the WebView). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Ask Daymark native on-device speech recognition; no online recognizer fallback. -->
