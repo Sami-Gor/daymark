@@ -2,7 +2,7 @@
 
 **Weather without the noise.**
 
-A calm, privacy-conscious weather app for the web (PWA) and Android, built with React, Vite, TypeScript, [Capacitor](https://capacitorjs.com), and [Open-Meteo](https://open-meteo.com).
+A calm, privacy-conscious weather app for the web (PWA) and Android. Current conditions, the next few hours, rain, UV, air quality and daylight — in one readable page, with no account, ads or tracking.
 
 <p>
   <a href="https://github.com/Sami-Gor/daymark/blob/main/LICENSE"><img alt="Licence" src="https://img.shields.io/github/license/Sami-Gor/daymark"></a>
@@ -71,6 +71,7 @@ The design is editorial rather than dashboard-like — a serif-led hero with a p
 ## Tech stack
 
 - [React 19](https://react.dev) + [TypeScript](https://www.typescriptlang.org) + [Vite 7](https://vite.dev)
+- [Capacitor 8](https://capacitorjs.com) for the Android shell; weather and place search use [Open-Meteo](https://open-meteo.com)
 - [Tailwind CSS 4](https://tailwindcss.com) with a hand-written design layer (Fraunces, Plus Jakarta Sans, DM Mono — self-hosted)
 - [Zod](https://zod.dev) for runtime validation of every API response
 - [wouter](https://github.com/molefrog/wouter) for routing and [Radix](https://www.radix-ui.com) primitives
