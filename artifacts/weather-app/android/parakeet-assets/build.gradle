@@ -31,6 +31,29 @@ def modelFiles = [
     "joiner.int8.onnx",
     "tokens.txt",
 ]
+
+// Pinned digests of the files installed by
+// android/kokoro-poc/scripts/fetch-parakeet-assets.sh. The same values are
+// compiled into the app, where they are checked again before the model loads.
+def modelSha256 = [
+    "encoder.int8.onnx": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+    "decoder.int8.onnx": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+    "joiner.int8.onnx":  "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+    "tokens.txt":        "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+]
+
+def sha256Of = { File file ->
+    def digest = java.security.MessageDigest.getInstance("SHA-256")
+    file.withInputStream { input ->
+        byte[] buffer = new byte[64 * 1024]
+        int read
+        while ((read = input.read(buffer)) > 0) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().collect { String.format("%02x", it & 0xff) }.join()
+}
+
 gradle.taskGraph.whenReady { graph ->
     def packaging = graph.allTasks.any { it.project == project }
     if (!packaging) {
@@ -42,5 +65,62 @@ gradle.taskGraph.whenReady { graph ->
         throw new GradleException(
             "The Parakeet model is missing: ${missing.join(', ')}. " +
             "Run android/kokoro-poc/scripts/fetch-parakeet-assets.sh before building.")
+    }
+}
+
+// Release packaging (bundleRelease and the asset-pack manifest) depends on this
+// check, so a corrupted or substituted asset fails the build instead of
+// shipping. Debug builds do not package the model and never run it.
+def verifyParakeetAssets = tasks.register("verifyParakeetAssets") {
+    group = "verification"
+    description = "Verifies the staged Parakeet model against the pinned SHA-256 digests."
+    doLast {
+        def modelDirectory = file("src/main/assets/parakeet")
+        def missing = modelFiles.findAll { !new File(modelDirectory, it).isFile() }
+        if (!missing.isEmpty()) {
+            throw new GradleException(
+                "The Parakeet model is missing: ${missing.join(', ')}. " +
+                "Run android/kokoro-poc/scripts/fetch-parakeet-assets.sh before building.")
+        }
+        def mismatches = []
+        modelFiles.each { name ->
+            def expected = modelSha256[name]
+            def actual = sha256Of(new File(modelDirectory, name))
+            if (actual != expected) {
+                mismatches << "${name}: expected ${expected}, found ${actual}"
+            }
+        }
+        if (!mismatches.isEmpty()) {
+            throw new GradleException(
+                "The staged Parakeet model failed its SHA-256 check:\n  " +
+                mismatches.join("\n  ") +
+                "\nRe-run android/kokoro-poc/scripts/fetch-parakeet-assets.sh to restore " +
+                "the pinned files before building a release bundle.")
+        }
+        logger.lifecycle("Parakeet model integrity verified (${modelFiles.size()} files).")
+    }
+}
+
+tasks.matching { candidate ->
+    candidate.name == "generateAssetPackManifest"
+}.configureEach {
+    dependsOn verifyParakeetAssets
+}
+
+// The asset pack has no release packaging task of its own: the app's bundle
+// task reads the pack. Wire those tasks explicitly so a release bundle always
+// verifies the staged model first.
+gradle.projectsEvaluated {
+    def appProject = rootProject.findProject(":app")
+    if (appProject == null) {
+        return
+    }
+    appProject.tasks.matching { candidate ->
+        def name = candidate.name
+        name == "bundleRelease" ||
+            name == "packageReleaseBundle" ||
+            (name.startsWith("package") && name.endsWith("Release"))
+    }.configureEach {
+        dependsOn verifyParakeetAssets
     }
 }

@@ -39,7 +39,7 @@ const MODEL_PREPARATION_POLL_MS = 500;
 /** How long the first run waits for the model to be materialised and loaded. */
 const MODEL_PREPARATION_WAIT_MS = 30_000;
 /** Reasons that will not change by waiting, so there is no point in polling. */
-const PERMANENT_UNAVAILABLE_REASONS = new Set(['model-missing', 'runtime-unavailable']);
+const PERMANENT_UNAVAILABLE_REASONS = new Set(['model-missing', 'model-corrupt', 'runtime-unavailable']);
 
 export type ParakeetRecognitionController = {
   readonly supported: boolean;
@@ -188,7 +188,7 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
         const code = /permission-blocked/i.test(message) ? 'permission-blocked'
           : /permission-denied/i.test(message) ? 'permission-denied'
           : /permission|not-allowed/i.test(message) ? 'permission-blocked'
-          : /offline-unavailable|api-unsupported|model-missing|model-preparing|runtime-unavailable/i.test(message)
+          : /offline-unavailable|api-unsupported|model-missing|model-corrupt|model-preparing|runtime-unavailable/i.test(message)
             ? 'offline-unavailable'
           : /cancel|aborted/i.test(message) ? 'aborted'
           : 'unknown';

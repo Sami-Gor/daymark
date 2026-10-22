@@ -29,7 +29,6 @@ import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig;
 import com.k2fsa.sherpa.onnx.QnnConfig;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
@@ -487,20 +486,58 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
      * <p>The model is materialised into the app's private files directory so ONNX
      * Runtime can memory-map it. That keeps the resident footprint of a 640 MB
      * model small, at the cost of one copy on disk.
+     *
+     * <p>Every file is verified against a pinned SHA-256 digest before it may be
+     * loaded. Materialisation writes a temporary file in the model directory,
+     * syncs it, verifies it and renames it into place, so a crash cannot leave a
+     * partial file at a final path. A verification marker lets later starts skip
+     * the hash pass without ever trusting a marker that does not match the
+     * pinned model version, sizes and digests.
      */
     private void prepareModel() {
         preparation.execute(() -> {
+            if (!assetsPresent()) {
+                synchronized (stateLock) {
+                    modelReady = false;
+                    unavailableReason = ParakeetModelAssets.REASON_MODEL_MISSING;
+                }
+                return;
+            }
+
+            File directory = modelDirectory();
             try {
-                if (!assetsPresent()) {
-                    synchronized (stateLock) {
-                        modelReady = false;
-                        unavailableReason = ParakeetModelAssets.REASON_MODEL_MISSING;
-                    }
-                    return;
+                ParakeetModelIntegrity.Result integrity = ParakeetModelIntegrity.verify(
+                        directory,
+                        ParakeetModelAssets.MODEL_VERSION,
+                        ParakeetModelAssets.MODEL_FILE_NAMES,
+                        ParakeetModelAssets.MODEL_FILE_SIZES,
+                        ParakeetModelAssets.MODEL_FILE_SHA256);
+                if (!integrity.isOk()) {
+                    Log.w(TAG, "model integrity: " + integrity.reason());
+                    ParakeetModelInstaller.install(
+                            directory,
+                            integrity,
+                            ParakeetModelAssets.MODEL_VERSION,
+                            ParakeetModelAssets.MODEL_FILE_NAMES,
+                            ParakeetModelAssets.MODEL_FILE_SIZES,
+                            ParakeetModelAssets.MODEL_FILE_SHA256,
+                            fileName -> getContext().getAssets().open(
+                                    ParakeetModelAssets.assetPath(fileName)));
                 }
-                if (!modelFilesPresent()) {
-                    materialiseModel();
+            } catch (Throwable error) {
+                Log.e(TAG, "model materialisation failed", error);
+                // Repair rather than load: never leave unverified material at a
+                // final path. The next start retries the copy from the assets.
+                ParakeetModelInstaller.deleteModelFiles(
+                        directory, ParakeetModelAssets.MODEL_FILE_NAMES);
+                synchronized (stateLock) {
+                    modelReady = false;
+                    unavailableReason = ParakeetModelAssets.REASON_MODEL_CORRUPT;
                 }
+                return;
+            }
+
+            try {
                 OfflineRecognizer built = buildRecognizer();
                 synchronized (stateLock) {
                     recognizer = built;
@@ -531,50 +568,8 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
         return true;
     }
 
-    private boolean modelFilesPresent() {
-        File directory = modelDirectory();
-        for (int index = 0; index < ParakeetModelAssets.MODEL_FILE_NAMES.length; index++) {
-            File file = new File(directory, ParakeetModelAssets.MODEL_FILE_NAMES[index]);
-            if (!file.isFile()
-                    || file.length() != ParakeetModelAssets.MODEL_FILE_SIZES[index]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private File modelDirectory() {
         return new File(getContext().getFilesDir(), ParakeetModelAssets.MODEL_DIRECTORY);
-    }
-
-    private void materialiseModel() throws IOException {
-        File directory = modelDirectory();
-        if (!directory.isDirectory() && !directory.mkdirs()) {
-            throw new IOException("cannot create the model directory");
-        }
-        AssetManager assets = getContext().getAssets();
-        for (int index = 0; index < ParakeetModelAssets.MODEL_FILE_NAMES.length; index++) {
-            String fileName = ParakeetModelAssets.MODEL_FILE_NAMES[index];
-            long expected = ParakeetModelAssets.MODEL_FILE_SIZES[index];
-            File target = new File(directory, fileName);
-            if (target.isFile() && target.length() == expected) {
-                continue;
-            }
-            if (target.exists() && !target.delete()) {
-                throw new IOException("cannot remove a partial model file");
-            }
-            try (InputStream input = assets.open(ParakeetModelAssets.assetPath(fileName));
-                 FileOutputStream output = new FileOutputStream(target)) {
-                byte[] buffer = new byte[1024 * 1024];
-                int read;
-                while ((read = input.read(buffer)) >= 0) {
-                    output.write(buffer, 0, read);
-                }
-            }
-            if (target.length() != expected) {
-                throw new IOException("model file length mismatch after copy");
-            }
-        }
     }
 
     private OfflineRecognizer buildRecognizer() {
