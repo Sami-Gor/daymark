@@ -2,6 +2,14 @@
 
 A calm, privacy-conscious weather app for the web (PWA) and Android, built with React, Vite, TypeScript, [Capacitor](https://capacitorjs.com), and [Open-Meteo](https://open-meteo.com).
 
+<p>
+  <a href="https://github.com/Sami-Gor/daymark/blob/main/LICENSE"><img alt="Licence" src="https://img.shields.io/github/license/Sami-Gor/daymark"></a>
+  <a href="https://github.com/Sami-Gor/daymark/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Sami-Gor/daymark?branch=main"></a>
+  <a href="https://github.com/Sami-Gor/daymark/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/Sami-Gor/daymark/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/Sami-Gor/daymark/actions/workflows/android-ci.yml"><img alt="Android CI status" src="https://github.com/Sami-Gor/daymark/actions/workflows/android-ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/Sami-Gor/daymark/actions/workflows/codeql.yml"><img alt="CodeQL status" src="https://github.com/Sami-Gor/daymark/actions/workflows/codeql.yml/badge.svg?branch=main"></a>
+</p>
+
 **Live app:** https://daymark-weather.pages.dev
 
 ![Daymark on desktop](docs/images/daymark-desktop.png)
