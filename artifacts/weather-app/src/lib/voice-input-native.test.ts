@@ -5,6 +5,8 @@ const { events, native, registered, registrationOrder } = vi.hoisted(() => {
     result: [],
     error: [],
     end: [],
+    started: [],
+    captureEnd: [],
   };
   const registered: string[] = [];
   const registrationOrder: string[] = [];
@@ -127,7 +129,30 @@ describe('createParakeetRecognitionController', () => {
     expect(controller.isListening()).toBe(false);
   });
 
-  it('cancels and clears a recognition session when its timeout expires', async () => {
+  it('does not start the watchdog while the permission prompt/start is pending', async () => {
+    vi.useFakeTimers();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    let resolveStart!: () => void;
+    native.start.mockReturnValue(new Promise<void>((resolve) => { resolveStart = resolve; }));
+    const onStart = vi.fn();
+    const onError = vi.fn();
+    expect(controller.start({ onStart, onError }, 'en-GB')).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(onError).not.toHaveBeenCalled();
+
+    resolveStart();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onStart).not.toHaveBeenCalled();
+    events.started[0]?.({ sessionId: 1 });
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels and clears a recognition session when the capture watchdog expires', async () => {
     vi.useFakeTimers();
     native.isAvailable.mockResolvedValue({ available: true, reason: '' });
     const controller = createParakeetRecognitionController();
@@ -136,13 +161,100 @@ describe('createParakeetRecognitionController', () => {
     const onError = vi.fn();
     expect(controller.start({ onError }, 'en-GB')).toBe(true);
     await Promise.resolve();
+    events.started[0]?.({ sessionId: 1 });
     expect(controller.isListening()).toBe(true);
 
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(32_000);
 
     expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
     expect(onError).toHaveBeenCalledWith('timeout');
     expect(controller.isListening()).toBe(false);
+  });
+
+  it('allows a long capture and decode inside the phase watchdogs', async () => {
+    vi.useFakeTimers();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onResult = vi.fn();
+    const onError = vi.fn();
+    expect(controller.start({ onResult, onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.started[0]?.({ sessionId: 1 });
+    await vi.advanceTimersByTimeAsync(30_000);
+    events.captureEnd[0]?.({ sessionId: 1 });
+    await vi.advanceTimersByTimeAsync(7_000);
+    events.result[0]?.({ sessionId: 1, transcript: 'a long utterance' });
+
+    expect(onResult).toHaveBeenCalledWith('a long utterance');
+    expect(onError).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('ignores a native start that resolves after the user stopped the session', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    let resolveStart!: () => void;
+    native.start.mockReturnValue(new Promise<void>((resolve) => { resolveStart = resolve; }));
+    const onStart = vi.fn();
+    expect(controller.start({ onStart }, 'en-GB')).toBe(true);
+    controller.stop();
+    resolveStart();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
+    expect(onStart).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('lets a newer request supersede a pending native start', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    let resolveFirst!: () => void;
+    let resolveSecond!: () => void;
+    native.start
+      .mockReturnValueOnce(new Promise<void>((resolve) => { resolveFirst = resolve; }))
+      .mockReturnValueOnce(new Promise<void>((resolve) => { resolveSecond = resolve; }));
+    const firstStart = vi.fn();
+    const secondStart = vi.fn();
+    controller.start({ onStart: firstStart }, 'en-GB');
+    controller.start({ onStart: secondStart }, 'en-GB');
+    expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
+
+    resolveFirst();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(firstStart).not.toHaveBeenCalled();
+
+    resolveSecond();
+    await Promise.resolve();
+    await Promise.resolve();
+    events.started[0]?.({ sessionId: 2 });
+    expect(secondStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps native permission codes without falling back to web copy', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    native.start.mockRejectedValueOnce(new Error('permission-blocked'));
+    const blocked = vi.fn();
+    expect(controller.start({ onError: blocked }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    expect(blocked).toHaveBeenCalledWith('permission-blocked');
+
+    native.start.mockRejectedValueOnce(new Error('permission-denied'));
+    const denied = vi.fn();
+    expect(controller.start({ onError: denied }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    expect(denied).toHaveBeenCalledWith('permission-denied');
   });
 
   it('maps native service errors to a terminal error without any retry', async () => {

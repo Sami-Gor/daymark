@@ -82,6 +82,10 @@ export function describeRecognitionError(error: string | null | undefined, local
     case 'not-allowed':
     case 'service-not-allowed':
       return translate(locale, 'ask.error.blocked');
+    case 'permission-denied':
+      return translate(locale, 'ask.error.micDeniedAndroid');
+    case 'permission-blocked':
+      return translate(locale, 'ask.error.micBlockedAndroid');
     case 'no-speech':
       return translate(locale, 'ask.error.noSpeech');
     case 'audio-capture':

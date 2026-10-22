@@ -190,6 +190,8 @@ const en = {
   'ask.daymark': 'Daymark:',
   'ask.unknown': "I can help with today's weather, rain, UV, air quality, the next few hours, or tomorrow.",
   'ask.error.blocked': 'Microphone access is blocked. Allow it for this site, then tap Ask Daymark again.',
+  'ask.error.micDeniedAndroid': "Microphone access wasn't allowed. Tap Ask Daymark again and allow microphone access in the Android permission prompt.",
+  'ask.error.micBlockedAndroid': 'Microphone access is blocked for Daymark. In Android Settings, open Apps > Daymark > Permissions, turn on Microphone, then tap Ask Daymark again.',
   'ask.error.noSpeech': "I didn't catch that. Tap Ask Daymark and try again.",
   'ask.error.audio': 'No microphone was found on this device.',
   'ask.error.network': 'Speech recognition needs a network connection right now.',

@@ -260,6 +260,9 @@ describe('describeRecognitionError', () => {
   it('maps permission denial and other failures to friendly copy', () => {
     expect(describeRecognitionError('not-allowed')).toContain('blocked');
     expect(describeRecognitionError('service-not-allowed')).toContain('blocked');
+    expect(describeRecognitionError('permission-denied')).toContain("wasn't allowed");
+    expect(describeRecognitionError('permission-blocked')).toContain('Android Settings');
+    expect(describeRecognitionError('permission-blocked')).not.toContain('for this site');
     expect(describeRecognitionError('no-speech')).toContain("didn't catch that");
     expect(describeRecognitionError('audio-capture')).toContain('No microphone');
     expect(describeRecognitionError('network')).toContain('network');

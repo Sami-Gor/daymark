@@ -27,12 +27,13 @@ type RecognitionController = {
  * preserve their previous browser-based behaviour.
  */
 export function useSpeechRecognition() {
+  const androidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   const controller = useMemo<RecognitionController>(() => {
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+    if (androidNative) {
       return createParakeetRecognitionController();
     }
     return createBrowserRecognitionController();
-  }, []);
+  }, [androidNative]);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
   const [supported, setSupported] = useState(controller.supported);
@@ -107,9 +108,11 @@ export function useSpeechRecognition() {
       },
       onEnd: () => setIsListening(false),
     }, options.lang);
-    if (started) setIsListening(true);
+    // Browser recognition has no native "started" event; keep its existing
+    // immediate UI state. Android waits for the native capture-start event.
+    if (started && !androidNative) setIsListening(true);
     return started;
-  }, [controller, supported]);
+  }, [controller, supported, androidNative]);
 
   const stop = useCallback(() => {
     controller.stop();

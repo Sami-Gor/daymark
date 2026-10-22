@@ -175,6 +175,8 @@ const fr: Record<TranslationKey, string> = {
   'ask.daymark': 'Daymark :',
   'ask.unknown': "Je peux aider pour la météo du jour, la pluie, l'UV, la qualité de l'air, les prochaines heures ou demain.",
   'ask.error.blocked': "L'accès au micro est bloqué. Autorisez-le pour ce site, puis touchez Demander à Daymark.",
+  'ask.error.micDeniedAndroid': "L'accès au micro n'a pas été autorisé. Touchez Demander à Daymark et autorisez le micro dans la demande d'autorisation Android.",
+  'ask.error.micBlockedAndroid': "L'accès au micro est bloqué pour Daymark. Dans les paramètres Android, ouvrez Applications > Daymark > Autorisations, activez Microphone, puis touchez Demander à Daymark.",
   'ask.error.noSpeech': "Je n'ai pas compris. Touchez Demander à Daymark et réessayez.",
   'ask.error.audio': 'Aucun microphone détecté sur cet appareil.',
   'ask.error.network': 'La reconnaissance vocale nécessite une connexion réseau.',

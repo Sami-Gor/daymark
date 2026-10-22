@@ -1,6 +1,9 @@
 package io.github.sami_gor.daymark.voice;
 
 import android.Manifest;
+import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.media.AudioFormat;
@@ -53,8 +56,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class ParakeetSpeechRecognitionPlugin extends Plugin {
     private static final String TAG = "DaymarkParakeet";
     private static final int MICROPHONE_REQUEST_CODE = 7311;
+    private static final String PERMISSION_PREFS = "daymark.permissions";
+    private static final String MIC_REQUESTED_KEY = "microphone-requested";
+    private static final Object permissionLock = new Object();
     private static ParakeetSpeechRecognitionPlugin pendingPermissionPlugin;
     private static PluginCall pendingPermissionCall;
+    private static int pendingPermissionSessionId = -1;
+    private static int pendingPermissionRequestCode = -1;
+    private static int nextPermissionRequestCode = MICROPHONE_REQUEST_CODE;
 
     /** Sample rate the evaluated model was measured at. */
     private static final int SAMPLE_RATE = 16000;
@@ -141,6 +150,11 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
             }
         }
 
+        // A new start supersedes any permission request left pending by an older
+        // tap. Do this before the permission check so a stale system result can
+        // never be applied to this session.
+        cancelPendingPermission(-1, "aborted");
+
         if (getContext().checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestMicrophonePermission(call);
             return;
@@ -150,42 +164,116 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
     }
 
     private void requestMicrophonePermission(PluginCall call) {
-        android.app.Activity activity = (android.app.Activity) getContext();
+        Activity activity = (Activity) getContext();
         if (activity == null) {
-            call.reject("not-allowed");
+            call.reject("permission-blocked");
             return;
         }
-        pendingPermissionPlugin = this;
-        pendingPermissionCall = call;
-        activity.requestPermissions(
-                new String[] { Manifest.permission.RECORD_AUDIO },
-                MICROPHONE_REQUEST_CODE);
+
+        SharedPreferences preferences =
+                activity.getSharedPreferences(PERMISSION_PREFS, Context.MODE_PRIVATE);
+        boolean requestedBefore = preferences.getBoolean(MIC_REQUESTED_KEY, false);
+        boolean canPromptAgain =
+                activity.shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO);
+
+        // Permission dialogs can be suppressed after two denials or after an
+        // Android-settings revocation. In that state requestPermissions may
+        // produce no visible prompt; fail with actionable guidance instead of
+        // silently doing nothing.
+        if (requestedBefore && !canPromptAgain) {
+            call.reject("permission-blocked");
+            return;
+        }
+
+        preferences.edit().putBoolean(MIC_REQUESTED_KEY, true).apply();
+        final int sessionId = call.getInt("sessionId", -1);
+        final int requestCode;
+        synchronized (permissionLock) {
+            requestCode = nextPermissionRequestCode++;
+            if (nextPermissionRequestCode > 65535) {
+                nextPermissionRequestCode = MICROPHONE_REQUEST_CODE;
+            }
+            pendingPermissionPlugin = this;
+            pendingPermissionCall = call;
+            pendingPermissionSessionId = sessionId;
+            pendingPermissionRequestCode = requestCode;
+        }
+        try {
+            activity.requestPermissions(
+                    new String[] { Manifest.permission.RECORD_AUDIO },
+                    requestCode);
+        } catch (RuntimeException error) {
+            cancelPendingPermission(sessionId, "permission-blocked");
+        }
     }
 
     /** Called from MainActivity's onRequestPermissionsResult. */
     public static void onRequestPermissionsResult(
             int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode != MICROPHONE_REQUEST_CODE) {
-            return;
+        ParakeetSpeechRecognitionPlugin plugin;
+        PluginCall call;
+        int sessionId;
+        synchronized (permissionLock) {
+            if (pendingPermissionRequestCode != requestCode
+                    || pendingPermissionPlugin == null
+                    || pendingPermissionCall == null) {
+                return;
+            }
+            plugin = pendingPermissionPlugin;
+            call = pendingPermissionCall;
+            sessionId = pendingPermissionSessionId;
+            pendingPermissionPlugin = null;
+            pendingPermissionCall = null;
+            pendingPermissionSessionId = -1;
+            pendingPermissionRequestCode = -1;
         }
-        ParakeetSpeechRecognitionPlugin plugin = pendingPermissionPlugin;
-        PluginCall call = pendingPermissionCall;
-        pendingPermissionPlugin = null;
-        pendingPermissionCall = null;
         if (plugin == null || call == null) {
             return;
         }
-        if (grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            plugin.start(call);
-        } else {
-            call.reject("not-allowed");
+        if (permissions.length == 0
+                || grantResults.length == 0
+                || !Manifest.permission.RECORD_AUDIO.equals(permissions[0])) {
+            // Android documents empty results as an interrupted/cancelled
+            // request, not as a user denial.
+            call.reject("aborted");
+            return;
         }
+        if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            plugin.beginCapture(call, sessionId);
+            return;
+        }
+        Activity activity = plugin.getContext() instanceof Activity
+                ? (Activity) plugin.getContext()
+                : null;
+        boolean canRetry = activity != null
+                && activity.shouldShowRequestPermissionRationale(
+                        Manifest.permission.RECORD_AUDIO);
+        call.reject(canRetry ? "permission-denied" : "permission-blocked");
+    }
+
+    private void cancelPendingPermission(int sessionId, String code) {
+        PluginCall pending = null;
+        synchronized (permissionLock) {
+            if (pendingPermissionPlugin != this
+                    || pendingPermissionCall == null
+                    || (sessionId >= 0 && pendingPermissionSessionId != sessionId)) {
+                return;
+            }
+            pending = pendingPermissionCall;
+            pendingPermissionPlugin = null;
+            pendingPermissionCall = null;
+            pendingPermissionSessionId = -1;
+            pendingPermissionRequestCode = -1;
+        }
+        pending.reject(code);
     }
 
     @PluginMethod
     public void cancel(PluginCall call) {
         final int sessionId = call.getInt("sessionId", -1);
+        // A pending permission request is part of the session for cancellation
+        // purposes even though AudioRecord has not been created yet.
+        cancelPendingPermission(sessionId, "aborted");
         Session session;
         synchronized (stateLock) {
             session = activeSession;
@@ -230,6 +318,11 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
             finishWithError(session, "offline-unavailable");
             return;
         }
+        synchronized (stateLock) {
+            if (activeSession != session || session.cancelled.get()) {
+                return;
+            }
+        }
 
         final SampleBuffer samples = new SampleBuffer();
         AudioRecord recorder = null;
@@ -254,6 +347,7 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
             }
             session.recorder = recorder;
             recorder.startRecording();
+            emitStarted(session.id);
 
             SpeechEndpointDetector detector =
                     new SpeechEndpointDetector(SPEECH_THRESHOLD, ONSET_CHUNKS, HANGOVER_CHUNKS);
@@ -283,6 +377,7 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
 
             releaseRecorder(recorder);
             session.recorder = null;
+            emitCaptureEnd(session.id);
 
             if (session.cancelled.get()) {
                 // cancel()/destroy already emitted the single aborted event for
@@ -359,6 +454,18 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
             }
         }
         emitError(session.id, code);
+    }
+
+    private void emitStarted(int sessionId) {
+        JSObject event = new JSObject();
+        event.put("sessionId", sessionId);
+        notifyListeners("started", event);
+    }
+
+    private void emitCaptureEnd(int sessionId) {
+        JSObject event = new JSObject();
+        event.put("sessionId", sessionId);
+        notifyListeners("captureEnd", event);
     }
 
     private void emitEnd(int sessionId) {
@@ -531,16 +638,21 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
     @Override
     protected void handleOnPause() {
         super.handleOnPause();
+        // Do not cancel a pending permission request here: Android permission
+        // dialogs commonly pause the host activity without stopping it.
         abortActiveSession();
     }
 
     @Override
+    protected void handleOnStop() {
+        super.handleOnStop();
+        abortActiveSession();
+        cancelPendingPermission(-1, "aborted");
+    }
+
+    @Override
     protected void handleOnDestroy() {
-        if (pendingPermissionCall != null) {
-            pendingPermissionCall.reject("offline-unavailable");
-            pendingPermissionCall = null;
-            pendingPermissionPlugin = null;
-        }
+        cancelPendingPermission(-1, "aborted");
         synchronized (stateLock) {
             released = true;
         }

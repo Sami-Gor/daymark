@@ -10,6 +10,7 @@ export type OnDeviceRecognitionHandlers = {
 type NativeResult = { sessionId: number; transcript: string };
 type NativeError = { sessionId: number; code: string };
 type NativeEnd = { sessionId: number };
+type NativeLifecycle = { sessionId: number };
 
 interface ParakeetSpeechRecognitionPlugin {
   isAvailable(): Promise<{ available: boolean; reason?: string }>;
@@ -18,6 +19,8 @@ interface ParakeetSpeechRecognitionPlugin {
   addListener(eventName: 'result', listenerFunc: (event: NativeResult) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'error', listenerFunc: (event: NativeError) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'end', listenerFunc: (event: NativeEnd) => void): Promise<PluginListenerHandle>;
+  addListener(eventName: 'started', listenerFunc: (event: NativeLifecycle) => void): Promise<PluginListenerHandle>;
+  addListener(eventName: 'captureEnd', listenerFunc: (event: NativeLifecycle) => void): Promise<PluginListenerHandle>;
 }
 
 /**
@@ -27,7 +30,10 @@ interface ParakeetSpeechRecognitionPlugin {
  * fails, the session fails with an explicit error.
  */
 const NativeRecognizer = registerPlugin<ParakeetSpeechRecognitionPlugin>('ParakeetSpeechRecognition');
-const RECOGNITION_TIMEOUT_MS = 30_000;
+// The native side owns the 30 s capture cap. These watchdogs are backstops
+// anchored to actual native phases, not to the click or the permission prompt.
+const CAPTURE_WATCHDOG_MS = 32_000;
+const DECODE_WATCHDOG_MS = 15_000;
 /** How often the plugin is asked whether the model has become usable. */
 const MODEL_PREPARATION_POLL_MS = 500;
 /** How long the first run waits for the model to be materialised and loaded. */
@@ -98,6 +104,27 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
           const handlers = detachSession(event.sessionId);
           handlers?.onEnd?.();
         }),
+        NativeRecognizer.addListener('started', (event) => {
+          if (!handlesEvent(event.sessionId)) return;
+          const handlers = activeHandlers;
+          handlers?.onStart?.();
+          recognitionTimeout = setTimeout(() => {
+            if (!handlesEvent(event.sessionId)) return;
+            void NativeRecognizer.cancel({ sessionId: event.sessionId }).catch(() => undefined);
+            const timedOut = detachSession(event.sessionId);
+            timedOut?.onError?.('timeout');
+          }, CAPTURE_WATCHDOG_MS);
+        }),
+        NativeRecognizer.addListener('captureEnd', (event) => {
+          if (!handlesEvent(event.sessionId)) return;
+          clearRecognitionTimeout();
+          recognitionTimeout = setTimeout(() => {
+            if (!handlesEvent(event.sessionId)) return;
+            void NativeRecognizer.cancel({ sessionId: event.sessionId }).catch(() => undefined);
+            const timedOut = detachSession(event.sessionId);
+            timedOut?.onError?.('timeout');
+          }, DECODE_WATCHDOG_MS);
+        }),
       ]);
       listeners.push(...registered);
 
@@ -151,22 +178,19 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
       const sessionId = ++sessionSequence;
       activeSessionId = sessionId;
       activeHandlers = handlers;
-      recognitionTimeout = setTimeout(() => {
-        if (!handlesEvent(sessionId)) return;
-        void NativeRecognizer.cancel({ sessionId }).catch(() => undefined);
-        const timedOut = detachSession(sessionId);
-        timedOut?.onError?.('timeout');
-      }, RECOGNITION_TIMEOUT_MS);
-      void NativeRecognizer.start({ sessionId, lang: lang?.trim() || 'en-GB' }).then(() => {
-        if (handlesEvent(sessionId)) handlers.onStart?.();
-      }).catch((error: unknown) => {
+      // No timer yet: the native plugin may be waiting for the user to answer
+      // the permission prompt. The capture watchdog starts on the native
+      // `started` event and the decode watchdog starts on `captureEnd`.
+      void NativeRecognizer.start({ sessionId, lang: lang?.trim() || 'en-GB' }).catch((error: unknown) => {
         if (!handlesEvent(sessionId)) return;
         const finished = detachSession(sessionId);
         const message = error instanceof Error ? error.message : String(error ?? '');
-        const code = /permission|not-allowed/i.test(message) ? 'not-allowed'
+        const code = /permission-blocked/i.test(message) ? 'permission-blocked'
+          : /permission-denied/i.test(message) ? 'permission-denied'
+          : /permission|not-allowed/i.test(message) ? 'permission-blocked'
           : /offline-unavailable|api-unsupported|model-missing|model-preparing|runtime-unavailable/i.test(message)
             ? 'offline-unavailable'
-          : /cancel/i.test(message) ? 'aborted'
+          : /cancel|aborted/i.test(message) ? 'aborted'
           : 'unknown';
         finished?.onError?.(code);
       });
