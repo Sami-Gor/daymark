@@ -15,10 +15,15 @@ on:
     branches: [main]
   pull_request:
     paths:
+      # The Gradle project, including daymark-voice/, parakeet-assets/ and
+      # every module and wrapper Gradle file.
       - 'artifacts/weather-app/android/**'
       - 'artifacts/weather-app/package.json'
       - 'artifacts/weather-app/capacitor.config.ts'
       - 'artifacts/weather-app/public/**'
+      # The native runtime and Parakeet model are fetched, not committed, so
+      # a change to a fetch script or its pinned URL/checksum must rebuild.
+      - 'android/kokoro-poc/scripts/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/android-ci.yml'
 
@@ -67,6 +72,49 @@ jobs:
       # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
       - name: Sync Capacitor Android project
         run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      # The DaymarkVoice module compiles Parakeet speech recognition against
+      # the sherpa-onnx runtime, which it consumes as a local
+      # `files('libs/sherpa-onnx-*.aar')` dependency. The AAR is not committed,
+      # so it has to be on disk before Gradle configures the project; without
+      # it, `:app:checkDebugAarMetadata` fails deep in artifact resolution with
+      # a bare "No such file or directory" for the AAR.
+      #
+      # The fetch script is checksum-pinned and ships with the voice module.
+      # It exists only once the module does, so branches that predate it skip
+      # the download instead of failing the job.
+      - name: Fetch the sherpa-onnx runtime
+        run: |
+          script=android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
+          if [ -f "$script" ]; then
+            "$script"
+          else
+            echo "::notice::$script is not on this branch; skipping the sherpa-onnx fetch."
+          fi
+
+      # Preflight for the failure above. Gradle reports a missing local AAR
+      # late and by path only, which reads as an obscure build break; fail here
+      # instead, naming the script that installs it, as soon as the module
+      # actually declares the runtime.
+      #
+      # The Parakeet *model* is deliberately not fetched in this job: it only
+      # compiles, unit-tests and lints, and the 0.6B int8 model would add
+      # hundreds of megabytes to every run. Release packaging must run
+      # android/kokoro-poc/scripts/fetch-parakeet-assets.sh before it builds an
+      # APK/AAB that ships speech recognition.
+      - name: Verify the sherpa-onnx runtime
+        run: |
+          module=artifacts/weather-app/android/daymark-voice
+          if ! grep -q "libs/sherpa-onnx-.*\.aar" "$module/build.gradle" 2>/dev/null; then
+            echo "::notice::$module does not declare the sherpa-onnx runtime on this branch; nothing to verify."
+            exit 0
+          fi
+          if ! compgen -G "$module/libs/sherpa-onnx-*.aar" >/dev/null; then
+            echo "error: $module declares the sherpa-onnx runtime but no AAR is installed." >&2
+            echo "       run android/kokoro-poc/scripts/fetch-sherpa-onnx.sh before Gradle." >&2
+            exit 1
+          fi
+          ls -l "$module"/libs/sherpa-onnx-*.aar
 
       # The committed JVM unit tests guard the minimum-WebView gate that
       # decides whether the WebView loads the bundle at all.
