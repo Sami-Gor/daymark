@@ -6,7 +6,7 @@ No privacy page, runtime source, Play Console declaration, website or release ar
 - **V2 line audited:** `release/v2-integrity` at `8611672` (three commits on top of V2 `ee04449`; the V2 branch is also present as `v2/privacy-hardened-voice`). The candidate artifact was rebuilt from this content and inspected; see the merged-manifest note below.
 - **V1 baseline:** the repository's own data-safety record names the released 1.0.0 source as `main` at `50194e8` (`docs/release/data-safety-v1-v2.md:7-10`). V1 line numbers below are from that commit, not from the V2 worktree.
 - **Public Play state:** the public Data safety page was read again on 22 October 2026; it still says **No data shared with third parties**, collects **Approximate location**, **Voice or sound recordings** and **In-app search history** (all Optional / App functionality), **encrypted in transit**, and **data can't be deleted**. The same state was recorded on 21 October 2026 in `docs/release/data-safety-v1-v2.md:19-32`.
-- **No device/APK inspection:** this audit was instructed not to use `adb`, so the production APK's merged manifest was not read from a device. No packet capture was made.
+- **Device/APK inspection scope:** no live Play device was used for packet capture. The candidate AAB's merged base manifest was inspected locally with `bundletool` (debug-signed structural build, 22 Oct 2026): `ACCESS_COARSE_LOCATION` only, no `ACCESS_FINE_LOCATION`, versionCode 2 / versionName 2.0.0, minSdk 24 / targetSdk 36. Production-signing continuity and the Play-signed artifact remain unverified.
 - **Worktree state:** the audited candidate is clean at `8611672`. The model-integrity commits add no network speech path or user-data persistence. The candidate release AAB was built from this content and inspected with `bundletool`; the base module declares `ACCESS_COARSE_LOCATION` only.
 
 Evidence labels used below:
@@ -21,6 +21,94 @@ The central finding is that the live Play form is not consistent with either a V
 - If **only V2 is distributed**, the form is over-declaring **Voice or sound recordings** (V2 Android uses on-device Parakeet), while still not resolving **Shared = No** for Open-Meteo.
 - If **both** are distributed, Play's multi-version "sum" rule requires both location types and audio until V1 is gone; the form declares only one location type.
 - In every reading, **"No data shared"** depends on a legal exception analysis that is not recorded in the repository or the public form.
+
+---
+
+## 0. Minimal evidence-backed amendments (EN/FR/ES)
+
+**Scope note.** No P2/P3/P4 note files were present in this workspace; every claim below was re-verified directly against the shipped source and the V2 candidate. Proposed texts are drafts only; they are **not** applied to `src/pages/privacy*.tsx` and nothing is published. Legal decisions are flagged inline.
+
+Each amendment uses the evidence labels from §0 of the original draft: **CONFIRMED** (source/manifest/build/public Play page), **INFERENCE** (follows from platform/architecture), **UNVERIFIED** (needs device/provider/Console proof). File:line references are to the V2 tree at `release/v2-integrity` unless marked `main@50194e8`.
+
+### A1 — Opening paragraph: "runs entirely" (EN/FR/ES)
+- **Files:** `privacy.tsx:26-29`, `privacy-fr.tsx:24-28`, `privacy-es.tsx:24-28`.
+- **Current (EN):** "Daymark is a weather app that runs entirely in your browser or installed app."
+- **Proposed (EN):** "Daymark is a weather app whose app logic runs in your browser or installed app. Daymark does not operate a backend, account system, or database of its own. To show weather, air quality, and place suggestions, the app sends requests directly from your device to Open-Meteo, as described below."
+- **Why:** weather/air-quality/geocoding requests leave the device (`weather.ts:15-17, 232-263, 307-329`). "Of its own" keeps the true no-Daymark-backend fact (`README.md:11, 67`).
+- **Strength:** CONFIRMED. **Legal decision?** No (wording only).
+
+### A2 — "no backend" vs "no data shared" distinction (EN/FR/ES)
+- **Files:** `privacy.tsx:51, 80-84`, `privacy-fr.tsx:51, 90-95`, `privacy-es.tsx:51, 89-94`; `README.md:67`; `SECURITY.md:27`.
+- **Proposed addition to the "short version" bullets:** keep "no user accounts or database, and does not operate its own backend or application server" but add "Daymark does not operate a backend, but third-party services (Open-Meteo; browser speech on web; Android system TTS for French/Spanish) do receive data you send them, as described below."
+- **Why:** "no backend" is an infrastructure claim; "no data shared" is a legal Play answer that the data flows do not support without an exception analysis (`data-safety-v1-v2.md:174-179, 256-258`).
+- **Strength:** CONFIRMED for flows; **legal decision** for the Play "Shared" answer.
+
+### A3 — Device location (EN/FR/ES)
+- **Files:** `privacy.tsx:92-101`, `privacy-fr.tsx:103-113`, `privacy-es.tsx:101-110`; `location-privacy.ts:13-57`; `App.tsx:90-149`; `storage-surface.test.ts:41-64`.
+- **Android:** OS approximate fix used unchanged; Daymark does not round it. Add: "**Android, not Daymark, determines the approximate estimate.**" (INFERENCE→CONFIRMED by code path `location-privacy.ts:48-57`).
+- **Web/PWA:** 0.025° grid (≈2.8 km N/S, ≈1.7 km E/W, ≈4.8 km² near London; <3 km² above ≈67° latitude). Add the area figure.
+- **No persistence:** only `daymark.locale` persists (`storage-surface.test.ts:41-64`); device location/search/transcript/weather are memory-only; web/PWA caches only the locality dataset and app shell (`sw.js:5-8, 51-57`).
+- **Provider retention:** Open-Meteo logs may contain coordinates; deleted after 90 days (`weather.ts:232-249`; `privacy.tsx:130-134`).
+- **Strength:** CONFIRMED for code/persistence; UNVERIFIED for the Play "Approximate" classification and for the actual coordinate sent (needs device capture). **Legal/technical decision** for the Play declaration.
+
+### A4 — Search-selected places (EN/FR/ES)
+- **Files:** `privacy.tsx:111-116`, `privacy-fr.tsx:124-129`, `privacy-es.tsx:120-125`; `weather.ts:232-249, 307-329`; `LocationSearch.tsx:9, 31-79`; `storage-surface.test.ts:7-18`.
+- **Wording to keep/add:** typed query goes to `geocoding-api.open-meteo.com`; selecting a result sends that place's **published** latitude/longitude (not the device location, not coarsened); no search history is persisted (query lives in component state, cleared on selection).
+- **Strength:** CONFIRMED. **Legal decision?** No for the fact; the Play "In-app search history = Yes/Shared" answer is a **legal decision**.
+
+### A5 — Voice input (EN/FR/ES)
+- **Files:** `privacy.tsx:142-158`, `privacy-fr.tsx:158-175`, `privacy-es.tsx:153-169`; `use-speech-recognition.ts:24-36`; `voice-input-native.ts:26-32`; `ParakeetSpeechRecognitionPlugin.java:39-55, 327-436, 491-515`; `voice-input-browser.ts:9-13`.
+- **Android (V2):** Parakeet TDT 0.6B v3 int8 via sherpa-onnx, on-device; no `SpeechRecognizer`, no Web Speech, no remote recogniser, no fallback; if the model is unavailable, an explicit error is reported (`voice-input-native.ts:164-197`; plugin `:491-515`). Recording/decoding/payload are memory-only; no audio or transcript is logged.
+- **Overclaim to remove:** "recognition runs entirely on your device" → replace with source-verifiable facts; do **not** claim packet-level zero egress. Status: CONFIRMED at source level; **UNVERIFIED at packet/device level** (gates open: `version-2-privacy-hardening.md:165-171, 205-209`).
+- **Web/PWA:** browser `SpeechRecognition`/`webkitSpeechRecognition`; provider may process audio remotely; Daymark does not receive/store audio; transcript in memory only. Add: "The browser or platform provider may retain audio or transcripts under its own policy; Daymark cannot see or delete a copy held by that provider." (INFERENCE; legal review recommended.)
+- **Strength:** CONFIRMED (source) + UNVERIFIED (packet). **Legal decision?** No for wording; Play "Voice or sound recordings" answer is a **legal/technical decision** (and must not merge web speech into the Android answer).
+
+### A6 — Narration (EN/FR/ES)
+- **Files:** `privacy.tsx:160-171`, `privacy-fr.tsx:177-189`, `privacy-es.tsx:171-183`; `speech-engine.ts:4-9, 29-50`; `speech-router.ts:129-171`; `SystemSpeechPlugin.java:145-171, 178-215`; `voice-browser.ts:9-11`.
+- **EN:** Kokoro on-device; if native synthesis fails, no fallback to system TTS, explicit error (`speech-router.ts:146-158`).
+- **FR/ES (Android):** only an installed voice with `isNetworkConnectionRequired()==false` is selected; voices flagged `KEY_FEATURE_NOT_INSTALLED` are skipped; otherwise explicit `system-tts-offline-unavailable` → UI `offline-voice-unavailable` (`SystemSpeechPlugin.java:145-171, 178-215`; `use-daymark-speech.ts:28-40`). No network-voice fallback.
+- **Web/PWA:** browser `speechSynthesis`; voice may be local or remote. Remove the internal "no cloud TTS" comment (`voice-browser.ts:9-11`) — it overclaims; the policy wording is already correct.
+- **Proposed addition:** "The text-to-speech engine is a separate app component, which may be supplied by your device manufacturer or Google; its own privacy policy applies." (INFERENCE for vendor; CONFIRMED for the handoff.)
+- **Strength:** CONFIRMED (code) + INFERENCE (vendor). **Legal decision?** Yes — whether narration text counts as user data / sharing to the OS TTS engine.
+
+### A7 — Weather/geocoding and hosting (EN/FR/ES)
+- **Files:** `privacy.tsx:118-135, 190-214`, `privacy-fr.tsx:131-151, 210-236`, `privacy-es.tsx:127-146, 204-229`; `weather.ts:15-17, 232-249, 279-299, 307-319`; `public/_headers`; `vite.config.ts:50-52`; `locality.ts:16-18`; `locality-load.ts:2-31`.
+- **Hosts:** `api.open-meteo.com` (forecast + micro-climate), `air-quality-api.open-meteo.com`, `geocoding-api.open-meteo.com`. Place search sends `name`, `count=8`, `language`, `format=json` (`weather.ts:307-319`).
+- **Open-Meteo:** free-API troubleshooting logs may contain coordinates; deleted after 90 days (`privacy.tsx:130-134`).
+- **Cloudflare Pages:** static host for web/PWA only; processes standard request metadata (IP, URL, user agent) under its own policy (`privacy.tsx:204-209`). Android assets are local; Cloudflare is not an Android runtime flow.
+- **GeoNames:** static dataset; no runtime transfer; lookup runs on device (`locality.ts:16-18`; `locality.worker.ts:1-6`).
+- **Strength:** CONFIRMED (hosts/params/logs). Open-Meteo's independent-controller characterization is the provider's own statement (INFERENCE/UNVERIFIED). **Legal decision?** Yes — processor roles and "Shared".
+
+### A8 — Retention and deletion (EN/FR/ES)
+- **Files:** `privacy.tsx:238-244, 273-283`, `privacy-fr.tsx:262-270, 302-315`, `privacy-es.tsx:253-260, 291-304`; `storage-surface.test.ts:7-18, 41-64`; `data-safety-v1-v2.md:160-170`.
+- **Proposed addition (EN):** "Because Daymark has no account or server-side store, there is no Daymark-held account data to delete. You can clear the language preference and the app's local storage in your browser or device settings. Requests sent to Open-Meteo are retained under Open-Meteo's policy, and Daymark cannot delete Open-Meteo's logs. If you have a question or a deletion request, contact us at the address below and we will explain what we can and cannot do."
+- **Strength:** CONFIRMED (Daymark-side facts); deletion process/wording is a **legal/product decision**. Do not imply Daymark can erase provider logs.
+
+### A9 — Cookies / host metadata wording (EN/FR/ES)
+- **Files:** `privacy.tsx:184`, `privacy-fr.tsx:203`, `privacy-es.tsx:197`; `storage-surface.test.ts:20, 57-64`.
+- **Current:** "Daymark does not use cookies …"
+- **Proposed:** "Daymark does not set cookies …" (app code sets none; host may process metadata under its own policy).
+- **Strength:** CONFIRMED for app code; host behaviour UNVERIFIED. **Legal decision?** No (wording), but Cloudflare config check is an ops action.
+
+### A10 — FR/ES translation fixes (FR/ES only)
+- **Files:** `privacy-fr.tsx:196-200`, `privacy-es.tsx:190-194`.
+- **Drift:** "pour les recherches hors ligne" / "para consultas sin conexión" implies offline place search. Forward place search is **not** offline; only the locality-name lookup is local (`locality.worker.ts:1-6`; `version-2-privacy-hardening.md:75-94`).
+- **Proposed FR:** "… dans Cache Storage pour la consultation locale du nom de la localité ; le service worker met séparément en cache les fichiers de l'application."
+- **Proposed ES:** "… en Cache Storage para la consulta local del nombre de la localidad; el service worker guarda por separado los archivos de la aplicación."
+- **Strength:** CONFIRMED (source). **Legal decision?** No.
+
+### A11 — Third-party list additions (EN/FR/ES)
+- **Files:** `privacy.tsx:190-214`, `privacy-fr.tsx:210-236`, `privacy-es.tsx:204-229`; `SystemSpeechPlugin.java:145-171`; `parakeet-assets/build.gradle:16-20`; `app/build.gradle:7-9`; `data-safety-v1-v2.md:164-165`.
+- **Add bullets:**
+  - "Your Android device's text-to-speech engine — only for French and Spanish narration in the Android app. Daymark selects a voice that does not require network access, but the engine is a separate app component and may be provided by your device manufacturer or Google." (INFERENCE for vendor; CONFIRMED for handoff.)
+  - "Google Play — distributes the Android app and delivers the Parakeet model as an install-time asset pack. Google Play's own privacy policy applies to that distribution." (CONFIRMED for asset pack.)
+  - In the Open-Meteo bullet: "Open-Meteo processes these requests on its own servers and describes itself as an independent data controller; its own privacy policy applies." (provider's own statement; not independently verified.)
+- **Strength:** CONFIRMED/INFERENCE as noted. **Legal decision?** Yes — processor roles and "Shared".
+
+### A12 — Security paragraph: HTTPS (EN/FR/ES)
+- **Files:** `privacy.tsx:246-253`, `privacy-fr.tsx:272-280`, `privacy-es.tsx:262-270`; `weather.ts:15-17`; `public/_headers`; `vite.config.ts:50-52`.
+- **Proposed addition:** "Requests to Open-Meteo use HTTPS." (CONFIRMED for app-controlled requests; platform speech transport remains outside this statement.)
+- **Strength:** CONFIRMED (app-controlled). **Legal decision?** No.
 
 ---
 
@@ -343,7 +431,7 @@ These are **proposals for the owner and legal reviewer**, not submitted answers.
 | Data type | V1 collected? | V1 shared? | V2 Android collected? | V2 shared? | Optional? | Purpose | Ephemeral? | Encrypted in transit? | Evidence |
 |---|---|---|---|---|---|---|---|---|---|
 | **Approximate location** | **Yes** (V1 declares COARSE and may receive a coarse fix; also declares FINE) | **No\*** (live form) / **Yes** (conservative) | **Yes** (OS approximate fix) | **No\*** / **Yes** | **Yes** | App functionality | **No** — Open-Meteo logs up to 90 days | **Yes** for the Open-Meteo HTTPS request | V1 manifest `:52-53`; V2 manifest `:61`; `location-privacy.ts:48-57`; `weather.ts:232-249`; `data-safety-v1-v2.md:160-170` |
-| **Precise location** | **Yes** (FINE + 2 dp cell <3 km²) | **Not declared** (the live form has no Precise row) / **Yes** (conservative) | **No** (source manifest coarse only; merged AAB unverified) | **N/A** (not collected) | **Yes** | App functionality | **No** | **Yes** for the Open-Meteo HTTPS request | V1 `App.tsx:101-106`; V2 manifest `:61`; `android-manifest-permissions.test.ts:71-77`; `data-safety-v1-v2.md:39-43` |
+| **Precise location** | **Yes** (FINE + 2 dp cell <3 km²) | **Not declared** (the live form has no Precise row) / **Yes** (conservative) | **No** (source manifest coarse only; **candidate AAB merged manifest verified coarse-only**) | **N/A** (not collected) | **Yes** | App functionality | **No** | **Yes** for the Open-Meteo HTTPS request | V1 `App.tsx:101-106`; V2 manifest `:61`; `android-manifest-permissions.test.ts:71-77`; `data-safety-v1-v2.md:39-43` |
 | **In-app search history** | **Yes** (typed query to geocoding) | **No\*** / **Yes** | **Yes** (unchanged) | **No\*** / **Yes** | **Yes** | App functionality | **No** — provider logs, not memory-only | **Yes** | `weather.ts:307-319`; `LocationSearch.tsx:31-63`; `data-safety-v1-v2.md:192-197` |
 | **Voice or sound recordings** | **Yes** (WebView speech; provider may process audio remotely; conservative) | **No\*** / **Yes** | **No** for Android-only (on-device Parakeet; source-level, packet proof open) | **N/A** (not collected) | **Yes** | App functionality | V1 **No/unknown**; V2 **N/A** | V1 **unverified for platform speech**; V2 **N/A** | V1 `use-speech-recognition.ts:10-13`; `voice-input-browser.ts:9-13`; V2 `use-speech-recognition.ts:24-36`; `voice-input-native.ts:26-32`; Parakeet `:39-55`; `data-safety-v1-v2.md:198-203` |
 | **Diagnostics / crash logs** | **No** app collection; platform vitals only | **No** | **No** app collection | **No** | N/A | N/A | N/A | N/A | `package.json:20-33`; `app/build.gradle:64-75`; no crash SDK; `data-safety-v1-v2.md:204` |
