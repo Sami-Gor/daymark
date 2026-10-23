@@ -189,6 +189,16 @@ scripts/                  workspace tooling
 - [Android production readiness](docs/release/android-production-readiness.md) and the [Play release checklist](docs/release/play-console-checklist.md)
 - [Privacy policy](https://daymark-weather.pages.dev/privacy), also available in the app at `/privacy`, `/fr/privacy` and `/es/privacy`
 
+## What's Coming
+
+**v2.0 — Coming soon**
+
+The next evolution of Daymark is in its final stages. Release details to follow.
+
+**v3.0 — On the horizon**
+
+Further ideas are in exploration as Daymark continues to evolve.
+
 ## Known limitations
 
 - Unit preference (°C/°F) is not persisted across reloads (the language preference is)
