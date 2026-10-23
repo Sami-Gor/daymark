@@ -2,6 +2,7 @@ package io.github.sami_gor.daymark.voice;
 
 import android.Manifest;
 import android.app.Activity;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -308,6 +309,10 @@ public final class ParakeetSpeechRecognitionPlugin extends Plugin {
         worker.execute(() -> captureAndRecognize(session));
     }
 
+    // RECORD_AUDIO is verified at line 157 (checkSelfPermission) before beginCapture()
+    // is ever called; Lint's MissingPermission cannot follow that cross-method
+    // guard, so the permission is re-checked here in spirit by the guard above.
+    @SuppressLint("MissingPermission")
     private void captureAndRecognize(Session session) {
         OfflineRecognizer engine;
         synchronized (stateLock) {

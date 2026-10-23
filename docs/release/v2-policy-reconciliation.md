@@ -542,17 +542,17 @@ These are the smallest text edits that remove the overclaims identified in §0/A
 
 **A1 — Opening paragraph (remove "runs entirely").**
 
-- `src/pages/privacy.tsx:27` — replace  
-  `Daymark is a weather app that runs entirely in your browser or installed app.`  
-  with  
+- `src/pages/privacy.tsx:27` — replace
+  `Daymark is a weather app that runs entirely in your browser or installed app.`
+  with
   `Daymark is a weather app whose app logic runs in your browser or installed app. Daymark does not operate a backend, account system, or database of its own. To show weather, air quality, and place suggestions, the app sends requests directly from your device to Open-Meteo, as described below.`
-- `src/pages/privacy-fr.tsx:26-27` — replace  
-  `Daymark est une application météo qui fonctionne entièrement dans votre navigateur ou en tant qu'application installée.`  
-  with  
+- `src/pages/privacy-fr.tsx:26-27` — replace
+  `Daymark est une application météo qui fonctionne entièrement dans votre navigateur ou en tant qu'application installée.`
+  with
   `Daymark est une application météo dont la logique s'exécute dans votre navigateur ou dans l'application installée. Daymark n'exploite pas de backend, de compte utilisateur ni de base de données propres. Pour afficher la météo, la qualité de l'air et les suggestions de lieux, l'application envoie des requêtes directement depuis votre appareil vers Open-Meteo, comme décrit ci-dessous.`
-- `src/pages/privacy-es.tsx:26-27` — replace  
-  `Daymark es una aplicación del tiempo que funciona por completo en tu navegador o como aplicación instalada.`  
-  with  
+- `src/pages/privacy-es.tsx:26-27` — replace
+  `Daymark es una aplicación del tiempo que funciona por completo en tu navegador o como aplicación instalada.`
+  with
   `Daymark es una aplicación del tiempo cuya lógica se ejecuta en tu navegador o en la aplicación instalada. Daymark no opera un backend, un sistema de cuentas ni una base de datos propios. Para mostrar el tiempo, la calidad del aire y las sugerencias de lugares, la aplicación envía solicitudes directamente desde tu dispositivo a Open-Meteo, como se describe a continuación.`
 
 **A3 — Device location (add "Android, not Daymark" + area).**
