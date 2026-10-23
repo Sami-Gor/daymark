@@ -93,7 +93,7 @@ test.describe('functional', () => {
     await expect.poll(() => page.evaluate(() => window.__geoCalls)).toBe(0);
   });
 
-  test('granted geolocation loads weather from rounded coordinates without reverse geocoding', async ({ browser }) => {
+  test('granted web geolocation loads weather from grid-rounded coordinates without reverse geocoding', async ({ browser }) => {
     const context = await browser.newContext({
       permissions: ['geolocation'],
       geolocation: { latitude: 51.5074567, longitude: -0.12789012 },
@@ -111,11 +111,50 @@ test.describe('functional', () => {
     const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
     expect(forecasts.length).toBeGreaterThan(0);
     for (const url of forecasts) {
-      expect(url).toContain('latitude=51.51');
-      expect(url).toContain('longitude=-0.13');
+      expect(url).toContain('latitude=51.5');
+      expect(url).toContain('longitude=-0.125');
       expect(url).not.toContain('5074567');
     }
     expect(requests.filter((url) => new URL(url).hostname === 'geocoding-api.open-meteo.com')).toEqual([]);
+    await context.close();
+  });
+
+  test('android native shell sends the OS approximate fix unchanged', async ({ browser }) => {
+    const context = await browser.newContext({
+      permissions: ['geolocation'],
+      geolocation: { latitude: 51.5074567, longitude: -0.12789012 },
+    });
+    const page = await context.newPage();
+    // Capacitor reports the platform as 'android' through its custom-platform
+    // hook. The app then takes the Android branch of the location flow (the
+    // manifest grants ACCESS_COARSE_LOCATION only, so the operating system
+    // supplies the approximate fix) while the JavaScript plugin
+    // implementations keep working.
+    await page.addInitScript(() => {
+      (window as unknown as { CapacitorCustomPlatform: { name: string } }).CapacitorCustomPlatform = {
+        name: 'android',
+      };
+    });
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await page.waitForLoadState('networkidle');
+    requests.length = 0;
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
+    const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
+    expect(forecasts.length).toBeGreaterThan(0);
+    for (const url of forecasts) {
+      // The approximate fix must leave the device untouched: rounding it
+      // again would compound the accuracy loss the OS permission already
+      // introduced.
+      expect(url).toContain('latitude=51.5074567');
+      expect(url).toContain('longitude=-0.12789012');
+      expect(url).not.toContain('latitude=51.51');
+      expect(url).not.toContain('longitude=-0.13');
+    }
     await context.close();
   });
 
@@ -2061,19 +2100,40 @@ test.describe('privacy policy page', () => {
   test('states the verified data practices in every language', async ({ page }) => {
     const expectations = {
       en: {
-        location: 'rounded to two decimal places',
-        speech: 'does not record or store your voice audio or speech transcripts',
+        location: 'requests approximate location only',
+        speech: 'Parakeet TDT 0.6B v3',
+        localSpeech: 'transcribes your speech locally',
+        webSpeech: 'may send your audio to the browser or platform provider',
+        webTranscript: 'browser returns a transcript to Daymark',
+        leavesDevice: 'leave your device and are sent to Open-Meteo',
+        offlineVoice: 'does not require a network connection',
         audience: 'general-audience weather utility',
+        versionNote: 'Daymark 1.0.0',
+        precisePermission: 'ACCESS_FINE_LOCATION',
       },
       fr: {
-        location: 'arrondies à deux décimales',
-        speech: 'n’enregistre ni ne conserve votre audio vocal ni vos transcriptions vocales',
+        location: 'demande uniquement une localisation approximative',
+        speech: 'Parakeet TDT 0.6B v3',
+        localSpeech: 'transcrit votre parole localement',
+        webSpeech: 'peut envoyer votre audio au fournisseur du navigateur ou de la plateforme',
+        webTranscript: 'le navigateur lui transmet une transcription',
+        leavesDevice: 'quittent votre appareil et sont envoyés à Open-Meteo',
+        offlineVoice: 'ne nécessite pas de connexion réseau',
         audience: 'grand public',
+        versionNote: 'Daymark 1.0.0',
+        precisePermission: 'ACCESS_FINE_LOCATION',
       },
       es: {
-        location: 'se redondean a dos decimales',
-        speech: 'no graba ni almacena tu audio de voz ni tus transcripciones',
+        location: 'solicita únicamente ubicación aproximada',
+        speech: 'Parakeet TDT 0.6B v3',
+        localSpeech: 'transcribe tu habla localmente',
+        webSpeech: 'puede enviar tu audio al proveedor del navegador o de la plataforma',
+        webTranscript: 'el navegador le devuelve una transcripción',
+        leavesDevice: 'salen de tu dispositivo y se envían a Open-Meteo',
+        offlineVoice: 'no requiera conexión de red',
         audience: 'público general',
+        versionNote: 'Daymark 1.0.0',
+        precisePermission: 'ACCESS_FINE_LOCATION',
       },
     } as const;
     for (const policy of policies) {
@@ -2086,7 +2146,14 @@ test.describe('privacy policy page', () => {
       expect(text).toContain('daymark.locale');
       expect(text).toContain(expectations[policy.lang].location);
       expect(text).toContain(expectations[policy.lang].speech);
+      expect(text).toContain(expectations[policy.lang].localSpeech);
+      expect(text).toContain(expectations[policy.lang].webSpeech);
+      expect(text).toContain(expectations[policy.lang].webTranscript);
+      expect(text).toContain(expectations[policy.lang].leavesDevice);
+      expect(text).toContain(expectations[policy.lang].offlineVoice);
       expect(text).toContain(expectations[policy.lang].audience);
+      expect(text).toContain(expectations[policy.lang].versionNote);
+      expect(text).toContain(expectations[policy.lang].precisePermission);
       expect(text).not.toMatch(/collects? no data/i);
     }
   });

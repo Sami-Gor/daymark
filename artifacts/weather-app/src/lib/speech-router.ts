@@ -18,7 +18,7 @@ export type BrowserSpeechAdapter = {
   readonly supported: boolean;
   speak: (
     text: string,
-    handlers?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+    handlers?: { onStart?: () => void; onEnd?: () => void; onError?: (reason?: string) => void },
     lang?: string,
   ) => boolean;
   stop: () => void;
@@ -89,10 +89,10 @@ export function createSpeechRouter(
             handlers.onEnd?.();
           }
         },
-        onError: () => {
+        onError: (reason) => {
           if (generation === token) {
             active = null;
-            handlers.onError?.('browser');
+            handlers.onError?.(reason || 'browser');
           }
         },
       },

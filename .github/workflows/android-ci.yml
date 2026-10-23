@@ -120,7 +120,7 @@ jobs:
       # decides whether the WebView loads the bundle at all.
       - name: Android unit tests
         working-directory: artifacts/weather-app/android
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :daymark-voice:testDebugUnitTest
 
       - name: Android debug build
         working-directory: artifacts/weather-app/android

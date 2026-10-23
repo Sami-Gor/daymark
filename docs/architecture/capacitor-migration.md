@@ -55,9 +55,10 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
   (Chrome granted it).
 - **Microphone / speech input:** `use-speech-recognition.ts` + AskDaymark use
   `SpeechRecognition`/`webkitSpeechRecognition` (browser), no `getUserMedia`.
-- **Speech output:** `use-browser-speech.ts` + `lib/voice-browser.ts` wrap
-  `window.speechSynthesis` with `SPEECH_LANGS` (en/fr/es) and single-utterance
-  semantics (`speak` cancels current first, `stop` = cancel).
+- **Speech output:** `use-browser-speech.ts` (removed in `332adba`) +
+  `lib/voice-browser.ts` wrap `window.speechSynthesis` with `SPEECH_LANGS`
+  (en/fr/es) and single-utterance semantics (`speak` cancels current first,
+  `stop` = cancel).
 - **Network:** Open-Meteo weather/air-quality/geocoding APIs; CSP whitelists
   those hosts in `public/_headers` and `vite.config.ts` preview headers.
 - **Offline:** SW app-shell precache + locality Cache Storage; weather needs
@@ -232,7 +233,8 @@ physical-device pass recorded in `docs/release/android-production-readiness.md`
 - Kokoro: READY, `voice=bm_fable`, streamed narration, Stop
   (`stopped=true`), offline (airplane mode) and repeated narration all pass.
 - Web/PWA: typecheck, 236 unit tests, 153 e2e tests and the production Vite
-  build pass; the service worker is skipped and cleaned up inside the native
+  build pass (the v2 candidate adds two unit-test files, so that branch runs
+  244 unit tests and the same 153 e2e tests); the service worker is skipped and cleaned up inside the native
   shell only.
 - Known environment limitations: the emulator has no fresh fused location fix
   and blocks mock providers, so "Use my location" could not be validated
@@ -260,8 +262,8 @@ project).
 
 Post-rollout cleanup candidates (do not execute before the Capacitor production rollout is stable):
 
-- `src/hooks/use-browser-speech.ts` — no production usages left (the unified
-  hook talks to `lib/voice-browser` directly).
+- The former `src/hooks/use-browser-speech.ts` hook was removed in `332adba`;
+  there is nothing left to clean up.
 - The root TWA project can be moved to an archive branch only after the
   Capacitor production rollout is stable; it is not part of the current
   production build and remains the documented rollback path until then.
