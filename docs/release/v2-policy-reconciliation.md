@@ -34,6 +34,8 @@ Each amendment uses the evidence labels from §0 of the original draft: **CONFIR
 - **Files:** `privacy.tsx:26-29`, `privacy-fr.tsx:24-28`, `privacy-es.tsx:24-28`.
 - **Current (EN):** "Daymark is a weather app that runs entirely in your browser or installed app."
 - **Proposed (EN):** "Daymark is a weather app whose app logic runs in your browser or installed app. Daymark does not operate a backend, account system, or database of its own. To show weather, air quality, and place suggestions, the app sends requests directly from your device to Open-Meteo, as described below."
+- **Proposed (FR):** "Daymark est une application météo dont la logique s'exécute dans votre navigateur ou dans l'application installée. Daymark n'exploite pas de backend, de compte utilisateur ni de base de données propres. Pour afficher la météo, la qualité de l'air et les suggestions de lieux, l'application envoie des requêtes directement depuis votre appareil vers Open-Meteo, comme décrit ci-dessous."
+- **Proposed (ES):** "Daymark es una aplicación del tiempo cuya lógica se ejecuta en tu navegador o en la aplicación instalada. Daymark no opera un backend, un sistema de cuentas ni una base de datos propios. Para mostrar el tiempo, la calidad del aire y las sugerencias de lugares, la aplicación envía solicitudes directamente desde tu dispositivo a Open-Meteo, como se describe a continuación."
 - **Why:** weather/air-quality/geocoding requests leave the device (`weather.ts:15-17, 232-263, 307-329`). "Of its own" keeps the true no-Daymark-backend fact (`README.md:11, 67`).
 - **Strength:** CONFIRMED. **Legal decision?** No (wording only).
 
@@ -76,7 +78,7 @@ Each amendment uses the evidence labels from §0 of the original draft: **CONFIR
 - **Hosts:** `api.open-meteo.com` (forecast + micro-climate), `air-quality-api.open-meteo.com`, `geocoding-api.open-meteo.com`. Place search sends `name`, `count=8`, `language`, `format=json` (`weather.ts:307-319`).
 - **Open-Meteo:** free-API troubleshooting logs may contain coordinates; deleted after 90 days (`privacy.tsx:130-134`).
 - **Cloudflare Pages:** static host for web/PWA only; processes standard request metadata (IP, URL, user agent) under its own policy (`privacy.tsx:204-209`). Android assets are local; Cloudflare is not an Android runtime flow.
-- **GeoNames:** static dataset; no runtime transfer; lookup runs on device (`locality.ts:16-18`; `locality.worker.ts:1-6`).
+- **GeoNames:** static dataset; no runtime transfer; lookup runs on device (`locality.ts:16-18`; `src/workers/locality.worker.ts:1-6`).
 - **Strength:** CONFIRMED (hosts/params/logs). Open-Meteo's independent-controller characterization is the provider's own statement (INFERENCE/UNVERIFIED). **Legal decision?** Yes — processor roles and "Shared".
 
 ### A8 — Retention and deletion (EN/FR/ES)
@@ -86,13 +88,13 @@ Each amendment uses the evidence labels from §0 of the original draft: **CONFIR
 
 ### A9 — Cookies / host metadata wording (EN/FR/ES)
 - **Files:** `privacy.tsx:184`, `privacy-fr.tsx:203`, `privacy-es.tsx:197`; `storage-surface.test.ts:20, 57-64`.
-- **Current:** "Daymark does not use cookies …"
-- **Proposed:** "Daymark does not set cookies …" (app code sets none; host may process metadata under its own policy).
+- **Current (EN):** "Daymark does not use cookies …"; **(FR)** "Daymark n'utilise pas de cookies …"; **(ES)** "Daymark no usa cookies …".
+- **Proposed (EN):** "Daymark does not set cookies …"; **(FR):** "Daymark ne dépose pas de cookies …"; **(ES):** "Daymark no establece cookies …" (app code sets none; host may process metadata under its own policy).
 - **Strength:** CONFIRMED for app code; host behaviour UNVERIFIED. **Legal decision?** No (wording), but Cloudflare config check is an ops action.
 
 ### A10 — FR/ES translation fixes (FR/ES only)
 - **Files:** `privacy-fr.tsx:196-200`, `privacy-es.tsx:190-194`.
-- **Drift:** "pour les recherches hors ligne" / "para consultas sin conexión" implies offline place search. Forward place search is **not** offline; only the locality-name lookup is local (`locality.worker.ts:1-6`; `version-2-privacy-hardening.md:75-94`).
+- **Drift:** "pour les recherches hors ligne" / "para consultas sin conexión" implies offline place search. Forward place search is **not** offline; only the locality-name lookup is local (`src/workers/locality.worker.ts:1-6`; `version-2-privacy-hardening.md:75-94`).
 - **Proposed FR:** "… dans Cache Storage pour la consultation locale du nom de la localité ; le service worker met séparément en cache les fichiers de l'application."
 - **Proposed ES:** "… en Cache Storage para la consulta local del nombre de la localidad; el service worker guarda por separado los archivos de la aplicación."
 - **Strength:** CONFIRMED (source). **Legal decision?** No.
@@ -145,7 +147,7 @@ The V1 build file at `50194e8` is `versionCode 1` / `versionName "1.0.0"` (`main
   - Every other platform: `roundDeviceLocation` snaps to `DEVICE_LOCATION_GRID_DEGREES = 0.025`, then rounds to three decimals (`:13, 26-32`).
 - The comment and code describe the web/PWA grid as about 2.8 km north/south and 1.7 km east/west near London, roughly 4.8 km² (`src/lib/location-privacy.ts:1-12`; `src/App.tsx:104-108`). At latitude φ the cell area is about **7.75 × cos(φ) km²**; it falls below 3 km² above roughly **67° latitude**. So the 0.025° grid is Approximate at UK latitudes, but it is not a universal Approximate guarantee. That matters only if the web/PWA flow is ever packaged in a Play artifact; it is not a Play-distributed artifact today.
 - The coordinate is passed to `loadWeather` (`src/App.tsx:122`) and then to `fetchWeather` (`src/lib/weather.ts:232-263`). Forecast and air-quality requests both carry `latitude` and `longitude` (`:233-249`). No other host receives the device coordinate from the app.
-- The nearby locality name is resolved **locally** from a static GeoNames dataset (`src/App.tsx:124`; `src/lib/locality.ts:16-18`; `src/lib/locality.worker.ts:1-6`). The web/PWA dataset is fetched from the app's own origin and cached; the Android dataset is bundled (`src/lib/locality-load.ts:2-31`; `src/pages/privacy.tsx:102-108`). No reverse-geocoding request is made.
+- The nearby locality name is resolved **locally** from a static GeoNames dataset (`src/App.tsx:124`; `src/lib/locality.ts:16-18`; `src/workers/locality.worker.ts:1-6`). The web/PWA dataset is fetched from the app's own origin and cached; the Android dataset is bundled (`src/lib/locality-load.ts:2-31`; `src/pages/privacy.tsx:102-108`). No reverse-geocoding request is made.
 
 **Search-selected place (not device location).**
 
@@ -402,7 +404,7 @@ And, in the Open-Meteo bullet, add:
 
 ### R11 — FR/ES notes
 
-**FR — locality cache wording (translation accuracy).** `src/pages/privacy-fr.tsx:196-198` says the static locality dataset is cached "pour les recherches hors ligne" (for offline searches). Forward place search is **not** offline; only the locality-name lookup is local (`docs/release/version-2-privacy-hardening.md:75-94`; `src/lib/locality.worker.ts:1-6`). Proposed replacement:
+**FR — locality cache wording (translation accuracy).** `src/pages/privacy-fr.tsx:196-198` says the static locality dataset is cached "pour les recherches hors ligne" (for offline searches). Forward place search is **not** offline; only the locality-name lookup is local (`docs/release/version-2-privacy-hardening.md:75-94`; `src/workers/locality.worker.ts:1-6`). Proposed replacement:
 
 > ... dans Cache Storage pour la consultation locale du nom de la localité ; le service worker met séparément en cache les fichiers de l'application.
 
@@ -533,6 +535,68 @@ Owner roles are generic because this draft does not assign named individuals.
 **What this audit does not prove:** it does not prove packet-level zero egress for V2 voice, and it does not prove the live Play form matches the shipped build. The candidate AAB's merged manifest was verified to lack `FINE`; the Play-signed artifact and Console answers remain **UNVERIFIED**.
 
 ---
+
+## Appendix — Minimal patch set (EN/FR/ES)
+
+These are the smallest text edits that remove the overclaims identified in §0/A1–A11. They are **proposed text only**; do not apply without legal review where an amendment is flagged as a legal decision. Paths are relative to `artifacts/weather-app/`.
+
+**A1 — Opening paragraph (remove "runs entirely").**
+
+- `src/pages/privacy.tsx:27` — replace  
+  `Daymark is a weather app that runs entirely in your browser or installed app.`  
+  with  
+  `Daymark is a weather app whose app logic runs in your browser or installed app. Daymark does not operate a backend, account system, or database of its own. To show weather, air quality, and place suggestions, the app sends requests directly from your device to Open-Meteo, as described below.`
+- `src/pages/privacy-fr.tsx:26-27` — replace  
+  `Daymark est une application météo qui fonctionne entièrement dans votre navigateur ou en tant qu'application installée.`  
+  with  
+  `Daymark est une application météo dont la logique s'exécute dans votre navigateur ou dans l'application installée. Daymark n'exploite pas de backend, de compte utilisateur ni de base de données propres. Pour afficher la météo, la qualité de l'air et les suggestions de lieux, l'application envoie des requêtes directement depuis votre appareil vers Open-Meteo, comme décrit ci-dessous.`
+- `src/pages/privacy-es.tsx:26-27` — replace  
+  `Daymark es una aplicación del tiempo que funciona por completo en tu navegador o como aplicación instalada.`  
+  with  
+  `Daymark es una aplicación del tiempo cuya lógica se ejecuta en tu navegador o en la aplicación instalada. Daymark no opera un backend, un sistema de cuentas ni una base de datos propios. Para mostrar el tiempo, la calidad del aire y las sugerencias de lugares, la aplicación envía solicitudes directamente desde tu dispositivo a Open-Meteo, como se describe a continuación.`
+
+**A3 — Device location (add "Android, not Daymark" + area).**
+
+- `src/pages/privacy.tsx:92-101` — insert after "does not declare ACCESS_FINE_LOCATION." : `Android, not Daymark, determines the approximate estimate.`; after "1.7 km east/west near London" insert `, roughly 4.8 km²`.
+- `src/pages/privacy-fr.tsx:103-113` and `src/pages/privacy-es.tsx:101-110` — apply the same two clarifications in translation.
+
+**A5 — Voice input (remove "entirely").**
+
+- `src/pages/privacy.tsx:142-148` — replace "recognition runs entirely on your device" with "speech recognition is performed on your device" and add "The Android voice code does not contain a network speech-recognition path, a platform speech recogniser, or a fallback to one; if the model is unavailable, Daymark reports that voice input is unavailable." Remove "entirely." Add to the web paragraph: "The browser or platform provider may retain audio or transcripts under its own policy; Daymark cannot see or delete a copy held by that provider."
+
+**A6 — Narration (add TTS engine disclosure).**
+
+- `src/pages/privacy.tsx:161-171` — insert after "passed to that installed voice on your device." : `The text-to-speech engine is a separate app component, which may be supplied by your device manufacturer or Google; its own privacy policy applies.`
+
+**A7 — Third-party list (add TTS engine + Google Play + Open-Meteo controller).**
+
+- `src/pages/privacy.tsx:190-214` — add bullets for "Your Android device's text-to-speech engine" and "Google Play"; add to the Open-Meteo bullet: "Open-Meteo processes these requests on its own servers and describes itself as an independent data controller; its own privacy policy applies."
+- `src/pages/privacy-fr.tsx:210-236` and `src/pages/privacy-es.tsx:204-229` — translate the same bullets.
+
+**A8 — Retention/deletion (add deletion process).**
+
+- `src/pages/privacy.tsx:238-244` — append: "Because Daymark has no account or server-side store, there is no Daymark-held account data to delete. You can clear the language preference and the app's local storage in your browser or device settings. Requests sent to Open-Meteo are retained under Open-Meteo's policy, and Daymark cannot delete Open-Meteo's logs. If you have a question or a deletion request, contact us at the address below and we will explain what we can and cannot do."
+
+**A9 — Cookies wording.**
+
+- `src/pages/privacy.tsx:184` — "does not use cookies" → "does not set cookies".
+- `src/pages/privacy-fr.tsx:203` — "n'utilise pas de cookies" → "ne dépose pas de cookies".
+- `src/pages/privacy-es.tsx:197` — "no usa cookies" → "no establece cookies".
+
+**A10 — FR/ES locality cache wording.**
+
+- `src/pages/privacy-fr.tsx:196-198` — "pour les recherches hors ligne" → "pour la consultation locale du nom de la localité".
+- `src/pages/privacy-es.tsx:190-192` — "para consultas sin conexión" → "para la consulta local del nombre de la localidad".
+
+**A12 — Security paragraph (HTTPS).**
+
+- `src/pages/privacy.tsx:246-253` — append: "Requests to Open-Meteo use HTTPS." (and FR/ES equivalents).
+
+**Code-comment cleanup (not policy):**
+
+- `src/lib/voice-browser.ts:9-11` — remove "no cloud TTS"; the browser may select a remote voice.
+
+**Legal decisions contained in this patch set:** A2 (Play "Shared"), A5 (Play "Voice or sound recordings" for Android), A6 (whether narration text is "sharing"), A8 (deletion-request answer/process), A11 (third-party processor roles), and A10's effective-date handling. All other items are wording/engineering facts.
 
 ## 7. Source index
 
