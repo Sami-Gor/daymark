@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { events, native, registered, registrationOrder } = vi.hoisted(() => {
+const { events, handles, native, registered, registrationOrder } = vi.hoisted(() => {
   const events: Record<string, Array<(payload: any) => void>> = {
     result: [],
     error: [],
@@ -8,6 +8,7 @@ const { events, native, registered, registrationOrder } = vi.hoisted(() => {
     started: [],
     captureEnd: [],
   };
+  const handles: Array<{ remove: ReturnType<typeof vi.fn> }> = [];
   const registered: string[] = [];
   const registrationOrder: string[] = [];
   const native = {
@@ -16,10 +17,12 @@ const { events, native, registered, registrationOrder } = vi.hoisted(() => {
     cancel: vi.fn(),
     addListener: vi.fn((eventName: string, listener: (payload: any) => void) => {
       events[eventName]?.push(listener);
-      return Promise.resolve({ remove: vi.fn() });
+      const handle = { remove: vi.fn() };
+      handles.push(handle);
+      return Promise.resolve(handle);
     }),
   };
-  return { events, native, registered, registrationOrder };
+  return { events, handles, native, registered, registrationOrder };
 });
 
 vi.mock('@capacitor/core', () => ({
@@ -43,6 +46,7 @@ function resetEvents() {
 beforeEach(() => {
   resetEvents();
   registered.length = 0;
+  handles.length = 0;
   native.isAvailable.mockReset();
   native.start.mockReset().mockResolvedValue(undefined);
   native.cancel.mockReset().mockResolvedValue(undefined);
@@ -77,6 +81,14 @@ describe('createParakeetRecognitionController', () => {
 
     expect(await controller.initialize()).toBe(false);
     // One probe: a missing model is permanent, so it is not polled.
+    expect(native.isAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not wait for a corrupt model', async () => {
+    native.isAvailable.mockResolvedValue({ available: false, reason: 'model-corrupt' });
+    const controller = createParakeetRecognitionController();
+
+    expect(await controller.initialize()).toBe(false);
     expect(native.isAvailable).toHaveBeenCalledTimes(1);
   });
 
@@ -272,7 +284,7 @@ describe('createParakeetRecognitionController', () => {
     expect(controller.isListening()).toBe(false);
   });
 
-  it('maps a missing model to the offline-unavailable error code', async () => {
+  it('passes a missing-model error event through unchanged', async () => {
     native.isAvailable.mockResolvedValue({ available: true, reason: '' });
     const controller = createParakeetRecognitionController();
     await controller.initialize();
@@ -283,5 +295,200 @@ describe('createParakeetRecognitionController', () => {
     events.error[0]?.({ sessionId: 1, code: 'model-missing' });
 
     expect(onError).toHaveBeenCalledWith('model-missing');
+  });
+
+  it('does not wait for an unavailable runtime', async () => {
+    native.isAvailable.mockResolvedValue({ available: false, reason: 'runtime-unavailable' });
+    const controller = createParakeetRecognitionController();
+
+    expect(await controller.initialize()).toBe(false);
+    expect(native.isAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not wait when the native side gives no reason to retry', async () => {
+    native.isAvailable.mockResolvedValue({ available: false });
+    const controller = createParakeetRecognitionController();
+
+    expect(await controller.initialize()).toBe(false);
+    expect(native.isAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('polls a preparing model every 500 ms', async () => {
+    vi.useFakeTimers();
+    native.isAvailable
+      .mockResolvedValueOnce({ available: false, reason: 'model-preparing' })
+      .mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+
+    const pending = controller.initialize();
+    await vi.advanceTimersByTimeAsync(499);
+    expect(native.isAvailable).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toBe(true);
+    expect(native.isAvailable).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up waiting for the model at the preparation deadline', async () => {
+    vi.useFakeTimers();
+    native.isAvailable.mockResolvedValue({ available: false, reason: 'model-preparing' });
+    const controller = createParakeetRecognitionController();
+    let resolved: boolean | null = null;
+    const pending = controller.initialize().then((value) => {
+      resolved = value;
+      return value;
+    });
+
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(resolved).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toBe(false);
+    const probesAtDeadline = native.isAvailable.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(native.isAvailable).toHaveBeenCalledTimes(probesAtDeadline);
+  });
+
+  it('probes the model once across repeated initialisation', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+
+    expect(await controller.initialize()).toBe(true);
+    expect(await controller.initialize()).toBe(true);
+    expect(native.isAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports unsupported when the native listener registration fails', async () => {
+    native.addListener.mockRejectedValueOnce(new Error('bridge unavailable'));
+    const controller = createParakeetRecognitionController();
+
+    expect(await controller.initialize()).toBe(false);
+    expect(controller.supported).toBe(false);
+    expect(native.isAvailable).not.toHaveBeenCalled();
+  });
+
+  it('refuses to start before initialisation has completed', () => {
+    const controller = createParakeetRecognitionController();
+    const onError = vi.fn();
+
+    expect(controller.start({ onError }, 'en-GB')).toBe(false);
+    expect(onError).toHaveBeenCalledWith('offline-unavailable');
+    expect(native.start).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('cancels and clears a session when the decode watchdog expires', async () => {
+    vi.useFakeTimers();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.started[0]?.({ sessionId: 1 });
+    await vi.advanceTimersByTimeAsync(30_000);
+    events.captureEnd[0]?.({ sessionId: 1 });
+
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(onError).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
+    expect(onError).toHaveBeenCalledWith('timeout');
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('maps an empty native error code to unknown instead of an empty string', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.error[0]?.({ sessionId: 1, code: '' });
+
+    expect(onError).toHaveBeenCalledWith('unknown');
+  });
+
+  it('delivers end without an error when the native side ends cleanly', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onEnd = vi.fn();
+    const onError = vi.fn();
+    expect(controller.start({ onEnd, onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.end[0]?.({ sessionId: 1 });
+
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('ignores a late native start failure for a superseded session', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    let rejectStart!: (error: unknown) => void;
+    native.start.mockReturnValue(new Promise<void>((_, reject) => {
+      rejectStart = reject;
+    }));
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    controller.stop();
+    rejectStart(new Error('permission-denied'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('starts a fresh session after a timeout', async () => {
+    vi.useFakeTimers();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const firstError = vi.fn();
+    expect(controller.start({ onError: firstError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.started[0]?.({ sessionId: 1 });
+    await vi.advanceTimersByTimeAsync(32_000);
+    expect(firstError).toHaveBeenCalledWith('timeout');
+
+    const onResult = vi.fn();
+    expect(controller.start({ onResult }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    expect(native.start).toHaveBeenLastCalledWith({ sessionId: 2, lang: 'en-GB' });
+    events.started[0]?.({ sessionId: 2 });
+    events.result[0]?.({ sessionId: 2, transcript: 'after the timeout' });
+
+    expect(onResult).toHaveBeenCalledWith('after the timeout');
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('dispose cancels the active session, removes listeners and blocks restarts', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+    expect(handles).toHaveLength(5);
+
+    expect(controller.start({}, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    controller.dispose();
+
+    expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
+    for (const handle of handles) expect(handle.remove).toHaveBeenCalledTimes(1);
+    expect(controller.isListening()).toBe(false);
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(false);
+    expect(onError).toHaveBeenCalledWith('offline-unavailable');
   });
 });

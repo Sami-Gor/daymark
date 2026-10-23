@@ -32,6 +32,31 @@ public final class ParakeetModelAssets {
         93939L,
     };
 
+    /**
+     * Pinned SHA-256 digests of the model files, in the same order as
+     * {@link #MODEL_FILE_NAMES}.
+     *
+     * <p>These are the digests published with the upstream release and pinned in
+     * {@code android/kokoro-poc/scripts/fetch-parakeet-assets.sh}. A byte-length
+     * check alone cannot detect same-length corruption, so the digests are the
+     * authority for what may be loaded.
+     */
+    public static final String[] MODEL_FILE_SHA256 = {
+        "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+        "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+        "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+        "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+    };
+
+    /**
+     * Identifier of the pinned model content.
+     *
+     * <p>Bump this whenever a file, its size or its digest changes. A marker
+     * written for a different identifier is treated as stale and the model is
+     * re-hashed before it may be used.
+     */
+    public static final String MODEL_VERSION = "parakeet-tdt-0.6b-v3-int8-sha256-1";
+
     /** Directory inside the app's private files directory the model is materialised into. */
     public static final String MODEL_DIRECTORY = "parakeet-v3-model";
 
@@ -41,10 +66,20 @@ public final class ParakeetModelAssets {
     /** Reason reported while the model is still being materialised. */
     public static final String REASON_MODEL_PREPARING = "model-preparing";
 
+    /** Reason reported when materialised model content fails verification. */
+    public static final String REASON_MODEL_CORRUPT = "model-corrupt";
+
     /** Reason reported when the runtime itself cannot be used. */
     public static final String REASON_RUNTIME_UNAVAILABLE = "runtime-unavailable";
 
     private ParakeetModelAssets() {
+    }
+
+    static {
+        if (MODEL_FILE_NAMES.length != MODEL_FILE_SIZES.length
+                || MODEL_FILE_NAMES.length != MODEL_FILE_SHA256.length) {
+            throw new AssertionError("the Parakeet model name, size and digest tables must align");
+        }
     }
 
     /** Asset path of a model file, for example {@code parakeet/encoder.int8.onnx}. */
