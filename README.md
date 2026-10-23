@@ -1,14 +1,31 @@
 # Daymark
 
-A calm, privacy-conscious weather app for the web (PWA) and Android, built with React, Vite, TypeScript, [Capacitor](https://capacitorjs.com), and [Open-Meteo](https://open-meteo.com).
+**Weather without the noise.**
 
-**Live app:** https://daymark-weather.pages.dev
+A calm, privacy-conscious weather app for the web (PWA) and Android. Current conditions, the next few hours, rain, UV, air quality and daylight — in one readable page, with no account, ads or tracking.
 
-![Daymark on desktop](docs/images/daymark-desktop.png)
+<p>
+  <a href="https://github.com/Sami-Gor/daymark/blob/main/LICENSE"><img alt="Licence" src="https://img.shields.io/github/license/Sami-Gor/daymark"></a>
+  <a href="https://github.com/Sami-Gor/daymark/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Sami-Gor/daymark?branch=main"></a>
+  <a href="https://github.com/Sami-Gor/daymark/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/Sami-Gor/daymark/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/Sami-Gor/daymark/actions/workflows/android-ci.yml"><img alt="Android CI status" src="https://github.com/Sami-Gor/daymark/actions/workflows/android-ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/Sami-Gor/daymark/actions/workflows/codeql.yml"><img alt="CodeQL status" src="https://github.com/Sami-Gor/daymark/actions/workflows/codeql.yml/badge.svg?branch=main"></a>
+</p>
+
+**Live app:** https://daymark-weather.pages.dev · **Source:** https://github.com/Sami-Gor/daymark
+
+[![Daymark on desktop and mobile](docs/images/daymark-hero.jpg)](https://daymark-weather.pages.dev)
+
+## Why Daymark?
+
+- **One question, answered well.** Current conditions, feels-like, a plain-English day cue and the next five hours — without dashboards or clutter.
+- **The details that change your day.** Rain chance and rainfall, UV with a protection window, air quality, sunrise and sunset, humidity and dew point.
+- **Private by architecture.** No accounts, ads, analytics or telemetry; geolocation is requested only when you tap *Use my location*, and weather and place search go directly to Open-Meteo.
+- **Web and Android.** Installable PWA, plus a Capacitor Android app with offline English narration from the bundled Kokoro voice.
 
 ## Overview
 
-Daymark answers one question well — *what's the sky doing?* — without dashboards, accounts, ads, or tracking. It is a client-side app on the web and in the Android WebView, with no Daymark-operated backend or database. It calls Open-Meteo directly for weather and place search; Open-Meteo's own handling is governed by its policies. Device location is only requested when you ask for it.
+Daymark is a client-side app on the web and in the Android WebView, with no Daymark-operated backend or database. It calls Open-Meteo directly for weather and place search; Open-Meteo's own handling is governed by its policies. Device location is only requested when you ask for it.
 
 ## Features
 
@@ -54,6 +71,7 @@ The design is editorial rather than dashboard-like — a serif-led hero with a p
 ## Tech stack
 
 - [React 19](https://react.dev) + [TypeScript](https://www.typescriptlang.org) + [Vite 7](https://vite.dev)
+- [Capacitor 8](https://capacitorjs.com) for the Android shell; weather and place search use [Open-Meteo](https://open-meteo.com)
 - [Tailwind CSS 4](https://tailwindcss.com) with a hand-written design layer (Fraunces, Plus Jakarta Sans, DM Mono — self-hosted)
 - [Zod](https://zod.dev) for runtime validation of every API response
 - [wouter](https://github.com/molefrog/wouter) for routing and [Radix](https://www.radix-ui.com) primitives
@@ -164,6 +182,13 @@ docs/                     architecture, release audit, README screenshots
 scripts/                  workspace tooling
 ```
 
+## Documentation
+
+- [Architecture and the Capacitor migration](docs/architecture/capacitor-migration.md)
+- [Security posture](SECURITY.md) and [security research](docs/security/README.md)
+- [Android production readiness](docs/release/android-production-readiness.md) and the [Play release checklist](docs/release/play-console-checklist.md)
+- [Privacy policy](https://daymark-weather.pages.dev/privacy), also available in the app at `/privacy`, `/fr/privacy` and `/es/privacy`
+
 ## Known limitations
 
 - Unit preference (°C/°F) is not persisted across reloads (the language preference is)
@@ -181,4 +206,17 @@ Daymark's source is [MIT](LICENSE). Bundled third-party components keep their ow
 
 ## Contributing
 
-Issues and pull requests are welcome. Please keep the client-only architecture: no backend, no tracking, no new third-party network origins without discussion.
+Issues and pull requests are welcome.
+
+- Keep the client-only architecture: no backend, no tracking, and no new third-party network origins without discussion.
+- Read [SECURITY.md](SECURITY.md) before changing network, location, voice or storage behaviour, and report security issues privately as described there.
+- Follow the existing typed API boundary and Zod validation in [`artifacts/weather-app/src/lib/weather.ts`](artifacts/weather-app/src/lib/weather.ts); the security posture is documented in [`docs/security/daymark-security.md`](docs/security/daymark-security.md).
+- Run the same checks as CI before opening a PR:
+
+  ```bash
+  pnpm --filter @workspace/weather-app run typecheck
+  pnpm --filter @workspace/weather-app run test
+  pnpm --filter @workspace/weather-app run test:e2e
+  ```
+
+  Android changes also run through [`.github/workflows/android-ci.yml`](.github/workflows/android-ci.yml).
