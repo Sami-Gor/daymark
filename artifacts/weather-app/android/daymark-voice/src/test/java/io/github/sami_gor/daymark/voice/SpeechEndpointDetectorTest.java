@@ -11,7 +11,9 @@ import org.junit.Test;
  *
  * <p>These cover the decision that replaced the fixed capture window used by
  * the earlier experiment, so a request ends when the user stops speaking instead
- * of after a fixed delay.
+ * of after a fixed delay. The onset cases pin down that a run of consecutive
+ * speech chunks is required: isolated transients must not start an utterance,
+ * and speech inside the hangover restarts the quiet run that ends it.
  */
 public class SpeechEndpointDetectorTest {
 
@@ -36,6 +38,68 @@ public class SpeechEndpointDetectorTest {
         assertFalse("two chunks are below the onset threshold", detector.hasSpeechStarted());
         detector.accept(SPEECH);
         assertTrue(detector.hasSpeechStarted());
+    }
+
+    @Test
+    public void resetsTheSpeechRunOnQuietChunksBeforeSpeechHasStarted() {
+        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
+        // speech, quiet, speech, quiet, speech: three speech chunks in total,
+        // but never three in a row, so the utterance must not start.
+        detector.accept(SPEECH);
+        assertFalse(detector.accept(QUIET));
+        detector.accept(SPEECH);
+        assertFalse(detector.accept(QUIET));
+        detector.accept(SPEECH);
+        assertFalse("non-consecutive speech chunks must not start the utterance",
+                detector.hasSpeechStarted());
+        assertFalse(detector.isFinished());
+    }
+
+    @Test
+    public void doesNotStartForIsolatedBlips() {
+        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
+        for (int blip = 0; blip < 3; blip++) {
+            detector.accept(SPEECH);
+            for (int index = 0; index < 50; index++) {
+                assertFalse(detector.accept(QUIET));
+            }
+        }
+        assertFalse("three isolated transients must not start the utterance",
+                detector.hasSpeechStarted());
+        assertFalse(detector.isFinished());
+    }
+
+    @Test
+    public void startsAfterConsecutiveSpeechEvenWhenBlipsCameEarlier() {
+        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
+        detector.accept(SPEECH);
+        for (int index = 0; index < 25; index++) {
+            detector.accept(QUIET);
+        }
+        assertFalse(detector.hasSpeechStarted());
+        for (int index = 0; index < 3; index++) {
+            detector.accept(SPEECH);
+        }
+        assertTrue("a real run of speech starts the utterance", detector.hasSpeechStarted());
+    }
+
+    @Test
+    public void postOnsetSpeechResetsTheHangoverCounter() {
+        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
+        for (int index = 0; index < 3; index++) {
+            detector.accept(SPEECH);
+        }
+        for (int index = 0; index < 24; index++) {
+            assertFalse(detector.accept(QUIET));
+        }
+        // A speech chunk inside the hangover restarts the quiet run.
+        assertFalse(detector.accept(SPEECH));
+        for (int index = 0; index < 24; index++) {
+            assertFalse(detector.accept(QUIET));
+        }
+        assertTrue("the hangover counts quiet since the last speech chunk",
+                detector.accept(QUIET));
+        assertTrue(detector.isFinished());
     }
 
     @Test

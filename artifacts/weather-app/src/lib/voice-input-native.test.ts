@@ -183,13 +183,60 @@ describe('createParakeetRecognitionController', () => {
     await Promise.resolve();
     events.started[0]?.({ sessionId: 1 });
     await vi.advanceTimersByTimeAsync(30_000);
-    events.captureEnd[0]?.({ sessionId: 1 });
-    await vi.advanceTimersByTimeAsync(7_000);
+    // A full 30 s capture reports its length, so the decode watchdog is
+    // 15 s + 30 s, and a 40 s decode still fits inside it.
+    events.captureEnd[0]?.({ sessionId: 1, capturedMs: 30_000 });
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(onError).not.toHaveBeenCalled();
     events.result[0]?.({ sessionId: 1, transcript: 'a long utterance' });
 
     expect(onResult).toHaveBeenCalledWith('a long utterance');
     expect(onError).not.toHaveBeenCalled();
     expect(controller.isListening()).toBe(false);
+  });
+
+  it('scales the decode watchdog with the captured audio length', async () => {
+    vi.useFakeTimers();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.started[0]?.({ sessionId: 1 });
+    await vi.advanceTimersByTimeAsync(30_000);
+    events.captureEnd[0]?.({ sessionId: 1, capturedMs: 30_000 });
+
+    // 15 s + 30 s: still decoding one millisecond short of the budget.
+    await vi.advanceTimersByTimeAsync(44_999);
+    expect(onError).not.toHaveBeenCalled();
+    expect(native.cancel).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
+    expect(onError).toHaveBeenCalledWith('timeout');
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('keeps the 15 s decode floor when no capture length is reported', async () => {
+    vi.useFakeTimers();
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.started[0]?.({ sessionId: 1 });
+    await vi.advanceTimersByTimeAsync(1_000);
+    events.captureEnd[0]?.({ sessionId: 1 });
+
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(onError).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onError).toHaveBeenCalledWith('timeout');
+    expect(native.cancel).toHaveBeenCalledWith({ sessionId: 1 });
   });
 
   it('ignores a native start that resolves after the user stopped the session', async () => {

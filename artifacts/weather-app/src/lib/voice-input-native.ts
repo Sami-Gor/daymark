@@ -11,6 +11,8 @@ type NativeResult = { sessionId: number; transcript: string };
 type NativeError = { sessionId: number; code: string };
 type NativeEnd = { sessionId: number };
 type NativeLifecycle = { sessionId: number };
+/** captureEnd additionally reports how long the microphone was live. */
+type NativeCaptureEnd = { sessionId: number; capturedMs?: number };
 
 interface ParakeetSpeechRecognitionPlugin {
   isAvailable(): Promise<{ available: boolean; reason?: string }>;
@@ -20,7 +22,7 @@ interface ParakeetSpeechRecognitionPlugin {
   addListener(eventName: 'error', listenerFunc: (event: NativeError) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'end', listenerFunc: (event: NativeEnd) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'started', listenerFunc: (event: NativeLifecycle) => void): Promise<PluginListenerHandle>;
-  addListener(eventName: 'captureEnd', listenerFunc: (event: NativeLifecycle) => void): Promise<PluginListenerHandle>;
+  addListener(eventName: 'captureEnd', listenerFunc: (event: NativeCaptureEnd) => void): Promise<PluginListenerHandle>;
 }
 
 /**
@@ -33,6 +35,12 @@ const NativeRecognizer = registerPlugin<ParakeetSpeechRecognitionPlugin>('Parake
 // The native side owns the 30 s capture cap. These watchdogs are backstops
 // anchored to actual native phases, not to the click or the permission prompt.
 const CAPTURE_WATCHDOG_MS = 32_000;
+/**
+ * Decode budget floor for short utterances. The native `captureEnd` reports
+ * how long the microphone was actually live, and the watchdog scales with it:
+ * decoding a full 30 s utterance is judged against 15 s + 30 s, not against
+ * the floor meant for a short answer.
+ */
 const DECODE_WATCHDOG_MS = 15_000;
 /** How often the plugin is asked whether the model has become usable. */
 const MODEL_PREPARATION_POLL_MS = 500;
@@ -118,12 +126,16 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
         NativeRecognizer.addListener('captureEnd', (event) => {
           if (!handlesEvent(event.sessionId)) return;
           clearRecognitionTimeout();
+          // Scale the decode budget with what was actually captured: the 15 s
+          // floor covers short utterances, and longer audio gets more room
+          // instead of being timed out mid-decode.
+          const capturedMs = Math.max(0, Number(event.capturedMs) || 0);
           recognitionTimeout = setTimeout(() => {
             if (!handlesEvent(event.sessionId)) return;
             void NativeRecognizer.cancel({ sessionId: event.sessionId }).catch(() => undefined);
             const timedOut = detachSession(event.sessionId);
             timedOut?.onError?.('timeout');
-          }, DECODE_WATCHDOG_MS);
+          }, DECODE_WATCHDOG_MS + capturedMs);
         }),
       ]);
       listeners.push(...registered);
@@ -188,6 +200,7 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
         const code = /permission-blocked/i.test(message) ? 'permission-blocked'
           : /permission-denied/i.test(message) ? 'permission-denied'
           : /permission|not-allowed/i.test(message) ? 'permission-blocked'
+          : /audio-capture/i.test(message) ? 'audio-capture'
           : /offline-unavailable|api-unsupported|model-missing|model-preparing|runtime-unavailable/i.test(message)
             ? 'offline-unavailable'
           : /cancel|aborted/i.test(message) ? 'aborted'

@@ -13,6 +13,11 @@ package io.github.sami_gor.daymark.voice;
  * has been seen and the signal has then stayed quiet for a hangover period, which
  * keeps the closing consonants of a word from truncating the utterance.
  *
+ * <p>Onset must be consecutive: quiet chunks before the utterance has started
+ * reset the speech run, so isolated transients (taps, clicks, a cough) never
+ * count towards it. Once the utterance has started, a speech chunk resets the
+ * quiet run that ends it.
+ *
  * <p>The class holds no Android types, so it is covered by plain JVM unit tests.
  */
 public final class SpeechEndpointDetector {
@@ -65,6 +70,13 @@ public final class SpeechEndpointDetector {
             return false;
         }
         quietChunks++;
+        if (!speechStarted) {
+            // Onset is consecutive: a quiet chunk breaks the run of speech, so
+            // a later chunk starts counting from zero again. Without this,
+            // isolated transients anywhere in the capture window would add up
+            // to a "started" utterance.
+            speechChunks = 0;
+        }
         if (speechStarted && quietChunks >= hangoverChunks) {
             finished = true;
             return true;
