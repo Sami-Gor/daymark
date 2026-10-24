@@ -250,6 +250,9 @@ overrides:
   brace-expansion: 5.0.12
   source-map-js: 1.2.2
 
+patchedDependencies:
+  '@capacitor/android@8.5.1': e3620a37b9700b82df5aa5a60bd518c33271fb0e69262fd0098e9298b45195f4
+
 importers:
 
   .:
@@ -448,7 +451,7 @@ importers:
     dependencies:
       '@capacitor/android':
         specifier: 8.5.1
-        version: 8.5.1(@capacitor/core@8.5.1)
+        version: 8.5.1(patch_hash=e3620a37b9700b82df5aa5a60bd518c33271fb0e69262fd0098e9298b45195f4)(@capacitor/core@8.5.1)
       '@capacitor/app':
         specifier: 8.1.1
         version: 8.1.1(@capacitor/core@8.5.1)
@@ -2677,7 +2680,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@capacitor/android@8.5.1(@capacitor/core@8.5.1)':
+  '@capacitor/android@8.5.1(patch_hash=e3620a37b9700b82df5aa5a60bd518c33271fb0e69262fd0098e9298b45195f4)(@capacitor/core@8.5.1)':
     dependencies:
       '@capacitor/core': 8.5.1
 

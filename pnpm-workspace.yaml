@@ -158,3 +158,6 @@ overrides:
 
 allowBuilds:
   esbuild: true
+
+patchedDependencies:
+  '@capacitor/android@8.5.1': patches/@capacitor__android@8.5.1.patch
