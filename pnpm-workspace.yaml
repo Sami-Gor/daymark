@@ -57,7 +57,7 @@ catalog:
   tailwind-merge: ^3.3.1
   tailwindcss: ^4.1.14
   tsx: ^4.21.0
-  vite: ^7.3.2
+  vite: ^7.3.7
   wouter: ^3.3.5
   zod: ^3.25.76
 
@@ -151,6 +151,10 @@ overrides:
   esbuild: "0.28.1"
   # postcss (via vite) accepts ^3.3.6; 3.3.18 is the patched same-major release.
   nanoid: "3.3.18"
+  # security: brace-expansion >=5.0.12 fixes GHSA-6j4f-fj2g-mc7p / -qhr7-859c-m2p7 / -q2hr-2g5m-vwhr (dev-only, via @capacitor/cli).
+  "brace-expansion": "5.0.12"
+  # security: source-map-js >=1.2.2 fixes GHSA-68fv-2mgg-jv7q (dev-only, via vite/postcss).
+  "source-map-js": "1.2.2"
 
 allowBuilds:
   esbuild: true

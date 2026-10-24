@@ -70,7 +70,7 @@ android {
     namespace "io.github.sami_gor.daymark"
     defaultConfig {
         applicationId "io.github.sami_gor.daymark"
-        minSdkVersion 23
+        minSdkVersion 24
         targetSdkVersion 36
         versionCode 1
         versionName "1.0.0"
@@ -243,8 +243,7 @@ repositories {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     
-        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
-    
+        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
 }
 
 // Fail clearly if a release build is requested without signing credentials.
