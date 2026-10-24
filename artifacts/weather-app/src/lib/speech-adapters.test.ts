@@ -12,24 +12,39 @@ function adapter(supported: boolean): BrowserSpeechAdapter {
 }
 
 describe('pickFallbackAdapter', () => {
-  it('uses the platform TTS bridge on native when the WebView has no Web Speech API', () => {
+  it('uses the platform TTS bridge on Android when the WebView has no Web Speech API', () => {
     const webSpeech = adapter(false);
     const systemSpeech = adapter(true);
-    const picked = pickFallbackAdapter({ isNativePlatform: true, webSpeech, systemSpeech });
+    const picked = pickFallbackAdapter({ isNativePlatform: true, platform: 'android', webSpeech, systemSpeech });
     expect(picked).toBe(systemSpeech);
   });
 
-  it('keeps the Web Speech API when it is available in the WebView', () => {
+  it('uses the offline-gated platform bridge on Android even when Web Speech is available', () => {
+    // A WebView that exposed speechSynthesis must not bypass the offline voice
+    // gate: Web Speech voices may be served by a network provider.
     const webSpeech = adapter(true);
     const systemSpeech = adapter(true);
-    const picked = pickFallbackAdapter({ isNativePlatform: true, webSpeech, systemSpeech });
+    const picked = pickFallbackAdapter({ isNativePlatform: true, platform: 'android', webSpeech, systemSpeech });
+    expect(picked).toBe(systemSpeech);
+  });
+
+  it('falls back to Web Speech on Android when no platform bridge is provided', () => {
+    const webSpeech = adapter(true);
+    const picked = pickFallbackAdapter({ isNativePlatform: true, platform: 'android', webSpeech, systemSpeech: null });
     expect(picked).toBe(webSpeech);
   });
 
-  it('never uses the platform bridge on the web', () => {
+  it('keeps the Web Speech API on iOS, which has no system TTS bridge implementation', () => {
+    const webSpeech = adapter(true);
+    const systemSpeech = adapter(true);
+    const picked = pickFallbackAdapter({ isNativePlatform: true, platform: 'ios', webSpeech, systemSpeech });
+    expect(picked).toBe(webSpeech);
+  });
+
+  it('keeps the Web Speech API on the web', () => {
     const webSpeech = adapter(false);
     const systemSpeech = adapter(true);
-    const picked = pickFallbackAdapter({ isNativePlatform: false, webSpeech, systemSpeech });
+    const picked = pickFallbackAdapter({ isNativePlatform: false, platform: 'web', webSpeech, systemSpeech });
     expect(picked).toBe(webSpeech);
   });
 });

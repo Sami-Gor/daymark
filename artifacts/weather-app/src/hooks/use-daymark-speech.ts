@@ -50,6 +50,7 @@ export function useDaymarkSpeech() {
     () =>
       pickFallbackAdapter({
         isNativePlatform: Capacitor.isNativePlatform(),
+        platform: Capacitor.getPlatform(),
         webSpeech: controller,
         systemSpeech,
       }),
