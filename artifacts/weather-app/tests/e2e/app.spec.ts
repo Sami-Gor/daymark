@@ -2318,6 +2318,98 @@ test.describe('geolocation flow', () => {
     await expect(page.getByTestId('toast')).toContainText('Allow location access');
   });
 
+  test('retry after a denial recovers once permission is granted, without any precise-location request', async ({ browser }) => {
+    // Browser-context permissions machinery (no JS stubs): an empty permission
+    // set auto-denies geolocation without a prompt surface, mirroring the
+    // Android "denied once" state; grantPermissions() then plays the user
+    // later allowing the coarse fix, and the same retry must recover.
+    const context = await browser.newContext({
+      permissions: [],
+      geolocation: { latitude: 51.5074567, longitude: -0.12789012 },
+    });
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      (window as any).__geoSurface = {
+        calls: 0,
+        highAccuracy: [] as boolean[],
+        permissionQueries: [] as string[],
+        mediaRequests: 0,
+      };
+      const surface = (window as any).__geoSurface;
+      // Count every geolocation request and whether it asks for a precise fix.
+      const originalPosition = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+      navigator.geolocation.getCurrentPosition = ((
+        success: PositionCallback,
+        error: PositionErrorCallback,
+        options?: PositionOptions,
+      ) => {
+        surface.calls += 1;
+        surface.highAccuracy.push(Boolean(options?.enableHighAccuracy));
+        return originalPosition(success, error, options);
+      }) as typeof navigator.geolocation.getCurrentPosition;
+      // Record any other permission surface the app might touch.
+      if (navigator.permissions?.query) {
+        const originalQuery = navigator.permissions.query.bind(navigator.permissions);
+        navigator.permissions.query = ((descriptor: PermissionDescriptor) => {
+          surface.permissionQueries.push(String(descriptor?.name));
+          return originalQuery(descriptor);
+        }) as typeof navigator.permissions.query;
+      }
+      if (navigator.mediaDevices?.getUserMedia) {
+        const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = ((constraints: MediaStreamConstraints) => {
+          surface.mediaRequests += 1;
+          return originalGetUserMedia(constraints);
+        }) as typeof navigator.mediaDevices.getUserMedia;
+      }
+    });
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__geoSurface.calls), 'no location request on load').toBe(0);
+
+    // First attempt: the context denies geolocation (code 1), no prompt shown.
+    requests.length = 0;
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('toast')).toContainText('Allow location access');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    expect(await page.evaluate(() => (window as any).__geoSurface.calls)).toBe(1);
+    expect(requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com')).toEqual([]);
+
+    // The user later grants permission (the coarse-only fix on Android) and
+    // retries the same button: the recovery must succeed.
+    requests.length = 0;
+    await context.grantPermissions(['geolocation']);
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    await expect(page.getByTestId('toast')).toBeHidden();
+    const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
+    expect(forecasts.length).toBeGreaterThan(0);
+    // The web platform snaps the fix to the privacy grid (Android passes the
+    // approximate fix through unchanged — covered by the native-shell test).
+    for (const url of forecasts) {
+      expect(url).toContain('latitude=51.5');
+      expect(url).toContain('longitude=-0.125');
+    }
+
+    // No fine-location escalation appeared anywhere in the deny→grant→retry
+    // cycle: only the approximate-fix request was made, never a precise one,
+    // and no other permission surface was touched.
+    const surface = await page.evaluate(() => (window as any).__geoSurface);
+    expect(surface.calls).toBe(2);
+    expect(surface.highAccuracy, 'every geolocation request must be approximate (enableHighAccuracy=false)').toEqual([false, false]);
+    expect(
+      surface.permissionQueries.filter((name: string) => name && name.toLowerCase() !== 'geolocation'),
+      'no permission other than geolocation may be queried',
+    ).toEqual([]);
+    expect(surface.mediaRequests, 'no getUserMedia in the location flow').toBe(0);
+    await context.close();
+  });
+
   test('requests mobile-friendly geolocation options', async ({ page }) => {
     await mockOpenMeteo(page);
     await stubTimedGeolocation(page, 0);
