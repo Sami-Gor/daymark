@@ -42,9 +42,6 @@ jobs:
           PORT: 5173
           BASE_PATH: /
 
-      - name: Unit tests
-        run: pnpm --filter @workspace/weather-app run test
-
       # Capacitor 8 Android modules compile with Java 21.
       - name: Set up Java for Android
         uses: actions/setup-java@v4
@@ -54,8 +51,13 @@ jobs:
 
       # Generate the Capacitor-managed Android files that are not committed
       # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
+      # This must happen before the unit tests: the network-boundary guard reads
+      # the bundled WebView index.html and capacitor.config.json.
       - name: Sync Capacitor Android project
         run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      - name: Unit tests
+        run: pnpm --filter @workspace/weather-app run test
 
       # The sherpa-onnx runtime is a compile-time dependency of the
       # DaymarkVoice module: the Parakeet plugin imports its classes, so the
