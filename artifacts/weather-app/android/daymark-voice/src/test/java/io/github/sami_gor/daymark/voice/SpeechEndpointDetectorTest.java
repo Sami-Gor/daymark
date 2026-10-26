@@ -251,6 +251,32 @@ public class SpeechEndpointDetectorTest {
     }
 
     @Test
+    public void noisyFloorBelowTheThresholdNeverStartsOrEnds() {
+        SpeechEndpointDetector detector =
+                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
+        // Just below the gate for 30 s: background noise must neither start an
+        // utterance nor accumulate into a false end.
+        for (int index = 0; index < 1500; index++) {
+            assertFalse(detector.accept(0.019f));
+        }
+        assertFalse(detector.hasSpeechStarted());
+        assertFalse(detector.isFinished());
+    }
+
+    @Test
+    public void zeroAmplitudeFramesAreSilenceNotSpeech() {
+        SpeechEndpointDetector detector =
+                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
+        // Empty/blocked reads surface as zero-amplitude chunks in the capture
+        // loop; they must never satisfy the onset run.
+        for (int index = 0; index < 500; index++) {
+            assertFalse(detector.accept(0f));
+        }
+        assertFalse(detector.hasSpeechStarted());
+        assertFalse(detector.isFinished());
+    }
+
+    @Test
     public void rejectsAnUnusableConfiguration() {
         assertRejected(0f, 1, 1, "a non-positive threshold");
         assertRejected(-1f, 1, 1, "a negative threshold");
