@@ -3,7 +3,6 @@ import { CalendarDays } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
-import { useToast } from '@/hooks/use-toast';
 import { useNativeNavigation } from '@/hooks/use-native-navigation';
 import NotFound from '@/pages/not-found';
 import Privacy from '@/pages/privacy';
@@ -34,6 +33,12 @@ import { AirQualityForecast } from '@/components/weather/AirQualityForecast';
 import { WeatherAlerts } from '@/components/weather/WeatherAlerts';
 import { deriveDayCue } from '@/lib/day-cue';
 import { resolveDeviceLocation } from '@/lib/location-privacy';
+import {
+  LOCATION_RETRY_KEY,
+  locationFailureFromCode,
+  locationFailureKey,
+  type LocationFailure,
+} from '@/lib/location-feedback';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
 import { useLocale } from '@/hooks/use-locale';
 
@@ -41,16 +46,16 @@ const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', l
 
 function Home() {
   const { t, locale } = useLocale();
-  const { toast, dismiss } = useToast();
   const [place, setPlace] = useState<Place>(LONDON);
   const [weather, setWeather] = useState<WeatherPayload | null>(null);
   const [unit, setUnit] = useState<Unit>('celsius');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<WeatherErrorCode | ''>('');
   const [isLocating, setIsLocating] = useState(false);
+  const [locationFailure, setLocationFailure] = useState<LocationFailure | null>(null);
   const requestId = useRef(0);
   const selectionId = useRef(0);
-  const locationToastId = useRef<string | null>(null);
+  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
   const loadWeather = useCallback(async (nextPlace: Place): Promise<boolean> => {
     const id = ++requestId.current;
@@ -80,20 +85,13 @@ function Home() {
     void loadWeather(nextPlace);
   }, [loadWeather]);
 
-  const clearLocationToast = useCallback(() => {
-    if (locationToastId.current) {
-      dismiss(locationToastId.current);
-      locationToastId.current = null;
-    }
-  }, [dismiss]);
-
   const findMe = useCallback(() => {
     if (!navigator.geolocation) {
-      toast({ title: t('current.locationTitle'), description: t('current.locationUnsupported') });
+      setLocationFailure('unsupported');
       return;
     }
-    // A new attempt replaces any stale location-error toast.
-    clearLocationToast();
+    // A new attempt replaces any stale location notice, including a denial.
+    setLocationFailure(null);
     const id = ++selectionId.current;
     setIsLocating(true);
     setError('');
@@ -106,7 +104,6 @@ function Home() {
       // compounds the loss of accuracy for regional forecasts.
       // Browsers without an approximate-permission contract snap the fix to
       // a roughly 3–5 km² grid before any coordinates leave the device.
-      const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
       const { latitude, longitude } = resolveDeviceLocation(
         coords.latitude,
         coords.longitude,
@@ -115,12 +112,13 @@ function Home() {
       try {
         // A newer search or location interaction wins over this older one.
         if (id !== selectionId.current) return;
-        clearLocationToast();
         const fallbackName = t('current.yourLocation');
         // Weather starts immediately from the privacy-filtered coordinates; naming is
         // enhancement-only and is resolved locally while weather loads.
         const loaded = await loadWeather({ name: fallbackName, latitude, longitude });
         if (!loaded || id !== selectionId.current) return;
+        // A successful fix clears any earlier denial/timeout notice.
+        setLocationFailure(null);
         const match = await lookupLocality(latitude, longitude);
         if (!match || match.confidence === 'low' || id !== selectionId.current) return;
         // Update only the label, only for the current intent, and only while
@@ -136,8 +134,7 @@ function Home() {
     }, (geoError) => {
       if (id !== selectionId.current) return;
       setIsLocating(false);
-      const key = geoError?.code === 2 ? 'current.locationUnavailable' : geoError?.code === 3 ? 'current.locationTimeout' : 'current.locationDenied';
-      locationToastId.current = toast({ title: t('current.locationTitle'), description: t(key) }).id;
+      setLocationFailure(locationFailureFromCode(geoError?.code));
     }, {
       // A cold mobile GPS fix routinely takes longer than 5 s, so give the
       // browser room to deliver a first fix before it reports a timeout.
@@ -146,7 +143,7 @@ function Home() {
       maximumAge: 300000,
       timeout: 12000,
     });
-  }, [clearLocationToast, loadWeather, toast, t]);
+  }, [isAndroidNative, loadWeather, t]);
 
   // No location permission is requested on load (DAYMARK-SEC-002): the app
   // opens on the default location and only asks when the user presses the
@@ -168,6 +165,20 @@ function Home() {
     <div className="weather-app">
       <div className="app-shell">
         <TopBar unit={unit} onUnitChange={setUnit} onFindMe={() => findMe()} isLocating={isLocating} isRefreshing={isRefreshing} />
+
+        {locationFailure && (
+          <div className="refresh-error" role="alert" data-testid="location-notice">
+            <span>{t(locationFailureKey(locationFailure, isAndroidNative), { place: place.name })}</span>
+            <button
+              type="button"
+              className="refresh-retry"
+              onClick={() => findMe()}
+              data-testid="button-location-retry"
+            >
+              {t(LOCATION_RETRY_KEY)}
+            </button>
+          </div>
+        )}
 
         {showInitialLoading && <LoadingState />}
         {!showInitialLoading && !weather && error && <WeatherError code={error} onRetry={() => void loadWeather(place)} />}

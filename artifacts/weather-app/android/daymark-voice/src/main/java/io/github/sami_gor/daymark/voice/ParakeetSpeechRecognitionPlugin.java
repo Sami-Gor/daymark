@@ -579,6 +579,9 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
             // The start call resolves only now that the microphone is live.
             session.settleSuccess();
         }
+        // Non-payload lifecycle metadata for the device test harness. The
+        // transcript, audio and any other recognition content is never logged.
+        logSession("session " + session.id + " capture started");
         return true;
     }
 
@@ -601,6 +604,19 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
      * only one terminal outcome is ever emitted, whichever of cancel, destroy or
      * the worker gets here first.
      */
+    /**
+     * Writes non-payload lifecycle metadata. The JVM lifecycle tests run
+     * against stub Android classes, where Log throws; the catch keeps those
+     * tests exercising the real plugin code without weakening device logging.
+     */
+    private static void logSession(String message) {
+        try {
+            Log.i(TAG, message);
+        } catch (RuntimeException notAndroidRuntime) {
+            // Unit-test JVM only; on Android Log is always present.
+        }
+    }
+
     private void finishWithError(Session session, String code) {
         synchronized (stateLock) {
             if (activeSession == session) {
@@ -609,6 +625,7 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
             if (!session.terminal.compareAndSet(false, true)) {
                 return;
             }
+            logSession("session " + session.id + " ended error " + code);
             notifyError(session.id, code);
             // The start call is settled last so the terminal event, which
             // carries the exact code, is what the web layer sees first.
@@ -630,6 +647,7 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
             if (!session.terminal.compareAndSet(false, true)) {
                 return;
             }
+            logSession("session " + session.id + " ended result");
             session.settleSuccess();
             notifyResult(session.id, transcript);
         }

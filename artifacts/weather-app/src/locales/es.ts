@@ -28,7 +28,9 @@ const es: Record<TranslationKey, string> = {
   'current.forecastReady': 'Pronóstico listo',
   'current.locationTitle': 'Ubicación no disponible',
   'current.locationUnsupported': 'Este navegador no ofrece servicios de ubicación.',
-  'current.locationDenied': 'No pudimos acceder a tu ubicación. Permite la ubicación para este sitio y vuelve a intentarlo.',
+  'current.locationDenied': 'No pudimos acceder a tu ubicación. Daymark muestra {place}. Permite el acceso a la ubicación para este sitio e inténtalo de nuevo.',
+  'current.locationDeniedAndroid': 'No se permitió el acceso a la ubicación. Daymark muestra {place}. Para usar tu zona, permite la ubicación aproximada para Daymark en Ajustes de Android y toca Reintentar.',
+  'current.locationRetry': 'Reintentar',
   'current.locationUnavailable': 'No pudimos determinar tu ubicación. Comprueba que los servicios de ubicación estén activados y vuelve a intentarlo.',
   'current.locationTimeout': 'La búsqueda de tu ubicación tardó demasiado. Inténtalo de nuevo o busca un lugar.',
 

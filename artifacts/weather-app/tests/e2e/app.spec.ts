@@ -158,26 +158,55 @@ test.describe('functional', () => {
     await context.close();
   });
 
-  test('denied geolocation shows a toast and keeps the loaded weather', async ({ browser }) => {
+  test('denied geolocation shows a persistent notice and keeps the loaded weather', async ({ browser }) => {
     const context = await browser.newContext({ permissions: [] });
     const page = await context.newPage();
     await mockOpenMeteo(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
-    // The click can be swallowed by the loading→content swap, so retry until
-    // the toast appears. On a denied context no second prompt is shown.
-    let toastShown = false;
-    const caught: string[] = [];
-    for (let attempt = 0; attempt < 3 && !toastShown; attempt++) {
-      await page.getByTestId('button-refresh-location').click();
-      try {
-        await expect(page.getByTestId('toast')).toContainText('Location unavailable', { timeout: 2000 });
-        toastShown = true;
-      } catch (e) {
-        caught.push(String(e).slice(0, 200));
-      }
-    }
-    if (!toastShown) throw new Error('toast never appeared; caught: ' + JSON.stringify(caught, null, 2));
+    await page.getByTestId('button-refresh-location').click();
+    const notice = page.getByTestId('location-notice');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText("couldn't access your location");
+    await expect(notice).toContainText('London');
+    await expect(page.getByTestId('button-location-retry')).toBeVisible();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await context.close();
+  });
+
+  test('geolocation timeout shows a timeout notice with a retry action', async ({ page }) => {
+    await page.addInitScript(() => {
+      navigator.geolocation.getCurrentPosition = ((_ok, error) => {
+        error?.({
+          code: 3,
+          message: 'timeout',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        } as GeolocationPositionError);
+      }) as typeof navigator.geolocation.getCurrentPosition;
+    });
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await page.getByTestId('button-refresh-location').click();
+    const notice = page.getByTestId('location-notice');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('took too long');
+    await expect(page.getByTestId('button-location-retry')).toBeVisible();
+  });
+
+  test('granting permission after denial recovers through the retry button', async ({ browser }) => {
+    const context = await browser.newContext({ permissions: [] });
+    const page = await context.newPage();
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('location-notice')).toBeVisible();
+
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: 51.5074567, longitude: -0.12789012 });
+    await page.getByTestId('button-location-retry').click();
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
     await context.close();
   });
@@ -2290,8 +2319,8 @@ test.describe('geolocation flow', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await failGeolocation(page, 3);
-    await expect(page.getByTestId('toast')).toContainText('took too long');
-    await expect(page.getByTestId('toast')).not.toContainText('Allow location access');
+    await expect(page.getByTestId('location-notice')).toContainText('took too long');
+    await expect(page.getByTestId('location-notice')).not.toContainText('Allow location access');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
   });
 
@@ -2303,8 +2332,8 @@ test.describe('geolocation flow', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await failGeolocation(page, 2);
-    await expect(page.getByTestId('toast')).toContainText('determine your location');
-    await expect(page.getByTestId('toast')).not.toContainText('Allow location access');
+    await expect(page.getByTestId('location-notice')).toContainText('determine your location');
+    await expect(page.getByTestId('location-notice')).not.toContainText('Allow location access');
   });
 
   test('keeps the existing permission-denied message for code 1', async ({ page }) => {
@@ -2315,7 +2344,7 @@ test.describe('geolocation flow', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await failGeolocation(page, 1);
-    await expect(page.getByTestId('toast')).toContainText('Allow location access');
+    await expect(page.getByTestId('location-notice')).toContainText('Allow location access');
   });
 
   test('retry after a denial recovers once permission is granted, without any precise-location request', async ({ browser }) => {
@@ -2373,7 +2402,7 @@ test.describe('geolocation flow', () => {
     // First attempt: the context denies geolocation (code 1), no prompt shown.
     requests.length = 0;
     await page.getByTestId('button-refresh-location').click();
-    await expect(page.getByTestId('toast')).toContainText('Allow location access');
+    await expect(page.getByTestId('location-notice')).toContainText('Allow location access');
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
     expect(await page.evaluate(() => (window as any).__geoSurface.calls)).toBe(1);
@@ -2386,7 +2415,7 @@ test.describe('geolocation flow', () => {
     await page.getByTestId('button-refresh-location').click();
     await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
-    await expect(page.getByTestId('toast')).toBeHidden();
+    await expect(page.getByTestId('location-notice')).toBeHidden();
     const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
     expect(forecasts.length).toBeGreaterThan(0);
     // The web platform snaps the fix to the privacy grid (Android passes the
@@ -2442,7 +2471,7 @@ test.describe('geolocation flow', () => {
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
 
     await page.getByTestId('button-refresh-location').click();
-    await expect(page.getByTestId('toast')).toContainText('took too long');
+    await expect(page.getByTestId('location-notice')).toContainText('took too long');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
   });
@@ -2494,7 +2523,7 @@ test.describe('geolocation flow', () => {
       await page.getByTestId('button-refresh-location').click();
       await expect(page.getByTestId('button-refresh-location')).toHaveText('Finding you…');
       await failGeolocation(page, code);
-      await expect(page.getByTestId('toast')).toBeVisible();
+      await expect(page.getByTestId('location-notice')).toBeVisible();
       await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
     }
   });
@@ -2741,7 +2770,7 @@ test.describe('non-destructive weather refresh', () => {
     await expect(page.locator('.loading-layout')).toHaveCount(0);
   });
 
-  test('a successful location clears the previous location error toast', async ({ page }) => {
+  test('a successful location clears the previous location error notice', async ({ page }) => {
     await mockOpenMeteo(page);
     await stubDeferredGeolocation(page);
     await page.goto('/');
@@ -2749,13 +2778,13 @@ test.describe('non-destructive weather refresh', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await failGeolocation(page, 1);
-    await expect(page.getByTestId('toast')).toBeVisible();
+    await expect(page.getByTestId('location-notice')).toBeVisible();
 
     await page.getByTestId('button-refresh-location').click();
-    await expect(page.getByTestId('toast')).toHaveCount(0);
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
     await resolveGeolocation(page);
     await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
-    await expect(page.getByTestId('toast')).toHaveCount(0);
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
   });
 
   test('both location controls refresh without a reload', async ({ page }) => {
