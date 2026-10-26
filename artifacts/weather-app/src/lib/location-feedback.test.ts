@@ -27,3 +27,27 @@ describe('location failure feedback', () => {
     expect(locationFailureKey('unavailable', true)).toBe('current.locationUnavailable');
   });
 });
+
+describe('localised location notices', () => {
+  it('provides the Android denial guidance in every supported locale', async () => {
+    const en = (await import('@/locales/en')).default;
+    const fr = (await import('@/locales/fr')).default;
+    const es = (await import('@/locales/es')).default;
+    for (const dictionary of [en, fr, es]) {
+      const message = dictionary['current.locationDeniedAndroid'];
+      expect(message).toContain('{place}');
+      expect(message).not.toContain('latitude');
+      expect(message).not.toContain('longitude');
+      expect(dictionary['current.locationRetry'].length).toBeGreaterThan(0);
+    }
+    expect(en['current.locationDeniedAndroid']).toContain('Android Settings');
+  });
+
+  it('never asks for high-accuracy or fine location', async () => {
+    const fs = await import('node:fs');
+    const app = fs.readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
+    expect(app).toContain('enableHighAccuracy: false');
+    expect(app).not.toContain('enableHighAccuracy: true');
+    expect(app).not.toContain('ACCESS_FINE_LOCATION');
+  });
+});

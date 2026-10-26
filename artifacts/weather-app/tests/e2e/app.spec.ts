@@ -3053,3 +3053,36 @@ test.describe('store promo gallery', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 });
+
+test('console boundary redacts synthetic recognition payloads', async ({ page }) => {
+  const messages: string[] = [];
+  page.on('console', (message) => messages.push(message.text()));
+  await mockOpenMeteo(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    console.log(JSON.stringify({ sessionId: 42, transcript: 'SYNTHETIC_SENTINEL_ALPHA', code: 'result' }));
+    console.log({ sessionId: 43, transcript: 'SYNTHETIC_SENTINEL_BETA', audio: 'RAW_AUDIO_SENTINEL' });
+  });
+  await page.waitForTimeout(150);
+  const logged = messages.join('\n');
+  expect(logged).not.toContain('SYNTHETIC_SENTINEL');
+  expect(logged).not.toContain('RAW_AUDIO_SENTINEL');
+  expect(logged).toContain('sessionId');
+});
+
+test('repeated location denial keeps the notice and recovery route without a prompt loop', async ({ browser }) => {
+  const context = await browser.newContext({ permissions: [] });
+  const page = await context.newPage();
+  await mockOpenMeteo(page);
+  await page.goto('/');
+  await page.getByTestId('button-refresh-location').click();
+  await expect(page.getByTestId('location-notice')).toBeVisible();
+  // Retry is denied again: the notice must stay stable, not disappear or loop.
+  await page.getByTestId('button-location-retry').click();
+  await expect(page.getByTestId('location-notice')).toBeVisible();
+  await page.getByTestId('button-refresh-location').click();
+  await expect(page.getByTestId('location-notice')).toBeVisible();
+  await expect(page.getByTestId('button-location-retry')).toBeVisible();
+  await expect(page.getByTestId('text-current-city')).toHaveText('London');
+  await context.close();
+});
