@@ -21,7 +21,17 @@ public class ParakeetModelAssetsTest {
     public void modelFileNamesAndSizesMatch() {
         assertEquals(ParakeetModelAssets.MODEL_FILE_NAMES.length,
                 ParakeetModelAssets.MODEL_FILE_SIZES.length);
+        assertEquals(ParakeetModelAssets.MODEL_FILE_NAMES.length,
+                ParakeetModelAssets.MODEL_FILE_SHA256.length);
         assertTrue(ParakeetModelAssets.MODEL_FILE_NAMES.length > 0);
+    }
+
+    @Test
+    public void pinsLowercaseSha256ForEveryFile() {
+        for (String digest : ParakeetModelAssets.MODEL_FILE_SHA256) {
+            assertNotNull(digest);
+            assertTrue("not a lowercase SHA-256: " + digest, digest.matches("[0-9a-f]{64}"));
+        }
     }
 
     @Test
@@ -80,6 +90,7 @@ public class ParakeetModelAssetsTest {
     @Test
     public void reasonCodesAreStable() {
         assertEquals("model-missing", ParakeetModelAssets.REASON_MODEL_MISSING);
+        assertEquals("model-corrupt", ParakeetModelAssets.REASON_MODEL_CORRUPT);
         assertEquals("model-preparing", ParakeetModelAssets.REASON_MODEL_PREPARING);
         assertEquals("runtime-unavailable", ParakeetModelAssets.REASON_RUNTIME_UNAVAILABLE);
     }
@@ -88,9 +99,10 @@ public class ParakeetModelAssetsTest {
     public void reasonCodesAreDistinct() {
         java.util.Set<String> codes = new java.util.HashSet<>();
         codes.add(ParakeetModelAssets.REASON_MODEL_MISSING);
+        codes.add(ParakeetModelAssets.REASON_MODEL_CORRUPT);
         codes.add(ParakeetModelAssets.REASON_MODEL_PREPARING);
         codes.add(ParakeetModelAssets.REASON_RUNTIME_UNAVAILABLE);
-        assertEquals(3, codes.size());
+        assertEquals(4, codes.size());
     }
 
     @Test

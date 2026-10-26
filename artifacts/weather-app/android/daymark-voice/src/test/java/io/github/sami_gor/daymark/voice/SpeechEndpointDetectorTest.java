@@ -150,6 +150,106 @@ public class SpeechEndpointDetectorTest {
         assertTrue("the threshold itself counts as speech", detector.hasSpeechStarted());
     }
 
+    // --- clause-pause regression (20 ms chunks, production 1500 ms hangover) ---
+
+    private static final int CHUNK_MS = 20;
+    private static final int PRODUCTION_HANGOVER_CHUNKS = 75;
+
+    private static boolean feedSpeech(SpeechEndpointDetector detector, int milliseconds) {
+        boolean ended = false;
+        for (int elapsed = 0; elapsed < milliseconds; elapsed += CHUNK_MS) {
+            ended |= detector.accept(SPEECH);
+        }
+        return ended;
+    }
+
+    private static boolean feedQuiet(SpeechEndpointDetector detector, int milliseconds) {
+        boolean ended = false;
+        for (int elapsed = 0; elapsed < milliseconds; elapsed += CHUNK_MS) {
+            ended |= detector.accept(QUIET);
+        }
+        return ended;
+    }
+
+    @Test
+    public void doesNotEndDuringANaturalClausePause() {
+        SpeechEndpointDetector detector =
+                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
+        assertFalse(feedSpeech(detector, 900));
+        // 900 ms is a long clause pause but well below the 1500 ms end threshold.
+        assertFalse("a clause pause must not end the utterance", feedQuiet(detector, 900));
+        assertFalse(detector.isFinished());
+        assertFalse(feedSpeech(detector, 700));
+        assertFalse("speech after the pause continues the same utterance",
+                feedQuiet(detector, 700));
+        assertFalse(detector.isFinished());
+    }
+
+    @Test
+    public void multiClauseQuestionIsCapturedAsOneUtterance() {
+        SpeechEndpointDetector detector =
+                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
+        // Three spoken clauses separated by typical 400-800 ms pauses. None may
+        // end the capture; the user is still asking one compound question.
+        assertFalse(feedSpeech(detector, 1800));
+        assertFalse("pause 1", feedQuiet(detector, 800));
+        assertFalse(feedSpeech(detector, 1500));
+        assertFalse("pause 2", feedQuiet(detector, 600));
+        assertFalse(feedSpeech(detector, 1200));
+        assertFalse("pause 3", feedQuiet(detector, 700));
+        assertFalse(detector.isFinished());
+        // The real end of the question: silence beyond the hangover.
+        assertTrue(feedQuiet(detector, 1500));
+        assertTrue(detector.isFinished());
+    }
+
+    @Test
+    public void shortNoiseBurstBetweenClausesDoesNotEndTheUtterance() {
+        SpeechEndpointDetector detector =
+                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
+        assertFalse(feedSpeech(detector, 600));
+        assertFalse(feedQuiet(detector, 1000));
+        detector.accept(SPEECH); // one 20 ms transient
+        assertFalse(feedQuiet(detector, 1000));
+        assertFalse(detector.isFinished());
+    }
+
+    @Test
+    public void continuousSpeechAtTheMaximumCaptureDurationNeverSelfEnds() {
+        SpeechEndpointDetector detector =
+                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
+        // 30 s of uninterrupted speech: the detector must not end the utterance
+        // on its own; only the plugin's MAX_CAPTURE_MS deadline may stop it.
+        assertFalse(feedSpeech(detector, 30000));
+        assertTrue(detector.hasSpeechStarted());
+        assertFalse(detector.isFinished());
+    }
+
+    @Test
+    public void trailingSilenceEndsExactlyOnce() {
+        SpeechEndpointDetector detector =
+                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
+        assertFalse(feedSpeech(detector, 500));
+        assertFalse(feedQuiet(detector, 1479));
+        assertTrue(feedQuiet(detector, 20));
+        assertTrue(detector.isFinished());
+        assertTrue("further silence stays finished", feedQuiet(detector, 1000));
+        assertTrue("speech after the end stays finished", detector.accept(SPEECH));
+    }
+
+    @Test
+    public void isolatedTransientsStillDoNotStartTheUtterance() {
+        SpeechEndpointDetector detector =
+                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
+        for (int burst = 0; burst < 4; burst++) {
+            detector.accept(SPEECH);
+            feedQuiet(detector, 400);
+        }
+        assertFalse("short bursts must not satisfy the consecutive onset",
+                detector.hasSpeechStarted());
+        assertFalse(detector.isFinished());
+    }
+
     @Test
     public void rejectsAnUnusableConfiguration() {
         assertRejected(0f, 1, 1, "a non-positive threshold");

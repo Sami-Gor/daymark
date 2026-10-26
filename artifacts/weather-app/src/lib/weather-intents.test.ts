@@ -8,14 +8,17 @@ import {
   getCurrentConditions,
   getHourlySummary,
   getIntentQueryValue,
+  getCombinedIntentResponse,
   getIntentResponse,
   getRainSummary,
+  getWindSummary,
   getTodayBriefing,
   getTomorrowSummary,
   getUVSummary,
   normalizeTranscript,
   resolveIntentCommand,
   resolveIntentTranscript,
+  resolveIntentTranscripts,
   type DaymarkIntentId,
   type DaymarkIntentResponse,
 } from './weather-intents';
@@ -34,6 +37,9 @@ const DEFAULT_CURRENT = {
   cloud_cover: 80,
   weather_code: 3,
   uv_index: 4,
+  wind_speed_10m: 14,
+  wind_gusts_10m: 30,
+  wind_direction_10m: 240,
 };
 
 const DEFAULT_HOURLY = {
@@ -95,6 +101,7 @@ describe('intent vocabulary', () => {
       today: 'daymark.today',
       current: 'daymark.current',
       rain: 'daymark.rain',
+      wind: 'daymark.wind',
       uv: 'daymark.uv',
       airQuality: 'daymark.air_quality',
       alerts: 'daymark.alerts',
@@ -119,7 +126,7 @@ describe('intent vocabulary', () => {
   it('maps intents to future deep-link values', () => {
     expect(getIntentQueryValue(DAYMARK_INTENTS.airQuality)).toBe('air-quality');
     expect(Object.values(INTENT_QUERY_VALUES)).toEqual([
-      'today', 'current', 'rain', 'uv', 'air-quality', 'alerts', 'hours', 'tomorrow',
+      'today', 'current', 'rain', 'wind', 'uv', 'air-quality', 'alerts', 'hours', 'tomorrow',
     ]);
   });
 
@@ -453,5 +460,95 @@ describe('resolveIntentTranscript', () => {
     expect(rain.spokenText).toContain('5 PM');
     const uv = getIntentResponse(uvIntent as DaymarkIntentId, tokyo, { locationName: 'Tokyo', locale: 'en-US' });
     expect(uv.spokenText).toContain('between 11 AM and 5 PM');
+  });
+});
+
+
+describe('getWindSummary', () => {
+  it('reports a breeze and meaningful gusts', () => {
+    const response = getWindSummary(buildWeather(), { locale: 'en' });
+    expect(response.intent).toBe(DAYMARK_INTENTS.wind);
+    expect(response.spokenText).toContain('14');
+    expect(response.spokenText).toContain('30');
+    expect(response.data?.speedKph).toBe(14);
+    expect(response.data?.gustsKph).toBe(30);
+  });
+
+  it('does not repeat a gust that is close to the mean wind', () => {
+    const response = getWindSummary(buildWeather({ current: { wind_speed_10m: 18, wind_gusts_10m: 21 } }), { locale: 'en' });
+    expect(response.spokenText).toContain('18');
+    expect(response.spokenText).not.toContain('21');
+  });
+
+  it('describes calm air', () => {
+    const response = getWindSummary(buildWeather({ current: { wind_speed_10m: 2, wind_gusts_10m: 3 } }), { locale: 'en' });
+    expect(response.spokenText.toLowerCase()).toContain('very little wind');
+    expect(response.data?.speedKph).toBe(2);
+  });
+
+  it('reports unavailable rather than inventing a wind value', () => {
+    const response = getWindSummary(buildWeather({ current: { temperature_2m: 18 } }), { locale: 'en' });
+    expect(response.data?.available).toBe(false);
+    expect(response.spokenText.toLowerCase()).toContain('unavailable');
+  });
+});
+
+describe('compound transcript intents', () => {
+  it('returns rain only', () => {
+    expect(resolveIntentTranscripts('is it raining?')).toEqual([DAYMARK_INTENTS.rain]);
+  });
+
+  it('returns temperature only', () => {
+    expect(resolveIntentTranscripts('what is the temperature?')).toEqual([DAYMARK_INTENTS.current]);
+  });
+
+  it('returns wind only', () => {
+    expect(resolveIntentTranscripts('how windy is it?')).toEqual([DAYMARK_INTENTS.wind]);
+  });
+
+  it('keeps every subject of a compound question', () => {
+    const intents = resolveIntentTranscripts(
+      'will it rain, what is the temperature and how windy is it?',
+    );
+    expect(intents).toEqual([DAYMARK_INTENTS.rain, DAYMARK_INTENTS.wind, DAYMARK_INTENTS.current]);
+  });
+
+  it('drops the umbrella today intent when specific subjects were asked', () => {
+    expect(resolveIntentTranscripts("what's the weather and will it rain?"))
+      .toEqual([DAYMARK_INTENTS.rain]);
+  });
+
+  it('keeps the single-intent resolver behaviour', () => {
+    expect(resolveIntentTranscript('how windy is it?')).toBe(DAYMARK_INTENTS.wind);
+    expect(resolveIntentTranscript('')).toBeNull();
+  });
+});
+
+describe('getCombinedIntentResponse', () => {
+  const question = 'will it rain, what is the temperature and how windy is it?';
+
+  it('answers every requested field from available data', () => {
+    const intents = resolveIntentTranscripts(question);
+    const response = getCombinedIntentResponse(intents, buildWeather(), { locale: 'en' });
+    expect(response.intents).toEqual(intents);
+    expect(response.spokenText.toLowerCase()).toContain('rain');
+    expect(response.spokenText).toContain('14');
+    expect(response.spokenText).toContain('18');
+    const data = response.data as { responses?: Array<{ intent: string; data?: { available?: boolean } }> };
+    expect(data.responses?.map((entry) => entry.intent)).toEqual(intents);
+  });
+
+  it('does not fabricate a missing wind value', () => {
+    const intents = [DAYMARK_INTENTS.wind, DAYMARK_INTENTS.current];
+    const response = getCombinedIntentResponse(intents, buildWeather({ current: { temperature_2m: 18 } }), { locale: 'en' });
+    expect(response.data?.available).toBe(false);
+    const data = response.data as { responses?: Array<{ intent: string; data?: { available?: boolean } }> };
+    expect(data.responses?.find((entry) => entry.intent === DAYMARK_INTENTS.wind)?.data?.available).toBe(false);
+  });
+
+  it('keeps single-intent responses byte-for-byte compatible', () => {
+    const single = getCombinedIntentResponse([DAYMARK_INTENTS.rain], buildWeather(), { locale: 'en' });
+    const direct = getIntentResponse(DAYMARK_INTENTS.rain, buildWeather(), { locale: 'en' });
+    expect(single).toEqual(direct);
   });
 });
