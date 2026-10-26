@@ -271,11 +271,16 @@ export function getRainSummary(weather: WeatherPayload, context: IntentContext =
 
 export function getWindSummary(weather: WeatherPayload, context: IntentContext = {}): DaymarkIntentResponse {
   const { t } = translator(context);
-  const speed = weather.current?.wind_speed_10m;
-  const gusts = weather.current?.wind_gusts_10m;
-  const direction = weather.current?.wind_direction_10m;
+  const rawSpeed = weather.current?.wind_speed_10m;
+  const rawGusts = weather.current?.wind_gusts_10m;
+  const rawDirection = weather.current?.wind_direction_10m;
+  // Third-party payloads are schema-validated at the network boundary, but a
+  // non-number must never be rounded into a fabricated value here either.
+  const speed = typeof rawSpeed === 'number' && Number.isFinite(rawSpeed) ? rawSpeed : null;
+  const gusts = typeof rawGusts === 'number' && Number.isFinite(rawGusts) ? rawGusts : null;
+  const direction = typeof rawDirection === 'number' && Number.isFinite(rawDirection) ? rawDirection : null;
 
-  if (speed == null || Number.isNaN(speed)) {
+  if (speed == null) {
     return unavailableResponse(
       DAYMARK_INTENTS.wind,
       t('intent.title.wind'),
@@ -285,7 +290,7 @@ export function getWindSummary(weather: WeatherPayload, context: IntentContext =
   }
 
   const roundedSpeed = Math.round(speed);
-  const roundedGusts = gusts == null || Number.isNaN(gusts) ? null : Math.round(gusts);
+  const roundedGusts = gusts == null ? null : Math.round(gusts);
   // Gusts are only worth speaking when they are meaningfully above the mean
   // wind; otherwise the two numbers are noise.
   const hasGusts = roundedGusts != null && roundedGusts >= roundedSpeed + 10;

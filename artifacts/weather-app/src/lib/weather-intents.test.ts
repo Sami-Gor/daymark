@@ -552,3 +552,55 @@ describe('getCombinedIntentResponse', () => {
     expect(single).toEqual(direct);
   });
 });
+
+describe('compound intent edge cases (synthetic payloads)', () => {
+  it('rejects a non-numeric wind speed instead of rounding it into a value', () => {
+    const response = getWindSummary(
+      buildWeather({ current: { temperature_2m: 18, wind_speed_10m: 'strong' as unknown as number } }),
+      { locale: 'en' },
+    );
+    expect(response.data?.available).toBe(false);
+    expect(response.spokenText.toLowerCase()).toContain('unavailable');
+    expect(response.spokenText).not.toContain('NaN');
+  });
+
+  it('keeps a numeric speed when only the gust value is malformed', () => {
+    const response = getWindSummary(
+      buildWeather({ current: { temperature_2m: 18, wind_speed_10m: 12, wind_gusts_10m: 'gusty' as unknown as number } }),
+      { locale: 'en' },
+    );
+    expect(response.data?.speedKph).toBe(12);
+    expect(response.spokenText).toContain('12');
+    expect(response.spokenText).not.toContain('NaN');
+  });
+
+  it('answers available subjects when one compound subject has malformed data', () => {
+    const intents = [DAYMARK_INTENTS.rain, DAYMARK_INTENTS.wind, DAYMARK_INTENTS.current];
+    const response = getCombinedIntentResponse(
+      intents,
+      buildWeather({ current: { temperature_2m: 18, wind_speed_10m: 'strong' as unknown as number } }),
+      { locale: 'en' },
+    );
+    const data = response.data as { available?: boolean; responses?: Array<{ intent: string; data?: { available?: boolean } }> };
+    expect(data.available).toBe(false);
+    expect(data.responses?.find((entry) => entry.intent === DAYMARK_INTENTS.wind)?.data?.available).toBe(false);
+    expect(response.spokenText.toLowerCase()).toContain('rain');
+    expect(response.spokenText).toContain('18');
+    expect(response.spokenText).not.toContain('NaN');
+  });
+
+  it('reports a missing temperature as unavailable while still answering wind and rain', () => {
+    const intents = [DAYMARK_INTENTS.rain, DAYMARK_INTENTS.current, DAYMARK_INTENTS.wind];
+    const response = getCombinedIntentResponse(
+      intents,
+      buildWeather({ current: { wind_speed_10m: 9 } }),
+      { locale: 'en' },
+    );
+    const data = response.data as { available?: boolean; responses?: Array<{ intent: string; data?: { available?: boolean } }> };
+    expect(data.available).toBe(false);
+    expect(data.responses?.find((entry) => entry.intent === DAYMARK_INTENTS.current)?.data?.available).toBe(false);
+    expect(response.spokenText.toLowerCase()).toContain('wind');
+    expect(response.spokenText).not.toContain('NaN');
+    expect(response.spokenText.toLowerCase()).not.toContain('undefined');
+  });
+});
