@@ -283,7 +283,7 @@ Expected for this release:
   certificate will produce an untrusted PKIX-chain warning, which is expected.
 - Package `io.github.sami_gor.daymark`.
 - `versionCode 2`, `versionName 2.0.0`.
-- `minSdkVersion 24`, `targetSdkVersion 36`.
+- `minSdkVersion 29`, `targetSdkVersion 36`.
 - The `parakeet` module is `dist:type="asset-pack"` with
   `<dist:install-time/>` and `dist:fusing include="true"`.
 - No `android:debuggable` or `android:testOnly`.

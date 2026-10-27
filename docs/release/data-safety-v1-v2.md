@@ -145,7 +145,7 @@ Source: <https://support.google.com/googleplay/android-developer/answer/11926878
   available to new users on newer Android versions.
 - An extension to **1 November 2026** can be requested in Console.
 
-Daymark's `compileSdk 36` / `targetSdk 36` / `minSdk 24` is compliant with the
+Daymark's `compileSdk 36` / `targetSdk 36` / `minSdk 29` is compliant with the
 new-app/update requirement. The extension is not needed for target 36.
 
 ### Open-Meteo terms and provider retention

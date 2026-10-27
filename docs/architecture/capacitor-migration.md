@@ -28,7 +28,7 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 | Rollback tag | `pre-capacitor-daymark` (annotated, local) |
 | applicationId / namespace | `io.github.sami_gor.daymark` |
 | versionCode / versionName | `1` / `1.0.0` |
-| minSdk / targetSdk / compileSdk | `24` / `36` / `36` |
+| minSdk / targetSdk / compileSdk | `29` / `36` / `36` |
 | Signing | `android/daymark-upload.keystore`, alias `daymark-upload`, SHA-256 `34:6B:BE:…:FA:7E` (rotated 2026-09-13; earlier `3C:60:AD:…:20:57` retired) |
 | Play metadata (state at this pre-migration snapshot) | package `io.github.sami_gor.daymark`; AAB versionCode 1; closed testing had been submitted; App Links association still depended on the Play app-signing SHA-256 |
 | Deep links | `https://daymark-weather.pages.dev` intent filter, `autoVerify`, fallback Custom Tabs |
@@ -146,7 +146,7 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 | JDK | 21 (required by Capacitor 8; TWA used 17) |
 | Node / pnpm | Node 24 is used by current CI (Node 26.8.2 was used for this migration validation) / pnpm 12.3.4 |
 | package id | `io.github.sami_gor.daymark` (unchanged) |
-| minSdk | 24 (Capacitor 8 minimum; TWA supported 23) |
+| minSdk | 29 (Android 10 baseline; Capacitor 8 minimum is 24) |
 | targetSdk / compileSdk | 36 / 36 (unchanged) |
 | versionCode / versionName | 1 / 1.0.0 (unchanged) |
 | Signing | `daymark-upload.keystore` (copied into the Capacitor project), alias `daymark-upload` |

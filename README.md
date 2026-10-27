@@ -224,7 +224,7 @@ Further ideas are in exploration as Daymark continues to evolve.
 - Severe-weather risks are forecast-derived Daymark estimates, **not** official warnings
 - On the web, voice input requires browser speech-recognition support. Web narration uses browser speech synthesis; Android English narration uses bundled Kokoro, while French/Spanish use Android system TTS with matching voice data. Unsupported input controls may be hidden; unavailable Android narration is reported as an error.
 - On Android, English narration uses the bundled local Kokoro voice (offline); French/Spanish use the device TTS engine, which needs the matching voice data installed
-- **In the v2 development branch**, Android voice input uses the bundled Parakeet TDT 0.6B v3 int8 model through sherpa-onnx, entirely on the device, on every supported Android version down to `minSdk 24`; there is no platform recogniser or online fallback. Android French/Spanish narration additionally refuses network-dependent voices instead of switching engines
+- **In the v2 development branch**, Android voice input uses the bundled Parakeet TDT 0.6B v3 int8 model through sherpa-onnx, entirely on the device, on supported Android 10+ versions (minSdk 29); there is no platform recogniser or online fallback. Android French/Spanish narration additionally refuses network-dependent voices instead of switching engines
 - The Android shell currently bundles the arm64-v8a Kokoro library only
 - Air-quality "nearby sensor" comparison is not yet wired to a sensor network; the regional forecast is shown
 - The very first reload immediately after a service-worker update may briefly miss the offline shell (self-heals on the next reload)

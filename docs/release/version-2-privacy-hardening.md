@@ -55,7 +55,7 @@ sources for the candidate.
 
 ## Compatibility
 
-- Keep `minSdk 24`, `targetSdk 36`, and `compileSdk 36`.
+- Keep `minSdk 29`, `targetSdk 36`, and `compileSdk 36`.
 - The bundled Parakeet TDT 0.6B v3 int8 model is introduced by this slice.
   It is the speech-to-text engine for the Android app, not an experiment: the
   earlier `v2test` build type and its unprotected test receiver are retired.
@@ -176,7 +176,7 @@ matching Android bundle is released.
       `offline-unavailable` behaviour without touching system packages, and a
       source-level check that the Android path contains no
       `android.speech.SpeechRecognizer`.
-- [ ] Android API 24–30 test: voice input works with the bundled model, and no
+- [ ] Android API 29–30 test: voice input works with the bundled model, and no
       network recognizer is invoked.
 - [ ] Cancel, timeout, error, app backgrounding, route unmount and repeated
       attempts invalidate sessions, clear transient handlers and destroy native

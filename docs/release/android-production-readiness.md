@@ -38,7 +38,7 @@ commit each was verified against is named in §18.
 | Signing | upload keystore copy inside the Android project, `keystore.properties`, not tracked |
 | Certificate | `CN=Daymark Upload`, SHA-256 `34:6B:BE:…:FA:7E` (rotated 2026-09-13; the earlier `3C:60:AD:…:20:57` key is retired) |
 | versionCode / versionName | `1` / `1.0.0` |
-| SDKs | compile/target 36, min 24 (Capacitor 8 minimum) |
+| SDKs | compile/target 36, min 29 (Android 10 baseline; Capacitor 8 minimum is 24) |
 | Native libs in AAB/APK | `arm64-v8a` only (`libkokoro_jni.so`, `libc++_shared.so`) |
 | Model integrity | APK asset SHA-256 matches documented values (`model_quantized.onnx` `fbae9257…`, `bm_fable.bin` `f8890831…`) |
 | Tracked secrets | none (`git ls-files` has no keystores/properties) |
@@ -51,6 +51,19 @@ Notes:
 - `arm64-v8a` only is intentional (Kokoro native library target). Devices
   without 64-bit ARM are filtered by Play; x86_64 emulators cannot run the
   production build (use an arm64 AVD).
+- **v2 Android floor:** Android 10 / API 29 is the production minimum. API
+  24–28 are out of scope for V2 support; earlier test results are retained as
+  historical evidence, not support claims. The frozen legacy TWA project is
+  separate and is not changed by this baseline.
+- **v2 WebView floor:** the full React/Capacitor UI requires Android System
+  WebView **90 or newer**. This is a feature-compatibility floor, **not** a
+  security certification or a claim that WebView 90/91 is current. The API 29
+  emulator was verified with WebView `91.0.4472.114`; that is test evidence,
+  not a recommendation to remain on that version. Android 10 devices normally
+  receive WebView updates through Play/OS updates. If the installed WebView is
+  below 90, Daymark shows the native update message instead of a blank
+  WebView; the API 29 compatibility evidence is retained with the release
+  reports.
 - `versionCode 1` is valid for the first upload; every later upload needs a bump.
 - `keystore.properties` is required for a signed release build; without it the
   release build fails. Keep the upload key backed up (Play App Signing makes
@@ -532,7 +545,7 @@ responses by design.
 ## 18. Physical-device test matrix
 
 Device classes: **A** recent flagship (e.g. Pixel 9/10 class), **B** mid-range
-(4–6 GB, e.g. Pixel a-series / Galaxy A), **C** older supported (Android 7–9,
+(4–6 GB, e.g. Pixel a-series / Galaxy A), **C** older supported (Android 10/API 29,
 3–4 GB, arm64). This is a reference matrix for broader coverage across device classes; ✓ marks
 applicability, not a claim that every row was executed. The completed Nothing
 A059P pass is documented below. **The full matrix is not a blanket release

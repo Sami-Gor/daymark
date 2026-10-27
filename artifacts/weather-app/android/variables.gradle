@@ -1,6 +1,6 @@
 ext {
-    // Capacitor 8 requires API 24; the TWA shell supported 23.
-    minSdkVersion = 24
+    // Daymark V2 baseline is Android 10 (API 29); Capacitor 8 minimum is API 24.
+    minSdkVersion = 29
     compileSdkVersion = 36
     targetSdkVersion = 36
     // The NDK the Kokoro JNI library is cross-compiled with

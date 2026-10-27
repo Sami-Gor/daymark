@@ -26,7 +26,7 @@ expected to open the app. Core physical-device testing is already complete;
 the wider matrix is optional additional QA, not a requirement to repeat it.
 
 Package: `io.github.sami_gor.daymark` · versionCode `1` / versionName `1.0.0`
-· minSdk `24` / targetSdk `36`
+· minSdk `29` / targetSdk `36`
 Origin: `https://daymark-weather.pages.dev` (Cloudflare Pages)
 Architecture: React/Vite → Capacitor Android (`artifacts/weather-app/android`;
 the repo-root `android/` is the frozen TWA rollback/history project)
