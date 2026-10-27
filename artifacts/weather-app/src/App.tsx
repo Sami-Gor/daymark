@@ -35,6 +35,7 @@ import { WeatherAlerts } from '@/components/weather/WeatherAlerts';
 import { deriveDayCue } from '@/lib/day-cue';
 import { resolveDeviceLocation } from '@/lib/location-privacy';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
+import { syncWidgetPreferences } from '@/lib/widget-sync';
 import { useLocale } from '@/hooks/use-locale';
 
 const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 };
@@ -78,7 +79,8 @@ function Home() {
     selectionId.current += 1;
     setIsLocating(false);
     void loadWeather(nextPlace);
-  }, [loadWeather]);
+    syncWidgetPreferences(unit, nextPlace);
+  }, [loadWeather, unit]);
 
   const clearLocationToast = useCallback(() => {
     if (locationToastId.current) {
@@ -121,6 +123,7 @@ function Home() {
         // enhancement-only and is resolved locally while weather loads.
         const loaded = await loadWeather({ name: fallbackName, latitude, longitude });
         if (!loaded || id !== selectionId.current) return;
+        syncWidgetPreferences(unit, { name: fallbackName, latitude, longitude });
         const match = await lookupLocality(latitude, longitude);
         if (!match || match.confidence === 'low' || id !== selectionId.current) return;
         // Update only the label, only for the current intent, and only while
@@ -130,6 +133,7 @@ function Home() {
             ? { ...current, name: match.name }
             : current
         ));
+        syncWidgetPreferences(unit, { name: match.name, latitude, longitude });
       } finally {
         if (id === selectionId.current) setIsLocating(false);
       }
@@ -146,12 +150,20 @@ function Home() {
       maximumAge: 300000,
       timeout: 12000,
     });
-  }, [clearLocationToast, loadWeather, toast, t]);
+  }, [clearLocationToast, loadWeather, toast, t, unit]);
 
   // No location permission is requested on load (DAYMARK-SEC-002): the app
   // opens on the default location and only asks when the user presses the
   // location button.
   useEffect(() => { void loadWeather(LONDON); }, [loadWeather]);
+
+  // Widget preferences are updated only after an explicit unit/location action,
+  // so reopening the app on its default London/Celsius state does not overwrite
+  // a widget's last user-selected city or unit.
+  const changeUnit = useCallback((nextUnit: Unit) => {
+    setUnit(nextUnit);
+    syncWidgetPreferences(nextUnit, place);
+  }, [place]);
 
   const showInitialLoading = isLoading && !weather;
   const isRefreshing = isLoading && Boolean(weather);
@@ -167,7 +179,7 @@ function Home() {
   return (
     <div className="weather-app">
       <div className="app-shell">
-        <TopBar unit={unit} onUnitChange={setUnit} onFindMe={() => findMe()} isLocating={isLocating} isRefreshing={isRefreshing} />
+        <TopBar unit={unit} onUnitChange={changeUnit} onFindMe={() => findMe()} isLocating={isLocating} isRefreshing={isRefreshing} />
 
         {showInitialLoading && <LoadingState />}
         {!showInitialLoading && !weather && error && <WeatherError code={error} onRetry={() => void loadWeather(place)} />}

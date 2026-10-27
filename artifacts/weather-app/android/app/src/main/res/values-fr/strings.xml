@@ -2,4 +2,13 @@
 <resources>
     <string name="webview_required_title">Daymark nécessite une version plus récente d’Android System WebView</string>
     <string name="webview_required_message">Mettez à jour Android System WebView depuis Google Play, puis rouvrez Daymark.</string>
+    <string name="widget_name">Météo Daymark</string>
+    <string name="widget_config_title">Statistiques du widget</string>
+    <string name="widget_config_help">Choisissez les statistiques. Utilisez les flèches pour les prioriser ; les premières apparaissent lorsque le widget est petit.</string>
+    <string name="widget_save">Enregistrer le widget</string>
+    <string name="widget_cancel">Annuler</string>
+    <string name="widget_move_up">Déplacer la statistique vers le haut</string>
+    <string name="widget_move_down">Déplacer la statistique vers le bas</string>
+    <string name="widget_next_hours">Prochaines heures</string>
+    <string name="widget_footer">Daymark · Open-Meteo</string>
 </resources>

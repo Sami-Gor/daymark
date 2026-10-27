@@ -6,4 +6,13 @@
     <string name="custom_url_scheme" translatable="false">io.github.sami_gor.daymark</string>
     <string name="webview_required_title">Daymark needs a newer Android System WebView</string>
     <string name="webview_required_message">Update Android System WebView from Google Play, then reopen Daymark.</string>
+    <string name="widget_name">Daymark weather</string>
+    <string name="widget_config_title">Widget statistics</string>
+    <string name="widget_config_help">Choose statistics. Use the arrows to prioritise; higher items appear first when the widget is small.</string>
+    <string name="widget_save">Save widget</string>
+    <string name="widget_cancel">Cancel</string>
+    <string name="widget_move_up">Move statistic up</string>
+    <string name="widget_move_down">Move statistic down</string>
+    <string name="widget_next_hours">Next hours</string>
+    <string name="widget_footer">Daymark · Open-Meteo</string>
 </resources>

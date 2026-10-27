@@ -7,6 +7,7 @@ import com.getcapacitor.BridgeActivity;
 import io.github.sami_gor.daymark.voice.DaymarkVoicePlugin;
 import io.github.sami_gor.daymark.voice.ParakeetSpeechRecognitionPlugin;
 import io.github.sami_gor.daymark.voice.SystemSpeechPlugin;
+import io.github.sami_gor.daymark.widget.WidgetSyncPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -29,6 +30,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(DaymarkVoicePlugin.class);
         registerPlugin(ParakeetSpeechRecognitionPlugin.class);
         registerPlugin(SystemSpeechPlugin.class);
+        registerPlugin(WidgetSyncPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
