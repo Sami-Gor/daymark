@@ -61,8 +61,19 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     public void load() {
         Context context = getContext();
         audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        engine = new KokoroLocalTtsEngine(context);
-        engine.initialize(this);
+        try {
+            engine = new KokoroLocalTtsEngine(context);
+            engine.initialize(this);
+        } catch (Throwable failure) {
+            // The engine must never take the app down with it: a build
+            // without libkokoro_jni.so (any ABI other than arm64-v8a, e.g.
+            // the x86_64 emulator build) or an unexpected startup failure
+            // degrades to "voice unavailable" instead of crashing startup.
+            // The web layer already gates narration on isAvailable().
+            Log.e(TAG, "load: native TTS engine unavailable: " + failure);
+            engine = null;
+            state = LocalTtsEngine.State.ERROR;
+        }
     }
 
     @PluginMethod

@@ -19,8 +19,15 @@ android {
         // the prebuilt sherpa AAR otherwise contributes armeabi-v7a/x86/x86_64
         // libraries that cannot run the voice engine. Restrict every ABI here
         // so the app bundle cannot install a partially native-compatible build.
+        //
+        // -PdaymarkTestAbi=<abi> overrides the single ABI for test/CI builds
+        // that must run on an ABI the shipped stack does not cover (the
+        // x86_64 Android 11 emulator of the API 30 location smoke workflow).
+        // Production never sets it, and such builds ship without
+        // libkokoro_jni.so on purpose: DaymarkVoicePlugin degrades to
+        // "voice unavailable" instead of using the library.
         ndk {
-            abiFilters "arm64-v8a"
+            abiFilters ((project.findProperty("daymarkTestAbi") ?: "arm64-v8a") as String)
         }
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

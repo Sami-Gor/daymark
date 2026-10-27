@@ -27,6 +27,12 @@ import java.util.List;
  *
  * This is a separate proof of concept and does not replace the existing
  * Web Speech API narration or the Sherpa POC.
+ *
+ * The native library is loaded through {@link KokoroNativeLibrary}, which
+ * tolerates its absence: builds that do not package libkokoro_jni.so (it is
+ * arm64-v8a only, so the x86_64 emulator build cannot contain it) start this
+ * engine straight into the ERROR state instead of throwing
+ * {@link UnsatisfiedLinkError} during class initialization.
  */
 public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
@@ -41,9 +47,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private static final int SEGMENT_LEAD_KEEP_MS = 100;
     private static final int SEGMENT_TRIM_CAP_MS = 600;
 
-    static {
-        System.loadLibrary("kokoro_jni");
-    }
+    // The library is loaded in KokoroNativeLibrary so a build without it
+    // (any ABI other than arm64-v8a) degrades to "unavailable" instead of
+    // failing class initialization here. The native method declarations
+    // below are only linked when the library is present; every call site is
+    // guarded by the availability check in initialize().
 
     private final Context appContext;
     private final HandlerThread workerThread;
@@ -76,6 +84,13 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     @Override
     public void initialize(final Listener newListener) {
         this.listener = newListener;
+        if (!KokoroNativeLibrary.isAvailable()) {
+            Log.e(TAG, "initialize: libkokoro_jni is not packaged in this build: "
+                    + KokoroNativeLibrary.loadFailure());
+            setState(State.ERROR);
+            notifyError("Native speech library is not available in this build");
+            return;
+        }
         setState(State.LOADING);
         worker.post(new Runnable() {
             @Override

@@ -10,7 +10,11 @@ android {
         consumerProguardFiles 'consumer-rules.pro'
         ndk {
             // The validated Kokoro JNI library is built for arm64-v8a only.
-            abiFilters 'arm64-v8a'
+            // -PdaymarkTestAbi=<abi> overrides the ABI for test/CI builds
+            // that run on a different emulator ABI; those builds deliberately
+            // have no libkokoro_jni.so and rely on the graceful-degradation
+            // path (see KokoroNativeLibrary) instead.
+            abiFilters ((project.findProperty("daymarkTestAbi") ?: "arm64-v8a") as String)
         }
     }
 
