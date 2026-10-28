@@ -103,11 +103,8 @@ jobs:
       # instead, naming the script that installs it, as soon as the module
       # actually declares the runtime.
       #
-      # The Parakeet *model* is deliberately not fetched in this job: it only
-      # compiles, unit-tests and lints, and the 0.6B int8 model would add
-      # hundreds of megabytes to every run. Release packaging must run
-      # android/kokoro-poc/scripts/fetch-parakeet-assets.sh before it builds an
-      # APK/AAB that ships speech recognition.
+      # Parakeet model assets are not committed and are large, so fetch them
+      # only after JVM tests pass, immediately before APK/AAB packaging.
       - name: Verify the sherpa-onnx runtime
         run: |
           module=artifacts/weather-app/android/daymark-voice
@@ -128,9 +125,12 @@ jobs:
         working-directory: artifacts/weather-app/android
         run: ./gradlew --no-daemon :app:testDebugUnitTest :daymark-voice:testDebugUnitTest
 
-      - name: Android debug build
+      - name: Fetch and verify Parakeet model assets
+        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+
+      - name: Android debug APK and AAB build
         working-directory: artifacts/weather-app/android
-        run: ./gradlew --no-daemon :app:assembleDebug
+        run: ./gradlew --no-daemon :app:assembleDebug :app:bundleDebug
 
       # Android Lint. `warningsAsErrors` stays off: the project has warnings
       # today, and the gate is there to catch new *errors*.
