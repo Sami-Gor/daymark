@@ -4,29 +4,31 @@ Companion to [`android-production-readiness.md`](android-production-readiness.md
 (§2 Play requirements, §3 Asset Links, §10 data map, §20 matrix, §21 release
 sequence).
 
-**Status (21 October 2026):** The maintainer reports that Daymark has moved to
-production. The public Play storefront was readable on this date, but the
+**Status (27 October 2026):** The maintainer reports that Daymark has moved to
+production. The public Play storefront was readable on 21 October 2026, but the
 **Play Console dashboard was not accessible read-only** — `play.google.com/console`
 redirected to the public marketing page and no signed-in session was present.
 This repository therefore holds no Console export or rollout record. The public
 listing says "Updated on Oct 20, 2026", shows 10+ downloads and PEGI 3, and its
-Data safety page declares Approximate location, Voice or sound recordings and
-In-app search history, all Optional / App functionality, with **no data shared**
-and **data can't be deleted**. See
-[`data-safety-v1-v2.md`](data-safety-v1-v2.md) for the field-by-field
-reconciliation and the evidence that the released 1.0.0 sends a two-decimal
-coordinate that appears to qualify as **Precise location**. The highest uploaded
-version code is not visible on the public listing; record it from the Console
-when access is available. The website deployment, by contrast, is
-independently verifiable — see §6. Remaining work in this checklist is
-post-release housekeeping: correct the Data safety declaration if it does not
-describe the shipped behaviour, and
-check the existing Digital Asset Links endpoint if verified website links are
-expected to open the app. Core physical-device testing is already complete;
-the wider matrix is optional additional QA, not a requirement to repeat it.
+**V1-era saved** Data safety page declares Approximate location, Voice or sound
+recordings and In-app search history, all Optional / App functionality, with
+**no data shared** and **data can't be deleted**. The V1 source sends a
+two-decimal coordinate and declares `ACCESS_FINE_LOCATION`, so the saved
+Approximate-only/no-sharing answers appear inaccurate; see
+[`data-safety-v1-v2.md`](data-safety-v1-v2.md). The highest uploaded version
+code is not visible on the public listing; record it from the Console when
+access is available. The owner has settled the V2 target at **Ages 18+ only**,
+but that target and the Data Safety correction are **not entered in Console**.
+The public PEGI 3 label is a content rating, not an 18+ target-audience
+declaration; do not treat either as verified enforcement. The website deployment,
+by contrast, is independently verifiable — see §6. Remaining work in this
+checklist is the V1/V2 Data Safety reconciliation before any submission.
+Core physical-device testing is already complete; the wider matrix is optional
+additional QA, not a requirement to repeat it.
 
-Package: `io.github.sami_gor.daymark` · versionCode `1` / versionName `1.0.0`
-· minSdk `29` / targetSdk `36`
+Package: `io.github.sami_gor.daymark` · released V1: versionCode `1` /
+versionName `1.0.0`, minSdk `24`, targetSdk `36` · V2 candidate: versionCode
+`2` / versionName `2.0.0`, minSdk `29`, targetSdk `36`
 Origin: `https://daymark-weather.pages.dev` (Cloudflare Pages)
 Architecture: React/Vite → Capacitor Android (`artifacts/weather-app/android`;
 the repo-root `android/` is the frozen TWA rollback/history project)
@@ -34,12 +36,13 @@ First submitted artifact: `app-release.aab` — SHA-256
 `309abe94f4c4f572fe1a478e5b517e76e17c1e49a2e45e9cb90d4571747b89b5`,
 96,463,981 bytes.
 
-**Document scope.** This checklist describes the **released v1.0.0** build. The
-`v2/privacy-hardened-voice` branch changes the location permission, the
-coordinate precision and the Android speech path, so the answers a future
-candidate would give differ for location and voice input. Those differences are
-stated inline below. The v2 candidate is not released, and the Data safety
-declaration must continue to describe the build that is actually distributed.
+**Document scope.** This checklist covers the **released v1.0.0** build that is
+currently distributed and the **unreleased V2 candidate** on
+`release/v2-candidate`. V2 changes the location permission, coordinate precision
+and Android speech path, so its answers differ for location and voice input.
+Those differences are stated inline. V2 is not released; until it fully
+replaces V1, the final global Data safety declaration must describe both
+currently distributed practices.
 
 ## 0. Pre-flight (local)
 
@@ -80,61 +83,91 @@ On a clean clone, run the Kokoro JNI + asset steps from
       language English (US), type App, Free.
 - [x] Accept the developer program policies.
 
-## 2. App content declarations — PREVIOUSLY REPORTED DONE; POST-RELEASE ACCURACY CHECK
+## 2. App content declarations — PREVIOUSLY REPORTED DONE; V2 AUDIT OPEN
 
-Play Console → **Policy and programs → App content**. All rows completed:
+Play Console → **Policy and programs → App content**. Rows below were previously
+completed for the released V1 declaration; the V2 target and Data Safety
+updates have **not** been entered in Console.
 
-- [x] Privacy policy: `https://daymark-weather.pages.dev/privacy`
+- [x] Privacy policy URL: `https://daymark-weather.pages.dev/privacy`.
 - [x] App access: **All functionality is available without special access**
       (no login).
 - [x] Ads: **No ads** (advertising ID = No).
 - [x] Content rating questionnaire (weather utility, no user content, no ads).
-- [x] Target audience completed.
+- [x] Target audience was previously completed for the released V1 declaration.
+- [ ] **V2 target audience: Ages 18+ only.** This is the owner-settled target
+      plan and is not yet entered in Console. No child age groups are selected;
+      the Families child-audience process is not part of this declared target.
+      Do not claim that an age gate or Restrict Minor Access is implemented.
+- [ ] **Audience declaration is not an access control.** The 18+ setting is a
+      Google Play declaration; it does not prove minors cannot access the app.
+      Assess the UK Children's Code / Age Appropriate Design Code separately
+      where applicable; selecting 18+ does not by itself resolve UK privacy
+      obligations.
+- [ ] **Open-Meteo / Families assessment remains unresolved.** The provider's
+      published terms are silent on child-directed use. Do not claim that
+      Open-Meteo is approved or prohibited for child users; no provider contact
+      was made. Reassess if the audience changes or a regulator treats the
+      service as likely to be accessed by children.
 - [x] Government apps: No · Financial features: No · Health: No · News: No.
-- [x] Data safety form was previously reported complete. **Post-release action:**
-      compare the saved answers with the shipped behaviour for location, WebView
-      speech input and browser/system TTS. Google Play includes app-controlled
-      WebViews in its data-flow rules and defines collection as transmission
-      off-device. Open-Meteo says its free-API server logs may contain geographic
-      coordinates and are deleted after 90 days, so do **not** mark location
-      processing as ephemeral. Sources: [Google Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469)
-      and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms).
+- [x] Data safety form was previously reported complete. The saved answers are
+      still V1-era and must be reconciled before V2 submission.
+- [ ] **Data Safety global form.** Google Play requires the **sum** of practices
+      across all versions currently distributed on production, open and closed
+      testing tracks (internal-testing-only artifacts are exempt). V1 remains
+      distributed until the full V2 production release. Do not label the final
+      form “V2-only.”
+- [ ] **V1 track inventory:** record the highest versionCode/versionName and
+      artifact behavior on every production, open, closed and staged rollout
+      track. V1 source evidence is on `main` at `44fd211` and the physical-test
+      source at `69e21c`; neither is proof of the artifact currently served.
+- [ ] **V1 speech/provider evidence:** establish whether V1 browser/WebView
+      recognition and system TTS transport audio/text off-device, and the
+      provider/retention path, before finalizing V1 audio sharing or global
+      encryption.
+- [ ] **Deletion:** no dedicated data-deletion mechanism is implemented. Daymark
+      has no accounts, backend user record, or location/search history. Clearing
+      local app/browser storage does not delete Open-Meteo provider logs.
+- [ ] **Public policy deployment:** the source policy now describes V2 and the
+      18+ audience, but the public `/privacy`, `/fr/privacy` and `/es/privacy`
+      routes still rendered the older 11 September 2026 policy on 27 October
+      2026. Do not treat the deployed policy as current until it is published.
+- [ ] **Packaged policy:** the local debug AAB/APK still contain old
+      `suitable for children and adults` policy text. They are debug artifacts,
+      not release candidates. Rebuild from the approved source; do not edit
+      generated assets manually.
 
-| Data type / flow | Current repo evidence | Console follow-up |
-|---|---|---|
-| Location | The user taps “Use my location”; coordinates are rounded to 2 decimal places and sent to Open-Meteo over HTTPS. Open-Meteo says free-API server logs may contain geographic coordinates and are deleted after 90 days. | **Released v1.0.0:** select **Precise location** (the sent grid is under 3 km² by Google's definition). **v2 candidate:** the app declares `ACCESS_COARSE_LOCATION` only and sends the OS-provided approximate fix unmodified on Android, so the Android answer becomes **Approximate location**; the web/PWA grid cell is roughly 4.8 km² at the example latitude, which also qualifies as Approximate. The cell area shrinks with latitude, so re-derive the answer from the build actually being submitted rather than reusing either value. In Data usage and handling: **Collected = Yes**; **Optional = Yes**; purpose **App functionality**; **Ephemeral = No** because provider logs may retain coordinates for 90 days. For **Shared**, Google provides exceptions for transfers to a qualifying service provider and for a specific user-initiated action the user reasonably expects. The explicit “Use my location” action may qualify for the latter; apply it only if the actual UI and disclosure support that conclusion, otherwise select Shared = Yes. Encryption in transit: Yes for this HTTPS flow. See [Play Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469) and [Open-Meteo Terms & Privacy](https://open-meteo.com/en/terms). |
-| Voice-input audio | Released v1.0.0: Ask Daymark uses browser/platform speech recognition; the app does not save audio or transcripts, but the speech provider may process audio remotely. v2 candidate: on Android, recognition runs on the device using the bundled Parakeet model, so no audio is transmitted; the web build is unchanged. | **Released v1.0.0:** in Data types, account for **Audio files → Voice or sound recordings** if audio is transmitted off-device. Collection and any sharing depend on the actual provider path; do not mark ephemeral unless that provider's documentation confirms memory-only real-time processing with no longer retention. **v2 candidate:** for the Android build the answer becomes “not collected” once the on-device path is device-verified; the web path is unchanged. The two platforms must be answered separately. |
-| In-app search history | The user types a place name; the query is sent to Open-Meteo forward geocoding. The app keeps no search history of its own. | Google Play's *App activity* category includes in-app search history. Account for the typed place query as app activity with the same provider retention caveat as location; answer it separately from app interactions. |
-| Voice-output text | Android English uses bundled local Kokoro; web uses browser speech synthesis; Android French/Spanish use native Android system TTS, and the v2 candidate selects only an installed voice that does not require a network connection | Keep English Android output local. For the web, check the actual selected speech provider. For the v2 Android French/Spanish path, no network voice is selected and the narration fails explicitly if no offline voice is installed. If forecast/location text is transmitted off-device on the web, include the affected data type and purpose; do not assume provider processing is ephemeral without evidence. |
-| App activity / personal info / messages / contacts | No in-app account, analytics or related SDK found in this audit | Confirm existing answers remain accurate |
-| Analytics / crash logs | No in-app analytics/crash SDK found in repo | Confirm existing answers remain accurate |
+### V2 Data Safety / location / voice checklist
 
-**Live public form (21 October 2026):** the storefront Data safety page says
-**No data shared**, and declares **Approximate location**, **Voice or sound
-recordings** and **In-app search history**, all Optional / App functionality,
-encrypted in transit, and **data can't be deleted**. It does **not** declare
-Precise location. That is inconsistent with the released v1.0.0 evidence in the
-Location row above, which sends a two-decimal fix below Play's 3 km² threshold.
-The live form also needs a recorded user-initiated-action analysis for the
-Open-Meteo transfer before "No data shared" can be relied on. Do not change the
-Console until the current track contents and the legal position are confirmed;
-see [`data-safety-v1-v2.md`](data-safety-v1-v2.md).
-
-- [ ] **Multi-version rule.** Play's Data safety section describes the **sum**
-      of an app's data collection and sharing across **all versions currently
-      distributed** on Google Play. While v1.0.0 — which declares
-      `ACCESS_FINE_LOCATION` and transmits a two-decimal fix — remains
-      distributed, declaring Approximate location only would be inaccurate.
-      Either withdraw v1.0.0 from Play, or declare both location types until it
-      is gone. Do not change the declaration for a candidate while the older
-      build is still live.
-- [x] Account-deletion requirement: not applicable because Daymark has no
-      account-creation flow.
-- [ ] Separately answer Data safety's "deletion request mechanism" question
-      based on the actual support process. Do not imply Daymark can erase
-      Open-Meteo's logs on demand; the provider's published terms say its free-API
-      logs may contain coordinates and are deleted after 90 days.
-- [x] AI asset declaration completed.
+- [ ] **Approximate location — Collected = Yes.** After explicit location
+      action and permission, V2 sends the coarse fix after the on-device
+      0.025° grid to Open-Meteo. Default London is a fixed place.
+- [ ] **Approximate location — Shared = Yes, provisionally.** Open-Meteo is an
+      independent controller; the current UI has no specific pre-action
+      third-party disclosure. A “No” answer requires a documented Play
+      exception and legal review.
+- [ ] **Approximate location — Optional = Yes; purpose App functionality;
+      Ephemeral = No** because Open-Meteo’s published troubleshooting logs may
+      retain coordinates for 90 days.
+- [ ] **In-app search history — Collected = Yes; Shared = Yes, provisionally;
+      Optional = Yes; purpose App functionality; Ephemeral = No.** Typed
+      `name` is sent to Open-Meteo geocoding; Daymark does not retain a search
+      history. Do not call it stored history.
+- [ ] **Voice or sound recordings — V2-only: Collected = No; Shared = No.**
+      Parakeet runs on-device; no system/browser/remote speech path is
+      registered. Packet-level proof is still absent.
+- [ ] **Local preferences — not a Data Safety collection.** `daymark.locale`
+      and Android `daymark.permissions`/`microphone-requested` remain on-device.
+- [ ] **Precise location — V2 = No.** Android declares only
+      `ACCESS_COARSE_LOCATION`; the 0.025° grid is applied before requests.
+      V1 still requires a precise-location row while it remains distributed.
+- [ ] **IP/network metadata:** disclose Open-Meteo’s receipt of source IP/URL
+      metadata in the policy. Do not guess a Play data type; resolve with
+      Play/legal if the final form requires one.
+- [ ] **Encryption in transit:** V2 Open-Meteo requests use HTTPS. Do not
+      finalize a global Yes while V1’s speech/TTS transport is unknown.
+- [ ] **Target audience/content rating/Data Safety consistency:** confirm all
+      three agree before submission. Console has not been edited.
 
 ## 3. Store listing — DONE (maintainer-reported; default store listing)
 
@@ -256,10 +289,10 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       website links opening in the app, not the fact that Daymark is in
       production. On-device domain verification remains optional and untested
       (see §7).
-- [ ] If adopting the revised privacy-page text in this PR, deploy the web build,
-      publish the same policy in a new Android bundle, and set the effective date
-      to the actual publication date. The already-uploaded AAB does not contain
-      these source edits.
+- [ ] Before any policy publication, deploy the revised web build, include the
+      same policy in a new Android bundle, and set the effective date to the
+      actual publication date. The already-uploaded AAB and the public
+      `/privacy` page do not contain these source edits.
 - [ ] Monitor Android vitals for ANRs/crashes, especially memory-related kills
       on lower-RAM devices. Additional device-matrix tests are optional QA, not
       a requirement to repeat the completed core device pass.
@@ -281,12 +314,12 @@ adb shell am start -a android.intent.action.VIEW -d "https://daymark-weather.pag
       unused value in Play Console rather than assuming the prior value.
 - [ ] **Privacy-policy publication sync:** the three policy source pages now state
       the Android on-device Parakeet path, distinguish it from the web/PWA
-      browser-speech path, disclose that approximate location and typed
+      no-voice web demo, disclose that grid-rounded location and typed
       geocoding/weather requests are sent to Open-Meteo, state the
-      French/Spanish installed-offline-voice constraint, and carry a version
-      note for 1.0.0 users. Those edits are not live: the live `/privacy` page
-      still showed the 11 September 2026 text on 21 October 2026, and the edits
-      are not in the already-uploaded AAB. Before using this revised wording,
+      V2 French/Spanish unavailable state, and carry a version
+      note for 1.0.0 users. Those edits are not live: the public policy routes
+      still showed the 11 September 2026 text on 21 October 2026 (and again on
+      27 October 2026), and the edits are not in the already-uploaded AAB. Before using this revised wording,
       deploy the web build and rebuild the Android bundle so the bundled policy
       matches. Increment `versionCode` to the next unused value (expected `2` if
       `1` is still the latest upload), confirm the three policy pages match and

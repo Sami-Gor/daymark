@@ -53,12 +53,13 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 - **Geolocation:** `navigator.geolocation.getCurrentPosition` (App.tsx), with
   device-location fallback labels; no native permission in the old shell
   (Chrome granted it).
-- **Microphone / speech input:** `use-speech-recognition.ts` + AskDaymark use
-  `SpeechRecognition`/`webkitSpeechRecognition` (browser), no `getUserMedia`.
-- **Speech output:** `use-browser-speech.ts` (removed in `332adba`) +
-  `lib/voice-browser.ts` wrap `window.speechSynthesis` with `SPEECH_LANGS`
-  (en/fr/es) and single-utterance semantics (`speak` cancels current first,
-  `stop` = cancel).
+- **Microphone / speech input (historical PWA):** the pre-V2 web shell used
+  browser `SpeechRecognition`/`webkitSpeechRecognition`; the V2 web/PWA demo has
+  no voice path and Ask Daymark is Android-only.
+- **Speech output (historical PWA):** the pre-V2 browser `speechSynthesis`
+  adapter (`voice-browser.ts`) has been removed. V2 web/PWA has no narration;
+  Android English uses bundled Kokoro, and French/Spanish narration is
+  unavailable in V2 with no system/network fallback.
 - **Network:** Open-Meteo weather/air-quality/geocoding APIs; CSP whitelists
   those hosts in `public/_headers` and `vite.config.ts` preview headers.
 - **Offline:** SW app-shell precache + locality Cache Storage; weather needs
@@ -100,7 +101,7 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
 | Service worker | served by Chrome, active | redundant; disable inside native shell, keep for web |
 | Geolocation permission | Chrome handles | WebView `onGeolocationPermissionsShowPrompt` + app permission |
 | Microphone | Chrome | WebView `onPermissionRequest` + app permission (AskDaymark) |
-| Speech output | Chrome browser speech synthesis/system voice | Android English: local Kokoro only (shows an error if unavailable); French/Spanish: native Android system TTS plugin. Web/PWA continues to use browser speech synthesis |
+| Speech output | Chrome browser speech synthesis/system voice | Android English: local Kokoro only (shows an error if unavailable); French/Spanish: unavailable in V2, no system/network/browser fallback. Web/PWA has no speech output. |
 | External links | Chrome handles | Capacitor opens in external browser (`@capacitor/app`/browser config) |
 | Back button | browser history | Capacitor hardware back handling → `window.history.back()` |
 | App links | verified by Chrome via DAL | Android intent filters + optional `@capacitor/app` `openUrl` |
@@ -119,13 +120,14 @@ publicly reachable as `ff496996fcf9b47d9524d81ac300e69c2974c805`.
   - Android implementation as a Gradle library module
     (`android/daymark-voice`) wrapping the validated `KokoroLocalTtsEngine`,
     the same Rust JNI cdylib, `model_quantized.onnx` and `bm_fable.bin`.
-  - Web implementation is a placeholder; the web UI uses browser speech APIs.
-    On Android, Kokoro is selected only for English when the native engine is
-    available; it does not fall back to system TTS for English. French/Spanish
-    use the Android `SystemSpeech` plugin.
-- Unified speech layer: `useDaymarkSpeech` selects
-  `kokoro` only for Android native + English + healthy engine;
-  `browser` for web/desktop and iOS. French/Spanish on Android use the
+  - The web/PWA UI has no speech path. On Android, Kokoro is selected only
+    for English when the native engine is available; it does not fall back to
+    system TTS for English. French/Spanish narration is unavailable in V2 and
+    the system-TTS plugin is not registered.
+- Unified speech layer: `useDaymarkSpeech` supports Android native English
+  Kokoro only. The web/PWA and iOS have no narration path. French/Spanish on
+  Android are explicitly unavailable in V2; the system-TTS plugin is not
+  registered.
   `SystemSpeech` plugin. If Android's native English engine is unavailable,
   the app surfaces a narration error; it does not fall back to browser/system
   speech for English.
@@ -194,9 +196,9 @@ Engine selection (`src/lib/speech-engine.ts`):
 |---|---|---|
 | Android Capacitor, native available | English | Kokoro `bm_fable` |
 | Android Capacitor, native unavailable | English | Narration error shown; never falls back to system TTS (English stays local-only) |
-| Android Capacitor | French/Spanish | Android system TTS (`SystemSpeech`) |
-| Web/PWA/desktop | any | Web Speech API |
-| iOS | any | Web Speech API (native plugin is a future path) |
+| Android Capacitor | French/Spanish | Unavailable in V2 (planned V2.2); no system/network/browser fallback |
+| Web/PWA/desktop | any | No voice feature |
+| iOS | any | No voice feature |
 
 ## Build and release
 
@@ -207,6 +209,7 @@ cd artifacts/weather-app && pnpm build
 # Capacitor sync + Android builds (JDK 21; java_home command below is macOS-specific)
 cd artifacts/weather-app
 pnpm exec cap sync android
+pnpm run verify:android-web-assets
 cd android
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bundleRelease
