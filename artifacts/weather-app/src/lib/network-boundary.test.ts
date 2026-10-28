@@ -493,33 +493,21 @@ describe('network boundary', () => {
     expect(bundled.android?.allowMixedContent).toBe(false);
   });
 
-  it('Android narration cannot fall back to WebView Web Speech in the shipped wiring', () => {
-    /*
-     * Boundary-level companion to the behavioural tests: `pickFallbackAdapter`
-     * is allowed (and tested in speech-adapters.test.ts) to return the
-     * webSpeech adapter when no system bridge is supplied — that branch keeps
-     * the pure function honest. What must never happen is the *production*
-     * call site supplying a null bridge on Android, because WebView
-     * speechSynthesis voices may be served by a network provider, while the
-     * SystemSpeech bridge is gated on offline voices only. This pins that
-     * wiring (secured with the routing fix): the hook always constructs the
-     * system adapter and always passes it.
-     */
-    const files = collectSourceFiles(path.join(appRoot, 'src'));
-    const callers = files
-      .filter((file) => /pickFallbackAdapter\s*\(\s*\{/.test(readFileSync(file, 'utf8')))
+  it('the web/PWA has no production browser speech path', () => {
+    // The V2 web demo is weather-only. Android voice is native only; no source
+    // module may construct or call the browser speech-recognition/synthesis
+    // APIs. The policy pages may describe the absence in prose but do not use
+    // these API identifiers.
+    const files = collectSourceFiles(path.join(appRoot, 'src'))
+      .filter((file) => !/src[\\/]pages[\\/]/.test(file));
+    const forbidden = ['speechSynthesis', 'SpeechSynthesisUtterance', 'webkitSpeechRecognition', 'window.SpeechRecognition', 'new SpeechRecognition'];
+    const offenders = files
+      .filter((file) => {
+        const code = stripTsComments(readFileSync(file, 'utf8'));
+        return forbidden.some((token) => code.includes(token));
+      })
       .map((file) => path.relative(appRoot, file));
-    expect(callers).toEqual(['src/hooks/use-daymark-speech.ts']);
-
-    const hook = readFileSync(path.join(appRoot, 'src', 'hooks', 'use-daymark-speech.ts'), 'utf8');
-    const calls = [...hook.matchAll(/pickFallbackAdapter\(\{([\s\S]*?)\}\)/g)];
-    expect(calls.length).toBe(1);
-    const arguments_ = calls[0]![1];
-    // The offline-gated system bridge is always supplied, never null/undefined.
-    expect(arguments_).toMatch(/\bsystemSpeech\b/);
-    expect(arguments_).not.toMatch(/systemSpeech\s*:\s*(?:null|undefined)/);
-    // And the bridge itself is unconditionally constructed as an object.
-    expect(hook).toContain('const systemSpeech = useMemo');
+    expect(offenders).toEqual([]);
   });
 
   it('the detectors actually fire (the guard is not vacuous)', () => {

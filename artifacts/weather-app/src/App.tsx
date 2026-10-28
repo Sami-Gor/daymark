@@ -99,15 +99,13 @@ function Home() {
     // improves the place label and never delays weather (see below).
     void ensureLocalityIndex();
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
-      // Android requests only ACCESS_COARSE_LOCATION, so the operating
-      // system supplies an approximate fix. Do not round it again: doing so
-      // compounds the loss of accuracy for regional forecasts.
-      // Browsers without an approximate-permission contract snap the fix to
-      // a roughly 3–5 km² grid before any coordinates leave the device.
+      // Both Android and web/PWA snap the device fix to the same 0.025-degree
+      // grid on-device. Android additionally requests only
+      // ACCESS_COARSE_LOCATION, so its fix is already approximate before the
+      // grid is applied and no unrounded fix is used for a weather request.
       const { latitude, longitude } = resolveDeviceLocation(
         coords.latitude,
         coords.longitude,
-        isAndroidNative,
       );
       try {
         // A newer search or location interaction wins over this older one.
@@ -143,7 +141,7 @@ function Home() {
       maximumAge: 300000,
       timeout: 12000,
     });
-  }, [isAndroidNative, loadWeather, t]);
+  }, [loadWeather, t]);
 
   // No location permission is requested on load (DAYMARK-SEC-002): the app
   // opens on the default location and only asks when the user presses the
@@ -216,6 +214,11 @@ function Home() {
               </div>
             </main>
           </>
+        )}
+        {!isAndroidNative && (
+          <p className="web-demo-note" data-testid="web-demo-note">
+            {t('demo.webLimited')}
+          </p>
         )}
         <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> {t('footer.by')}</span><span className="footer-links"><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a><Link href={privacyHref} data-testid="link-privacy">{t('footer.privacy')}</Link></span></footer>
       </div>

@@ -1,11 +1,11 @@
 /**
- * Coarsens device-derived coordinates on platforms that do not expose
- * Android's approximate-location permission contract to Daymark.
+ * Coarsens device-derived coordinates before any location-derived request.
  *
  * A 0.025-degree cell is roughly 2.8 km north/south and 1.7 km east/west
- * around London (about 4.8 km²). Android instead relies on the operating
- * system's approximate location because the Android manifest deliberately
- * declares ACCESS_COARSE_LOCATION without ACCESS_FINE_LOCATION.
+ * around London (about 4.8 km²). The same on-device grid is used by the web/PWA
+ * and the Android app; Android additionally declares only
+ * ACCESS_COARSE_LOCATION, so the OS fix is already approximate before this
+ * second, independently applied privacy step.
  *
  * Search-selected place coordinates are governed by the place-search flow,
  * not this helper.
@@ -33,26 +33,20 @@ export function roundDeviceLocation(latitude: number, longitude: number): {
 }
 
 /**
- * Decides which device-derived coordinates Daymark is allowed to send.
+ * Returns the only device-derived coordinates Daymark is allowed to send.
  *
- * On Android the manifest declares ACCESS_COARSE_LOCATION and deliberately
- * does not declare ACCESS_FINE_LOCATION, so the operating system already
- * supplies an approximate fix. That fix is used unchanged, because rounding
- * it again would compound the loss of accuracy the permission already
- * introduced and would undo the regional forecast detail the approximate
- * location is there to preserve.
- *
- * Every other platform has no such permission contract, so the fix is snapped
- * to the privacy grid before it leaves the device.
+ * Both Android and web/PWA snap the fix to the same 0.025-degree grid on the
+ * device. Android's manifest additionally declares only
+ * ACCESS_COARSE_LOCATION and never ACCESS_FINE_LOCATION; the grid is applied
+ * once to whatever approximate fix Android supplies. The returned pair is
+ * the value used for the Open-Meteo forecast and air-quality requests.
  */
 export function resolveDeviceLocation(
   latitude: number,
   longitude: number,
-  isAndroidNative: boolean,
 ): {
   latitude: number;
   longitude: number;
 } {
-  if (isAndroidNative) return { latitude, longitude };
   return roundDeviceLocation(latitude, longitude);
 }

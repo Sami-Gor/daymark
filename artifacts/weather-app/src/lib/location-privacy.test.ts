@@ -79,30 +79,22 @@ describe('roundDeviceLocation', () => {
 });
 
 describe('resolveDeviceLocation', () => {
-  it('sends the approximate fix unchanged on Android', () => {
-    // Android grants ACCESS_COARSE_LOCATION only, so the operating system
-    // already coarsened the fix. Rounding it again would compound the loss
-    // of accuracy for regional forecasts.
-    expect(resolveDeviceLocation(51.5074567, -0.12789012, true)).toEqual({
-      latitude: 51.5074567,
-      longitude: -0.12789012,
+  it('snaps every device-derived fix to the agreed 0.025-degree grid', () => {
+    expect(resolveDeviceLocation(51.5074567, -0.12789012)).toEqual({
+      latitude: 51.5,
+      longitude: -0.125,
     });
-    // The two-decimal rounding of v1.0.0 stays removed on this path.
-    expect(resolveDeviceLocation(51.5074567, -0.12789012, true).latitude).not.toBe(
+    // The v1 two-decimal rounding remains obsolete; the V2 grid is coarser.
+    expect(resolveDeviceLocation(51.5074567, -0.12789012).latitude).not.toBe(
       Number(51.5074567.toFixed(2)),
     );
   });
 
-  it('snaps the fix to the privacy grid on every other platform', () => {
-    expect(resolveDeviceLocation(51.5074567, -0.12789012, false)).toEqual({
-      latitude: 51.5,
-      longitude: -0.125,
-    });
-  });
-
-  it('applies a different policy per platform', () => {
-    const android = resolveDeviceLocation(51.5074567, -0.12789012, true);
-    const web = resolveDeviceLocation(51.5074567, -0.12789012, false);
-    expect(android).not.toEqual(web);
+  it('does not expose an Android bypass that sends the raw fix', () => {
+    const raw = { latitude: 51.5074567, longitude: -0.12789012 };
+    const resolved = resolveDeviceLocation(raw.latitude, raw.longitude);
+    expect(resolved.latitude).toBe(51.5);
+    expect(resolved.longitude).toBe(-0.125);
+    expect(resolved).not.toEqual(raw);
   });
 });
