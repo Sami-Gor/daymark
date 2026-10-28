@@ -99,10 +99,10 @@ function Home() {
     // improves the place label and never delays weather (see below).
     void ensureLocalityIndex();
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
-      // Both Android and web/PWA snap the device fix to the same 0.025-degree
-      // grid on-device. Android additionally requests only
-      // ACCESS_COARSE_LOCATION, so its fix is already approximate before the
-      // grid is applied and no unrounded fix is used for a weather request.
+      // Both Android and web/PWA apply the same latitude-aware on-device grid
+      // (0.025° latitude minimum; longitude widens where needed to preserve
+      // 3 km²). Android additionally requests only ACCESS_COARSE_LOCATION, so
+      // no unrounded fix is used for a weather request.
       const { latitude, longitude } = resolveDeviceLocation(
         coords.latitude,
         coords.longitude,

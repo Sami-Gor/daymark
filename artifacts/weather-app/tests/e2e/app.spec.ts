@@ -131,7 +131,7 @@ test.describe('functional', () => {
     const page = await context.newPage();
     // Capacitor reports the platform as 'android' through its custom-platform
     // hook. The manifest grants ACCESS_COARSE_LOCATION only, and the app also
-    // applies the shared 0.025-degree on-device grid before requesting weather.
+    // applies the shared latitude-aware on-device grid before requesting weather.
     await page.addInitScript(() => {
       (window as unknown as { CapacitorCustomPlatform: { name: string } }).CapacitorCustomPlatform = {
         name: 'android',
