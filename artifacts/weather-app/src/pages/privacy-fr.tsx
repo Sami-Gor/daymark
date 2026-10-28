@@ -82,11 +82,14 @@ export default function PrivacyFr() {
       <p>
         L’application Android déclare uniquement <code>ACCESS_COARSE_LOCATION</code> et ne déclare pas
         <code>ACCESS_FINE_LOCATION</code>. Android et le web/PWA arrondissent la position dérivée de
-        l’appareil sur une grille de 0,025 degré sur l’appareil avant de l’envoyer à Open-Meteo. Près
-        de Londres, cela représente environ 2,8 km nord/sud et 1,7 km est/ouest (environ 4,8 km²). La
-        grille réduit la précision mais n’anonymise pas la requête : les coordonnées arrondies quittent
-        votre appareil et sont envoyées à Open-Meteo. L’application revient à Londres lors d’un
-        rechargement ou d’une réouverture.
+        l’appareil sur une grille de 0,025 degré avec un pas minimal de 0,025 degré sur l’appareil avant
+        de l’envoyer à Open-Meteo. Aux hautes latitudes, l’espacement en longitude s’élargit juste assez
+        pour conserver une zone d’au moins 3 km² ; le pas de latitude ne descend jamais sous 0,025°.
+        Près de Londres, cela représente environ 2,8 km nord/sud et 1,7 km est/ouest (environ 4,8 km²) ;
+        aux hautes latitudes, l’espacement en longitude peut être plus large. La grille réduit la
+        précision mais n’anonymise pas la requête : les coordonnées arrondies quittent votre appareil et
+        sont envoyées à Open-Meteo. L’application revient à Londres lors d’un rechargement ou d’une
+        réouverture.
       </p>
       <p>
         Pour la localisation de l’appareil, Daymark résout aussi localement un nom de localité proche

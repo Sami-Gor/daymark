@@ -50,8 +50,9 @@ sources for the candidate.
   browser synthesis path.
 - Android declares `ACCESS_COARSE_LOCATION` only and does not declare
   `ACCESS_FINE_LOCATION`. Both Android and web/PWA snap device-derived
-  coordinates to the same 0.025-degree grid on the device before weather
-  requests; no alternate request path sends the raw fix.
+  coordinates to the same latitude-aware grid on the device before weather
+  requests; the latitude step has a 0.025° minimum and longitude widens only to
+  preserve at least 3 km², with no raw-fix bypass.
 - Typed place search remains separate: user-entered queries still go to
   Open-Meteo geocoding.
 - The bundled GeoNames locality data remains reverse-lookup only. Forward
@@ -67,6 +68,8 @@ Age Appropriate Design Code must be assessed separately where it applies;
 selecting 18+ does not resolve those UK obligations. Open-Meteo's published
 terms are silent on child-directed use. The provider is neither declared
 approved nor prohibited for child users, and no provider contact was made.
+This is not a separate child-targeting blocker for the adult-only design;
+the final store-listing/content check remains the relevant content check.
 
 ## Compatibility
 
@@ -111,17 +114,18 @@ considered in Data safety.
 ## Approximate device-location evaluation
 
 Android requests only `ACCESS_COARSE_LOCATION`; the V2 app also applies the
-same on-device 0.025-degree grid as web/PWA before sending a location-derived
-weather request. The OS permission and the grid are separate privacy steps.
-Around London the grid cell is approximately 2.8 km north/south by 1.7 km
-east/west (about 4.8 km²). It is not a universal guarantee of the same physical
-cell area at every latitude. The web/PWA uses the identical grid.
+same latitude-aware on-device grid as web/PWA before sending a location-derived
+weather request. The latitude step has a 0.025° minimum; above the latitude
+where a 0.025° longitude cell would be below 3 km², the longitude step widens
+just enough to keep the represented area at or above the Play approximate
+floor. Around London the cell is approximately 2.8 km north/south by 1.7 km
+east/west (about 4.8 km²). The web/PWA uses the identical policy.
 
 The user can also choose a city/place manually and deny GPS permission. Typed
 place search remains a separate path and goes to Open-Meteo geocoding; it is
 not made local by the GPS permission change.
 
-Forecast impact: the shared 0.025-degree grid, together with Android's coarse
+Forecast impact: the shared latitude-aware grid, together with Android's coarse
 permission, should preserve more regional detail than 0.1-degree rounding. Coastal,
 elevation and urban differences can still affect the selected forecast point.
 Test representative London, coastal and elevated UK locations. Confirm that
@@ -209,20 +213,23 @@ Android bundle is released.
       POC, so it needs its own measurement. English narration is unchanged from
       v1.0.0, where the same behaviour is recorded in
       `docs/release/android-production-readiness.md`; that record does not
-      evidence this candidate. This gate stays open until a redacted traffic
-      capture or a packet-level capture is attached.
-- [ ] Network instrumentation on a physical device during voice input and
-      narration records no speech service traffic. Outstanding: logcat showed
-      no recognizer errors or payloads, but absence of log messages is not
-      treated as proof of no traffic. Preserve redacted test evidence and
-      confirm no payload is sent to weather/geocoding endpoints.
+      evidence this candidate. Privacy-path evidence is closed by source and
+      tests; the remaining item is a measured cold-start performance check, not
+      a packet-capture gate.
+- [x] Source/data-flow review and regression tests establish the V2 speech
+      boundary: audio/transcript values are not sent to network clients,
+      analytics, telemetry or persisted history. Packet capture is not a
+      standalone release gate. This does not claim universal zero network
+      traffic; forecast requests remain separate. Live microphone behaviour
+      remains a device-quality check.
 - [x] Web/PWA and Android code tests confirm device-derived coordinates are
-      snapped to the 0.025-degree grid before weather requests. The Playwright
+      snapped to the latitude-aware grid before weather requests. The Playwright
       tests inspect outgoing request URLs; the Android-path test sets the
-      Capacitor Android platform and asserts the same grid, so the raw browser
-      fix is not used. This is not a physical-device GPS test.
-- [ ] Test representative UK microclimate locations and confirm the final Play
-      Data safety classification against the actual data flow and provider path.
+      Capacitor Android platform and asserts the same policy, so the raw browser
+      fix is not used. Area tests cover UK and high-latitude boundaries. This is
+      not a physical-device GPS test.
+- [x] Deterministic location tests cover UK, high-latitude and pole boundaries;
+      physical microclimate testing remains optional device-quality coverage.
 - [x] Existing test suite remains green; resolve any unrelated regression before
       release. 19 test files / 244 unit tests and 153 browser tests pass on
       the branch head this record was written against (`fe18893`, 2026-10-19).

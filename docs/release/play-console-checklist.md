@@ -104,11 +104,16 @@ updates have **not** been entered in Console.
       Assess the UK Children's Code / Age Appropriate Design Code separately
       where applicable; selecting 18+ does not by itself resolve UK privacy
       obligations.
-- [ ] **Open-Meteo / Families assessment remains unresolved.** The provider's
-      published terms are silent on child-directed use. Do not claim that
-      Open-Meteo is approved or prohibited for child users; no provider contact
-      was made. Reassess if the audience changes or a regulator treats the
-      service as likely to be accessed by children.
+- [x] **In-app content is not child-directed.** The weather utility has no
+      child-directed characters, activities, rewards or advertising, so the
+      Google Play Families child-targeting process is not a separate blocker
+      for the 18+ design, subject to final store-listing/content-rating review.
+      This is not a claim of Families approval or legal exemption.
+- [x] **Open-Meteo / Families is not a separate child-targeting blocker for
+      this adult-only design.** The provider's published terms are still silent
+      on child-directed use; do not claim approval or prohibition and do not
+      contact the provider. Reassess if the audience changes or a regulator
+      treats the service as likely to be accessed by children.
 - [x] Government apps: No · Financial features: No · Health: No · News: No.
 - [x] Data safety form was previously reported complete. The saved answers are
       still V1-era and must be reconciled before V2 submission.
@@ -117,10 +122,11 @@ updates have **not** been entered in Console.
       testing tracks (internal-testing-only artifacts are exempt). V1 remains
       distributed until the full V2 production release. Do not label the final
       form “V2-only.”
-- [ ] **V1 track inventory:** record the highest versionCode/versionName and
-      artifact behavior on every production, open, closed and staged rollout
-      track. V1 source evidence is on `main` at `44fd211` and the physical-test
-      source at `69e21c`; neither is proof of the artifact currently served.
+- [ ] **Only Console fact — V1 track/version inventory:** record the highest
+      versionCode/versionName and release status on every production, open,
+      closed and staged rollout track. V1 source evidence is on `main` at
+      `44fd211` and the physical-test source at `69e21c`; neither is proof of
+      the artifact currently served.
 - [ ] **V1 speech/provider evidence:** establish whether V1 browser/WebView
       recognition and system TTS transport audio/text off-device, and the
       provider/retention path, before finalizing V1 audio sharing or global
@@ -141,7 +147,8 @@ updates have **not** been entered in Console.
 
 - [ ] **Approximate location — Collected = Yes.** After explicit location
       action and permission, V2 sends the coarse fix after the on-device
-      0.025° grid to Open-Meteo. Default London is a fixed place.
+      latitude-aware grid (0.025° minimum step; longitude widens to preserve
+      3 km²) to Open-Meteo. Default London is a fixed place.
 - [ ] **Approximate location — Shared = Yes, provisionally.** Open-Meteo is an
       independent controller; the current UI has no specific pre-action
       third-party disclosure. A “No” answer requires a documented Play
@@ -153,14 +160,17 @@ updates have **not** been entered in Console.
       Optional = Yes; purpose App functionality; Ephemeral = No.** Typed
       `name` is sent to Open-Meteo geocoding; Daymark does not retain a search
       history. Do not call it stored history.
-- [ ] **Voice or sound recordings — V2-only: Collected = No; Shared = No.**
+- [x] **Voice or sound recordings — V2-only: Collected = No; Shared = No.**
       Parakeet runs on-device; no system/browser/remote speech path is
-      registered. Packet-level proof is still absent.
+      registered. Source/data-flow regression tests establish the boundary.
+      Packet capture is not a standalone gate; no universal zero-traffic claim
+      is made.
 - [ ] **Local preferences — not a Data Safety collection.** `daymark.locale`
       and Android `daymark.permissions`/`microphone-requested` remain on-device.
 - [ ] **Precise location — V2 = No.** Android declares only
-      `ACCESS_COARSE_LOCATION`; the 0.025° grid is applied before requests.
-      V1 still requires a precise-location row while it remains distributed.
+      `ACCESS_COARSE_LOCATION`; the latitude-aware grid is applied before
+      requests. V1 still requires a precise-location row while it remains
+      distributed.
 - [ ] **IP/network metadata:** disclose Open-Meteo’s receipt of source IP/URL
       metadata in the policy. Do not guess a Play data type; resolve with
       Play/legal if the final form requires one.

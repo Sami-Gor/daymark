@@ -27,7 +27,8 @@ have. Where the two differ, both are stated.
 > **V2 update (27 October 2026):** the web/PWA demo has no voice features; the
 > Android app keeps on-device Parakeet input and English Kokoro narration;
 > French/Spanish narration is unavailable in V2 and the system-TTS plugin is
-> not registered. Both Android and web/PWA apply the same 0.025-degree grid.
+> not registered. Both Android and web/PWA apply the same latitude-aware grid
+> with a 0.025-degree minimum step.
 > Rows below that describe v1 browser speech or system TTS are retained as v1
 > evidence, not as current V2 behaviour.
 
@@ -161,7 +162,9 @@ Play Console / release status: Daymark has moved to production (maintainer-confi
    declaration, not a legal conclusion: assess the UK Children's Code / Age
    Appropriate Design Code separately where applicable. The Open-Meteo terms
    are silent on child-directed use; do not claim provider approval or
-   prohibition, and do not contact the provider. Console was not edited.
+   prohibition, and do not contact the provider. This is not a separate
+   child-targeting blocker for the 18+ design; the final store-listing/content
+   check remains. Console was not edited.
 5. **Global V1 declaration:** while V1 remains currently distributed, the Data
    Safety sum must include V1's precise two-decimal location, browser speech
    recognition, system TTS and search behavior. V1 track inventory and
@@ -271,8 +274,10 @@ Error mapping: unsupported API, `PERMISSION_DENIED` (code 1), `POSITION_UNAVAILA
 No background location, no continuous tracking, nothing persisted.
 
 **v2 candidate:** both the Android and web/PWA paths snap device-derived
-coordinates to the same 0.025-degree grid on the device before weather
-requests. Android also declares only `ACCESS_COARSE_LOCATION`. The outgoing
+coordinates to the same latitude-aware grid on the device before weather
+requests. Android also declares only `ACCESS_COARSE_LOCATION`. The grid keeps
+the 0.025° latitude minimum and widens longitude where needed to preserve at
+least 3 km². The outgoing
 request coordinates are covered by a browser test that sets the Android
 platform; neither path has been verified on a physical device for this
 candidate.
@@ -408,8 +413,8 @@ made that the extended soak was completed; it is not a blanket release gate.
 | Crash reports | none in-app | — | — | — | — |
 | App logs | Instrumentation | logcat only | No | — | Device log buffer |
 | Web/PWA hosting metadata | Browser request | Cloudflare Pages (web/PWA only) | Deliver the static site and protect it | Cloudflare's own policy; not controlled by Daymark | Yes: IP address, requested URL and user agent | Web/PWA only; not a Play artifact |
-| Approximate device location (**v2 candidate**) | Android coarse fix after user action | Not stored by Daymark after request | Snapped on-device to the 0.025-degree grid | Open-Meteo (forecast, air quality) | Provider-side logging applies |
-| Grid-snapped device location (**v2 candidate**, web/PWA) | Device coordinates after user action | Not stored by Daymark after request | Same 0.025-degree grid on the device | Open-Meteo (forecast, air quality) | Provider-side logging applies |
+| Approximate device location (**v2 candidate**) | Android coarse fix after user action | Not stored by Daymark after request | Snapped to the latitude-aware grid (0.025° minimum step; longitude widens to preserve 3 km²) | Open-Meteo (forecast, air quality) | Provider-side logging applies |
+| Grid-snapped device location (**v2 candidate**, web/PWA) | Device coordinates after user action | Not stored by Daymark after request | Same latitude-aware grid on the device | Open-Meteo (forecast, air quality) | Provider-side logging applies |
 
 Privacy summary (for policy/Data Safety review): Daymark sends user-initiated
 grid-rounded coordinates and weather/search queries to Open-Meteo; locality
@@ -422,8 +427,10 @@ Data safety definitions rather than treating “not stored by Daymark” as
 equivalent to “not transmitted off device.”
 
 **v2 candidate:** the Android app requests `ACCESS_COARSE_LOCATION` only and
-both Android and web/PWA apply the same 0.025-degree grid before weather
-requests. Android microphone audio and transcript stay in memory for the
+both Android and web/PWA apply the same latitude-aware grid before weather
+requests. The 0.025° latitude step is a minimum; longitude widens where needed
+to preserve at least 3 km². Android microphone audio and transcript stay in
+memory for the
 on-device Parakeet session; the web/PWA has no voice path. English Kokoro
 narration is local; French/Spanish narration is unavailable in V2. The
 `INTERNET` permission remains for weather and WebView traffic and is not used by
@@ -659,7 +666,7 @@ this PR has not built or uploaded a new AAB.
 | Existing AAB build/signing/versioning | EXISTING AAB VERIFIED; POLICY COPY NOT PACKAGED | release consistency | uploaded versionCode 1 AAB signature/hash were verified in the prior artifact audit; this PR changes privacy-page source text but not the existing bundle | if adopting the policy changes, deploy the web version and build/validate a new AAB with the next unused versionCode; then smoke-test a Play-signed install |
 | Play App Signing fingerprint | DONE (recorded, live) | App Links website side | signing enrolled on first upload; app-signing SHA-256 `04:3C:41:…:9F:FA` recorded from Play Console → App integrity; live file also keeps upload `34:6B:BE:…:FA:7E`; preserved in PR #35 (`8f85a96`) | none for this fix |
 | Digital Asset Links endpoint | DONE (live, verified) | verified App Links (website side) | Production endpoint returns HTTP 200 + `application/json` with the correct package and both fingerprints; DAL statement API returns the expected statements | none; on-device domain verification remains optional and untested |
-| Data safety declaration | POST-RELEASE POLICY ACCURACY CHECK | policy accuracy | Previously marked complete; V1 source sends two-decimal location and has browser/system speech; V2 uses coarse permission plus the 0.025° grid and native voice. Open-Meteo logs may contain coordinates for up to 90 days; V1 speech-provider transport varies. | reconcile the combined form: V1 precise location, voice/sound and search; V2 approximate location and search, with V2 voice not collected; mark not ephemeral; review sharing against Play's definition and confirm V1 speech-provider transport; see §10 and checklist |
+| Data safety declaration | POST-RELEASE POLICY ACCURACY CHECK | policy accuracy | Previously marked complete; V1 source sends two-decimal location and has browser/system speech; V2 uses coarse permission plus the latitude-aware grid (0.025° minimum) and native voice. Open-Meteo logs may contain coordinates for up to 90 days; V1 speech-provider transport varies. | reconcile the combined form: V1 precise location, voice/sound and search; V2 approximate location and search, with V2 voice not collected; mark not ephemeral; review sharing against Play's definition and confirm V1 speech-provider transport; see §10 and checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete for V1 in checklist; V2 owner target is Ages 18+ only but is not entered in Console | **V2 gate:** confirm Data Safety/target/content rating agree; record any Play minor-access restriction; do not claim a code-level age gate. While V1 remains distributed, include V1 precise location/speech/system-TTS/search rows in the global Data Safety sum. Console was not edited. |
 | Production release | PRODUCTION (maintainer-confirmed, 13 October 2026) | current release state | Maintainer says Daymark has moved to production; the live Console state is not independently verified in this repository | re-check the production track and record the result and date here |
 | Location behavior | CORE DEVICE PASS RECORDED | medium | real-device location use passed in brief validation | no need to repeat the completed location path; extended denial/permanent-denial cases are optional coverage |

@@ -81,10 +81,13 @@ export default function PrivacyEs() {
       <p>
         La aplicación Android declara únicamente <code>ACCESS_COARSE_LOCATION</code> y no declara
         <code>ACCESS_FINE_LOCATION</code>. Android y la web/PWA ajustan la posición derivada del
-        dispositivo a una cuadrícula de 0,025 grados en el dispositivo antes de enviarla a Open-Meteo.
-        Cerca de Londres son unos 2,8 km norte/sur y 1,7 km este/oeste (unos 4,8 km²). La cuadrícula
-        reduce la precisión pero no anonimiza la solicitud: las coordenadas redondeadas salen de tu
-        dispositivo y se envían a Open-Meteo. La aplicación vuelve a Londres al recargar o reabrir.
+        dispositivo a una cuadrícula de 0,025 grados con un paso mínimo de 0,025 grados en el
+        dispositivo antes de enviarla a Open-Meteo. En latitudes altas, el espaciado de longitud se
+        amplía justo lo necesario para mantener un área de al menos 3 km²; el paso de latitud nunca
+        baja de 0,025°. Cerca de Londres son unos 2,8 km norte/sur y 1,7 km este/oeste (unos 4,8 km²);
+        en latitudes altas el espaciado de longitud puede ser mayor. La cuadrícula reduce la precisión
+        pero no anonimiza la solicitud: las coordenadas redondeadas salen de tu dispositivo y se envían
+        a Open-Meteo. La aplicación vuelve a Londres al recargar o reabrir.
       </p>
       <p>
         Para la ubicación del dispositivo, Daymark también resuelve localmente un nombre de localidad

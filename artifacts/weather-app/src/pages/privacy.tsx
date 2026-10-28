@@ -80,11 +80,13 @@ export default function Privacy() {
       <p>
         The Android app declares <code>ACCESS_COARSE_LOCATION</code> only and does not declare
         <code>ACCESS_FINE_LOCATION</code>. Both Android and the web/PWA snap the device-derived
-        coordinates to a 0.025-degree grid on your device before they are sent to Open-Meteo. Near
-        London this is roughly 2.8 km north/south and 1.7 km east/west (about 4.8 km²). The grid reduces
-        precision but does not anonymise the request: the rounded coordinates still leave your device
-        and are sent to Open-Meteo. The app returns to its default London location when you reload or
-        reopen it.
+        coordinates to a 0.025-degree grid with a 0.025-degree minimum step on your device before they
+        are sent to Open-Meteo. At high latitudes, the longitude spacing widens just enough to keep the
+        represented area at least 3 km²; the latitude step never goes below 0.025°. Near London this
+        is roughly 2.8 km north/south and 1.7 km east/west (about 4.8 km²); at high latitude the
+        longitude spacing may be wider. The grid reduces precision but does not anonymise the request:
+        the rounded coordinates still leave your device and are sent to Open-Meteo. The app returns to
+        its default London location when you reload or reopen it.
       </p>
       <p>
         For device location, Daymark also resolves a nearby locality name (for example, a town name)
