@@ -56,6 +56,11 @@ jobs:
       - name: Sync Capacitor Android project
         run: pnpm --filter @workspace/weather-app exec cap sync android
 
+      # Capacitor writes the web build into Android assets. Fail before any
+      # Gradle packaging if the copied inventory or hashes do not match dist.
+      - name: Verify Android web assets
+        run: pnpm --filter @workspace/weather-app run verify:android-web-assets
+
       - name: Unit tests
         run: pnpm --filter @workspace/weather-app run test
 

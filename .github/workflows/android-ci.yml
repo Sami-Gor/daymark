@@ -21,6 +21,7 @@ on:
       - 'artifacts/weather-app/package.json'
       - 'artifacts/weather-app/capacitor.config.ts'
       - 'artifacts/weather-app/public/**'
+      - 'artifacts/weather-app/scripts/**'
       # The native runtime and Parakeet model are fetched, not committed, so
       # a change to a fetch script or its pinned URL/checksum must rebuild.
       - 'android/kokoro-poc/scripts/**'
@@ -72,6 +73,11 @@ jobs:
       # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
       - name: Sync Capacitor Android project
         run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      # Capacitor writes the web build into Android assets. Fail before any
+      # Gradle packaging if the copied inventory or hashes do not match dist.
+      - name: Verify Android web assets
+        run: pnpm --filter @workspace/weather-app run verify:android-web-assets
 
       # The DaymarkVoice module compiles Parakeet speech recognition against
       # the sherpa-onnx runtime, which it consumes as a local
