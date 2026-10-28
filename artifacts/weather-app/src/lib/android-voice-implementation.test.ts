@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -31,6 +31,27 @@ const javaSources = collectJavaSources(androidRoot);
 const readAll = () => javaSources.map((file) => ({ file, text: readFileSync(file, 'utf8') }));
 
 describe('android voice input implementation', () => {
+  it('keeps the Parakeet model exclusively in the install-time asset pack', () => {
+    // The base app source set must not carry a second copy. A duplicate base
+    // copy is what caused the AAB asset collision.
+    const baseModelDir = path.join(androidRoot, 'app/src/main/assets/parakeet');
+    if (existsSync(baseModelDir)) {
+      expect(readdirSync(baseModelDir).filter((name) => name.endsWith('.onnx') || name === 'tokens.txt'))
+        .toEqual([]);
+    }
+
+    const packBuild = readFileSync(
+      path.join(androidRoot, 'parakeet-assets/build.gradle'),
+      'utf8',
+    );
+    expect(packBuild).toMatch(/deliveryType\s*=\s*["']install-time["']/);
+    expect(packBuild).toMatch(/verifyParakeetAssets/);
+
+    const appBuild = readFileSync(path.join(androidRoot, 'app/build.gradle'), 'utf8');
+    expect(appBuild).toMatch(/verifyParakeetAssetOwnership/);
+    expect(appBuild).toMatch(/assetPacks\s*=\s*\[":parakeet-assets"\]/);
+  });
+
   it('finds the android sources to check', () => {
     expect(javaSources.length).toBeGreaterThan(0);
   });
@@ -64,6 +85,9 @@ describe('android voice input implementation', () => {
     expect(registrations.filter((name) => name.includes('SpeechRecognition'))).toEqual([
       'ParakeetSpeechRecognitionPlugin',
     ]);
+    // V2 does not register a system-TTS fallback; French/Spanish narration is
+    // explicitly unavailable until the planned V2.2 work.
+    expect(registrations).not.toContain('SystemSpeechPlugin');
     // The plugin's own Capacitor name is the one the web layer calls.
     const plugin = readFileSync(
       path.join(
