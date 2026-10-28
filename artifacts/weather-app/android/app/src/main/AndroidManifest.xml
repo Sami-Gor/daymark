@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -50,9 +59,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- "Use my location" (geolocation in the WebView). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- AskDaymark voice input (Web Speech Recognition in the WebView). -->
+    <!-- Ask Daymark native on-device speech recognition; no online recognizer fallback. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- Capacitor requests this alongside RECORD_AUDIO for WebView capture. -->
+    <!-- Bundled Kokoro narration requests audio focus through AudioManager. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>

@@ -3,6 +3,7 @@ package io.github.sami_gor.daymark.voice;
 import android.os.Handler;
 import android.os.Looper;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.Voice;
 import android.speech.tts.UtteranceProgressListener;
 
 import com.getcapacitor.JSObject;
@@ -12,6 +13,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -119,6 +121,16 @@ public class SystemSpeechPlugin extends Plugin {
     }
 
     @Override
+    protected void handleOnPause() {
+        super.handleOnPause();
+        if (tts != null) {
+            tts.stop();
+        }
+        speaking = false;
+        resolvePending();
+    }
+
+    @Override
     protected void handleOnDestroy() {
         super.handleOnDestroy();
         resolvePending();
@@ -131,15 +143,76 @@ public class SystemSpeechPlugin extends Plugin {
     }
 
     private void startSpeaking(String text, String lang) {
-        int availability = tts.setLanguage(Locale.forLanguageTag(lang));
-        if (availability == TextToSpeech.LANG_MISSING_DATA || availability == TextToSpeech.LANG_NOT_SUPPORTED) {
-            rejectPending("system tts language not supported");
+        Locale requested = Locale.forLanguageTag(lang == null || lang.trim().isEmpty() ? "en" : lang);
+        if (requested.getLanguage().isEmpty()) {
+            rejectPending("system-tts-offline-unavailable");
             return;
         }
-        speaking = true;
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+
+        Voice voice = findOfflineVoice(requested);
+        if (voice == null) {
+            // Do not rely on the engine's default voice: it may use the network.
+            rejectPending("system-tts-offline-unavailable");
+            return;
+        }
+
+        try {
+            tts.setVoice(voice);
+            speaking = true;
+            int result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+            if (result != TextToSpeech.SUCCESS) {
+                speaking = false;
+                rejectPending("system-tts-offline-unavailable");
+            }
+        } catch (RuntimeException error) {
+            speaking = false;
+            rejectPending("system-tts-offline-unavailable");
+        }
     }
 
+    /**
+     * Select a locally installed voice for the requested language. Prefer an
+     * exact region match, then higher quality. Voices flagged as requiring
+     * network access or missing installation data are never selected.
+     */
+    private Voice findOfflineVoice(Locale requested) {
+        if (tts == null || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.LOLLIPOP) {
+            return null;
+        }
+        Set<Voice> voices;
+        try {
+            voices = tts.getVoices();
+        } catch (RuntimeException error) {
+            return null;
+        }
+        if (voices == null) return null;
+
+        Voice best = null;
+        int bestRegionMatch = -1;
+        int bestQuality = Integer.MIN_VALUE;
+        for (Voice candidate : voices) {
+            if (candidate == null || candidate.isNetworkConnectionRequired()) continue;
+            Locale candidateLocale = candidate.getLocale();
+            if (candidateLocale == null || !requested.getLanguage().equals(candidateLocale.getLanguage())) continue;
+            if (candidate.getFeatures() != null
+                && candidate.getFeatures().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)) {
+                continue;
+            }
+
+            int availability = tts.isLanguageAvailable(candidateLocale);
+            if (availability < TextToSpeech.LANG_AVAILABLE) continue;
+
+            int regionMatch = requested.getCountry().equalsIgnoreCase(candidateLocale.getCountry()) ? 1 : 0;
+            int quality = candidate.getQuality();
+            if (best == null || regionMatch > bestRegionMatch
+                || (regionMatch == bestRegionMatch && quality > bestQuality)) {
+                best = candidate;
+                bestRegionMatch = regionMatch;
+                bestQuality = quality;
+            }
+        }
+        return best;
+    }
     private void finishSpeaking() {
         speaking = false;
         mainHandler.post(this::resolvePending);

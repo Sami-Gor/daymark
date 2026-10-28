@@ -13,7 +13,7 @@ A client-side weather app: current conditions, hourly/daily forecast, UV, air qu
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- Frontend: React 19 + Vite 7 + Tailwind CSS 4, wouter router, TanStack Query provider
+- Frontend: React 19 + Vite 7 + Tailwind CSS 4, wouter router
 - Data: Open-Meteo APIs (forecast, air quality, geocoding) — direct browser calls, no key required
 - i18n: typed EN/FR/ES dictionaries in `src/locales/` (no i18n dependency); web voice uses browser Web Speech APIs, while Android uses local Kokoro for English output and system TTS for French/Spanish
 - Optional env (documented, not yet consumed): `VITE_PURPLEAIR_API_KEY`
@@ -48,4 +48,4 @@ Client-only weather for any searched location: current conditions with plain-Eng
 
 ## Pointers
 
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- See `README.md` (Local development) and `pnpm-workspace.yaml` for the workspace structure, TypeScript setup, and package details

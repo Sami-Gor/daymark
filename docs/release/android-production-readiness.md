@@ -15,9 +15,20 @@ means extra assurance, not a release gate. Section 18 records the completed
 physical-device pass; Sections 20–21 state the current status and what
 actually remains.
 
+**Document scope.** This audit describes the **released v1.0.0** build — the
+bundle uploaded to Google Play and the code on `main`. The
+`v2/privacy-hardened-voice` branch changes the location permission, the
+coordinate precision and the Android speech path. Those changes are called out
+inline as **v2 candidate** behaviour and are specified in full in
+`docs/release/version-2-privacy-hardening.md`. The v2 candidate is not released,
+and the v1.0.0 statements below remain accurate for the app users actually
+have. Where the two differ, both are stated.
+
 ## 1. Build / release pipeline
 
-Verified from the current tree:
+Verified against the released v1.0.0 artefacts (the signed AAB and release APK
+inspected below). The rows below are not re-verified by every later commit; the
+commit each was verified against is named in §18.
 
 | Check | Result |
 |---|---|
@@ -32,7 +43,8 @@ Verified from the current tree:
 | Model integrity | APK asset SHA-256 matches documented values (`model_quantized.onnx` `fbae9257…`, `bm_fable.bin` `f8890831…`) |
 | Tracked secrets | none (`git ls-files` has no keystores/properties) |
 | Production runtime config | bundled assets, no `server.url`, no dev-server dependency |
-| `pnpm audit --prod` | no known vulnerabilities |
+| Dependency audit (released v1.0.0) | `pnpm audit --prod` — no known vulnerabilities |
+| Dependency audit (CI, current) | CI enforces `pnpm audit --audit-level critical`; no critical advisories. High and moderate advisories are reported but do not fail the pipeline. |
 | R8 keep rules | Kokoro JNI + Capacitor plugin rules present; release smoke test passed |
 
 Notes:
@@ -94,7 +106,7 @@ Repository-side readiness:
 | Foreground services | none |
 | Storage permissions | none |
 
-Play Console / release status: Daymark has moved to production (maintainer-confirmed, 13 October 2026). No further verification of production status is required for this documentation update. The remaining Console notes below concern data declarations and optional link-association configuration, not whether the app is in production.
+Play Console / release status: Daymark has moved to production (maintainer-confirmed, 13 October 2026). This repository holds no Console export, rollout record or store-listing capture that independently verifies it, so the status is recorded as maintainer-reported; re-check the production track when the Console is next reviewed and record the result and date here. The remaining Console notes below concern data declarations and optional link-association configuration, not whether the app is in production.
 
 1. Play App Signing enrolled via the first upload; the **app signing key**
    SHA-256 is recorded and live:
@@ -201,6 +213,13 @@ Merged release manifest contains exactly:
 No notifications, foreground-service, storage or background-location
 permissions. No clearly dead permission found; nothing removed.
 
+**v2 candidate:** `ACCESS_FINE_LOCATION` is removed from the merged manifest.
+The app requests `ACCESS_COARSE_LOCATION` only and uses the approximate fix
+Android returns. The `INTERNET` permission remains, for the existing weather and
+WebView features rather than for the voice path. The exported-component set is
+unchanged; the candidate adds only package-visibility `<queries>` entries for
+`RecognitionService` and `TTS_SERVICE`.
+
 ## 5. Location
 
 Implementation (`src/App.tsx`): explicit user gesture, `ensureLocalityIndex()`
@@ -212,6 +231,12 @@ bundled GeoNames dataset, weather fetched once per intent, timeout 12 s,
 Error mapping: unsupported API, `PERMISSION_DENIED` (code 1), `POSITION_UNAVAILABLE`
 (code 2), `TIMEOUT` (code 3), each with distinct copy; errors dismiss on retry.
 No background location, no continuous tracking, nothing persisted.
+
+**v2 candidate:** the Android path no longer applies the two-decimal rounding
+step — it sends the OS-provided approximate fix unmodified. The web/PWA path
+snaps device-derived coordinates to a 0.025-degree grid on the device. Both
+are covered by unit and browser tests; neither has been verified on a physical
+device for the candidate.
 
 **Already tested on a physical device:** the user-initiated location flow
 resolved the locality and refreshed the weather successfully (§18). The
@@ -235,6 +260,19 @@ does not implement local speech recognition. The UI already discloses "Voice
 recognition is handled by your browser or device and may use its speech
 service." If the WebView delegates to the Google speech service, audio may
 leave the device; this must be disclosed in Data Safety.
+
+**v2 candidate:** on Android the path becomes
+`use-speech-recognition.ts` → `voice-input-native.ts` →
+`ParakeetSpeechRecognitionPlugin` → the **Parakeet TDT 0.6B v3 int8** model
+through the **sherpa-onnx** offline transducer, running on the device at 16 kHz
+with 80-dimensional features and greedy decoding, with a fresh stream per
+utterance and an energy-based endpoint so the user is answered when they stop
+speaking. `android.speech.SpeechRecognizer` is not used anywhere in the Android
+voice path, and there is no generic recogniser, remote retry or silent online
+fallback: a missing or unusable model reports an explicit error. The web path is
+unchanged and remains the browser speech service. The candidate's classification for the **Android** build is
+therefore "on-device", while the web path stays "potentially cloud-dependent";
+the two must not be merged in a Data safety answer.
 
 **Already tested on a physical device:** AskDaymark received a transcript and
 displayed an answer (§18). Additional compatibility and edge-case coverage—
@@ -271,6 +309,11 @@ Notes:
   would abort the process (no `catch_unwind`). Panics were not observed; treat
   as a residual risk covered by device testing.
 - Bluetooth/headphone routing relies on default AudioTrack routing; untested.
+
+**v2 candidate:** French/Spanish narration selects only an installed Android
+voice whose `isNetworkConnectionRequired()` is false. If none is installed, the
+plugin rejects with `system-tts-offline-unavailable` and the interface shows the
+offline-narration error; there is no network-voice or system-default fallback.
 
 **Core narration already tested on a physical device:** playback, Stop,
 restart without overlap, and basic lifecycle handling passed (§18).
@@ -319,12 +362,17 @@ made that the extended soak was completed; it is not a blanket release gate.
 | Location search text | User input | No | Yes, when searching | `geocoding-api.open-meteo.com` | Provider-side |
 | Locality name lookup | `localities-v1.json` | Bundled + Cache Storage | No | — | On device |
 | Microphone audio | User gesture | No | Depending on platform speech service (possibly Google) | OS/browser speech service | Outside app control |
+| Microphone audio (**v2 candidate**, Android) | User gesture | No | No — the bundled Parakeet model transcribes on the device | — | No |
+| Recognition transcript (**v2 candidate**, Android) | Bundled Parakeet model | No | No (in-memory only) | — | No |
 | Recognition transcript | Speech service | No | No (in-memory only) | — | No |
-| TTS narration text | Intent layer | No | Android English: no, local Kokoro; web: browser speech synthesis; Android French/Spanish: native Android system TTS. Remote processing depends on the selected voice/provider | Browser speech service (web) or Android system TTS (French/Spanish) | Daymark does not retain it; provider-side processing/retention depends on service |
+| TTS narration text | Intent layer | No | Android English: no, local Kokoro; web: browser speech synthesis; Android French/Spanish: native Android system TTS (v2 candidate: only an installed voice that does not require a network connection). Remote processing depends on the selected voice/provider | Browser speech service (web) or Android system TTS (French/Spanish) | Daymark does not retain it; provider-side processing/retention depends on service |
 | Preferences | App | `localStorage` (`daymark.locale`) | No | — | Until cleared |
 | Analytics | none | — | — | — | — |
 | Crash reports | none in-app | — | — | — | — |
 | App logs | Instrumentation | logcat only | No | — | Device log buffer |
+| Web/PWA hosting metadata | Browser request | Cloudflare Pages (web/PWA only) | Deliver the static site and protect it | Cloudflare's own policy; not controlled by Daymark | Yes: IP address, requested URL and user agent | Web/PWA only; not a Play artifact |
+| Approximate device location (**v2 candidate**) | Android approximate fix after user action | Not stored by Daymark after request | Sent unmodified; no additional rounding | Open-Meteo (forecast, air quality) | Provider-side logging applies |
+| Grid-snapped device location (**v2 candidate**, web/PWA) | Device coordinates after user action | Not stored by Daymark after request | Snapped to a 0.025-degree grid on the device | Open-Meteo (forecast, air quality) | Provider-side logging applies |
 
 Privacy summary (for policy/Data Safety review): Daymark sends user-initiated
 rounded coordinates and weather/search queries to Open-Meteo; locality naming
@@ -332,10 +380,21 @@ uses a bundled GeoNames dataset. Android English narration runs locally through
 the bundled Kokoro model. Web narration and Android French/Spanish narration are
 handed to browser/system speech APIs; their processing depends on the selected
 provider and voice. Daymark does not retain narration text or location history
-and has no backend; Ask Daymark input is handed to the browser/platform
-recognition service and may be processed remotely. Assess these provider flows
-against current Data safety definitions rather than treating “not stored by
-Daymark” as equivalent to “not transmitted off device.”
+and has no backend; in the released v1.0.0 and on the web, Ask Daymark input is
+handed to the browser/platform recognition service and may be processed
+remotely, while the v2 Android candidate transcribes it on the device. Assess
+these provider flows against current Data safety definitions rather than
+treating “not stored by Daymark” as equivalent to “not transmitted off device.”
+
+**v2 candidate:** the same map applies with three changes. The Android app
+requests `ACCESS_COARSE_LOCATION` only and sends the OS-provided approximate
+fix unmodified, so the transmitted location is the OS approximation rather
+than a two-decimal rounding of a precise fix; the web/PWA path snaps
+device-derived coordinates to a 0.025-degree grid on the device; and on
+Android the microphone audio and the recognition transcript stay on the
+device, because recognition uses the bundled Parakeet TDT 0.6B v3 model
+with no online fallback. The web speech path is unchanged. The `INTERNET` permission
+remains for weather and WebView traffic and is not used by the voice path.
 
 ## 11. Logging / debugging
 
@@ -382,7 +441,8 @@ OPTIONAL hardening:
 ## 13. Dependency / supply chain
 
 - npm/pnpm: exact Capacitor versions (`8.5.1`, `@capacitor/app 8.1.1`), pnpm
-  lockfile committed; `pnpm audit --prod` clean.
+  lockfile committed; the released v1.0.0 audit recorded `pnpm audit --prod`
+  clean, and CI now enforces `pnpm audit --audit-level critical`.
 - Gradle: AGP 8.13.0, Gradle 8.14.3, JDK 21 required; Capacitor/AndroidX from
   Google Maven; no unexpected repositories.
 - Rust: `Cargo.lock` committed; `ort 2.0.0-rc.13` + ONNX Runtime 1.28.2
@@ -409,10 +469,28 @@ OPTIONAL hardening:
 | Capacitor core/cli/android/app | MIT | compiled | |
 | AndroidX/Google libraries | Apache-2.0 | compiled | |
 | Fonts (Fraunces, Plus Jakarta Sans, DM Mono) | SIL OFL-1.1 | asset | license files in `src/fonts` |
+| GeoNames locality dataset (`localities-v1.json`) | CC BY 4.0 | asset | credited in the privacy pages; attribution obligation |
 
-No copyleft obligations in the distributed binary. The only residual licensing
-item is the undocumented per-voice training-data provenance of `bm_fable`:
-unresolved but low risk (official voice collection, Apache-2.0 declared).
+No copyleft obligations in the distributed binary. The residual licensing items
+are the undocumented per-voice training-data provenance of `bm_fable`
+(unresolved but low risk — official voice collection, Apache-2.0 declared) and
+the GeoNames attribution obligation.
+
+### V2 candidate licensing
+
+The following is redistributed by the V2 candidate, which bundles an on-device
+ASR model. None of it is in the released v1.0.0 binary. The attribution and
+notice obligations are recorded in `THIRD-PARTY-NOTICES.md`; the table below
+summarises them.
+
+| Component | License | Redistributed | Notes |
+|---|---|---|---|
+| sherpa-onnx runtime and JNI | Apache-2.0 | V2 candidate asset | Licence notice retained in `THIRD-PARTY-NOTICES.md` |
+| ONNX Runtime Android shared libraries (bundled inside the sherpa runtime) | MIT | V2 candidate asset | Copyright notice retained; distinct from the build-time `ort` link above |
+| Bundled ASR model weights (Parakeet TDT 0.6B v3 int8) | CC-BY-4.0 | V2 candidate asset | Attribution, licence link and an indication of the int8 quantisation in `THIRD-PARTY-NOTICES.md` |
+
+These obligations are recorded in the repository. Verify them again against
+the final bundle before the V2 candidate ships.
 
 ## 15. Accessibility
 
@@ -506,7 +584,7 @@ merge-confidence pass.
 | versionCode / versionName | 1 / 1.0.0 |
 | Signer certificate SHA-256 | `346BBEF3438C6FE81E89F63FC0A0FF29E96DA1989874E6BA187A9E52C3AAFA7E` (matches upload key; verified with `apksigner`) |
 | A — launch / weather / location | PASS: launch and weather render; permission granted; "Use my location" resolved to the expected test locality; refresh applied; no crash/ANR |
-| B — voice input (Ask Daymark) | PASS: `RECORD_AUDIO` granted; transcript "will it rain today" and the answer both appeared |
+| B — voice input (Ask Daymark) | PASS: `RECORD_AUDIO` granted; a recognised transcript and the corresponding answer both appeared (the verbatim prompt and transcript are withheld from this public record) |
 | C — Kokoro narration | PASS: start toggles to Stop; audio audible and intelligible; Stop silences immediately; restart plays again with no overlap |
 | D — lifecycle | PASS: narration stops on Home; app usable after returning |
 | E — font scale + stability | PASS: 1.5x layout readable with no clipping observed; no crash/ANR; battery 35.0 °C, thermal status 0; font restored to 1.0 |
@@ -530,8 +608,8 @@ this PR has not built or uploaded a new AAB.
   and `androidbrowserhelper` dependency — keep until the production rollout is
   stable and the rollback path is no longer needed. The core physical-device pass
   is already complete (§18).
-- `artifacts/weather-app/src/hooks/use-browser-speech.ts` — unused in
-  production (the unified hook uses `lib/voice-browser` directly).
+- The former `artifacts/weather-app/src/hooks/use-browser-speech.ts` hook was
+  removed in `332adba`; there is nothing left to clean up.
 - `KokoroTtsTestActivity` (TWA project only) — diagnostic, not in the
   Capacitor build.
 - Keep any local Sherpa POC archives as historical material. Old notes refer
@@ -550,7 +628,7 @@ this PR has not built or uploaded a new AAB.
 | Digital Asset Links endpoint | DONE (live, verified) | verified App Links (website side) | Production endpoint returns HTTP 200 + `application/json` with the correct package and both fingerprints; DAL statement API returns the expected statements | none; on-device domain verification remains optional and untested |
 | Data safety declaration | POST-RELEASE POLICY ACCURACY CHECK | policy accuracy | Previously marked complete; rounded location is sent to Open-Meteo, whose free-API policy says logs may contain coordinates for up to 90 days; speech-provider processing varies | reconcile saved form; classify the rounded location as precise, collected, optional, for app functionality and not ephemeral; review sharing against Play's service-provider definition and confirm speech-provider flows; see §10 and checklist |
 | Other Play forms (content rating, target audience, ads, app access, AI asset, etc.) | PREVIOUSLY REPORTED DONE (manual) | release gate | recorded as complete in checklist; live Console state not verified | confirm each still reflects the current app and release |
-| Production release | PRODUCTION (maintainer-confirmed, 13 October 2026) | current release state | Maintainer says Daymark has moved to production | no further status verification required for this paperwork |
+| Production release | PRODUCTION (maintainer-confirmed, 13 October 2026) | current release state | Maintainer says Daymark has moved to production; the live Console state is not independently verified in this repository | re-check the production track and record the result and date here |
 | Location behavior | CORE DEVICE PASS RECORDED | medium | real-device location use passed in brief validation | no need to repeat the completed location path; extended denial/permanent-denial cases are optional coverage |
 | Speech recognition | CORE DEVICE PASS RECORDED | medium | real-device voice input and transcript passed; platform service can vary | no need to repeat the completed voice-input path; service/permission edge cases are optional coverage |
 | Audio focus/BT/calls | CORE LIFECYCLE PASS; EXTENDED CASES NOT CLAIMED | medium | Home lifecycle passed; Bluetooth/call/music interruption not included in the recorded brief pass | optional extended QA only, unless you specifically want those cases covered |
@@ -560,10 +638,11 @@ this PR has not built or uploaded a new AAB.
 | Real-device latency | CORE DEVICE PASS RECORDED; BENCHMARK OPTIONAL | low | real-device flow was exercised; emulator estimate ~2.4 s | no repeat required; benchmark only if needed |
 | App data-flow behaviour | POST-RELEASE DATA SAFETY RECONCILIATION | policy accuracy | no in-app analytics, rounded location requests, no transcript/location logging; Open-Meteo logs may retain coordinates for up to 90 days; speech providers may process data off-device | update the saved form where needed: precise location, collected, optional, app functionality, not ephemeral; resolve sharing using Play's service-provider definition and confirm voice-provider flows; see §2, §10 and checklist |
 | Security (WebView/bridge/components) | READY | — | audit §12 | optional CSP hardening |
-| Licensing | READY | — | WTFPL cleared; permissive stack | note bm_fable provenance |
+| Licensing | READY | — | WTFPL cleared; permissive stack; GeoNames dataset credited | note bm_fable provenance; a candidate that bundles an ASR model must add its Apache-2.0 / MIT / CC-BY-4.0 attribution (§14) |
 | Dependencies | READY | — | prod audit clean, pinned versions | none |
 | Offline behavior | READY | — | airplane-mode checks | none |
 | Error states | READY | — | code audit + e2e | device polish |
+| V2 candidate (`v2/privacy-hardened-voice`) | OPTIONAL — candidate gates open; not released | release gate | `docs/release/version-2-privacy-hardening.md`; the branch changes the location permission, the coordinate precision and the Android speech path | complete the open gates, bump `versionCode`, rebuild and sign, then submit through closed testing. The shared documents above still describe v1.0.0 by design. |
 | Release logging | OPTIONAL | low | no user content | reduce verbosity later |
 | Resource shrinking | OPTIONAL | low | not enabled | consider post-launch |
 | CSP in native shell | OPTIONAL | low | no CSP headers native | consider meta CSP later |
@@ -590,12 +669,12 @@ only if additional assurance is needed or a specific release risk warrants them.
 Build and signing pipeline, package/SDK/ABI configuration, model/voice
 integrity, Kokoro lifecycle/Stop/offline/no-text-logging, segmentation
 invariants, privacy data map, WebView/bridge security configuration, component
-exposure, dependency hygiene, offline shell, web tests (236 unit / 153 e2e),
+exposure, dependency hygiene, offline shell, web tests (236 unit / 153 e2e on `main`; 244 unit on the v2 candidate),
 production web build, privacy policy URL.
 
 ### D. OPTIONAL POST-LAUNCH
 Reduce release log verbosity, add a native-shell CSP meta tag, enable resource
-shrinking, remove the unused browser-speech hook, archive the TWA project,
+shrinking, archive the TWA project,
 consider a low-memory/trim listener, evaluate per-voice provenance documentation
 with the upstream voice source.
 
@@ -617,8 +696,9 @@ with the upstream voice source.
    WebView data flows and off-device transmission must be considered; do not
    infer answers solely from lack of app-side storage. See
    https://support.google.com/googleplay/android-developer/answer/10787469.
-4. Production is recorded as live, per maintainer confirmation. No further
-   production-status check is required for this paperwork.
+4. Production is recorded as live, per maintainer confirmation. The live
+   Console state is not independently verified in this repository; re-check it
+   when the Console is next reviewed and record the result here.
 5. Digital Asset Links is a separate app-link check, not a prerequisite for
    applying for production access. The existing website's
    `/.well-known/assetlinks.json` endpoint and the Digital Asset Links statement

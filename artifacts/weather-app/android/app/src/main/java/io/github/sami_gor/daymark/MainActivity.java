@@ -5,9 +5,18 @@ import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 import io.github.sami_gor.daymark.voice.DaymarkVoicePlugin;
+import io.github.sami_gor.daymark.voice.ParakeetSpeechRecognitionPlugin;
 import io.github.sami_gor.daymark.voice.SystemSpeechPlugin;
 
 public class MainActivity extends BridgeActivity {
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        ParakeetSpeechRecognitionPlugin.onRequestPermissionsResult(
+                requestCode, permissions, grantResults);
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // Very old WebViews cannot parse the production bundle; show a native
@@ -18,6 +27,7 @@ public class MainActivity extends BridgeActivity {
             return;
         }
         registerPlugin(DaymarkVoicePlugin.class);
+        registerPlugin(ParakeetSpeechRecognitionPlugin.class);
         registerPlugin(SystemSpeechPlugin.class);
         super.onCreate(savedInstanceState);
     }
