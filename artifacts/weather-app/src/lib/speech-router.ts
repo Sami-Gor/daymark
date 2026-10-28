@@ -1,10 +1,13 @@
-import { isEnglish, selectSpeechEngine, type SpeechEngine, type SpeechSelection } from './speech-engine';
+import { selectSpeechEngine, type SpeechEngine, type SpeechSelection } from './speech-engine';
 import { segmentForSpeech } from './tts-segmentation';
 
 /*
- * Routes speech to the native DaymarkVoice engine or the browser Web Speech
- * API. Pure and injectable so engine selection, fallback and stop routing can
- * be unit tested without React or Capacitor.
+ * Routes narration to the bundled Android Kokoro engine only.
+ *
+ * The web/PWA demo has no narration path. Android French/Spanish narration is
+ * deliberately unavailable in V2; there is no browser-speech or Android
+ * system-TTS fallback. The router is injectable so engine selection and
+ * cancellation can be tested without React or Capacitor.
  */
 
 export type SpeechHandlers = {
@@ -12,16 +15,6 @@ export type SpeechHandlers = {
   onEnd?: () => void;
   onError?: (reason?: string) => void;
   onEngine?: (selection: SpeechSelection) => void;
-};
-
-export type BrowserSpeechAdapter = {
-  readonly supported: boolean;
-  speak: (
-    text: string,
-    handlers?: { onStart?: () => void; onEnd?: () => void; onError?: (reason?: string) => void },
-    lang?: string,
-  ) => boolean;
-  stop: () => void;
 };
 
 export type NativeSpeechAdapter = {
@@ -45,7 +38,6 @@ export type SpeechRouter = {
 
 export function createSpeechRouter(
   env: SpeechEnvironment,
-  browser: BrowserSpeechAdapter,
   native: NativeSpeechAdapter,
 ): SpeechRouter {
   let active: SpeechEngine | null = null;
@@ -68,48 +60,9 @@ export function createSpeechRouter(
     });
   }
 
-  function speakWithBrowser(
-    text: string,
-    lang: string | undefined,
-    handlers: SpeechHandlers,
-    token: number,
-  ): boolean {
-    const started = browser.speak(
-      text,
-      {
-        onStart: () => {
-          if (generation === token) {
-            active = 'browser';
-            handlers.onStart?.();
-          }
-        },
-        onEnd: () => {
-          if (generation === token) {
-            active = null;
-            handlers.onEnd?.();
-          }
-        },
-        onError: (reason) => {
-          if (generation === token) {
-            active = null;
-            handlers.onError?.(reason || 'browser');
-          }
-        },
-      },
-      lang,
-    );
-    if (!started) {
-      active = null;
-      handlers.onError?.('browser-unavailable');
-      return false;
-    }
-    active = 'browser';
-    return true;
-  }
-
   return {
     supported() {
-      return env.isNativePlatform || browser.supported;
+      return env.isNativePlatform && env.platform === 'android';
     },
     select,
     async speak(text, lang, handlers) {
@@ -124,58 +77,43 @@ export function createSpeechRouter(
         return false;
       }
       handlers.onEngine?.(selection);
-      const token = ++generation;
-
-      if (selection.engine === 'kokoro') {
-        active = 'kokoro';
-        handlers.onStart?.();
-        let segments: string[] | undefined;
-        try {
-          const plan = segmentForSpeech(spoken);
-          segments = plan.length > 1 ? plan : undefined;
-        } catch (error) {
-          console.warn('DaymarkSpeech segmentation failed; using whole-text synthesis', error);
-        }
-        try {
-          await native.speak(spoken, lang, segments);
-          if (generation === token) {
-            active = null;
-            handlers.onEnd?.();
-          }
-          return true;
-        } catch (error) {
-          if (generation !== token) {
-            return false;
-          }
-          active = null;
-          // English narration is local-only by design: never switch it to the
-          // device/system TTS engine (which may be cloud-backed). Surface the
-          // failure instead so the UI can tell the user.
-          if (isEnglish(lang)) {
-            console.warn('DaymarkSpeech native speak failed', error);
-            handlers.onError?.('native-failed');
-            return false;
-          }
-          console.warn('DaymarkSpeech native speak failed; using browser fallback', error);
-          return speakWithBrowser(spoken, lang, handlers, token);
-        }
-      }
-
-      // Android English selected but the native engine is unavailable: the
-      // whole point of the local engine, so no system-TTS fallback here.
-      if (selection.reason === 'native-unavailable') {
+      if (selection.engine !== 'kokoro') {
+        active = null;
         handlers.onError?.(selection.reason);
         return false;
       }
-
-      return speakWithBrowser(spoken, lang, handlers, token);
+      const token = ++generation;
+      active = 'kokoro';
+      handlers.onStart?.();
+      let segments: string[] | undefined;
+      try {
+        const plan = segmentForSpeech(spoken);
+        segments = plan.length > 1 ? plan : undefined;
+      } catch (error) {
+        console.warn('DaymarkSpeech segmentation failed; using whole-text synthesis', error);
+      }
+      try {
+        await native.speak(spoken, lang, segments);
+        if (generation === token) {
+          active = null;
+          handlers.onEnd?.();
+        }
+        return true;
+      } catch (error) {
+        if (generation !== token) {
+          return false;
+        }
+        active = null;
+        // Never fall back to system or network speech. Surface the failure.
+        console.warn('DaymarkSpeech native speak failed', error);
+        handlers.onError?.('native-failed');
+        return false;
+      }
     },
     stop() {
       generation++;
       if (active === 'kokoro') {
         void native.stop();
-      } else if (active === 'browser') {
-        browser.stop();
       }
       active = null;
     },

@@ -232,6 +232,7 @@ android/kokoro-poc/scripts/fetch-parakeet-assets.sh
 pnpm install --frozen-lockfile
 pnpm run build
 pnpm --filter @workspace/weather-app exec cap sync android
+pnpm --filter @workspace/weather-app run verify:android-web-assets
 
 cd artifacts/weather-app/android
 ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:bundleRelease
@@ -245,7 +246,10 @@ Notes:
   `android/kokoro-poc/.build/kokoro-src` (gitignored) and cross-compiles with
   the NDK. It requires `ANDROID_NDK_HOME`.
 - The web build must run **before** `cap sync`; otherwise the copied web
-  assets are stale or absent.
+  assets are stale or absent. The explicit asset guard must then pass. Gradle
+  also wires the same guard into `preBuild` and the debug/release asset-merge
+  tasks, so a direct `assembleDebug`/`bundleRelease` cannot silently package a
+  stale Android asset tree.
 - `:app:assembleDebug` and `:app:bundleRelease` are deliberately in one Gradle
   invocation. Both use the same resolved classpath.
 - The release build is R8-minified. `mapping.txt` is under
@@ -283,7 +287,7 @@ Expected for this release:
   certificate will produce an untrusted PKIX-chain warning, which is expected.
 - Package `io.github.sami_gor.daymark`.
 - `versionCode 2`, `versionName 2.0.0`.
-- `minSdkVersion 24`, `targetSdkVersion 36`.
+- `minSdkVersion 29`, `targetSdkVersion 36`.
 - The `parakeet` module is `dist:type="asset-pack"` with
   `<dist:install-time/>` and `dist:fusing include="true"`.
 - No `android:debuggable` or `android:testOnly`.

@@ -25,7 +25,7 @@ android {
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
     signingConfigs {
@@ -91,4 +91,64 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+/*
+ * The Android app packages app/src/main/assets/public, which Capacitor writes
+ * from the web dist. Gradle does not run `cap copy` implicitly, so a direct
+ * assemble/bundle can otherwise package whatever snapshot happens to be there.
+ * Synchronize/build first (or run the sync:android-web script), then this guard
+ * verifies the exact file inventory and SHA-256 hashes before assets merge.
+ */
+def webProjectRoot = file('../..')
+def webDistDir = file('../../dist/public')
+def androidWebAssetsDir = file('src/main/assets/public')
+
+tasks.register('verifyWebAssets', Exec) {
+    group = 'verification'
+    description = 'Fail unless Android web assets exactly match the current web dist.'
+    workingDir = webProjectRoot
+    commandLine 'node', 'scripts/verify-android-web-assets.mjs',
+            '--dist', webDistDir.absolutePath,
+            '--android', androidWebAssetsDir.absolutePath
+}
+
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('verifyWebAssets')
+}
+
+tasks.matching { it.name == 'mergeDebugAssets' || it.name == 'mergeReleaseAssets' }.configureEach {
+    dependsOn tasks.named('verifyWebAssets')
+}
+
+/*
+ * The Parakeet model has one delivery owner: the install-time asset pack.
+ * A second copy under the base app assets is packaged into both the base APK
+ * and the asset pack, which makes bundle packaging ambiguous. Keep the model
+ * out of the base source set; release packaging verifies the pack bytes in
+ * :parakeet-assets:verifyParakeetAssets.
+ */
+def baseParakeetAssetsDir = file('src/main/assets/parakeet')
+def packedParakeetAssetsDir = file('../parakeet-assets/src/main/assets/parakeet')
+
+tasks.register('verifyParakeetAssetOwnership') {
+    group = 'verification'
+    description = 'Fails if the Parakeet model is duplicated into the base app assets.'
+    doLast {
+        if (baseParakeetAssetsDir.exists() && baseParakeetAssetsDir.listFiles()?.any { it.isFile() }) {
+            throw new GradleException(
+                "Parakeet model is present in app/src/main/assets/parakeet. " +
+                "The install-time parakeet asset pack is the only delivery owner; " +
+                "remove the base-module copy before packaging.")
+        }
+        if (!packedParakeetAssetsDir.isDirectory()) {
+            logger.lifecycle(
+                "Parakeet asset pack is not staged; release packaging will fail until " +
+                "fetch-parakeet-assets.sh is run.")
+        }
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('verifyParakeetAssetOwnership')
 }

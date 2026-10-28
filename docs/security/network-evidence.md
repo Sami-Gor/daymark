@@ -1,7 +1,7 @@
 # Network boundary evidence and capture plan
 
 **Last reviewed:** 2026-10-24
-**HEAD at review:** `5b9013c` (branch `fix/location-privacy-native-lifecycle-compatibility`)
+**HEAD at review:** historical audit at `5b9013c`; current V2 policy is reconciled in `docs/release/data-safety-v1-v2.md` on 27 October 2026
 **Automated guard:** `artifacts/weather-app/src/lib/network-boundary.test.ts` (14 checks, all passing)
 
 This page records what Daymark's network boundary is, what the automated guard
@@ -59,12 +59,10 @@ set: an anchor to any other host fails.
 - The recognition path is fully on-device (Parakeet via sherpa-onnx; audio in
   an in-memory buffer; no URL literal in the plugin — also pinned by
   `android-voice-model-loading.test.ts` and `android-voice-implementation.test.ts`).
-- Narration is Kokoro (bundled model) or the system TTS bridge, which refuses
-  any voice with `isNetworkConnectionRequired()` (pinned by
-  `system-speech-offline.test.ts`); the shipped wiring can never select the
-  WebView Web Speech adapter on Android, whose `speechSynthesis` voices may be
-  network-served (pinned by this guard's wiring check; the adapter-selection
-  behaviour is covered by `speech-adapters.test.ts`).
+- Narration is Kokoro (bundled model) for English on Android. French/Spanish
+  narration is unavailable in V2 and the system-TTS plugin is not registered;
+  there is no WebView Web Speech or network-voice fallback. The web/PWA demo
+  has no speech path at all.
 - **The Capacitor native HTTP bridge (`plugins.CapacitorHttp`) stays disabled**
   in both `capacitor.config.ts` and the bundled
   `android/app/src/main/assets/capacitor.config.json`; `androidScheme` is
@@ -120,7 +118,7 @@ allowed-host destinations; no other web network API, cleartext, dynamic, or
 protocol-relative URL exists; the service worker and app shell stay
 same-origin; first-party Android Java has no network API or URL literal; the
 native HTTP bridge stays disabled; Android narration wiring cannot select
-WebView Web Speech; and the retired TWA tree stays network-free or gone.
+WebView Web Speech or system-TTS fallback; the web/PWA has no speech path; and the retired TWA tree stays network-free or gone.
 
 Two properties of the guard itself are worth recording:
 
@@ -160,11 +158,9 @@ Two properties of the guard itself are worth recording:
 - **Dynamic loading.** Reflection or runtime class loading could in principle
   reach network APIs without source tokens; no such code exists in first-party
   sources, but a text-level guard cannot exclude the technique.
-- **Web/PWA speech is remote-capable by design.** On browsers (not the Android
-  app), recognition uses the platform `SpeechRecognition` provider and
-  narration uses `speechSynthesis` voices that may be network-served; this is
-  disclosed in the privacy pages and is out of the Android boundary this
-  guard pins.
+- **Web/PWA speech is absent by design in V2.** The web/PWA demo has no voice
+  controls and no browser speech path. Android recognition is the native
+  Parakeet path; its runtime egress has not been packet-verified.
 - **Provider-side retention, logging, or processing** (Open-Meteo, Cloudflare,
   the OS, Play) is outside any client-side evidence.
 - **Data flow inside an allowed request** cannot be seen statically: the guard
@@ -201,7 +197,7 @@ Per-window protocol (all four):
 | 0 | Idle / launch | Cold start with default place, let first render settle, then **no taps**, screen on, ~90 s | −10 s → +90 s | The two Open-Meteo sessions from the mount load (`api` + `air-quality-api`), then quiet; establishes the post-load floor and OS/Play noise |
 | 1 | Weather refresh | Cold start; after first render trigger a second load (place re-selection or the error-retry affordance — no dedicated refresh button exists) | −10 s → +45 s per action | Exactly **2 TLS sessions per load** to :443: `api.open-meteo.com /v1/forecast`, `air-quality-api.open-meteo.com /v1/air-quality`. Optional separate windows: geocoding (one `geocoding-api` session per query), micro-climate (one extra `api` session with `ukmo_seamless`), "Use my location" (must show the **local** `https://localhost` locality fetch inside the WebView, never an external flow) |
 | 2 | Recognition | Tap Ask Daymark, speak one short phrase (≤15 s), let it answer; nothing else | −15 s → +90 s | **Zero new TLS sessions**, no new SNI, no outbound growth beyond handshake noise above the window-0 floor |
-| 3 | Narration | Tap Hear today on the same screen | −10 s → +60 s | **Zero new sessions**, zero outbound growth; TTS audio must be produced locally, never downloaded |
+| 3 | Android English narration | Tap Hear today on the Android screen | −10 s → +60 s | **Zero new sessions**, zero outbound growth; Kokoro audio must be produced locally, never downloaded. French/Spanish narration is unavailable in V2. |
 
 Dirty-window threshold: any new SNI, or outbound bytes exceeding the idle floor
 by more than a handshake-sized envelope, is a finding.

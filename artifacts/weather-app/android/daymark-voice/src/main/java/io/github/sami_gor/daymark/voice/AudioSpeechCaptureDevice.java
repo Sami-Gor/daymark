@@ -1,5 +1,9 @@
 package io.github.sami_gor.daymark.voice;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -13,7 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>The recorder is constructed, started and verified inside
  * {@link #start()}, so a caller can never observe a half-open microphone, and
  * {@link #read} is bounded so a stalled audio input cannot block the capture
- * loop forever.
+ * loop forever. The device also checks {@code RECORD_AUDIO} immediately before
+ * constructing the recorder. The plugin checks before starting a session, but
+ * this local check closes the permission-revocation race between that session
+ * check and recorder construction and makes the guard visible to Android Lint.
  */
 final class AudioSpeechCaptureDevice implements SpeechCaptureDevice {
 
@@ -22,6 +29,7 @@ final class AudioSpeechCaptureDevice implements SpeechCaptureDevice {
     /** How long a data-less read waits before polling again. Not a busy spin. */
     private static final long POLL_INTERVAL_MS = 5;
 
+    private final Context context;
     private final int sampleRate;
     private final Object lock = new Object();
     private final AtomicBoolean released = new AtomicBoolean(false);
@@ -29,10 +37,17 @@ final class AudioSpeechCaptureDevice implements SpeechCaptureDevice {
     /** Guarded by {@link #lock}; null until started or after release. */
     private AudioRecord recorder;
 
-    AudioSpeechCaptureDevice(int sampleRate) {
+    AudioSpeechCaptureDevice(Context context, int sampleRate) {
+        this.context = context;
         this.sampleRate = sampleRate;
     }
 
+    // MissingPermission is suppressed only here: the immediate
+    // Context.checkSelfPermission guard above the AudioRecord call is the
+    // control-flow evidence Lint cannot follow across the local check. If the
+    // permission is revoked after that guard, AudioRecord throws SecurityException,
+    // which this method rethrows for the plugin to map to not-allowed.
+    @SuppressLint("MissingPermission")
     @Override
     public boolean start() {
         final AudioRecord built;
@@ -40,6 +55,14 @@ final class AudioSpeechCaptureDevice implements SpeechCaptureDevice {
             if (released.get()) {
                 return false;
             }
+        }
+        // The plugin also checks before beginCapture(); this second check is
+        // the guard for this class in isolation and for permission revocation
+        // between the session check and recorder construction.
+        if (context == null
+                || context.checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                        != PackageManager.PERMISSION_GRANTED) {
+            throw new SecurityException("RECORD_AUDIO permission not granted");
         }
         final int minBuffer = AudioRecord.getMinBufferSize(
                 sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);

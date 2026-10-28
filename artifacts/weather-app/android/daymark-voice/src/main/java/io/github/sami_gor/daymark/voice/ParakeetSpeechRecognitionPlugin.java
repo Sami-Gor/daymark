@@ -127,7 +127,7 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
      * {@link AudioRecord}-backed device.
      */
     volatile Supplier<SpeechCaptureDevice> captureDeviceSupplier =
-            () -> new AudioSpeechCaptureDevice(SAMPLE_RATE);
+            () -> new AudioSpeechCaptureDevice(getContext(), SAMPLE_RATE);
 
     /** Injection point for the clock used by capture deadlines and durations. */
     volatile LongSupplier clock = SystemClock::elapsedRealtime;

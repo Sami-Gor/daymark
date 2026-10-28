@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
+    "verify:android-web-assets": "node scripts/verify-android-web-assets.mjs",
+    "sync:android-web": "pnpm run build && pnpm exec cap copy android && pnpm run verify:android-web-assets",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "test": "vitest run",
     "test:e2e": "playwright test",

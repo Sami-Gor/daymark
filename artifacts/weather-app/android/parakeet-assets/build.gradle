@@ -117,9 +117,11 @@ gradle.projectsEvaluated {
     }
     appProject.tasks.matching { candidate ->
         def name = candidate.name
-        name == "bundleRelease" ||
+        name == "bundleDebug" ||
+            name == "bundleRelease" ||
+            name == "packageDebugBundle" ||
             name == "packageReleaseBundle" ||
-            (name.startsWith("package") && name.endsWith("Release"))
+            (name.startsWith("package") && (name.endsWith("Debug") || name.endsWith("Release")))
     }.configureEach {
         dependsOn verifyParakeetAssets
     }

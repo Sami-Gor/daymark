@@ -56,6 +56,11 @@ jobs:
       - name: Sync Capacitor Android project
         run: pnpm --filter @workspace/weather-app exec cap sync android
 
+      # Capacitor writes the web build into Android assets. Fail before any
+      # Gradle packaging if the copied inventory or hashes do not match dist.
+      - name: Verify Android web assets
+        run: pnpm --filter @workspace/weather-app run verify:android-web-assets
+
       - name: Unit tests
         run: pnpm --filter @workspace/weather-app run test
 
@@ -65,6 +70,12 @@ jobs:
       # fetched here and its checksum is verified by the script.
       - name: Fetch the sherpa-onnx runtime
         run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
+
+      # The Parakeet model is not committed. Fetch the pinned archive and
+      # verify all four model hashes before Gradle packages the debug APK/AAB.
+      # The asset-pack ownership and integrity guards remain active.
+      - name: Fetch Parakeet model assets
+        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
 
       # Compile the native Android modules as well as the web layer. This
       # catches Java/API/manifest regressions in Capacitor plugin changes.
@@ -77,7 +88,7 @@ jobs:
       # invocation so those regressions cannot merge silently.
       - name: Android build and unit tests
         working-directory: artifacts/weather-app/android
-        run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest :daymark-voice:testDebugUnitTest :app:lintDebug
+        run: ./gradlew --no-daemon :app:assembleDebug :app:bundleDebug :app:testDebugUnitTest :daymark-voice:testDebugUnitTest :app:lintDebug
 
       - name: Install Playwright browser
         run: pnpm --filter @workspace/weather-app exec playwright install chromium --with-deps

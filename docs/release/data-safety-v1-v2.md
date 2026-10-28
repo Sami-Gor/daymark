@@ -1,324 +1,403 @@
-# Data safety reconciliation — Daymark 1.0.0 and 2.0.0
+# Data safety reconciliation — Daymark V2
 
-Status: audit record, 21 October 2026. This document is not a Play Console
-submission. No Play Console declaration was changed, and no website deployment
-was performed.
+**Status:** implementation and declaration audit, 27 October 2026. This is
+**not** a Play Console submission. No Console declaration, signing material,
+AAB, deployment, or public policy page was changed.
 
-Scope: the released `1.0.0` build on `main` (source commit `50194e8`) and the
-V2 candidate on `v2/privacy-hardened-voice` (audited at `baf83e9`, committed on
-`release/v2-compliance`). Evidence is source, manifest, build configuration and
-the public Play listing. There was no packet capture and no accuracy benchmark.
+**Scope:** the V2 candidate on `release/v2-candidate` (HEAD `30ff64b`, plus the
+uncommitted privacy changes under review), the current web/PWA demo, and the V1
+transition. The Play Data safety form applies to the Android package; the
+standalone web/PWA is not a Play artifact, although the same public policy
+covers it. No packet capture or live microphone session was performed.
 
-## 1. Public Play state observed (read-only)
+## 1. Official rules used
 
-The Play Console dashboard was **not accessible read-only** from this
-environment: `https://play.google.com/console` redirected to the public
-`google.play/business` marketing page, and no signed-in Console session was
-present. Console-only state therefore remains a manual check.
+Consulted 27 October 2026:
 
-The public listing was readable on 21 October 2026:
+1. Google Play Console Help, **“Provide information for Google Play's Data
+   safety section”**,
+   <https://support.google.com/googleplay/android-developer/answer/10787469?hl=en>.
+   Definitions of collection, sharing, ephemeral processing, data types,
+   encryption in transit, deletion, track scope and the version-sum rule.
+2. Google Play Console Help, **“User Data”**,
+   <https://support.google.com/googleplay/android-developer/answer/10144311?hl=en>.
+   Transparency, consent and sensitive-data policy context.
+3. Google Play Console Help, **“Manage target audience and app content
+   settings”**,
+   <https://support.google.com/googleplay/android-developer/answer/9867159?hl=en>.
+   Target-age declaration and accuracy guidance.
+4. **Open-Meteo Terms & Privacy**, <https://open-meteo.com/en/terms>, fetched
+   27 October 2026. Provider evidence; not a Google rule.
 
-- <https://play.google.com/store/apps/details?id=io.github.sami_gor.daymark&hl=en&gl=GB>
-  — "Updated on Oct 20, 2026"; 10+ downloads; PEGI 3; "Initial production
-  release of Daymark."
-- <https://play.google.com/store/apps/datasafety?id=io.github.sami_gor.daymark&hl=en&gl=GB>
-  — the developer-provided form says:
-  - **No data shared with third parties.**
-  - Collects **Location → Approximate location**, **Audio → Voice or sound
-    recordings**, and **App activity → In-app search history**.
-  - Each listed type is **Optional**, purpose **App functionality**.
-  - **Data is encrypted in transit.**
-  - **Data can't be deleted** (the developer does not provide a deletion
-    request mechanism).
+The owner has settled the audience at **Ages 18+ only**. No child age group is
+selected for V2. The in-app content is a general weather utility and contains
+no child-directed characters, activities, rewards or advertising. The Google
+Play Families Policy child-targeting process is therefore not a separate
+blocker for this adult-targeted design, subject to the final store-listing and
+content-rating check. This is not a claim of Families approval or of a legal
+exemption.
 
-This is the public storefront rendering, not the Console form. The listing does
-not expose the highest uploaded version code. The source tree has `versionCode
-2` / `versionName 2.0.0`; whether that is the highest code on Play is a manual
-Console check.
+### Audience declaration and separate assessments
 
-**Finding:** the live form selects Approximate location only. The released
-1.0.0 app declares `ACCESS_FINE_LOCATION` and sends a two-decimal coordinate
-(`src/App.tsx`, `findMe()`), which at UK latitudes is roughly a 0.8 km² cell —
-below Play's 3 km² threshold for Approximate location. The live form therefore
-appears to under-declare Precise location for the released build. The "No data
-shared" answer also needs a documented user-initiated-action analysis because
-Open-Meteo receives the coordinate/search and retains logs for up to 90 days.
-Both points are manual/legal decisions, not changes made by this audit.
+The 18+ choice is a **Google Play target-audience declaration**, not a technical
+access restriction. Daymark has no date-of-birth gate, and the setting does not
+prove that minors cannot access the app.
 
-## 2. Data-flow matrix
+The **UK Children's Code / Age Appropriate Design Code** assessment is separate
+from the Play declaration. Selecting 18+ does not by itself resolve those UK
+privacy obligations; the assessment must be completed where the Code applies.
 
-Column meanings:
+The Open-Meteo terms are silent on child-directed use. The earlier mixed-age
+Families proposal is withdrawn under the owner's 18+ decision, but that decision
+does not establish that Open-Meteo is approved or prohibited for child users.
+That remains a specific provider assessment if the audience changes or if a
+regulator treats the service as likely to be accessed by children; it is not a
+separate child-targeting blocker for the adult-only design. No provider contact
+was made.
 
-- **Leaves device?** — whether data is transmitted off the device by the app
-  or by an app-controlled WebView/API call. "No" is a source-level finding, not
-  a packet-level proof.
-- **Storage / retention evidence** — separates Daymark's own storage from a
-  provider's retention. Daymark has no backend or database.
-- **Play Data safety topic** — the Play data type that the flow maps to, if the
-  flow is in the Play-distributed Android artifact. Web/PWA-only flows are
-  marked as such.
+### Proportionate UK Children's Code assessment
 
-| Data | Source | Destination | Purpose | Storage / retention evidence | Leaves device? | Play Data safety topic |
-|---|---|---|---|---|---|---|
-| Android device-derived location, V2 | Android/WebView geolocation after "Use my location"; only `ACCESS_COARSE_LOCATION` is declared | `api.open-meteo.com` and `air-quality-api.open-meteo.com` query parameters; Open-Meteo | Forecast and air quality at the user's approximate area | Daymark: React state only, no persistence. Open-Meteo: free-API server logs "may contain sensitive information such as geographical coordinates"; "All log files will be deleted after a period of 90 days." | **Yes** — the OS approximate fix is sent unmodified (`resolveDeviceLocation(..., isAndroidNative=true)`). | **Location → Approximate location** (OS approximation is ≥3 km² by Play's definition). |
-| Web/PWA device location | Browser geolocation after explicit action; snapped to a 0.025° grid on the device (`location-privacy.ts`) | Open-Meteo forecast/air-quality endpoints | Same | Daymark: none; Open-Meteo provider logs as above | **Yes** — the grid-rounded coordinates are sent. Near London the cell is ~4.8 km² (Approximate); the cell shrinks with latitude, so the Play classification would need re-derivation if this flow were ever in a Play artifact. | Web/PWA only; not a Play-distributed artifact. If it were, **Approximate location** at the tested latitude. |
-| Android device-derived location, V1.0.0 | WebView geolocation; manifest declares `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` | Open-Meteo forecast/air-quality endpoints | Same | Daymark: none; Open-Meteo provider logs as above | **Yes** — coordinates rounded to **two decimal places** before sending (`findMe()` on `main`). | **Location → Precise location** while 1.0.0 is distributed (the two-decimal cell is <3 km²). Also **Approximate location** for V2. |
-| Typed place-search query | User keyboard input in the search box | `geocoding-api.open-meteo.com` `name=` query; Open-Meteo | Suggest matching places | Daymark: input state only, no search history. Open-Meteo: request URL/query is processed by the provider; its published free-API privacy text commits to 90-day deletion of webserver logs and does not establish memory-only processing. | **Yes** — the typed text is sent. | **App activity → In-app search history** (Optional; App functionality). |
-| Android speech audio and transcript, V2 | Microphone after explicit action; `AudioRecord` 16 kHz mono | On-device Parakeet TDT 0.6B v3 int8 through sherpa-onnx | Speech-to-text for Ask Daymark | Daymark: in-memory audio buffer and transcript only; no files; plugin states no audio/transcript logging. Model files are in app-private storage. | **No, by source inspection.** The Android voice path contains no `SpeechRecognizer`, Web Speech, remote recogniser, retry or online fallback (`android-voice-implementation.test.ts`). Packet-level/device proof is still outstanding. | **Audio → Voice or sound recordings: not collected for a V2-only Android build.** While V1 is distributed, the sum still requires Yes (next row). |
-| V1 Android speech audio | Microphone via WebView `SpeechRecognition` / `webkitSpeechRecognition` | Browser/WebView speech service; the provider may process audio remotely | Speech-to-text | Daymark: transcript in memory only. Provider retention unknown; no provider documentation is retained in the repository. | **Potentially yes** — depends on the WebView/platform speech provider; source cannot establish on-device processing. | **Audio → Voice or sound recordings** (Optional; App functionality; ephemeral cannot be claimed). |
-| Web/PWA speech audio | Browser `SpeechRecognition` / `webkitSpeechRecognition` | Browser or platform speech provider, possibly remote | Speech-to-text | Daymark: transcript in memory only. Provider retention unknown. | **Potentially yes** — the browser supplies the implementation; Daymark makes no on-device guarantee. | Web/PWA only; not in the Play artifact. |
-| Android English narration | Intent/briefing text | On-device Kokoro model through the `DaymarkVoice` JNI plugin | Read the briefing aloud | Daymark: no narration text stored; logs contain timings/segment counts/PSS, not text. | **No** — local engine; no system-TTS fallback for English. | No listed user-data type; on-device processing. |
-| Android French/Spanish narration, V2 | Intent/briefing text | Installed Android system TTS engine; only a voice with `isNetworkConnectionRequired() == false` is selected | Read the briefing aloud | Daymark: no narration text stored. The selected voice is installed on the device; the engine's own retention is outside Daymark. | **No off-device send by Daymark** when an eligible offline voice is selected; the text is passed to another on-device app component. If no eligible voice exists, narration fails with `system-tts-offline-unavailable`. | No listed user-data type; on-device app-to-app handoff. Device test of FR/ES voice selection is outstanding. |
-| Android French/Spanish narration, V1.0.0 | Intent/briefing text | Device default Android TTS voice | Read the briefing aloud | Daymark: no narration text stored. The default voice may require network; provider retention unknown. | **Potentially yes** — V1 did not gate on `isNetworkConnectionRequired()`. | No listed user-data type unless the narration contains user data; the text is app-generated. Flag for legal review only if a searched place name is considered user data. |
-| Web/PWA narration | Intent/briefing text | Browser `speechSynthesis`; voice may be local or remote | Read the briefing aloud | Daymark: no narration text stored; provider/voice retention unknown. | **Potentially yes** — depending on the browser and selected voice. | Web/PWA only; not in the Play artifact. |
-| Language preference | Language selector | `localStorage` key `daymark.locale` | Remember UI language | Daymark: on-device only, until cleared. `storage-surface.test.ts` permits this as the only app-controlled persistent key. | **No** | Not collected; on-device preference. |
-| Locality dataset and lookup result | Bundled/downloaded static GeoNames dataset; local nearest-locality lookup | Cache Storage (web/PWA) or bundled assets (Android); result used as a label | Name a device-location area without reverse geocoding | Daymark: static asset cached; no coordinates or results persisted as history. | **No** — no GeoNames request; no coordinates sent to GeoNames. | Not collected. |
-| Weather/air-quality request metadata | App request | Open-Meteo; Cloudflare for web/PWA static hosting | Deliver forecast/hosting | Open-Meteo logs may contain coordinates and are deleted after 90 days. Cloudflare processes standard request metadata (IP, URL, user agent) for delivery/security under its own policy; Daymark does not control its retention. | **Yes** — IP and request URL necessarily reach the provider/host. | The coordinates/search content are covered by the location/search rows. IP/request metadata is not separately declared unless used to identify a user; manual review. |
-| App logs | Android logcat / web console | Device log buffer; Capacitor debug logging only in debug builds | Diagnostics | Daymark: no recognition payload, transcript, coordinates or narration text in audited log statements; Kokoro logs timings/PSS, Parakeet logs model-preparation failure. Logcat is a device buffer. | **No** — not sent to Daymark. | Not collected. |
-| Analytics / crash SDK data | None found in app dependencies or source | None | — | No analytics, advertising or crash-reporting SDK in `package.json`, Gradle dependencies or source. Android vitals/Play Console crash data is platform-level, not an app SDK. | **No app-controlled flow** | No app analytics/crash-log collection. Confirm platform-level Play reporting is not treated as app collection (manual). |
-| Third-party libraries and model delivery | Capacitor/React/Radix/zod/wouter/lucide; sherpa-onnx/ONNX Runtime; Kokoro; GeoNames; Open-Meteo | On-device libraries; Open-Meteo only for runtime weather/geocoding; Google Play for model asset-pack delivery | App runtime, UI, on-device inference, weather | No analytics/ads/crash SDK found. Model/licence notices in `THIRD-PARTY-NOTICES.md`. Play asset pack is app content, not user data. | Only the Open-Meteo flows above. | No additional data types. |
+The controls are: a general weather utility with no child-directed characters,
+activities, rewards or advertising; an 18+ store declaration that is not an
+age gate; optional coarse location with on-device latitude-aware rounding; no
+search history; no advertising or profiling; no transcript/audio history; and
+clear privacy text. No specific unmet Code control has been identified for this
+adult-targeted design. External legal sign-off is not required as a generic
+release condition; reassess if the content, audience or processing changes.
 
-## 3. V1.0.0 vs V2 candidate — code-level differences
+## 2. V2 source audit
 
-| Area | Released 1.0.0 (`main`, `50194e8`) | V2 candidate (`baf83e9`) | Evidence |
+### External network destinations
+
+| Destination | Source / purpose | Data sent | Notes |
 |---|---|---|---|
-| Android location permission | `ACCESS_COARSE_LOCATION` + `ACCESS_FINE_LOCATION` | `ACCESS_COARSE_LOCATION` only; `ACCESS_FINE_LOCATION` absent | app manifest / `android-manifest-permissions.test.ts` (merged manifest not rebuilt) |
-| Device-location precision | Rounded to two decimal places on the device | Android: OS approximate fix used unmodified; web/PWA: 0.025° grid on the device | `src/App.tsx`, `src/lib/location-privacy.ts` |
-| Android speech input | WebView `SpeechRecognition` / `webkitSpeechRecognition`; provider may be remote | Parakeet TDT 0.6B v3 int8 through sherpa-onnx; on-device; no fallback | `voice-input-browser.ts` vs `voice-input-native.ts`, `ParakeetSpeechRecognitionPlugin.java` |
-| Web/PWA speech input | Browser speech recognition | Unchanged | `use-speech-recognition.ts` branches on Android native |
-| Android English narration | Bundled Kokoro, local | Bundled Kokoro, local | `speech-router.ts`, `DaymarkVoicePlugin` |
-| Android French/Spanish narration | Device default system TTS; may require network | Only an installed voice with `isNetworkConnectionRequired() == false`; explicit offline-unavailable error otherwise | `SystemSpeechPlugin.java` on each commit |
-| Typed place search | Open-Meteo geocoding | Unchanged | `weather.ts` `searchPlaces()` |
-| Analytics / crash SDK | None found | None found | `package.json`, Gradle files, source search |
-| versionCode / versionName | 1 / 1.0.0 | 2 / 2.0.0 | `artifacts/weather-app/android/app/build.gradle` |
-| compile / target / min SDK | 36 / 36 / 24 | 36 / 36 / 24 | `variables.gradle` |
-| Native debug symbols | Not configured in the first release | `ndk.debugSymbolLevel 'SYMBOL_TABLE'` in release | `app/build.gradle`; whether the AAB actually carries them is untested here |
-| Model delivery | Kokoro assets in the app | Parakeet added as an install-time Play asset pack | `parakeet-assets/build.gradle` |
-| Privacy text in the artifact | Released policy (live page still shows the 11 September 2026 text) | Source pages updated for 2.0.0, but not deployed and not in a shipped AAB | live `/privacy` fetch, 21 Oct 2026 |
+| `https://api.open-meteo.com/v1/forecast` | `artifacts/weather-app/src/lib/weather.ts` — forecast and micro-climate comparison | Coordinates, forecast field names, timezone | HTTPS. Default London and selected/device place requests use this host. |
+| `https://air-quality-api.open-meteo.com/v1/air-quality` | `weather.ts` — air quality | Coordinates, air-quality field names, timezone | HTTPS. |
+| `https://geocoding-api.open-meteo.com/v1/search` | `weather.ts` — forward place search | Typed `name`, count, language, format | HTTPS. No reverse-geocoding lookup. |
+| Same-origin `/locality/localities-v1.json` | `src/lib/locality-load.ts` and `public/sw.js` | Static locality dataset request | Not a third-party destination; cache is an application resource. |
+| Web/PWA static host / Cloudflare | deployed web asset delivery | Standard HTTP request metadata | Web/PWA only; Cloudflare’s own policy applies. |
+| External links in privacy pages | `<a href>` to Open-Meteo/Cloudflare/GeoNames | None until clicked | Navigation links, not background requests. |
 
-No source-level analytics, advertising, crash-reporting or tracking SDK was
-found in either tree. That is not proof that a platform never logs or reports
-anything; it is only evidence about code and dependencies. Absence of log lines
-was not treated as proof of no network traffic.
+Source/dependency inspection found **no analytics, advertising, crash-reporting,
+tracking SDK, external font/CDN request, native HTTP client, or remote speech
+provider** in the V2 app. Capacitor is configured for bundled local assets and
+`androidScheme: https`; there is no remote `server.url`. The native Java
+network-boundary test scans the first-party Java modules for HTTP/URL literals.
 
-## 4. Current official guidance (fetched 21 October 2026)
+### Location
 
-### Play Data safety
+`artifacts/weather-app/src/lib/location-privacy.ts` applies a latitude-aware
+on-device grid with a 0.025-degree minimum latitude step. Above the latitude
+where a 0.025-degree longitude cell would be below 3 km², the longitude step
+widens just enough to preserve that minimum area. `App.tsx` obtains the browser/Android fix only
+after an explicit “Use my location” action and passes the rounded coordinates
+to `fetchWeather`. Forecast, air-quality and micro-climate requests all use the
+same rounded place object; there is no alternate request path with the raw fix.
 
-Source: <https://support.google.com/googleplay/android-developer/answer/10787469?hl=en>
+The default London forecast is requested on opening without location
+permission. The Android manifest declares `ACCESS_COARSE_LOCATION` and not
+`ACCESS_FINE_LOCATION`. Automated tests inspect outgoing web and simulated
+Android request URLs, including forecast and air-quality URLs; physical-device
+request inspection from the prior campaign is separate evidence and did not use
+packet capture. See `location-privacy.test.ts`, `tests/e2e/app.spec.ts`, and
+`network-boundary.test.ts`.
 
-- **Collection** means "transmitting data from your app off a user's device."
-  It includes libraries/SDKs and "user data collected from a webview which has
-  been opened from your app, if your app is in control of the code/behavior
-  delivered through that webview."
-- **Ephemeral processing** must still be included in the form, but is not shown
-  if the data is only in memory and retained no longer than necessary to
-  service the request. The article's weather-location example does not apply
-  when the provider keeps logs; Open-Meteo says logs are deleted after 90 days,
-  so Daymark does **not** claim ephemeral processing.
-- **Sharing** includes off-device transfers and on-device transfers to another
-  app. Exceptions include a **service provider** acting on the developer's
-  instructions, and a **specific user-initiated action** where the user
-  reasonably expects the data to be shared, or prominent disclosure and
-  consent.
-- **Multi-version rule:** the Data safety section "describes the sum of your
-  app's data collection and sharing across all its versions currently
-  distributed on Google Play." If any version requires collection, it must be
-  declared required, not optional.
-- **Data types:** Approximate location is an area **greater than or equal to 3
-  square kilometers**, including Android `ACCESS_COARSE_LOCATION`; Precise
-  location is **less than 3 square kilometers**, including
-  `ACCESS_FINE_LOCATION`.
+### Place search
 
-Other relevant points: "You alone are responsible for making complete and
-accurate declarations"; encryption-in-transit is declared only if it applies to
-all user data collected by the app, including SDKs; the deletion question asks
-whether the developer provides a deletion-request mechanism.
+`searchPlaces()` trims the query, requires at least two characters, and sends
+only:
 
-### Target API level
+- `name=<typed query>`
+- `count=8` by default
+- `language`
+- `format=json`
 
-Source: <https://support.google.com/googleplay/android-developer/answer/11926878?hl=en>
+to `geocoding-api.open-meteo.com`. The UI holds the query/results in component
+state only. No localStorage, IndexedDB, native database, or search-history
+record is written. The query is therefore **In-app search history** for the
+off-device request, not a Daymark-maintained search history.
 
-- From **31 August 2026**, new apps and app updates must target **Android 16
-  (API 36)** or higher (Wear OS/Automotive/TV/XR have separate levels).
-- Existing apps must target **Android 15 (API 35)** or higher to remain
-  available to new users on newer Android versions.
-- An extension to **1 November 2026** can be requested in Console.
+### Voice pathways
 
-Daymark's `compileSdk 36` / `targetSdk 36` / `minSdk 24` is compliant with the
-new-app/update requirement. The extension is not needed for target 36.
+- **Ask Daymark:** `use-speech-recognition.ts` creates the native
+  `ParakeetSpeechRecognitionPlugin` only on Android. The plugin uses the bundled
+  Parakeet TDT 0.6B v3 int8 model through sherpa-onnx on the device. Audio is
+  held in memory for the user-initiated session; the source does not persist
+  audio or transcript and does not send them to a Daymark server.
+- **English narration:** `use-daymark-speech.ts` routes Android English to the
+  bundled Kokoro `DaymarkVoice` plugin. `speech-engine.ts` returns `unavailable`
+  for non-English and unsupported platforms; there is no browser-speech or
+  system-TTS fallback.
+- **System TTS:** `MainActivity` registers only `DaymarkVoicePlugin` and
+  `ParakeetSpeechRecognitionPlugin`; `SystemSpeechPlugin` is not registered.
+  The V2 source has no browser `SpeechRecognition`/`speechSynthesis` calls.
+- **Network routes:** the native voice modules contain no HTTP/URL literals;
+  the app's only off-device voice-related route is the normal weather/search
+  request path, not an audio upload. **No packet capture was performed.** This
+  is source/test evidence, not proof of zero speech egress.
+- **Limitations:** no live microphone session, no audible narration, no
+  recognition accuracy/latency measurement, and no packet-level speech privacy
+  verification. The current candidate does not include PR #54's patched
+  sherpa-onnx runtime; this audit is not validation of that patch.
 
-### Open-Meteo terms and provider retention
+### Local preferences and storage
 
-Source: <https://open-meteo.com/en/terms> (fetched 21 October 2026)
+- Web/PWA and Android WebView: `daymark.locale` in localStorage.
+- Android: private `SharedPreferences` named `daymark.permissions` containing
+  the boolean `microphone-requested`, used only to avoid repeating a microphone
+  permission prompt.
+- Application resources: bundled model files, web app-shell cache and the
+  locality dataset/cache.
 
-- The free API is for non-commercial use, subject to rate limits, under
-  **CC BY 4.0**.
-- Privacy section: "We may collect non-personal information, such as IP
-  addresses, for technical reasons such as server maintenance or prevent
-  misuse, but this information is not linked to user identities in any way."
-- "For troubleshooting purposes, we keep webserver log files that may contain
-  sensitive information such as geographical coordinates. We do not share this
-  data with any third party. All log files will be deleted after a period of 90
-  days."
-- OpenMeteo GmbH says it "acts as an independent data controller for the
-  personal data processed for the purposes described in this privacy notice."
+These are on-device values. None is intentionally sent to a Daymark backend or
+included in a weather/search request. There are no accounts, profiles, location
+history, search history, transcript history, recording files or weather-history
+records. The policy discloses that clearing local storage does not delete
+third-party provider records.
 
-The provider's "non-personal" wording is not treated as proof of full
-anonymisation under Play's "Anonymous data" sharing exception. Its 90-day log
-retention is the reason Daymark does not mark location/search processing
-ephemeral. Daymark cannot delete Open-Meteo's logs on a user's behalf.
+### Privacy-policy access
 
-## 5. Proposed Data safety answers — sum of distributed versions
+The app routes `/privacy`, `/fr/privacy`, and `/es/privacy` from `App.tsx` to
+the current English, French and Spanish policy pages. The current source pages
+describe V2 and the 18+ audience. The public policy routes
+`https://daymark-weather.pages.dev/privacy`, `/fr/privacy` and `/es/privacy`
+returned HTTP 200 on 27 October 2026 but still rendered the older pre-V2 policy
+text; the rendered English, French and Spanish pages carried the 11 September
+2026 effective date (the French rendered date uses a different spacing but is
+the same policy). No deployment was performed. The public site and the current
+candidate source therefore must not be treated as identical until the policy is
+deployed.
 
-These are proposals for manual review, not submitted answers. "Shared" is the
-hardest field: the current live form says No, relying on the user-initiated
-action (and possibly service-provider) exception. The conservative alternative
-is Yes. The source and UI support a user-initiated reading, but the final answer
-is a legal/product decision and must match the privacy policy and in-app
-disclosure.
+### Local Android artifact consistency
 
-| Play field | Proposed answer (V1 + V2 sum) | Rationale | Confidence | Manual decision |
+The local debug AAB (`44aa384c…`) and debug APK (`5eeb5553…`) are QA/debug
+builds, not release candidates. Their packaged web bundle still contains the old
+`suitable for children and adults` policy wording, while the current source has
+the 18+ and source-IP wording. The generated assets were not edited manually. A
+new Android bundle must be built from the approved policy source before release;
+no rebuild was performed in this audit. The AAB is debug-signed and cannot
+verify the production signing path.
+
+## 3. V2 Data Safety decision record
+
+Play’s “collect” definition is transmission of data from the app off-device,
+regardless of whether the recipient is the developer or a third party. Daymark
+operating no backend does not make the Open-Meteo requests “not collected”; it
+removes a Daymark-operated recipient.
+
+| Field | Proposed V2 answer | Evidence | Official source | Status / confidence |
 |---|---|---|---|---|
-| Does the app collect or share user data? | **Yes** | Location, typed search, and (while V1 is distributed) speech audio leave the device. | High | No |
-| Approximate location — collected | **Yes** | V2 Android sends the OS approximate fix to Open-Meteo; web/PWA grid flow also exists. | High | No |
-| Approximate location — shared | **No (if the user-initiated-action exception is accepted) / Yes (conservative)** | Open-Meteo is a third party and an independent controller; its logs may retain coordinates for 90 days. The live form says No. | Low | **Yes — legal/policy review** |
-| Approximate location — optional/required | **Optional** | User can deny location and use search or the default place; no version requires it. | High | No |
-| Approximate location — purpose | **App functionality** | Forecast/air quality. | High | No |
-| Approximate location — ephemeral | **No** | Provider logs are retained up to 90 days; ephemeral requires memory-only, no longer than necessary. | High | No |
-| Approximate location — encrypted in transit | **Yes** | Open-Meteo requests are HTTPS; TLS is enforced by the app. | High | No |
-| Precise location — collected | **Yes while v1.0.0 is distributed; No after it is withdrawn** | V1 declares `ACCESS_FINE_LOCATION` and sends a two-decimal coordinate (<3 km²). V2 Android declares coarse only. | High on code; Medium on Play classification | **Yes — confirm rollout/withdrawal** |
-| Precise location — shared / optional / purpose / ephemeral / encryption | Same pattern as approximate: **No/Yes sharing decision; Optional; App functionality; Ephemeral No; Encrypted Yes** | Same provider path and retention. | Medium | **Yes — sharing decision** |
-| In-app search history — collected | **Yes** | Typed `name=` queries go to `geocoding-api.open-meteo.com`; no local search history is stored. | High | No |
-| In-app search history — shared | **No (if the user-initiated-action exception is accepted) / Yes (conservative)** | Same Open-Meteo analysis. | Low | **Yes** |
-| In-app search history — optional/required | **Optional** | Search is optional; default place works without it. | High | No |
-| In-app search history — purpose | **App functionality** | Place suggestions. | High | No |
-| In-app search history — ephemeral | **No** | Provider request/log handling is not documented as memory-only; 90-day log retention applies to provider logs. | Medium | **Yes — confirm provider logging** |
-| In-app search history — encrypted in transit | **Yes** | HTTPS. | High | No |
-| Voice or sound recordings — collected | **Yes while v1.0.0 is distributed; No for a V2-only Android build** | V1 Android uses WebView speech recognition; the provider may process audio remotely. V2 Android uses on-device Parakeet with no remote path (source-level; packet proof open). | High on code; Medium on V1 provider | **Yes — V1 withdrawal / provider path** |
-| Voice or sound recordings — shared | **No (if the user-initiated/service-provider exception is accepted) / Yes (conservative)** | The speech provider may be a platform service; its role and retention are not documented in the repo. | Low | **Yes — provider terms** |
-| Voice or sound recordings — optional/required | **Optional** | Ask Daymark is optional; denial leaves the app usable. | High | No |
-| Voice or sound recordings — purpose | **App functionality** | Speech-to-text for Ask Daymark. | High | No |
-| Voice or sound recordings — ephemeral | **No / unknown** | No evidence of memory-only provider processing or a retention period. Do not claim ephemeral. | Low | **Yes — obtain provider docs** |
-| Voice or sound recordings — encrypted in transit | **Yes for app-controlled flows; manual for platform speech** | The app's own Open-Meteo calls are HTTPS. The platform/browser speech transport is outside app control and was not packet-verified. The form has one global answer, so do not answer Yes unless the whole path is confirmed. | Medium | **Yes** |
-| Data types not listed | **No** — no account/personal info, financial, health, messages, photos/videos, files, calendar, contacts, app interactions, installed apps, other UGC, web browsing, crash logs, diagnostics or device IDs declared | No accounts, no analytics/crash SDK, no ad ID, no device-ID access. Android vitals is platform-level. | Medium | **Yes — confirm no hidden SDK/provider** |
-| Encryption in transit | **Yes**, if the voice path's platform transport is confirmed encrypted; otherwise this cannot be a blanket Yes | Open-Meteo is HTTPS. The app declares one global answer. | Medium | **Yes** |
-| Deletion request mechanism | **No** | Daymark holds no account or server-side user data; it cannot delete Open-Meteo logs. Current live form says "Data can't be deleted." | High on Daymark; Medium on form wording | **Yes — match current Console answer** |
-| Ads / advertising ID | **No ads; no advertising ID** | No ad SDK, no ad ID permission/use. | High | No |
-| App access | **All functionality available without special access** | No login/account. | High | No |
-| Target audience / content rating | **General audience; weather utility; no user-generated content; PEGI 3-like** | Current public listing shows PEGI 3. | High on public listing; Medium on questionnaire | **Yes — Console** |
-| AI asset declaration | **Previously completed; re-check** | Parakeet is an on-device ASR model, not a generative content feature. The existing declaration may still be accurate. | Medium | **Yes — Console** |
-| Families policy | **Not applicable / not child-targeted** | General-audience weather app. | High | No |
+| Approximate location — collected | **Yes** | After explicit location action and permission, the Android coarse fix is sent to Open-Meteo after the latitude-aware grid (0.025° minimum step). Default London is fixed, not device location. | Data Safety collection; Location definitions | High on source facts; not packet-verified. |
+| Approximate location — shared | **Yes, provisional** | Open-Meteo is an independent controller receiving the rounded coordinates. No prominent pre-action disclosure naming Open-Meteo is currently shown. | Data Safety sharing; Open-Meteo notice | Conservative owner direction. A “No” answer requires a documented Play exception and legal review. |
+| Approximate location — optional | **Yes** | User can decline location; London and place search still work. | Data Safety optional | High. |
+| Approximate location — purpose | **App functionality** | Forecast/air quality for the requested area. | Data Safety purposes | High. |
+| Approximate location — ephemeral | **No** | Open-Meteo says troubleshooting webserver logs may contain coordinates and are deleted after 90 days. | Ephemeral definition; Open-Meteo notice | High on available provider evidence. |
+| Approximate location — encryption in transit | **Yes for V2 requests** | V2 Open-Meteo forecast/air-quality requests use HTTPS. | Encryption in transit | High for V2; not a global yes while V1 is distributed. |
+| Precise location — V2 | **No** | Android declares only `ACCESS_COARSE_LOCATION` and no `ACCESS_FINE_LOCATION`; the shared latitude-aware grid is applied before requests. | Data Safety Precise location | Source verified; actual release artifact still needs inspection. V1 still requires a precise-location row. |
+| In-app search history — collected | **Yes** | Typed `name` is sent to Open-Meteo geocoding; Daymark retains no query history. | Data collection; App activity / In-app search history | High. |
+| In-app search history — shared | **Yes, provisional** | The query is transferred to Open-Meteo, an independent controller. The current UI does not obtain a specific pre-action third-party disclosure/consent. | Data sharing exceptions | Conservative owner direction; a “No” answer needs documented exception/legal review. |
+| In-app search history — optional | **Yes** | Default forecast and location selection work without search. | Optional | High. |
+| In-app search history — purpose | **App functionality** | Place suggestions. | Purposes | High. |
+| In-app search history — ephemeral | **No** | The query is in the request URL, and no evidence establishes memory-only processing. Open-Meteo states a 90-day retention for troubleshooting logs that may contain coordinates, but does not state a query-specific period; do not invent one. | Ephemeral; Open-Meteo notice | No memory-only evidence; query-specific retention remains unstated. |
+| In-app search history — encryption in transit | **Yes for V2 requests** | Geocoding uses HTTPS. | Encryption | High for V2; global answer remains blocked by V1. |
+| Voice or sound recordings — V2-only | **No collected / No shared** | Parakeet is on-device; audio is in memory; no remote recognizer or system/browser speech path is registered. | On-device processing | Source/test evidence; no packet capture. |
+| Microphone permission | **Optional app permission** | `RECORD_AUDIO` only for explicit Ask Daymark. | Collection definition / Android permission | High. |
+| Local preferences | **Not a Data Safety collection** | `daymark.locale` and `daymark.permissions`/`microphone-requested` remain on-device. | Collection definition | High, subject to source tests. |
+| IP address / network metadata | **No Daymark-selected data type; provider-receipt classification unresolved** | Open-Meteo receives source IP/URL metadata; the policy now discloses this. Daymark does not use IP to identify a user or derive location. | Data Safety IP-address FAQ | No Play data type can be justified from Daymark's own use. Because Play treats off-device transmission as collection, the provider-receipt classification still needs Play/legal resolution; do not guess one. |
+| Deletion request mechanism | **No dedicated mechanism** | No accounts or backend user record; no location/search history. Local storage can be cleared; Open-Meteo logs cannot be deleted by Daymark. | Deletion FAQ | Current implementation; policy must not imply provider deletion. |
+| Encryption in transit — global | **Not finalized** | V2 requests are HTTPS, but V1 remains distributed and its speech-provider transport is unknown. | Encryption; version-sum rule | Do not select global Yes until V1 is gone or provider transport is evidenced. |
+| Other data types | **No additional types identified** | No analytics, ads, crash SDK, contacts, files, messages, health, financial or advertising-ID use found. | Data types | High for inspected source; confirm dependency/SDK inventory at submission. |
+| Advertising | **No** | No ad SDK or advertising-ID use found. | Data types/purposes | High. |
+| Target audience | **Ages 18+ only** | Owner decision. No child age groups selected; no Families child-audience declaration. | Target audience guidance | Owner-settled; Console not edited. No claim that an age gate is implemented. |
 
-### If/when v1.0.0 is withdrawn
+**High-latitude resolution:** the implementation now uses a latitude-aware
+longitude step. The 0.025° latitude step is a hard minimum; where a fixed
+0.025° longitude step would produce a cell below 3 km², the longitude spacing
+widens just enough to keep the effective cell at or above the Play
+approximate-location floor. At the exact poles the grid point is clamped to the
+last 0.025° cell centre inside the pole so a zero-area point is not emitted.
+Deterministic tests cover UK, 67.2°, 80°, 89.9°, 89.975° and pole inputs.
 
-If no 1.0.0 artifact remains on any Play track and the Android app is V2-only:
 
-- **Approximate location** stays Yes (V2 Android).
-- **Precise location** can become No.
-- **In-app search history** stays Yes.
-- **Voice or sound recordings** can become No for the Android artifact, because
-  V2 Android recognition is on-device. The web/PWA speech path is not a Play
-  artifact. This must be re-checked if any Android fallback to Web Speech is
-  ever reintroduced.
-- The "sum" rule still applies to any older artifact left on a track, including
-  closed/internal tracks that are distributed.
+**IP determination:** on the inspected V2 source, Daymark does not use IP
+addresses for identification, location inference, analytics or profiling. The
+source IP is ordinary transport metadata received by the provider. That yields
+no Play data type attributable to Daymark's own use. However, Play applies
+“collection” to off-device transmission, so whether the provider's receipt must
+be entered under a specific data type is unresolved; it must be resolved with
+the actual Play definitions and legal/Play guidance, not guessed.
 
-## 6. Release configuration checks
+**Open-Meteo role:** its published notice identifies OpenMeteo GmbH as an
+independent data controller and says troubleshooting logs may contain
+geographic coordinates and are deleted after 90 days. Daymark does not control
+those logs. The provider’s own statement that it does not share data with third
+parties does not turn Daymark’s transfer to Open-Meteo into a service-provider
+transfer under Play’s definition. No one contacted Open-Meteo.
 
-Observed from source and the public listing on 21 October 2026. "Untestable"
-means this audit could not inspect the relevant Play artifact or Console page.
+## 4. V1 audit and combined-version declaration
 
-| Check | Evidence | Status |
-|---|---|---|
-| Package | `io.github.sami_gor.daymark` in `capacitor.config.ts`, `applicationId` in `android/app/build.gradle`, and the public listing URL. | **OK** (source + public listing) |
-| Version | `versionCode 2` / `versionName 2.0.0` in `android/app/build.gradle`; released v1.0.0 was `1` / `1.0.0`. | **Source OK; highest Play code untestable** |
-| compile / target / min SDK | 36 / 36 / 24 in `variables.gradle`. | **OK**; target 36 meets the 31 Aug 2026 new-app/update requirement |
-| ABI | `arm64-v8a` only in `daymark-voice/build.gradle`; Play filters non-arm64 devices. | **OK** (source) |
-| Native debug symbols | Release `ndk { debugSymbolLevel 'SYMBOL_TABLE' }` in `android/app/build.gradle`; the first AAB did not upload symbols (checklist §10). | **Configured; AAB contents untestable** |
-| Parakeet licence | CC BY 4.0 attribution, licence link, source URL, int8 form/provenance and SHA-256 pins in `THIRD-PARTY-NOTICES.md`; model card is CC BY 4.0. | **OK in source; verify final bundle** |
-| Privacy URL | `https://daymark-weather.pages.dev/privacy`, `/fr/privacy`, `/es/privacy` all HTTP 200 `text/html`; `/.well-known/assetlinks.json` HTTP 200 `application/json`. | **Live URL OK; live policy text is older than source** |
-| Privacy-page accessibility | Semantic `h1`/`h2`, `<article lang>`, labelled language switcher, keyboard-focusable links; 15 privacy-page browser tests pass, including 320/390 px no-overflow checks. No TalkBack/screen-reader audit. | **Automated OK; device a11y untested** |
-| Store listing | Public listing "Updated on Oct 20, 2026", 10+ downloads, PEGI 3, "Initial production release of Daymark"; no ads or in-app-purchase badge observed. | **Public listing OK; Console metadata manual** |
-| App access / ads / audience / rating | No login or account in source; no ad SDK; general-audience weather utility; public rating PEGI 3. | **Source/public OK; Console forms manual** |
-| Data safety consistency | Live form: Approximate location only, audio, search history, no sharing, encrypted, can't delete. Precise location for v1.0.0 and the "No sharing" analysis do not reconcile from source alone. | **MISMATCH — manual/legal** |
-| Play Console | Dashboard redirected to the public marketing page; no signed-in session. | **Untestable read-only** |
+### V1 source evidence
 
-## 7. Open evidence and manual actions
+The available V1 sources are the `main` branch tip `44fd211` and the
+release-tested physical-device commit `69e21c`. Both declare `versionCode 1`,
+`versionName 1.0.0`, `minSdk 24`, and `targetSdk 36`. `main` is later than the
+physical-test commit, so neither revision is proof of the artifact currently
+served on every Play track. The release-readiness document's `min 29` row was
+changed by commit `30ff64b` during the V2 API-floor work; it is not independent
+V1 artifact evidence. The actual V1 manifest still requires inspection.
 
-- [ ] Sign in to Play Console read-only and record the highest `versionCode` on
-      each track, the current Data safety answers, the privacy-policy URL, the
-      app-access/ads/audience/rating/AI-asset rows, and any native-symbols
-      warning. This audit could not open the Console dashboard.
-- [ ] Resolve the **Precise location** mismatch: either the live form is wrong
-      for v1.0.0, or v1.0.0 has been withdrawn. Do not change the form to
-      Approximate-only while a precise build is still distributed.
-- [ ] Decide whether "Shared = No" is defensible under Play's user-initiated
-      action exception for Open-Meteo, given its independent-controller wording
-      and 90-day logs. If not, mark location and search as Shared = Yes.
-- [ ] Obtain the actual Android WebView/browser speech provider path and
-      retention terms for v1.0.0; the repository does not contain them.
-- [ ] Device/packet-level proof that the V2 Android voice path makes no speech
-      network request and has no fallback. Source tests are not packet proof.
-- [ ] Device proof that the Android V2 coordinate sent on the wire is the
-      OS-provided approximate fix, with a request-URL capture.
-- [ ] Device proof of FR/ES offline voice selection and the explicit
-      `offline-voice-unavailable` path.
-- [ ] Cancellation/lifecycle/no-payload-log verification on a device.
-- [ ] Confirm the AAB actually carries native debug symbols and that the
-      privacy pages in the AAB match the deployed web policy.
-- [ ] Check TalkBack focus/announcements and 200% font scaling on the three
-      privacy pages. Only automated layout/overflow checks were run here.
-- [ ] Verify the final AAB contains the CC BY 4.0 attribution and the int8
-      provenance note, and that no additional licence obligation comes from the
-      sherpa-onnx AAR's bundled libraries.
-- [ ] Deploy the revised policy pages (EN/FR/ES) and set the effective date to
-      the actual publication date; then rebuild the Android AAB so the bundled
-      policy matches. The live policy is still the 11 September 2026 text.
-- [x] Re-run the privacy-page tests and the web build after these text changes
-      (21 October 2026): TypeScript passed, 262 unit tests passed, the
-      production build passed, and the 15 privacy-page browser tests passed. No
-      accuracy benchmark was run for this audit.
+V1 source behavior:
 
-## 8. Publication steps prepared for the maintainer (not executed)
+- `src/App.tsx` rounds device coordinates to two decimal places (about 1 km)
+  before the weather request; it does not use the V2 latitude-aware grid.
+- Android manifest declares both `ACCESS_COARSE_LOCATION` and
+  `ACCESS_FINE_LOCATION`.
+- Ask Daymark uses browser/WebView `SpeechRecognition`; audio may be processed
+  by the platform/browser speech provider, which is outside Daymark’s control.
+- English Android narration uses local Kokoro. French/Spanish Android narration
+  uses the registered Android `SystemSpeechPlugin` (system TTS), with browser
+  speech synthesis on web/PWA.
+- Weather, air-quality and geocoding requests use the same three Open-Meteo
+  hosts. V1 source contains no analytics/advertising/crash SDK and no native
+  HTTP client.
+- V1 persists `daymark.locale` in local storage. It has no V2
+  `daymark.permissions` Parakeet prompt flag.
+- V1 source contains no transcript/audio persistence in its adapters, but the
+  browser/platform speech provider and system TTS path can have their own
+  off-device processing. No provider-level packet capture or terms evidence is
+  available in this repository.
 
-The privacy-page edits in this branch are source-controlled but **not deployed**.
-When the release owner is ready:
+### Combined declaration while V1 remains distributed
 
-1. Run `pnpm --filter @workspace/weather-app build` and the normal web checks.
-2. Deploy `artifacts/weather-app/dist/public` through the existing Cloudflare
-   Pages workflow (do not create a new deployment path).
-3. Verify `https://daymark-weather.pages.dev/privacy`, `/fr/privacy` and
-   `/es/privacy` show the version note, the 2.0.0 Android/web distinction and
-   the current effective/last-updated dates. Set the effective date to the
-   actual publication date at that point.
-4. Rebuild the Android bundle with `versionCode 2` / `versionName 2.0.0` (or the
-   next unused code confirmed in Console) so the bundled policy matches, and
-   read the three policy pages from the built assets before signing.
-5. Update the Play Data safety form only after the track contents are known and
-   the legal sharing decision is recorded. Do not change the form to
-   Approximate-only while a precise v1.0.0 build is still distributed.
-6. Record the Console check date, highest version code, track contents and the
-   final Data safety answers in `play-console-checklist.md`.
+Play requires the Data safety form to describe the **sum** of practices across
+all versions currently distributed. While V1 remains on production, open,
+closed or a staged rollout, the final global answer must include:
 
-No CI workflow, Play Console declaration, or website deployment was changed by
-this audit.
+- **Approximate location — Yes** and **Precise location — Yes (source
+  indicates)**: V1 sends a two-decimal coordinate and declares
+  `ACCESS_FINE_LOCATION`. Console must verify the actual versionCode/artifact;
+  do not assume the `main` or `69e21c` source is byte-identical to the V1
+  artifact users have.
+- **In-app search history — Yes**; typed queries go to Open-Meteo.
+- **Voice or sound recordings — Yes / shared unresolved** while V1 is
+  distributed: browser/WebView recognition may send audio to a provider, and
+  the provider path/retention/transport are not established.
+- **Encryption in transit — not global Yes**: V1 weather/search HTTPS does not
+  establish the transport used by its speech provider or system TTS path.
+- **Deletion — same no-account/no-provider-log mechanism**.
+- **IP/network metadata — unresolved** as above.
 
-## 9. Source references
+Internal-testing-only artifacts are exempt. Closed/open/production tracks and
+staged rollouts are included. Notifying users does not change distribution and
+does not remove V1 from the global declaration. Existing V1 installations are
+not deliberately disabled; V1 removal is tied to the full V2 production
+release, not a fixed date.
 
-- V2 location: `artifacts/weather-app/src/App.tsx` (`findMe`),
-  `artifacts/weather-app/src/lib/location-privacy.ts`
-- V2 voice input: `artifacts/weather-app/src/lib/voice-input-native.ts`,
-  `artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetSpeechRecognitionPlugin.java`
-- V2 voice output: `artifacts/weather-app/src/lib/speech-router.ts`,
-  `.../SystemSpeechPlugin.java`, `.../DaymarkVoicePlugin.java`
-- Network boundary: `artifacts/weather-app/src/lib/weather.ts`
-- Storage: `artifacts/weather-app/src/lib/i18n.ts`,
-  `artifacts/weather-app/src/lib/storage-surface.test.ts`,
-  `artifacts/weather-app/public/sw.js`
-- Policy pages: `artifacts/weather-app/src/pages/privacy.tsx`,
-  `privacy-fr.tsx`, `privacy-es.tsx`
-- Manifest/build: `artifacts/weather-app/android/app/src/main/AndroidManifest.xml`,
-  `artifacts/weather-app/android/app/build.gradle`,
-  `artifacts/weather-app/android/variables.gradle`
-- Live public listing and Data safety page, accessed 21 October 2026.
+Once V1 is no longer currently distributed on any non-internal track, the
+official version-sum rule no longer requires V1 rows. A conservative owner may
+retain them until support ends, but the form must not be labeled “V2-only”
+while V1 is still distributed.
+
+### Final proposed global matrix by applicable version
+
+This is the proposed answer set for a global form covering V1 while it remains
+distributed outside internal testing, plus V2. It is not a Console submission.
+
+| Data type / field | V1 source evidence | V2 source evidence | Proposed global answer |
+|---|---|---|---|
+| Approximate location | Coarse permission exists, but V1 also declares fine and sends two decimals; precise row is the conservative source-led classification. | Coarse manifest, latitude-aware grid, no fine permission. | **Collected Yes; Shared Yes (provisional); Optional Yes; App functionality; Not ephemeral.** |
+| Precise location | V1 source sends two-decimal coordinates with `ACCESS_FINE_LOCATION`; actual distributed manifest remains to be checked. | V2 does not collect precise location. | **Yes while V1 is distributed; No for V2.** |
+| In-app search history | Typed query to Open-Meteo; no Daymark history. | Typed query to Open-Meteo; no Daymark history. | **Collected Yes; Shared Yes (provisional); Optional; App functionality; Not ephemeral.** |
+| Voice or sound recordings | Browser/WebView recognition and system/browser TTS; provider transport remains external. | Parakeet and Kokoro on-device; no system/browser/remote fallback; no transcript/audio persistence found. | **V1: Yes (conservative); V2: No collected; global: Yes while V1 is distributed.** |
+| IP / requested URL metadata | Provider receives transport metadata; no Daymark use for identification/location. | Same. | **Disclosed; no Daymark-selected Play data type; provider-receipt category remains a specific legal/Play classification question.** |
+| Local preferences / models | `daymark.locale`; no V2 permission flag in V1 source. | `daymark.locale`; `daymark.permissions`/`microphone-requested`; bundled models. | **Not a Data Safety collection.** |
+| Encryption in transit | Weather/search source uses HTTPS; V1 speech/TTS provider transport is not established. | V2 Open-Meteo requests use HTTPS. | **Yes for Daymark-controlled V2 requests; global Yes is not claimed while V1 speech transport is unverified.** |
+| Deletion | No account/history deletion mechanism; provider logs are outside Daymark control. | Same. | **No dedicated deletion mechanism; local clearing does not delete provider records.** |
+
+### Track/version inventory template — owner confirmation only
+
+The only Play Console fact required to reconcile this matrix is the actual
+track/version inventory. Fill this from a read-only Console view; do not change
+tracks.
+
+| Track | Version code | Version name | Release status / rollout | Internal-only? | Included in global form? |
+|---|---:|---|---|---|---|
+| Production |  |  |  | No | Yes if distributed |
+| Open testing |  |  |  | No | Yes if distributed |
+| Closed testing |  |  |  | No | Yes if distributed |
+| Internal testing |  |  |  | Yes if internal-only | Exempt unless separately distributed |
+| Staged rollout |  |  |  | No | Yes if active |
+
+The actual V1 artifact manifest and speech/TTS provider evidence are separate
+artifact/runtime questions, not Console settings.
+
+### Exact Play Console fact still required
+
+**Only the track/version inventory in the template above requires Play Console
+confirmation.** It establishes whether V1 is still distributed outside internal
+testing and which versionCode/versionName the global form must include. The
+18+ audience decision is already made; target, content-rating and minor-access
+settings are operator checks, not facts about the data-flow matrix. Artifact
+manifest/speech evidence is a separate artifact/runtime question.
+
+## 5. Remaining blockers
+
+1. **V1 declaration:** the Console track/version inventory is the remaining
+   Console fact; the actual V1 artifact manifest and speech/TTS provider
+   evidence are separate artifact/runtime checks. Do not submit a V2-only form
+   while V1 is distributed.
+2. **Global encryption:** not final until all applicable V1 speech/TTS paths
+   and all current distributed versions are covered.
+3. **IP/network metadata:** classify only with the actual Play definitions and
+   legal/Play guidance; do not guess a data type.
+4. **Sharing:** the conservative V2 answer is Yes for location and search;
+   a No answer requires a documented user-initiated-action/prominent-disclosure
+   exception and legal review.
+5. **High-latitude area definition:** implemented and source/test verified by
+   the latitude-aware longitude step and pole-safe clamp; the release artifact
+   still needs build-time verification.
+6. **Deletion:** no dedicated mechanism; clearing local storage does not delete
+   Open-Meteo records.
+7. **Public policy deployment:** the public URL still rendered the 11 September
+   2026 policy; the current V2 source policy has not been published.
+8. **Speech evidence:** the V2 source/data-flow review and regression tests
+   establish that audio/transcript content is not sent to network clients,
+   analytics, telemetry or persisted history. Packet capture is not a
+   standalone release gate; no universal zero-traffic claim is made. Live
+   microphone/accuracy/latency behaviour remains a device-quality check.
+9. **Console:** target audience, content rating and Data Safety were not edited.
+   The owner-selected 18+ target is a preparation decision; no age gate or
+   Restrict Minor Access is verified in this app.
+10. **UK/Open-Meteo:** the proportionate UK assessment records no specific
+    unmet control; the Open-Meteo child-directed-use assessment is a specific
+    provider item only if the audience changes. Selecting 18+ is not a legal
+    conclusion or a technical access control.
+11. **Artifact alignment:** local debug Android artifacts contain old policy
+    wording; the public policy routes were still old at the last check. A new
+    Android bundle and authorised policy deployment are required for release.
+
+## 6. Evidence references
+
+- V2 network: `artifacts/weather-app/src/lib/weather.ts`,
+  `src/lib/locality-load.ts`, `public/sw.js`,
+  `src/lib/network-boundary.test.ts`, `capacitor.config.ts`
+- V2 location: `src/lib/location-privacy.ts`, `src/App.tsx`,
+  `src/lib/location-privacy.test.ts`, `tests/e2e/app.spec.ts`,
+  `android/app/src/main/AndroidManifest.xml`
+- V2 search: `src/lib/weather.ts` (`searchPlaces`),
+  `src/components/weather/LocationSearch.tsx`
+- V2 voice: `src/lib/speech-engine.ts`, `speech-router.ts`,
+  `src/hooks/use-daymark-speech.ts`, `src/hooks/use-speech-recognition.ts`,
+  `android/daymark-voice/.../ParakeetSpeechRecognitionPlugin.java`,
+  `android/app/src/main/java/.../MainActivity.java`
+- V2 storage: `src/lib/i18n.ts`, `src/lib/storage-surface.test.ts`,
+  `android/daymark-voice/.../ParakeetSpeechRecognitionPlugin.java`
+- V1 source: `git show main:...` and `git show 69e21c:...` for `App.tsx`,
+  `AndroidManifest.xml`, `use-speech-recognition.ts`,
+  `use-daymark-speech.ts`, `SystemSpeechPlugin.java`, `weather.ts`;
+  `main` tip `44fd211`; physical-test source `69e21c`.
+- Open-Meteo Terms & Privacy: <https://open-meteo.com/en/terms>
+- Official Play Console Help links in §1.
+
+No Play Console edit, provider contact, commit, deployment or policy
+publication was made.
