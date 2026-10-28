@@ -71,18 +71,19 @@ jobs:
       - name: Fetch the sherpa-onnx runtime
         run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
 
-      # Compile the native Android modules as well as the web layer. This
-      # catches Java/API/manifest regressions in Capacitor plugin changes.
-      # The committed JVM unit tests guard the minimum-WebView gate that
-      # decides whether the WebView loads the bundle at all. One Gradle
-      # invocation rather than a second step avoids a redundant
-      # configuration phase and keeps both tasks on one resolved classpath.
-      # The DaymarkVoice module's own tests (permission lifecycle, model
-      # integrity, endpoint detection) and app lint run in the same
-      # invocation so those regressions cannot merge silently.
-      - name: Android build and unit tests
+      # Run JVM checks before downloading the large install-time model pack.
+      - name: Android unit tests
         working-directory: artifacts/weather-app/android
-        run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest :daymark-voice:testDebugUnitTest :app:lintDebug
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :daymark-voice:testDebugUnitTest
+
+      # The APK build runs the Parakeet asset guard. Fetch the pinned model
+      # archive and verify the archive and all four extracted files first.
+      - name: Fetch and verify Parakeet model assets
+        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+
+      - name: Android debug build and lint
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:assembleDebug :app:lintDebug
 
       - name: Install Playwright browser
         run: pnpm --filter @workspace/weather-app exec playwright install chromium --with-deps
