@@ -1,14 +1,12 @@
 import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
 
 /*
- * English privacy policy. This page describes Daymark 2.0.0 and records the
- * differences from released 1.0.0 in the version note. Daymark operates no
- * backend or database of its own, so the important distinction is between what
- * Daymark itself stores (the language preference plus non-user-history app
- * resources) and what is transmitted to third-party services (Open-Meteo,
- * browser speech in the web/PWA app, installed Android text-to-speech voices)
- * during normal use, including the default forecast request and optional
- * location/voice features.
+ * English privacy policy for Daymark V2 (2.0.0).
+ *
+ * This page is the source for the web/PWA and Android policy. It deliberately
+ * separates Daymark-controlled processing from direct Open-Meteo requests and
+ * web-host request metadata, and it does not present V2.2 plans as current
+ * capabilities.
  */
 
 export default function Privacy() {
@@ -20,106 +18,47 @@ export default function Privacy() {
       brandNote="Privacy Policy"
       backLabel="← Back to weather"
       switcherLabel="Policy language"
-      effectiveText="Effective date: October 11, 2026 · Last updated: October 21, 2026"
+      effectiveText="Effective date: October 27, 2026 · Last updated: October 27, 2026"
       tagline="Daymark — weather, simply"
     >
       <p>
-        Daymark is a weather app that runs entirely in your browser or installed app. This policy
-        explains, in plain language, what information is involved when you use it.
-      </p>
-
-      <h2>Versions of Daymark</h2>
-      <p>
-        This policy describes Daymark 2.0.0 and the current web/PWA build. Daymark 1.0.0, which may
-        still be installed on a device or available until it is replaced, behaves differently in three
-        ways. On Android, it requested precise location (<code>ACCESS_FINE_LOCATION</code> as well as{' '}
-        <code>ACCESS_COARSE_LOCATION</code>) and rounded coordinates to two decimal places before
-        sending them to Open-Meteo. Ask Daymark used the browser or WebView speech recognition
-        described below, not the bundled Parakeet model. On Android, French and Spanish narration
-        could use the device&rsquo;s default text-to-speech voice, which may have required a network
-        connection. If you are using Daymark 1.0.0, those behaviours apply.
+        Daymark is a weather app for a limited web/PWA demo and a fuller Android app. Most
+        processing happens in your browser or installed app, but Daymark sends weather,
+        air-quality, and place-search requests directly to Open-Meteo, and the website host
+        processes ordinary request metadata. This policy explains those flows and the choices
+        available to you.
       </p>
 
       <h2>Who operates Daymark</h2>
       <p>
-        Daymark is operated by Sami Belhadj. For questions about this policy or your information,
-        contact skylinelabdev@gmail.com.
+        Daymark is operated by Sami. For questions about this policy or your information, contact
+        <a href="mailto:skylinelabdev@gmail.com"> skylinelabdev@gmail.com</a>.
       </p>
 
-      <h2>The short version</h2>
-      <ul>
-        <li>Daymark has no user accounts or database, and does not operate its own backend or application server for accounts, analytics, storage, or history.</li>
-        <li>The Daymark app includes no analytics, advertising, or tracking SDKs.</li>
-        <li>Daymark itself does not store your location, searches, voice, or weather history.</li>
-        <li>
-          Daymark loads a forecast for its default place when the app opens. When you search for another
-          place, refresh conditions, or use device location, the corresponding weather or place-search
-          requests are sent directly from your browser or installed app to Open-Meteo, a third-party weather service.
-          This means your approximate location, when you choose to use it, and the text you type into place
-          search leave your device and are sent to Open-Meteo when you use those features.
-        </li>
-        <li>
-          In the installed Android app, Ask Daymark transcribes speech on your device with a speech model
-          bundled with the app. In the web/PWA app, voice input uses your browser&rsquo;s speech recognition,
-          which may send audio to your browser or operating-system provider.
-        </li>
-        <li>
-          Narration uses a bundled local voice for English on Android, an installed offline Android voice for
-          French and Spanish, and your browser&rsquo;s speech synthesis on the web.
-        </li>
-      </ul>
-
-      <h2>What information Daymark processes</h2>
-      <p>To show weather, Daymark processes:</p>
-      <ul>
-        <li>the default place shown when the app opens (London), a place you search for, or your device&rsquo;s location if you allow it;</li>
-        <li>the weather, air-quality, and place-search responses returned by Open-Meteo;</li>
-        <li>your on-device preferences, such as language.</li>
-      </ul>
+      <h2>V2 and V1 transition</h2>
       <p>
-        This information is processed in your browser or installed app while you use Daymark. It is
-        not sent to any backend or application server operated by Daymark, because Daymark does not
-        operate one. Some of it is sent off your device to Open-Meteo: the approximate coordinates
-        used for a device-location forecast, and the text you type into place search. Those requests
-        are described below.
+        This policy describes Daymark V2 (version 2.0.0) on the web/PWA and Android. Daymark 1.0.0
+        may remain installed on a device, or available through Google Play, until V2 reaches its full
+        production release. When V2 is fully released, V1 will be removed from Google Play and
+        official support for V1 will end. Existing V1 installations will not be deliberately disabled.
+      </p>
+      <p>
+        V1 behaved differently: its Android build requested precise location as well as approximate
+        location, used browser/WebView speech recognition for voice input, and could use the device&rsquo;s
+        default Android text-to-speech voice for French and Spanish narration. Those V1 behaviours
+        apply only while a V1 installation is in use.
       </p>
 
-      <h2>Location data</h2>
+      <h2>Weather and place-search requests</h2>
       <p>
-        Daymark never asks for your location on its own. Your location is used only if you press
-        &ldquo;Use my location&rdquo; and grant permission.
+        When the app opens, Daymark loads a forecast for London, its default place. That request is
+        sent directly from your browser or installed app to Open-Meteo and does not require location
+        permission.
       </p>
       <p>
-        In the installed Android app, Daymark requests approximate location only: it declares
-        Android&rsquo;s ACCESS_COARSE_LOCATION permission and does not declare ACCESS_FINE_LOCATION.
-        Daymark uses the approximate estimate returned by Android without further rounding. In the
-        web/PWA version, the browser&rsquo;s device location is snapped on your device to a 0.025-degree
-        grid (about 2.8 km north/south and 1.7 km east/west near London) before it is sent to Open-Meteo.
-        This reduces precision; it does not anonymise the request. The approximate coordinates still
-        leave your device and are sent to Open-Meteo. Daymark itself does not save your location, and
-        the app returns to its default location when you reload or reopen it.
-      </p>
-      <p>
-        When you use device location, Daymark also resolves a nearby locality name (for example, a
-        town name) locally from a static GeoNames dataset. In the web/PWA version, the dataset is
-        downloaded from Daymark&rsquo;s site and the app caches it locally in Cache Storage after first
-        use. In the installed Android app, the dataset is included with the app&rsquo;s bundled assets.
-        No reverse-geocoding service — including GeoNames — receives your coordinates, and the lookup
-        result stays on your device.
-      </p>
-
-      <h2>Location search</h2>
-      <p>
-        When you type in the search box, the text you enter leaves your device and is sent to
-        Open-Meteo&rsquo;s geocoding service to suggest matching places. Daymark does not save your
-        searches.
-      </p>
-
-      <h2>Weather and air-quality services</h2>
-      <p>
-        Forecasts, air-quality data, and place search come from{' '}
+        Weather, air-quality, and place-search data come from
         <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>. Requests go
-        directly from your browser or installed app to Open-Meteo&rsquo;s servers:
+        directly to:
       </p>
       <ul>
         <li><code>api.open-meteo.com</code> — forecasts</li>
@@ -127,170 +66,150 @@ export default function Privacy() {
         <li><code>geocoding-api.open-meteo.com</code> — place search</li>
       </ul>
       <p>
-        Open-Meteo&rsquo;s published terms for its free non-commercial API say that troubleshooting
-        server logs may contain sensitive information such as geographic coordinates and that log files
-        are deleted after 90 days. This retention is controlled by Open-Meteo, not Daymark. Please check
-        Open-Meteo&rsquo;s current <a href="https://open-meteo.com/en/terms" target="_blank" rel="noreferrer">Terms &amp; Privacy</a>
-        for details.
+        When you type in the search box, the text you enter is sent to Open-Meteo&rsquo;s geocoding
+        service to suggest matching places. Daymark does not save your searches. Daymark does not
+        operate a backend or application server for accounts, weather history, searches, or voice data.
       </p>
 
-      <h2>Voice input (Ask Daymark)</h2>
+      <h2>Location data</h2>
       <p>
-        Ask Daymark is optional. It starts only when you press the microphone button and grant
-        permission.
+        Daymark does not request location on load. Your device location is used only when you press
+        &ldquo;Use my location&rdquo; and grant permission. You can skip location entirely and use the
+        default place or search for a place.
       </p>
       <p>
-        In the installed Android app, recognition runs entirely on your device: the Parakeet
-        TDT 0.6B v3 speech model, bundled with the app, transcribes your speech locally through the
-        sherpa-onnx runtime. Daymark does not send your audio to a speech service or to any Daymark
-        server. The transcript is held in memory only; Daymark does not record or store your voice
-        audio or speech transcripts.
+        The Android app declares <code>ACCESS_COARSE_LOCATION</code> only and does not declare
+        <code>ACCESS_FINE_LOCATION</code>. Both Android and the web/PWA snap the device-derived
+        coordinates to a 0.025-degree grid on your device before they are sent to Open-Meteo. Near
+        London this is roughly 2.8 km north/south and 1.7 km east/west (about 4.8 km²). The grid reduces
+        precision but does not anonymise the request: the rounded coordinates still leave your device
+        and are sent to Open-Meteo. The app returns to its default London location when you reload or
+        reopen it.
       </p>
       <p>
-        In the web/PWA app, voice recognition is handled by your browser&rsquo;s SpeechRecognition or
-        webkitSpeechRecognition interface. Depending on your browser, operating system, and
-        configuration, that service may send your audio to the browser or platform provider for
-        processing, including a remote service. Daymark does not receive the audio; the browser
-        returns a transcript to Daymark so it can answer the question, and Daymark holds that
-        transcript in memory without storing it. The Android app and the web/PWA app therefore have
-        different voice-input behaviour, and this policy describes both. In Daymark 1.0.0, the
-        Android app used this browser/WebView path too, so the same provider caveat applied there.
+        For device location, Daymark also resolves a nearby locality name (for example, a town name)
+        locally from a static GeoNames dataset. The web/PWA downloads the dataset from Daymark&rsquo;s
+        site and caches it locally; the Android app includes it in bundled assets. No reverse-geocoding
+        service, including GeoNames, receives your coordinates.
       </p>
 
-      <h2>Voice output (Hear today)</h2>
+      <h2>Web/PWA demo</h2>
       <p>
-        &ldquo;Hear today&rdquo; reads the briefing aloud. In the Android app, English narration is
-        generated on your device by the bundled Kokoro model. French and Spanish use an installed Android
-        system text-to-speech voice, and Daymark selects only a voice that does not require a network
-        connection; the narration text is passed to that installed voice on your device. If no such
-        offline voice is installed, Daymark reports that narration is unavailable instead of using a
-        network voice or another speech service. In the web app, narration uses the browser&rsquo;s
-        speech-synthesis API, which may use a local or remote voice depending on your browser and
-        settings. Daymark does not operate a speech backend or store narration text. Browser,
-        operating-system, and voice providers manage their own processing and voice data.
+        The web/PWA build is a limited weather demo. It has no Ask Daymark microphone control and no
+        &ldquo;Hear today&rdquo; narration control. It does not request microphone permission and does
+        not invoke browser speech-recognition or speech-synthesis APIs. The Android app provides the
+        full voice feature set described below.
+      </p>
+
+      <h2>Android voice input (Ask Daymark)</h2>
+      <p>
+        Ask Daymark is optional on Android. It starts only when you press the microphone button and
+        grant microphone permission. Recognition uses the bundled Parakeet TDT 0.6B v3 int8 model
+        through the sherpa-onnx runtime on the device. Audio is captured temporarily during that
+        user-initiated session and held in memory for recognition; Daymark does not intentionally
+        record or persist the audio or the resulting transcript, and does not send either to a Daymark
+        speech server. The Android voice path has no Android SpeechRecognizer, browser-speech, or
+        online-recogniser fallback in the code. This is a source-level and automated-test statement,
+        not an independently verified packet-level zero-egress claim.
+      </p>
+
+      <h2>Android narration</h2>
+      <p>
+        English narration is generated on your device by the bundled Kokoro model. Daymark does not
+        store narration text. French and Spanish narration is not available in V2 and is planned for
+        V2.2; Daymark shows an unavailable message and does not fall back to Android system TTS, a
+        network voice, or browser speech synthesis.
       </p>
 
       <h2>Information stored on your device</h2>
       <p>
-        Daymark stores your language preference (English, French, or Spanish) in your browser&rsquo;s
-        local storage under the key <code>daymark.locale</code>. This is the only persistent user
-        preference Daymark intentionally stores. It remains until you change it or clear your browser
-        or site storage. In the web/PWA version, Daymark caches the static locality dataset in Cache
-        Storage for offline lookup, while the service worker separately caches app-shell files. The
-        installed Android app loads the locality dataset from bundled assets. These are application
-        resources, not a history of your locations or weather.
+        Daymark stores the language code in local storage under <code>daymark.locale</code>. The
+        Android app also stores one private app-state value in SharedPreferences named
+        <code>daymark.permissions</code>: the boolean <code>microphone-requested</code>, used only to
+        avoid repeatedly prompting for microphone permission after it has already been requested or
+        denied. Neither value is location,
+        search, transcript, or weather history, and Daymark stores none of those histories. The web/PWA
+        service worker caches app-shell resources, and the locality lookup uses Cache Storage for the
+        static dataset; those are application resources, not user history. The Android app loads the
+        locality dataset from bundled assets.
       </p>
       <p>
-        Daymark does not use cookies, does not use browser session storage or IndexedDB, and does not
-        keep a history of locations, searches, transcripts, or weather. In the web/PWA version,
-        Daymark&rsquo;s service worker caches the app&rsquo;s own files (HTML, scripts, styles, icons,
-        and fonts) so the app can open offline; it does not cache weather or air-quality responses.
+        Daymark&rsquo;s app code does not use cookies, browser session storage, or IndexedDB for user state. You can
+        clear the locale preference and application caches by clearing this site&rsquo;s or app&rsquo;s
+        storage in your browser or device settings. Clearing local storage does not automatically
+        delete data already retained by third-party providers such as Open-Meteo.
       </p>
 
-      <h2>Third-party services</h2>
+      <h2>Third parties and retention</h2>
       <ul>
-        <li>Open-Meteo — weather, air quality, and place search, as described above.</li>
         <li>
-          GeoNames — locality names for device location. In the web/PWA version, the static dataset
-          is downloaded from Daymark&rsquo;s site; in the installed Android app it is bundled with the
-          app. The lookup runs on your device; no coordinates are sent to GeoNames.
+          Open-Meteo — weather, air quality, and place search. Its current published privacy notice says
+          it acts as an independent data controller, may keep troubleshooting webserver logs containing
+          sensitive information such as geographical coordinates, and deletes those log files after 90
+          days. Open-Meteo also receives ordinary network request metadata, including the source IP
+          address and requested URL, to serve the request. Daymark does not use the IP address to
+          identify you or to determine your location; Open-Meteo&rsquo;s notice says it may process IP
+          addresses for technical reasons. Daymark does not control that retention. Please check
+          Open-Meteo&rsquo;s current
+          <a href="https://open-meteo.com/en/terms" target="_blank" rel="noreferrer">Terms &amp; Privacy</a>.
         </li>
         <li>
-          Your browser&rsquo;s speech service — only in the web app, and only when you use the
-          optional voice features. The Android app recognises speech on your device and does not
-          contact a speech service. Android French and Spanish narration uses only an installed
-          offline Android voice.
-        </li>
-        <li>
-          Cloudflare Pages — static hosting for the web/PWA. Cloudflare delivers the site and
-          processes standard request metadata, such as IP address, requested URL and user agent, for
-          delivery, security and abuse prevention under its own{' '}
+          Cloudflare Pages — static hosting for the web/PWA. Cloudflare processes standard website
+          request metadata such as IP address, requested URL, and user agent for delivery, security,
+          and abuse prevention under its own
           <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noreferrer">privacy policy</a>.
+          Daymark does not claim a fixed Cloudflare retention period.
         </li>
         <li>
-          The Parakeet speech model and the sherpa-onnx runtime, bundled with the Android app and
-          used to recognise speech on your device.
+          GeoNames — the static locality dataset and local nearest-locality lookup. No coordinates are
+          sent to GeoNames.
+        </li>
+        <li>
+          The Parakeet speech model, Kokoro narration model, and sherpa-onnx runtime are bundled with the
+          Android app or delivered as app assets. They run on the device for the features described
+          above.
         </li>
       </ul>
       <p>
-        Locality data © <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>,
-        used under the Creative Commons Attribution 4.0 licence (CC BY 4.0).
-      </p>
-      <p>
-        Speech model: <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3" target="_blank" rel="noreferrer">Parakeet TDT 0.6B v3</a> by
-        NVIDIA Corporation, used under the Creative Commons Attribution 4.0 International Licence
-        (CC BY 4.0). The published weights are quantised to int8 for on-device inference.
-      </p>
-      <p>
-        The Daymark app does not include third-party analytics, advertising, tracking pixels, or
-        tracking SDKs. Open-Meteo is used for weather and place search; the web app uses browser
-        speech capabilities, and Android French and Spanish narration uses installed offline Android
-        voices.
-      </p>
-
-      <h2>Analytics, advertising, and tracking</h2>
-      <p>
-        The Daymark app includes no analytics tools, advertising, trackers, or telemetry SDKs. The
-        web/PWA host processes standard request metadata for delivery and security, as described
-        under Third-party services.
-      </p>
-
-      <h2>Data retention</h2>
-      <p>
-        Daymark has no accounts or database and does not operate its own backend or application
-        server, so it does not retain your location, searches, voice audio, transcripts, or weather
-        history. Your language preference stays on your device until you change it or clear storage.
-        Third-party providers set their own retention periods; please see their policies.
+        Daymark does not include analytics, advertising, tracking pixels, or tracking SDKs. Daymark does
+        not claim that every third-party service is independently secure or that all external processing
+        is retained for zero days.
       </p>
 
       <h2>Security</h2>
       <p>
-        The hosted web/PWA version is served over HTTPS and uses the site's configured content
-        security policy. The installed Android app loads bundled local assets; the website's HTTP
-        security headers do not apply inside its WebView, but the bundled page carries an equivalent
-        Content-Security-Policy meta tag. The app is a static bundle with no secrets and no backend
-        or application server operated by Daymark.
+        The hosted web/PWA is served over HTTPS and uses the site&rsquo;s configured Content Security
+        Policy. The installed Android app loads bundled local assets; the hosted site&rsquo;s HTTP
+        security headers do not apply inside its WebView. Daymark is a static bundle with no secrets and
+        no Daymark-operated backend. These are limited, verifiable properties; they are not a guarantee
+        about third-party services or the entire device.
       </p>
 
-      <h2>International processing</h2>
+      <h2>Age suitability</h2>
       <p>
-        Open-Meteo processes weather and search requests on its own servers. In the web app, browser
-        speech recognition and speech synthesis may process audio or narration remotely, depending on
-        the provider and settings. In the Android app, voice input and English narration are processed
-        on your device, and French or Spanish narration uses only an installed offline voice. Those
-        providers&rsquo; own policies describe where and how such processing happens.
+        Daymark is intended for adults aged 18 and over and is not directed to children. This is a
+        Google Play target-audience declaration, not a technical access restriction or an age gate;
+        Daymark does not claim that no minor can access the app. It has no user accounts and Daymark
+        does not maintain profiles, location histories, search histories, or voice-transcript
+        histories. Daymark does not use advertising or tracking IDs. The app does not ask for a date
+        of birth. Selecting an adult audience does not by itself resolve any separate legal or
+        regulatory assessment, including the UK Children’s Code where applicable.
       </p>
 
-      <h2>Children&rsquo;s privacy</h2>
-      <p>
-        Daymark is a general-audience weather utility and is not specifically designed for children.
-        It does not provide user accounts, and Daymark itself does not maintain profiles, location
-        histories, search histories, or voice-transcript histories. Children should use location and
-        microphone permissions with appropriate supervision where required by their device, platform,
-        or local rules.
-      </p>
-
-      <h2>Your choices and controls</h2>
+      <h2>Your choices</h2>
       <ul>
-        <li>You can skip geolocation entirely and search for a place by name.</li>
-        <li>You can deny or revoke location permission in your browser or device settings.</li>
-        <li>You can avoid Ask Daymark and use the app without voice input.</li>
-        <li>You can deny or revoke microphone permission at any time.</li>
-        <li>
-          You can clear the stored language preference by clearing this site&rsquo;s or app&rsquo;s
-          storage in your browser or device settings.
-        </li>
+        <li>Use the default London forecast or place search without granting device location.</li>
+        <li>Deny or revoke location permission in your browser or device settings.</li>
+        <li>On Android, avoid Ask Daymark and use the weather features without microphone access.</li>
+        <li>Deny or revoke microphone permission at any time.</li>
+        <li>Clear the locale preference and application caches in your browser or device settings.</li>
       </ul>
 
-      <h2>Changes to this policy</h2>
+      <h2>Changes and contact</h2>
       <p>
-        If Daymark&rsquo;s data practices change, this page will be updated and the effective date
-        revised.
-      </p>
-
-      <h2>Contact</h2>
-      <p>
-        Questions or concerns: skylinelabdev@gmail.com — operated by Sami Belhadj.
+        If Daymark&rsquo;s practices change, this page will be updated and the effective date revised.
+        Questions or concerns: <a href="mailto:skylinelabdev@gmail.com">skylinelabdev@gmail.com</a>.
+        Daymark is operated by Sami.
       </p>
     </PrivacyPolicyLayout>
   );
