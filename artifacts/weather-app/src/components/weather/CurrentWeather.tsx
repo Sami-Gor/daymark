@@ -81,11 +81,7 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
         )}
         {isAndroidNative && speech.error && (
           <p className="voice-error" role="alert" data-testid="voice-error">
-            {speech.errorCode === 'non-english-unavailable'
-              ? t('voice.error.frenchSpanishUnavailable')
-              : speech.errorCode === 'offline-voice-unavailable'
-                ? t('voice.error.offlineUnavailable')
-                : t('voice.error.unavailable')}
+            {t('voice.error.unavailable')}
           </p>
         )}
       </div>
