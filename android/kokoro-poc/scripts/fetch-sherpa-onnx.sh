@@ -30,10 +30,12 @@ fi
 
 mkdir -p "$LIBS"
 
-actual="$(shasum -a 256 "$LIBS/$AAR_NAME" 2>/dev/null | awk '{print $1}')"
-if [ "$actual" = "$AAR_SHA256" ]; then
-  echo "ok: using provisioned patched $AAR_NAME"
-  exit 0
+if [ -f "$LIBS/$AAR_NAME" ]; then
+  actual="$(shasum -a 256 "$LIBS/$AAR_NAME" | awk '{print $1}')"
+  if [ "$actual" = "$AAR_SHA256" ]; then
+    echo "ok: using provisioned patched $AAR_NAME"
+    exit 0
+  fi
 fi
 
 if [ -z "$AAR_URL" ]; then
