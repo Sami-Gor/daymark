@@ -141,7 +141,14 @@ expected SONAMEs; the JNI library depends on `libandroid.so`, `liblog.so`,
 - The disposable Daymark checkout built successfully with
   `cd artifacts/weather-app/android && ./gradlew :app:assembleDebug` after
   `pnpm run sync:android-web`; the web-asset verifier and Parakeet integrity
-  task both passed.
+  task both passed. That debug build does not imply that
+  `:daymark-voice:lintDebug` passes: lint was not rerun for this rebuild, and
+  this document makes no claim that it passes.
+- Existing CVE/QA documentation records a pre-existing `MissingPermission`
+  finding at `AudioSpeechCaptureDevice.java:50`. The CVE patch does not
+  introduce or suppress that finding, and this rebuild does not change the
+  related lint configuration or audio source. It remains a separate
+  pre-existing Android lint issue.
 - The debug APK (`app-debug.apk` SHA-256
   `6d2b395b9a3562cdb00b366fe104df42c312fd75bf0e5558a88bbb9737835c58`)
   contains only `lib/arm64-v8a/libsherpa-onnx-jni.so` and
