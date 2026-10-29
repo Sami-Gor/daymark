@@ -23,6 +23,11 @@ git rev-parse HEAD
 git status --short
 ```
 
+The PR #54 native sherpa-onnx security suite is documented below as a
+patch-specific addition. Its patch, fixtures and results are not automatically
+part of the `26c933a…` baseline; attribute them only to PR #54 after that PR is
+reviewed and integrated.
+
 Do not reuse old test counts or results unless the candidate SHA, build identity
 and environment are also the same.
 
@@ -33,6 +38,7 @@ The repository contains:
 - TypeScript type checks and Vitest unit tests for the web application.
 - Playwright browser tests against the production web build.
 - Android JVM tests for the app shell and the native voice module.
+- A patch-specific host-native sherpa-onnx security regression suite for PR #54.
 - Android debug packaging and lint tasks.
 - GitHub Actions checks, dependency audit and CodeQL static analysis.
 - Manual physical-device checks that are not represented by an automated
@@ -348,6 +354,104 @@ The V2 Android build declares minimum API 29, target/compile SDK 36 and
 `arm64-v8a`; the release documentation also states a WebView 90 feature floor.
 Those are documented requirements, not proof of compatibility on an untested
 device.
+
+### PR #54 native sherpa-onnx security suite
+
+This is a patch-specific host-native suite for PR #54's embedded sherpa-onnx
+security fix. It is not part of the `release/v2-candidate` baseline at
+`26c933a…`, and its results must not be attributed to that baseline unless PR
+#54 is reviewed and integrated.
+
+The suite exercises the CVE-2026-108954 joiner-width validation around the
+generic and NeMo transducer decoders, including the modified-beam paths. The
+embedded source patch SHA-256 is:
+
+```text
+fd58558bdb9a7b82be8c2bfe7890890ca01edfedd95797e285d313b0bacd9f99
+```
+
+#### Prerequisites
+
+- A clean sherpa-onnx **v1.13.8** checkout at commit
+  `11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf`.
+- CMake 3.22 or newer.
+- A C++17 compiler with AddressSanitizer support for the ASan build.
+- Network access on the first build for ONNX Runtime and googletest downloads.
+- Python with `onnx` and `numpy` only when regenerating fixtures; the tracked
+  runner uses the committed fixtures.
+
+#### Reproduce the suite
+
+From the repository root of the PR #54 branch:
+
+```bash
+git clone https://github.com/k2-fsa/sherpa-onnx.git /tmp/sherpa-repro
+git -C /tmp/sherpa-repro checkout 11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf
+
+cd android/kokoro-poc/sherpa-onnx-cve-2026-108954
+./tests/run-native-tests.sh /tmp/sherpa-repro
+```
+
+The runner applies the tracked patch to the disposable checkout, copies the
+synthetic fixtures, builds the focused native test target, and runs it in both
+normal and AddressSanitizer configurations. Do not apply the patch into the
+main Daymark checkout.
+
+To regenerate the tracked fixtures instead of using them directly:
+
+```bash
+cd android/kokoro-poc/sherpa-onnx-cve-2026-108954
+python3 tests/generate_fixtures.py
+```
+
+The generator defaults to `tests/fixtures/cve-2026-108954` relative to the
+script and also accepts an explicit output directory as its first argument.
+
+#### Reported evidence and coverage
+
+**Previously reported evidence, not rerun for this documentation change:** the
+focused native suite reported **24/24 passing in the normal build and 24/24
+passing under AddressSanitizer** for the tested patch and environment. These
+results are not a guarantee for other commits, toolchains, model packs or
+runtime conditions. Re-run the suite and record the exact patch/commit and
+environment before relying on the result.
+
+Coverage includes:
+
+- generic and NeMo modified-beam search validation;
+- invalid, missing and zero `context_size` handling before modified-beam
+  decoding;
+- extreme NeMo vocabulary metadata, including the `INT32_MAX` boundary;
+- narrow/wide joiner widths and malformed dimensions;
+- dynamic NeMo TDT joiner widths changing between decoder iterations.
+
+The dynamic-width test establishes a first TDT output with two duration logits
+and a later five-column output with only one duration logit. It requires the
+decoder's specific width-rejection diagnostic rather than only an empty result.
+
+#### Guard-removal sensitivity
+
+The test was previously checked by removing the NeMo TDT per-iteration width
+guard in a disposable copy. The dynamic-width test then failed at the expected
+missing-width-rejection assertion, while the guarded implementation passed. This
+shows the test is sensitive to that guard. It is a host-native sensitivity check
+only: it does not establish physical Android behaviour, native AAR behaviour, or
+the absence of all unsafe memory layouts.
+
+#### Limitations and artifact status
+
+- Host native tests do not prove physical Android behaviour, AudioRecord/OEM
+  lifecycle, Android runtime loading of the JNI library, packet-level privacy,
+  production signing, or release readiness.
+- The synthetic malformed models are test fixtures, not evidence about arbitrary
+  model packs.
+- The AAR tracked in Git is the **earlier build**. Its recorded SHA-256 is
+  `d55696ad36cdb507970a4ef888657bac10cf21f3c800f0589d07cdc44083a0ef`.
+  It does not contain the latest modified-beam source patch. Rebuild it from the
+  final reviewed source, verify the rebuilt binary, and update its checksum and
+  provenance before merge or release.
+- Passing this suite does not supersede independent security review, device
+  testing, packet capture evidence or Play Console checks.
 
 ## Security and privacy test coverage
 
