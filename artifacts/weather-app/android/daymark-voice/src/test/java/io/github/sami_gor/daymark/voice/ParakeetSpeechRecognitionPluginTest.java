@@ -455,6 +455,97 @@ public class ParakeetSpeechRecognitionPluginTest {
                 captureEnd.capturedMs() >= 30_000L);
     }
 
+    @Test
+    public void noSpeechThenRetryStartsAFreshSuccessfulSession() throws InterruptedException {
+        // The first capture produces no data and reaches the 30 s cap.
+        plugin.clock = new SteadyClock(1_000L);
+        final FakeCaptureDevice noSpeech = new FakeCaptureDevice();
+        noSpeech.zeroReads = true;
+        plugin.captureDeviceSupplier = () -> noSpeech;
+
+        final RecordingStart first = new RecordingStart();
+        assertNotNull(plugin.beginSession(16, first));
+        assertTrue(awaitWithin(5_000, () -> terminalCount(16) == 1));
+        assertEquals("no-speech", terminalCode(16));
+
+        // A fresh session must be accepted after the failed one.
+        plugin.clock = new SteadyClock(0);
+        final FakeCaptureDevice successful = new FakeCaptureDevice();
+        successful.script = new int[] { 4000, 4000, 4000 };
+        plugin.captureDeviceSupplier = () -> successful;
+        final RecordingStart second = new RecordingStart();
+        assertNotNull(plugin.beginSession(17, second));
+        assertTrue("the retry must produce a result",
+                awaitWithin(5_000, () -> sessionEvents(17).stream()
+                        .anyMatch(event -> "result".equals(event.name()))));
+        assertEquals(Collections.singletonList("success"), second.outcomes);
+        assertEquals(1, successful.effectiveReleases.get());
+    }
+
+    @Test
+    public void immediateNewCaptureAfterACompletedLongUtterance() throws InterruptedException {
+        // 1,500 sequential 20 ms reads reach the 30 s cap with continuous speech.
+        plugin.clock = new SteadyClock(20L);
+        final FakeCaptureDevice longDevice = new FakeCaptureDevice();
+        longDevice.script = new int[1500];
+        Arrays.fill(longDevice.script, 4000);
+        plugin.captureDeviceSupplier = () -> longDevice;
+
+        final RecordingStart longStart = new RecordingStart();
+        assertNotNull(plugin.beginSession(18, longStart));
+        assertTrue("the long capture must complete",
+                awaitWithin(5_000, () -> sessionEvents(18).stream()
+                        .anyMatch(event -> "result".equals(event.name()))));
+        final RecordedEvent longEnd = sessionEvents(18).stream()
+                .filter(event -> "captureEnd".equals(event.name()))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(longEnd);
+        assertTrue("the long capture should use the full cap",
+                longEnd.capturedMs() >= 30_000L);
+
+        // Start the next capture immediately after the terminal result.
+        plugin.clock = new SteadyClock(0);
+        final FakeCaptureDevice next = new FakeCaptureDevice();
+        next.script = new int[] { 4000, 4000, 4000 };
+        plugin.captureDeviceSupplier = () -> next;
+        final RecordingStart nextStart = new RecordingStart();
+        assertNotNull("a new session must not be rejected after the long result",
+                plugin.beginSession(19, nextStart));
+        assertTrue("the immediate next capture must produce a result",
+                awaitWithin(5_000, () -> sessionEvents(19).stream()
+                        .anyMatch(event -> "result".equals(event.name()))));
+        assertEquals(Collections.singletonList("success"), nextStart.outcomes);
+        assertEquals(1, next.effectiveReleases.get());
+    }
+
+    @Test
+    public void shortReadsUseActualFrameDurationForAClausePause() throws InterruptedException {
+        // Six 160-frame speech reads = 60 ms onset. The first quiet run is
+        // 100 reads = 1000 ms (below the 1500 ms hangover). Six more speech
+        // reads reset it; the final quiet run must consume 150 reads before
+        // the endpoint. The old chunk-count detector ended at 75 quiet reads,
+        // before the second clause could be included.
+        plugin.clock = new SteadyClock(0);
+        final FakeCaptureDevice device = new FakeCaptureDevice();
+        device.readSize = 160;
+        final int[] script = new int[6 + 100 + 6];
+        for (int index = 0; index < 6; index++) script[index] = 4000;
+        for (int index = 6 + 100; index < script.length; index++) script[index] = 4000;
+        device.script = script;
+        plugin.captureDeviceSupplier = () -> device;
+
+        final RecordingStart start = new RecordingStart();
+        assertNotNull(plugin.beginSession(15, start));
+        assertTrue("the short-read capture must complete with a result",
+                awaitWithin(5_000, () -> sessionEvents(15).stream()
+                        .anyMatch(event -> "result".equals(event.name()))));
+        assertEquals(Collections.singletonList("success"), start.outcomes);
+        assertTrue("the detector must process the full one-second pause and 1.5 s hangover, not 75 reads",
+                device.readCalls.get() >= 200);
+        assertEquals(1, device.effectiveReleases.get());
+    }
+
     // ------------------------------------------------------------------
     // Unchanged busy/released guards.
     // ------------------------------------------------------------------
@@ -554,6 +645,8 @@ public class ParakeetSpeechRecognitionPluginTest {
         volatile boolean zeroReads;
         volatile Runnable duringStart;
         volatile Runnable duringRead;
+        /** Number of frames returned per read; -1 uses the whole buffer. */
+        volatile int readSize = -1;
         /** Chunk level per read; a negative entry is returned verbatim as an error. */
         volatile int[] script = new int[0];
 
@@ -587,8 +680,11 @@ public class ParakeetSpeechRecognitionPluginTest {
             if (level < 0) {
                 return level;
             }
-            Arrays.fill(buffer, (short) level);
-            return buffer.length;
+            final int size = readSize > 0
+                    ? Math.min(readSize, buffer.length)
+                    : buffer.length;
+            Arrays.fill(buffer, 0, size, (short) level);
+            return size;
         }
 
         @Override

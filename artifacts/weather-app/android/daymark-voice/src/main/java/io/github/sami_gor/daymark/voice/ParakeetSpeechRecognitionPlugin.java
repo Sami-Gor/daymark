@@ -84,9 +84,11 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
 
     /** Sample rate the evaluated model was measured at. */
     private static final int SAMPLE_RATE = 16000;
+    /** AudioRecord is configured for mono, so each PCM short is one frame. */
+    private static final int AUDIO_CHANNEL_COUNT = 1;
     /** Feature dimension the evaluated model was measured with. */
     private static final int FEATURE_DIMENSION = 80;
-    /** 20 ms of audio per chunk. */
+    /** 20 ms of audio per read buffer. */
     private static final int CHUNK_SAMPLES = 320;
     /** Hard cap on a single utterance. */
     private static final int MAX_CAPTURE_MS = 30000;
@@ -99,9 +101,9 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
     /** Root-mean-square amplitude at or above which a chunk counts as speech. */
     private static final float SPEECH_THRESHOLD = 0.02f;
     /** 60 ms of speech needed before the utterance is considered started. */
-    private static final int ONSET_CHUNKS = 3;
+    private static final int ONSET_MS = 60;
     /** 1500 ms of quiet needed after speech to end the utterance. */
-    private static final int HANGOVER_CHUNKS = 75;
+    private static final int HANGOVER_MS = 1500;
     /** CPU threads used for inference. */
     private static final int NUM_THREADS = 2;
     /**
@@ -473,7 +475,8 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
 
             final long captureStartMs = clock.getAsLong();
             SpeechEndpointDetector detector =
-                    new SpeechEndpointDetector(SPEECH_THRESHOLD, ONSET_CHUNKS, HANGOVER_CHUNKS);
+                    new SpeechEndpointDetector(
+                            SPEECH_THRESHOLD, SAMPLE_RATE, ONSET_MS, HANGOVER_MS);
             short[] chunk = new short[CHUNK_SAMPLES];
             long deadline = clock.getAsLong() + MAX_CAPTURE_MS;
             boolean reachedLimit = false;
@@ -496,7 +499,9 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
                 }
                 if (read > 0) {
                     samples.append(chunk, read);
-                    if (detector.accept(rootMeanSquare(chunk, read))) {
+                    final int frameCount = read / AUDIO_CHANNEL_COUNT;
+                    if (frameCount > 0
+                            && detector.accept(rootMeanSquare(chunk, read), frameCount)) {
                         break;
                     }
                 }

@@ -7,62 +7,87 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 /**
- * Unit tests for the utterance endpoint detector.
+ * Unit tests for the frame-duration utterance endpoint detector.
  *
- * <p>These cover the decision that replaced the fixed capture window used by
- * the earlier experiment, so a request ends when the user stops speaking instead
- * of after a fixed delay. The onset cases pin down that a run of consecutive
- * speech chunks is required: isolated transients must not start an utterance,
- * and speech inside the hangover restarts the quiet run that ends it.
+ * <p>The production detector uses actual frame counts, so these tests exercise
+ * full and short reads, one-second clause pauses, the exact 1,500 ms hangover,
+ * zero-length reads, and continuous speech. The same amount of audio must
+ * produce the same decision regardless of how it is divided into reads.
  */
 public class SpeechEndpointDetectorTest {
 
     private static final float QUIET = 0.001f;
     private static final float SPEECH = 0.2f;
+    private static final int SAMPLE_RATE = 16_000;
+    private static final int ONSET_MS = 60;
+    private static final int HANGOVER_MS = 1_500;
+
+    private static SpeechEndpointDetector detector() {
+        return new SpeechEndpointDetector(
+                0.02f, SAMPLE_RATE, ONSET_MS, HANGOVER_MS);
+    }
+
+    private static int frames(int milliseconds) {
+        return (int) Math.round(SAMPLE_RATE * (milliseconds / 1000.0));
+    }
+
+    private static boolean feed(
+            SpeechEndpointDetector detector,
+            float rootMeanSquare,
+            int totalFrames,
+            int readFrames) {
+        if (totalFrames < 0 || readFrames <= 0) {
+            throw new IllegalArgumentException("invalid test feed");
+        }
+        boolean ended = false;
+        int remaining = totalFrames;
+        while (remaining > 0) {
+            int count = Math.min(readFrames, remaining);
+            ended |= detector.accept(rootMeanSquare, count);
+            remaining -= count;
+        }
+        return ended;
+    }
 
     @Test
     public void doesNotEndBeforeSpeechHasStarted() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
+        SpeechEndpointDetector detector = detector();
         for (int index = 0; index < 100; index++) {
-            assertFalse(detector.accept(QUIET));
+            assertFalse(detector.accept(QUIET, 320));
         }
         assertFalse(detector.hasSpeechStarted());
         assertFalse(detector.isFinished());
     }
 
     @Test
-    public void needsConsecutiveSpeechChunksToStartTheUtterance() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
-        detector.accept(SPEECH);
-        detector.accept(SPEECH);
-        assertFalse("two chunks are below the onset threshold", detector.hasSpeechStarted());
-        detector.accept(SPEECH);
+    public void needsConsecutiveSpeechFramesToStartTheUtterance() {
+        SpeechEndpointDetector detector = detector();
+        // 959 frames is just below the 960-frame / 60 ms onset threshold.
+        assertFalse(detector.accept(SPEECH, 959));
+        assertFalse(detector.hasSpeechStarted());
+        assertFalse(detector.accept(SPEECH, 1));
         assertTrue(detector.hasSpeechStarted());
     }
 
     @Test
-    public void resetsTheSpeechRunOnQuietChunksBeforeSpeechHasStarted() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
-        // speech, quiet, speech, quiet, speech: three speech chunks in total,
-        // but never three in a row, so the utterance must not start.
-        detector.accept(SPEECH);
-        assertFalse(detector.accept(QUIET));
-        detector.accept(SPEECH);
-        assertFalse(detector.accept(QUIET));
-        detector.accept(SPEECH);
-        assertFalse("non-consecutive speech chunks must not start the utterance",
+    public void resetsTheSpeechRunOnQuietFramesBeforeSpeechHasStarted() {
+        SpeechEndpointDetector detector = detector();
+        assertFalse(detector.accept(SPEECH, 320));
+        assertFalse(detector.accept(QUIET, 320));
+        assertFalse(detector.accept(SPEECH, 320));
+        assertFalse(detector.accept(QUIET, 320));
+        assertFalse(detector.accept(SPEECH, 320));
+        assertFalse("non-consecutive speech must not start the utterance",
                 detector.hasSpeechStarted());
         assertFalse(detector.isFinished());
     }
 
     @Test
     public void doesNotStartForIsolatedBlips() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
+        SpeechEndpointDetector detector = detector();
         for (int blip = 0; blip < 3; blip++) {
-            detector.accept(SPEECH);
-            for (int index = 0; index < 50; index++) {
-                assertFalse(detector.accept(QUIET));
-            }
+            detector.accept(SPEECH, 320);
+            assertFalse(feed(detector, QUIET, frames(1000), 320));
         }
         assertFalse("three isolated transients must not start the utterance",
                 detector.hasSpeechStarted());
@@ -71,223 +96,158 @@ public class SpeechEndpointDetectorTest {
 
     @Test
     public void startsAfterConsecutiveSpeechEvenWhenBlipsCameEarlier() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
-        detector.accept(SPEECH);
-        for (int index = 0; index < 25; index++) {
-            detector.accept(QUIET);
-        }
+        SpeechEndpointDetector detector = detector();
+        detector.accept(SPEECH, 320);
+        assertFalse(feed(detector, QUIET, frames(500), 320));
         assertFalse(detector.hasSpeechStarted());
-        for (int index = 0; index < 3; index++) {
-            detector.accept(SPEECH);
-        }
+        assertFalse(feed(detector, SPEECH, frames(60), 320));
         assertTrue("a real run of speech starts the utterance", detector.hasSpeechStarted());
     }
 
     @Test
-    public void postOnsetSpeechResetsTheHangoverCounter() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
-        for (int index = 0; index < 3; index++) {
-            detector.accept(SPEECH);
-        }
-        for (int index = 0; index < 24; index++) {
-            assertFalse(detector.accept(QUIET));
-        }
-        // A speech chunk inside the hangover restarts the quiet run.
-        assertFalse(detector.accept(SPEECH));
-        for (int index = 0; index < 24; index++) {
-            assertFalse(detector.accept(QUIET));
-        }
-        assertTrue("the hangover counts quiet since the last speech chunk",
-                detector.accept(QUIET));
+    public void postOnsetSpeechResetsTheQuietFrames() {
+        SpeechEndpointDetector detector = detector();
+        assertFalse(feed(detector, SPEECH, frames(300), 320));
+        assertEquals(false, feed(detector, QUIET, frames(1499), 320));
+        assertFalse(detector.accept(SPEECH, 1));
+        assertEquals(false, feed(detector, QUIET, frames(1499), 320));
+        assertTrue(detector.accept(QUIET, frames(1)));
         assertTrue(detector.isFinished());
     }
 
     @Test
-    public void endsAfterTheHangoverPeriodOfQuiet() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
-        for (int index = 0; index < 3; index++) {
-            detector.accept(SPEECH);
-        }
-        for (int index = 0; index < 24; index++) {
-            assertFalse("quiet is shorter than the hangover", detector.accept(QUIET));
-        }
-        assertTrue(detector.accept(QUIET));
+    public void normalFullReadsEndAtTheExactHangover() {
+        SpeechEndpointDetector detector = detector();
+        assertFalse(feed(detector, SPEECH, frames(300), 320));
+        assertFalse(feed(detector, QUIET, frames(1499), 320));
+        assertTrue(detector.accept(QUIET, frames(1)));
         assertTrue(detector.isFinished());
     }
 
     @Test
-    public void staysFinishedOnceTheUtteranceHasEnded() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
-        for (int index = 0; index < 3; index++) {
-            detector.accept(SPEECH);
-        }
-        for (int index = 0; index < 25; index++) {
-            detector.accept(QUIET);
-        }
-        assertTrue(detector.accept(SPEECH));
-        assertTrue("a finished utterance stays finished", detector.accept(SPEECH));
-    }
-
-    @Test
-    public void resetsForTheNextUtterance() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 3, 25);
-        for (int index = 0; index < 3; index++) {
-            detector.accept(SPEECH);
-        }
-        for (int index = 0; index < 25; index++) {
-            detector.accept(QUIET);
-        }
-        detector.reset();
-        assertFalse(detector.hasSpeechStarted());
+    public void oneSecondPauseBetweenClausesDoesNotEndTheUtterance() {
+        SpeechEndpointDetector detector = detector();
+        assertFalse(feed(detector, SPEECH, frames(900), 320));
+        assertFalse("a one-second clause pause must not end the utterance",
+                feed(detector, QUIET, frames(1000), 320));
         assertFalse(detector.isFinished());
-        assertFalse(detector.accept(QUIET));
-    }
-
-    @Test
-    public void treatsAChunkAtTheThresholdAsSpeech() {
-        SpeechEndpointDetector detector = new SpeechEndpointDetector(0.02f, 1, 5);
-        assertFalse(detector.accept(0.02f));
-        assertTrue("the threshold itself counts as speech", detector.hasSpeechStarted());
-    }
-
-    // --- clause-pause regression (20 ms chunks, production 1500 ms hangover) ---
-
-    private static final int CHUNK_MS = 20;
-    private static final int PRODUCTION_HANGOVER_CHUNKS = 75;
-
-    private static boolean feedSpeech(SpeechEndpointDetector detector, int milliseconds) {
-        boolean ended = false;
-        for (int elapsed = 0; elapsed < milliseconds; elapsed += CHUNK_MS) {
-            ended |= detector.accept(SPEECH);
-        }
-        return ended;
-    }
-
-    private static boolean feedQuiet(SpeechEndpointDetector detector, int milliseconds) {
-        boolean ended = false;
-        for (int elapsed = 0; elapsed < milliseconds; elapsed += CHUNK_MS) {
-            ended |= detector.accept(QUIET);
-        }
-        return ended;
-    }
-
-    @Test
-    public void doesNotEndDuringANaturalClausePause() {
-        SpeechEndpointDetector detector =
-                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
-        assertFalse(feedSpeech(detector, 900));
-        // 900 ms is a long clause pause but well below the 1500 ms end threshold.
-        assertFalse("a clause pause must not end the utterance", feedQuiet(detector, 900));
-        assertFalse(detector.isFinished());
-        assertFalse(feedSpeech(detector, 700));
-        assertFalse("speech after the pause continues the same utterance",
-                feedQuiet(detector, 700));
+        assertFalse(feed(detector, SPEECH, frames(700), 320));
+        assertFalse(feed(detector, QUIET, frames(700), 320));
         assertFalse(detector.isFinished());
     }
 
     @Test
-    public void multiClauseQuestionIsCapturedAsOneUtterance() {
-        SpeechEndpointDetector detector =
-                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
-        // Three spoken clauses separated by typical 400-800 ms pauses. None may
-        // end the capture; the user is still asking one compound question.
-        assertFalse(feedSpeech(detector, 1800));
-        assertFalse("pause 1", feedQuiet(detector, 800));
-        assertFalse(feedSpeech(detector, 1500));
-        assertFalse("pause 2", feedQuiet(detector, 600));
-        assertFalse(feedSpeech(detector, 1200));
-        assertFalse("pause 3", feedQuiet(detector, 700));
+    public void completeMultiClauseQuestionIsOneUtterance() {
+        SpeechEndpointDetector detector = detector();
+        assertFalse(feed(detector, SPEECH, frames(1800), 320));
+        assertFalse("pause 1", feed(detector, QUIET, frames(800), 320));
+        assertFalse(feed(detector, SPEECH, frames(1500), 320));
+        assertFalse("pause 2", feed(detector, QUIET, frames(600), 320));
+        assertFalse(feed(detector, SPEECH, frames(1200), 320));
+        assertFalse("pause 3", feed(detector, QUIET, frames(700), 320));
         assertFalse(detector.isFinished());
-        // The real end of the question: silence beyond the hangover.
-        assertTrue(feedQuiet(detector, 1500));
+        assertTrue("the final silence ends the question once",
+                feed(detector, QUIET, frames(1500), 320));
         assertTrue(detector.isFinished());
     }
 
     @Test
-    public void shortNoiseBurstBetweenClausesDoesNotEndTheUtterance() {
-        SpeechEndpointDetector detector =
-                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
-        assertFalse(feedSpeech(detector, 600));
-        assertFalse(feedQuiet(detector, 1000));
-        detector.accept(SPEECH); // one 20 ms transient
-        assertFalse(feedQuiet(detector, 1000));
-        assertFalse(detector.isFinished());
+    public void shortReadsHaveTheSameAudioDurationAsFullReads() {
+        for (int readFrames : new int[] { 320, 160, 80, 1 }) {
+            SpeechEndpointDetector detector = detector();
+            assertFalse("speech at " + readFrames + " frames/read",
+                    feed(detector, SPEECH, frames(300), readFrames));
+            assertFalse("1000 ms pause at " + readFrames + " frames/read",
+                    feed(detector, QUIET, frames(1000), readFrames));
+            assertFalse(detector.isFinished());
+            assertTrue("remaining 500 ms at " + readFrames + " frames/read",
+                    feed(detector, QUIET, frames(500), readFrames));
+            assertTrue(detector.isFinished());
+        }
     }
 
     @Test
-    public void continuousSpeechAtTheMaximumCaptureDurationNeverSelfEnds() {
-        SpeechEndpointDetector detector =
-                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
-        // 30 s of uninterrupted speech: the detector must not end the utterance
-        // on its own; only the plugin's MAX_CAPTURE_MS deadline may stop it.
-        assertFalse(feedSpeech(detector, 30000));
-        assertTrue(detector.hasSpeechStarted());
+    public void zeroLengthReadsAreNoOps() {
+        SpeechEndpointDetector detector = detector();
+        assertFalse(feed(detector, SPEECH, frames(60), 320));
+        assertFalse(detector.accept(QUIET, 0));
         assertFalse(detector.isFinished());
+        assertTrue(feed(detector, QUIET, frames(1500), 320));
+        assertTrue(detector.isFinished());
+        assertTrue("zero after completion remains completed", detector.accept(QUIET, 0));
+    }
+
+    @Test
+    public void continuousSpeechForThirtySecondsNeverSelfEnds() {
+        for (int readFrames : new int[] { 320, 160, 80 }) {
+            SpeechEndpointDetector detector = detector();
+            assertFalse(feed(detector, SPEECH, frames(30_000), readFrames));
+            assertTrue(detector.hasSpeechStarted());
+            assertFalse(detector.isFinished());
+        }
     }
 
     @Test
     public void trailingSilenceEndsExactlyOnce() {
-        SpeechEndpointDetector detector =
-                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
-        assertFalse(feedSpeech(detector, 500));
-        assertFalse(feedQuiet(detector, 1479));
-        assertTrue(feedQuiet(detector, 20));
+        SpeechEndpointDetector detector = detector();
+        assertFalse(feed(detector, SPEECH, frames(500), 320));
+        assertFalse(feed(detector, QUIET, frames(1499), 320));
+        assertTrue(detector.accept(QUIET, frames(1)));
         assertTrue(detector.isFinished());
-        assertTrue("further silence stays finished", feedQuiet(detector, 1000));
-        assertTrue("speech after the end stays finished", detector.accept(SPEECH));
+        assertTrue("further silence stays finished", detector.accept(QUIET, frames(1000)));
+        assertTrue("speech after the end stays finished", detector.accept(SPEECH, frames(320)));
     }
 
     @Test
-    public void isolatedTransientsStillDoNotStartTheUtterance() {
-        SpeechEndpointDetector detector =
-                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
-        for (int burst = 0; burst < 4; burst++) {
-            detector.accept(SPEECH);
-            feedQuiet(detector, 400);
-        }
-        assertFalse("short bursts must not satisfy the consecutive onset",
-                detector.hasSpeechStarted());
-        assertFalse(detector.isFinished());
+    public void treatsAThresholdFrameAsSpeech() {
+        SpeechEndpointDetector detector = detector();
+        assertFalse(detector.accept(0.02f, 1));
+        assertFalse(detector.hasSpeechStarted());
+        assertFalse(feed(detector, 0.02f, frames(59), 320));
+        assertFalse(feed(detector, 0.02f, frames(1), 320));
+        assertTrue("the threshold itself counts as speech", detector.hasSpeechStarted());
     }
 
     @Test
-    public void noisyFloorBelowTheThresholdNeverStartsOrEnds() {
-        SpeechEndpointDetector detector =
-                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
-        // Just below the gate for 30 s: background noise must neither start an
-        // utterance nor accumulate into a false end.
-        for (int index = 0; index < 1500; index++) {
-            assertFalse(detector.accept(0.019f));
-        }
+    public void resetsForTheNextUtterance() {
+        SpeechEndpointDetector detector = detector();
+        assertFalse(feed(detector, SPEECH, frames(60), 320));
+        assertTrue(feed(detector, QUIET, frames(1500), 320));
+        detector.reset();
         assertFalse(detector.hasSpeechStarted());
         assertFalse(detector.isFinished());
+        assertFalse(detector.accept(QUIET, 320));
     }
 
     @Test
-    public void zeroAmplitudeFramesAreSilenceNotSpeech() {
-        SpeechEndpointDetector detector =
-                new SpeechEndpointDetector(0.02f, 3, PRODUCTION_HANGOVER_CHUNKS);
-        // Empty/blocked reads surface as zero-amplitude chunks in the capture
-        // loop; they must never satisfy the onset run.
-        for (int index = 0; index < 500; index++) {
-            assertFalse(detector.accept(0f));
-        }
-        assertFalse(detector.hasSpeechStarted());
-        assertFalse(detector.isFinished());
-    }
-
-    @Test
-    public void rejectsAnUnusableConfiguration() {
-        assertRejected(0f, 1, 1, "a non-positive threshold");
-        assertRejected(-1f, 1, 1, "a negative threshold");
-        assertRejected(0.02f, 0, 1, "an onset of zero chunks");
-        assertRejected(0.02f, 1, 0, "a hangover of zero chunks");
-    }
-
-    private static void assertRejected(float threshold, int onsetChunks, int hangoverChunks, String what) {
+    public void rejectsNegativeFrameCount() {
+        SpeechEndpointDetector detector = detector();
         boolean threw = false;
         try {
-            new SpeechEndpointDetector(threshold, onsetChunks, hangoverChunks);
+            detector.accept(SPEECH, -1);
+        } catch (IllegalArgumentException expected) {
+            threw = true;
+        }
+        assertTrue("negative frame counts must be rejected", threw);
+    }
+
+    @Test
+    public void rejectsUnusableConfiguration() {
+        assertRejected(0f, 16_000, 60, 1500, "non-positive threshold");
+        assertRejected(0.02f, 0, 60, 1500, "non-positive sample rate");
+        assertRejected(0.02f, 16_000, 0, 1500, "non-positive onset");
+        assertRejected(0.02f, 16_000, 60, 0, "non-positive hangover");
+    }
+
+    private static void assertRejected(
+            float threshold,
+            int sampleRate,
+            int onsetMs,
+            int hangoverMs,
+            String what) {
+        boolean threw = false;
+        try {
+            new SpeechEndpointDetector(threshold, sampleRate, onsetMs, hangoverMs);
         } catch (IllegalArgumentException expected) {
             threw = true;
         }
