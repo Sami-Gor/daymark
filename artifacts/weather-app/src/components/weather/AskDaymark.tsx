@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Mic, Square } from 'lucide-react';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useLocale } from '@/hooks/use-locale';
-import { getIntentResponse, normalizeTranscript, resolveIntentTranscript } from '@/lib/weather-intents';
+import { getCombinedIntentResponse, getIntentResponse, normalizeTranscript, resolveIntentTranscripts } from '@/lib/weather-intents';
 import { SPEECH_LANGS } from '@/lib/i18n';
 import type { Place, Unit, WeatherPayload } from '@/lib/weather';
 
@@ -67,12 +67,15 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
       locale,
       onTranscript: (transcript) => {
         const question = normalizeTranscript(transcript);
-        const intent = resolveIntentTranscript(question);
-        if (!intent) {
+        const intents = resolveIntentTranscripts(question);
+        if (!intents.length) {
           setExchange({ question, answer: t('ask.unknown') });
           return;
         }
-        const response = getIntentResponse(intent, weather, { locationName: place.name, unit, locale });
+        const context = { locationName: place.name, unit, locale };
+        const response = intents.length > 1
+          ? getCombinedIntentResponse(intents, weather, context)
+          : getIntentResponse(intents[0], weather, context);
         setExchange({ question, answer: response.spokenText });
         pendingSpoken.current = response.spokenText;
       },

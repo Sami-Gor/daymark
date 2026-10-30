@@ -42,9 +42,6 @@ jobs:
           PORT: 5173
           BASE_PATH: /
 
-      - name: Unit tests
-        run: pnpm --filter @workspace/weather-app run test
-
       # Capacitor 8 Android modules compile with Java 21.
       - name: Set up Java for Android
         uses: actions/setup-java@v4
@@ -54,8 +51,18 @@ jobs:
 
       # Generate the Capacitor-managed Android files that are not committed
       # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
+      # This must happen before the unit tests: the network-boundary guard reads
+      # the bundled WebView index.html and capacitor.config.json.
       - name: Sync Capacitor Android project
         run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      # Capacitor writes the web build into Android assets. Fail before any
+      # Gradle packaging if the copied inventory or hashes do not match dist.
+      - name: Verify Android web assets
+        run: pnpm --filter @workspace/weather-app run verify:android-web-assets
+
+      - name: Unit tests
+        run: pnpm --filter @workspace/weather-app run test
 
       # The sherpa-onnx runtime is a compile-time dependency of the
       # DaymarkVoice module: the Parakeet plugin imports its classes, so the
@@ -64,15 +71,24 @@ jobs:
       - name: Fetch the sherpa-onnx runtime
         run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
 
+      # The Parakeet model is not committed. Fetch the pinned archive and
+      # verify all four model hashes before Gradle packages the debug APK/AAB.
+      # The asset-pack ownership and integrity guards remain active.
+      - name: Fetch Parakeet model assets
+        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+
       # Compile the native Android modules as well as the web layer. This
       # catches Java/API/manifest regressions in Capacitor plugin changes.
       # The committed JVM unit tests guard the minimum-WebView gate that
       # decides whether the WebView loads the bundle at all. One Gradle
       # invocation rather than a second step avoids a redundant
       # configuration phase and keeps both tasks on one resolved classpath.
+      # The DaymarkVoice module's own tests (permission lifecycle, model
+      # integrity, endpoint detection) and app lint run in the same
+      # invocation so those regressions cannot merge silently.
       - name: Android build and unit tests
         working-directory: artifacts/weather-app/android
-        run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :app:assembleDebug :app:bundleDebug :app:testDebugUnitTest :daymark-voice:testDebugUnitTest :app:lintDebug
 
       - name: Install Playwright browser
         run: pnpm --filter @workspace/weather-app exec playwright install chromium --with-deps

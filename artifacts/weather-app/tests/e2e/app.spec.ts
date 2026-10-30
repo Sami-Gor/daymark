@@ -108,28 +108,30 @@ test.describe('functional', () => {
     requests.length = 0;
     await page.getByTestId('button-refresh-location').click();
     await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
-    const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
-    expect(forecasts.length).toBeGreaterThan(0);
-    for (const url of forecasts) {
+    const locationRequests = requests.filter((url) => {
+      const host = new URL(url).hostname;
+      return host === 'api.open-meteo.com' || host === 'air-quality-api.open-meteo.com';
+    });
+    expect(locationRequests.length).toBeGreaterThan(1);
+    for (const url of locationRequests) {
       expect(url).toContain('latitude=51.5');
       expect(url).toContain('longitude=-0.125');
       expect(url).not.toContain('5074567');
+      expect(url).not.toContain('12789012');
     }
     expect(requests.filter((url) => new URL(url).hostname === 'geocoding-api.open-meteo.com')).toEqual([]);
     await context.close();
   });
 
-  test('android native shell sends the OS approximate fix unchanged', async ({ browser }) => {
+  test('android native shell sends the same grid-rounded fix as the web/PWA', async ({ browser }) => {
     const context = await browser.newContext({
       permissions: ['geolocation'],
       geolocation: { latitude: 51.5074567, longitude: -0.12789012 },
     });
     const page = await context.newPage();
     // Capacitor reports the platform as 'android' through its custom-platform
-    // hook. The app then takes the Android branch of the location flow (the
-    // manifest grants ACCESS_COARSE_LOCATION only, so the operating system
-    // supplies the approximate fix) while the JavaScript plugin
-    // implementations keep working.
+    // hook. The manifest grants ACCESS_COARSE_LOCATION only, and the app also
+    // applies the shared latitude-aware on-device grid before requesting weather.
     await page.addInitScript(() => {
       (window as unknown as { CapacitorCustomPlatform: { name: string } }).CapacitorCustomPlatform = {
         name: 'android',
@@ -144,40 +146,72 @@ test.describe('functional', () => {
     requests.length = 0;
     await page.getByTestId('button-refresh-location').click();
     await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
-    const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
-    expect(forecasts.length).toBeGreaterThan(0);
-    for (const url of forecasts) {
-      // The approximate fix must leave the device untouched: rounding it
-      // again would compound the accuracy loss the OS permission already
-      // introduced.
-      expect(url).toContain('latitude=51.5074567');
-      expect(url).toContain('longitude=-0.12789012');
-      expect(url).not.toContain('latitude=51.51');
-      expect(url).not.toContain('longitude=-0.13');
+    const locationRequests = requests.filter((url) => {
+      const host = new URL(url).hostname;
+      return host === 'api.open-meteo.com' || host === 'air-quality-api.open-meteo.com';
+    });
+    expect(locationRequests.length).toBeGreaterThan(1);
+    for (const url of locationRequests) {
+      // The Android path must never transmit the raw browser/OS fix through
+      // either the forecast or air-quality request. It uses the same grid as
+      // the web build, independent of the permission level.
+      expect(url).toContain('latitude=51.5');
+      expect(url).toContain('longitude=-0.125');
+      expect(url).not.toContain('5074567');
+      expect(url).not.toContain('12789012');
     }
     await context.close();
   });
 
-  test('denied geolocation shows a toast and keeps the loaded weather', async ({ browser }) => {
+  test('denied geolocation shows a persistent notice and keeps the loaded weather', async ({ browser }) => {
     const context = await browser.newContext({ permissions: [] });
     const page = await context.newPage();
     await mockOpenMeteo(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
-    // The click can be swallowed by the loading→content swap, so retry until
-    // the toast appears. On a denied context no second prompt is shown.
-    let toastShown = false;
-    const caught: string[] = [];
-    for (let attempt = 0; attempt < 3 && !toastShown; attempt++) {
-      await page.getByTestId('button-refresh-location').click();
-      try {
-        await expect(page.getByTestId('toast')).toContainText('Location unavailable', { timeout: 2000 });
-        toastShown = true;
-      } catch (e) {
-        caught.push(String(e).slice(0, 200));
-      }
-    }
-    if (!toastShown) throw new Error('toast never appeared; caught: ' + JSON.stringify(caught, null, 2));
+    await page.getByTestId('button-refresh-location').click();
+    const notice = page.getByTestId('location-notice');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText("couldn't access your location");
+    await expect(notice).toContainText('London');
+    await expect(page.getByTestId('button-location-retry')).toBeVisible();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await context.close();
+  });
+
+  test('geolocation timeout shows a timeout notice with a retry action', async ({ page }) => {
+    await page.addInitScript(() => {
+      navigator.geolocation.getCurrentPosition = ((_ok, error) => {
+        error?.({
+          code: 3,
+          message: 'timeout',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        } as GeolocationPositionError);
+      }) as typeof navigator.geolocation.getCurrentPosition;
+    });
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await page.getByTestId('button-refresh-location').click();
+    const notice = page.getByTestId('location-notice');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('took too long');
+    await expect(page.getByTestId('button-location-retry')).toBeVisible();
+  });
+
+  test('granting permission after denial recovers through the retry button', async ({ browser }) => {
+    const context = await browser.newContext({ permissions: [] });
+    const page = await context.newPage();
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('location-notice')).toBeVisible();
+
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: 51.5074567, longitude: -0.12789012 });
+    await page.getByTestId('button-location-retry').click();
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
     await context.close();
   });
@@ -284,8 +318,7 @@ test.describe('day cue hero', () => {
     },
   };
 
-  test('shows one visual cue with no explanatory text and Hear today underneath', async ({ page }) => {
-    await stubSpeechPlayback(page);
+  test('shows one visual cue with no explanatory text or web voice controls', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.goto('/');
     const cue = page.getByTestId('day-cue');
@@ -295,11 +328,9 @@ test.describe('day cue hero', () => {
     const hero = page.locator('.today-hero');
     await expect(hero).not.toContainText('Sunglasses');
     await expect(hero).not.toContainText('Umbrella?');
-    const cueBox = await cue.boundingBox();
-    const hearBox = await page.getByTestId('button-hear-today').boundingBox();
-    expect(hearBox!.y).toBeGreaterThan(cueBox!.y);
-    await expect(page.getByTestId('button-hear-today')).toBeVisible();
-    await expect(page.getByTestId('button-hear-today')).toHaveText(/Hear today/);
+    await expect(page.getByTestId('button-hear-today')).toHaveCount(0);
+    await expect(page.getByTestId('button-ask-daymark')).toHaveCount(0);
+    await expect(page.getByTestId('web-demo-note')).toBeVisible();
   });
 
   test('renders the rain cue for a wet day', async ({ page }) => {
@@ -717,345 +748,58 @@ test.describe('built security headers (dist/public)', () => {
   });
 });
 
-/** Stub the Web Speech playback API before app scripts run. */
-async function stubSpeechPlayback(page: Page) {
-  await page.addInitScript(() => {
-    class FakeUtterance {
-      text: string;
-      lang = '';
-      onstart: (() => void) | null = null;
-      onend: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      constructor(text: string) {
-        this.text = text;
-      }
-    }
-    const state = { spoken: [] as string[], cancelCount: 0, last: null as { onend?: () => void } | null };
-    const synthesis = {
-      speaking: false,
-      speak(utterance: { text: string }) {
-        state.last = utterance as { onend?: () => void };
-        state.spoken.push(utterance.text);
-      },
-      cancel() {
-        state.cancelCount += 1;
-      },
-      getVoices() {
-        return [];
-      },
-    };
-    Object.defineProperty(window, 'SpeechSynthesisUtterance', { value: FakeUtterance, configurable: true });
-    Object.defineProperty(window, 'speechSynthesis', { value: synthesis, configurable: true });
-    (window as any).__speech = state;
-  });
-}
-
-/** Stub the SpeechRecognition API before app scripts run. */
-async function stubSpeechRecognition(page: Page, supported = true) {
-  await page.addInitScript((isSupported: boolean) => {
-    const state = { starts: 0, stops: 0, aborts: 0, instance: null as any };
-    class FakeRecognition {
-      lang = '';
-      continuous = true;
-      interimResults = true;
-      maxAlternatives = 1;
-      onstart: (() => void) | null = null;
-      onresult: ((event: unknown) => void) | null = null;
-      onerror: ((event: unknown) => void) | null = null;
-      onend: (() => void) | null = null;
-      constructor() {
-        state.instance = this;
-      }
-      start() {
-        state.starts += 1;
-      }
-      stop() {
-        state.stops += 1;
-      }
-      abort() {
-        state.aborts += 1;
-      }
-    }
-    Object.defineProperty(window, 'SpeechRecognition', { value: isSupported ? FakeRecognition : undefined, configurable: true });
-    Object.defineProperty(window, 'webkitSpeechRecognition', { value: undefined, configurable: true });
-    (window as any).__recognition = state;
-  }, supported);
-}
-
-function emitRecognitionResult(page: Page, transcript: string) {
-  return page.evaluate((text: string) => {
-    const instance = (window as any).__recognition?.instance;
-    if (!instance?.onresult) return false;
-    instance.onresult({ resultIndex: 0, results: [{ 0: { transcript: text }, isFinal: true }] });
-    return true;
-  }, transcript);
-}
-
-function emitRecognitionEnd(page: Page) {
-  return page.evaluate(() => {
-    (window as any).__recognition?.instance?.onend?.();
-  });
-}
-
-test.describe('voice controls', () => {
-  test('Hear today speaks the briefing and toggles to Stop', async ({ page }) => {
-    await stubSpeechPlayback(page);
+test.describe('web demo voice boundary', () => {
+  test('renders no web voice controls', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.goto('/');
-    const button = page.getByTestId('button-hear-today');
-    await expect(button).toBeVisible();
-    await expect(button).toHaveText(/Hear today/);
-    await button.click();
-    await expect(button).toHaveText(/Stop/);
-    await expect(button).toHaveAttribute('aria-label', /Stop reading/);
-    const spoken = await page.evaluate(() => (window as any).__speech.spoken);
-    expect(spoken).toHaveLength(1);
-    expect(spoken[0]).toContain('degrees');
-    await button.click();
-    await expect(button).toHaveText(/Hear today/);
-    expect(await page.evaluate(() => (window as any).__speech.cancelCount)).toBeGreaterThanOrEqual(1);
-  });
-
-  test('speech end resets the playback control', async ({ page }) => {
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    const button = page.getByTestId('button-hear-today');
-    await button.click();
-    await expect(button).toHaveText(/Stop/);
-    await page.evaluate(() => (window as any).__speech.last?.onend?.());
-    await expect(button).toHaveText(/Hear today/);
-  });
-
-  test('changing the language stops the active narration', async ({ page }) => {
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    const button = page.getByTestId('button-hear-today');
-    await button.click();
-    await expect(button).toHaveText(/Stop/);
-    await page.getByTestId('select-language').selectOption('fr');
-    await expect(button).not.toHaveText(/^Stop$/);
-    expect(await page.evaluate(() => (window as any).__speech.cancelCount)).toBeGreaterThanOrEqual(1);
-  });
-
-  test('Hear today stops an active listening session', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    await page.getByTestId('button-ask-daymark').click();
-    expect(await page.evaluate(() => (window as any).__recognition.starts)).toBe(1);
-    await page.getByTestId('button-hear-today').click();
-    expect(await page.evaluate(() => (window as any).__recognition.stops)).toBeGreaterThanOrEqual(1);
-  });
-
-  test('shows a narration error when playback cannot start', async ({ page }) => {
-    await page.addInitScript(() => {
-      class FakeUtterance {
-        text: string;
-        lang = '';
-        onstart: (() => void) | null = null;
-        onend: (() => void) | null = null;
-        onerror: (() => void) | null = null;
-        constructor(text: string) {
-          this.text = text;
-        }
-      }
-      const synthesis = {
-        speaking: false,
-        speak() {
-          throw new Error('no audio output');
-        },
-        cancel() {
-          // no-op
-        },
-        getVoices() {
-          return [];
-        },
-      };
-      Object.defineProperty(window, 'SpeechSynthesisUtterance', { value: FakeUtterance, configurable: true });
-      Object.defineProperty(window, 'speechSynthesis', { value: synthesis, configurable: true });
-    });
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    const button = page.getByTestId('button-hear-today');
-    await button.click();
-    await expect(page.getByTestId('voice-error')).toBeVisible();
-    await expect(page.getByTestId('voice-error')).toHaveText(/Voice playback isn't available/);
-    await expect(button).toHaveText(/Hear today/);
-    await expect(button).not.toHaveAttribute('aria-pressed', 'true');
-  });
-
-  test('Ask Daymark hides when speech recognition is unsupported', async ({ page }) => {
-    await stubSpeechRecognition(page, false);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await expect(page.getByTestId('button-hear-today')).toHaveCount(0);
     await expect(page.getByTestId('button-ask-daymark')).toHaveCount(0);
     await expect(page.getByTestId('ask-privacy')).toHaveCount(0);
-    await expect(page.getByTestId('button-hear-today')).toBeVisible();
+    await expect(page.getByTestId('voice-error')).toHaveCount(0);
   });
 
-  test('shows a localized voice privacy disclosure when voice is available', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-
-    const note = page.getByTestId('ask-privacy');
-    await expect(note).toBeVisible();
-    await expect(note).toContainText('handled by your browser or device');
-    expect(await note.evaluate((element) => element.tabIndex)).toBe(-1);
-
-    await page.getByTestId('select-language').selectOption('fr');
-    await expect(note).toContainText('assurée par votre navigateur');
-
-    await page.getByTestId('select-language').selectOption('es');
-    await expect(note).toContainText('navegador o dispositivo');
-  });
-
-  test('does not request the microphone on load', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
+  test('never invokes browser speech recognition or synthesis', async ({ page }) => {
     await page.addInitScript(() => {
-      (window as any).__mediaRequests = 0;
-      const media = navigator.mediaDevices;
-      if (media?.getUserMedia) {
-        const original = media.getUserMedia.bind(media);
-        media.getUserMedia = (constraints) => {
-          (window as any).__mediaRequests += 1;
-          return original(constraints);
-        };
+      (window as any).__speechCalls = 0;
+      (window as any).__recognitionConstructs = 0;
+      const synthesis = {
+        speaking: false,
+        speak() { (window as any).__speechCalls += 1; },
+        cancel() { (window as any).__speechCalls += 1; },
+        getVoices() { return []; },
+      };
+      Object.defineProperty(window, 'speechSynthesis', { value: synthesis, configurable: true });
+      class FakeUtterance { text: string; constructor(text: string) { this.text = text; } }
+      Object.defineProperty(window, 'SpeechSynthesisUtterance', { value: FakeUtterance, configurable: true });
+      class FakeRecognition {
+        constructor() { (window as any).__recognitionConstructs += 1; }
+        start() { (window as any).__recognitionConstructs += 1; }
+        stop() {}
       }
+      Object.defineProperty(window, 'SpeechRecognition', { value: FakeRecognition, configurable: true });
+      Object.defineProperty(window, 'webkitSpeechRecognition', { value: FakeRecognition, configurable: true });
     });
     await mockOpenMeteo(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
-    expect(await page.evaluate(() => (window as any).__recognition.starts)).toBe(0);
-    expect(await page.evaluate(() => (window as any).__mediaRequests)).toBe(0);
+    await page.waitForTimeout(250);
+    expect(await page.evaluate(() => (window as any).__speechCalls)).toBe(0);
+    expect(await page.evaluate(() => (window as any).__recognitionConstructs)).toBe(0);
   });
 
-  test('Ask Daymark resolves a rain question and shows the answer', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
+  test('clearly labels the web build as a limited demo in every language', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.goto('/');
-    const button = page.getByTestId('button-ask-daymark');
-    await expect(button).toHaveText(/Ask Daymark/);
-    await button.click();
-    await expect(button).toHaveText(/Stop/);
-    await expect(page.getByTestId('ask-status')).toHaveText(/Listening/);
-    expect(await page.evaluate(() => (window as any).__recognition.starts)).toBe(1);
-
-    expect(await emitRecognitionResult(page, 'When will it rain?')).toBe(true);
-    await emitRecognitionEnd(page);
-    await expect(button).toHaveText(/Ask Daymark/);
-    await expect(page.getByTestId('ask-question')).toContainText('when will it rain');
-    await expect(page.getByTestId('ask-answer')).toContainText('chance of rain');
-    await expect(page.getByTestId('ask-answer')).toContainText('11 PM');
-
-    const spoken = await page.evaluate(() => (window as any).__speech.spoken);
-    expect(spoken).toHaveLength(1);
-    expect(spoken[0]).toContain('chance of rain');
-
-    // No transcript or question is persisted anywhere.
-    expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
-  });
-
-  test('unknown questions get the deterministic fallback, not a made-up answer', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    await page.getByTestId('button-ask-daymark').click();
-    await emitRecognitionResult(page, 'what is the meaning of life');
-    await emitRecognitionEnd(page);
-    await expect(page.getByTestId('ask-answer')).toContainText('I can help with');
-    expect(await page.evaluate(() => (window as any).__speech.spoken)).toHaveLength(0);
-  });
-
-  test('Stop ends recognition and returns the control to idle', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    const button = page.getByTestId('button-ask-daymark');
-    await button.click();
-    await expect(button).toHaveText(/Stop/);
-    await button.click();
-    await expect(button).toHaveText(/Ask Daymark/);
-    await expect(page.getByTestId('ask-status')).toHaveCount(0);
-    expect(await page.evaluate(() => (window as any).__recognition.stops)).toBe(1);
-  });
-
-  test('permission errors are readable and return the UI to idle', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    const button = page.getByTestId('button-ask-daymark');
-    await button.click();
-    await page.evaluate(() => (window as any).__recognition.instance.onerror?.({ error: 'not-allowed' }));
-    await expect(page.getByTestId('ask-error')).toContainText('blocked');
-    await expect(button).toHaveText(/Ask Daymark/);
-    expect(await page.evaluate(() => (window as any).__recognition.starts)).toBe(1);
-  });
-
-  test('starting recognition stops playback and stale sessions cannot update the UI', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    const hear = page.getByTestId('button-hear-today');
-    const ask = page.getByTestId('button-ask-daymark');
-
-    await hear.click();
-    await expect(hear).toHaveText(/Stop/);
-    await ask.click();
-    await expect(hear).toHaveText(/Hear today/);
-    expect(await page.evaluate(() => (window as any).__speech.cancelCount)).toBeGreaterThanOrEqual(1);
-
-    await page.evaluate(() => {
-      (window as any).__staleResult = (window as any).__recognition.instance.onresult;
-    });
-    await ask.click(); // stop the first session
-    await ask.click(); // start a new session
-    expect(await page.evaluate(() => (window as any).__recognition.starts)).toBe(2);
-    await page.evaluate(() => {
-      (window as any).__staleResult?.({ resultIndex: 0, results: [{ 0: { transcript: 'will it rain' }, isFinal: true }] });
-    });
-    await expect(page.getByTestId('ask-question')).toHaveCount(0);
-
-    await emitRecognitionResult(page, "what's the uv");
-    await emitRecognitionEnd(page);
-    await expect(page.getByTestId('ask-question')).toContainText("what's the uv");
-    await expect(page.getByTestId('ask-answer')).toContainText('UV index');
-  });
-
-  test('unmounting aborts recognition and stops background listening', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    const ask = page.getByTestId('button-ask-daymark');
-    await ask.click();
-    await expect(ask).toHaveText(/Stop/);
-
-    await page.evaluate(() => {
-      window.history.pushState({}, '', '/missing');
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    });
-    await expect(page.getByTestId('button-ask-daymark')).toHaveCount(0);
-    expect(await page.evaluate(() => (window as any).__recognition.stops)).toBeGreaterThanOrEqual(1);
-    const detached = await page.evaluate(() => {
-      const instance = (window as any).__recognition.instance;
-      return instance ? { onresult: instance.onresult, onerror: instance.onerror, onend: instance.onend } : null;
-    });
-    expect(detached).not.toBeNull();
-    expect(detached?.onresult).toBeNull();
-    expect(detached?.onerror).toBeNull();
-    expect(detached?.onend).toBeNull();
+    const note = page.getByTestId('web-demo-note');
+    await expect(note).toContainText('weather only');
+    await expect(note).toContainText('Android app');
+    await page.getByTestId('select-language').selectOption('fr');
+    await expect(note).toContainText('Démo web : météo uniquement');
+    await expect(note).toContainText('application Android');
+    await page.getByTestId('select-language').selectOption('es');
+    await expect(note).toContainText('Demo web: solo el tiempo');
+    await expect(note).toContainText('app de Android');
   });
 });
 
@@ -1187,25 +931,6 @@ test.describe('location search', () => {
     await expect(page.getByTestId('location-results')).not.toContainText('Paris');
   });
 
-  test('voice uses the selected location', async ({ page }) => {
-    await stubSpeechPlayback(page);
-    await stubSpeechRecognition(page);
-    await mockLocations(page);
-    await page.goto('/');
-    await page.getByTestId('input-location-search').fill('tokyo');
-    await page.getByTestId('location-option-0').click();
-    await expect(page.getByTestId('text-current-city')).toHaveText('Tokyo');
-
-    await page.getByTestId('button-hear-today').click();
-    const spoken = await page.evaluate(() => (window as any).__speech.spoken);
-    expect(spoken[0]).toContain('in Tokyo');
-
-    await page.getByTestId('button-ask-daymark').click();
-    await emitRecognitionResult(page, 'When will it rain?');
-    await emitRecognitionEnd(page);
-    await expect(page.getByTestId('ask-answer')).toContainText('11 PM');
-  });
-
   test('micro-climate is shown in the UK and hidden elsewhere', async ({ page }) => {
     await mockLocations(page);
     await page.goto('/');
@@ -1271,25 +996,7 @@ test.describe('severe weather alerts', () => {
     await expect(page.getByTestId('alert-time-wind')).toHaveText(/5 PM–6 PM/);
   });
 
-  test('mentions the risk in the Hear today briefing', async ({ page }) => {
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page, { forecast: WINDY_FORECAST });
-    await page.goto('/');
-    await page.getByTestId('button-hear-today').click();
-    const spoken = await page.evaluate(() => (window as any).__speech.spoken);
-    expect(spoken[0]).toContain('Strong winds expected');
-  });
 
-  test('answers an alert question through the intent layer', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page, { forecast: WINDY_FORECAST });
-    await page.goto('/');
-    await page.getByTestId('button-ask-daymark').click();
-    await emitRecognitionResult(page, 'Are there any warnings?');
-    await emitRecognitionEnd(page);
-    await expect(page.getByTestId('ask-answer')).toContainText('Strong winds expected');
-  });
 
   test('replaces the alert when the selected location changes', async ({ page }) => {
     await page.route('**/geocoding-api.open-meteo.com/**', (route) => route.fulfill({
@@ -1426,41 +1133,8 @@ test.describe('multilingual interface', () => {
     expect(windowAfter).toMatch(/Protection solaire conseillée/);
   });
 
-  test('Hear today speaks the localized briefing', async ({ page }) => {
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    await page.getByTestId('select-language').selectOption('fr');
-    await page.getByTestId('button-hear-today').click();
-    const spoken = await page.evaluate(() => (window as any).__speech.spoken);
-    expect(spoken[0]).toContain('Il fait');
-    expect(spoken[0]).toContain('London');
-  });
 
-  test('Ask Daymark accepts a French phrase', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    await page.getByTestId('select-language').selectOption('fr');
-    await page.getByTestId('button-ask-daymark').click();
-    await emitRecognitionResult(page, 'Va-t-il pleuvoir ?');
-    await emitRecognitionEnd(page);
-    await expect(page.getByTestId('ask-question')).toContainText('pleuvoir');
-    await expect(page.getByTestId('ask-answer')).toContainText('pluie');
-  });
 
-  test('Ask Daymark accepts a Spanish phrase', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-    await page.getByTestId('select-language').selectOption('es');
-    await page.getByTestId('button-ask-daymark').click();
-    await emitRecognitionResult(page, '¿Va a llover?');
-    await emitRecognitionEnd(page);
-    await expect(page.getByTestId('ask-answer')).toContainText('lluvia');
-  });
 
   test('alert UI translates', async ({ page }) => {
     await mockOpenMeteo(page, { forecast: WINDY_FORECAST });
@@ -1503,9 +1177,7 @@ test.describe('persisted storage', () => {
     expect(state.cookie).toBe('');
   });
 
-  test('does not persist location, search, transcript, weather or alert state', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
+  test('does not persist location, search, weather or alert state', async ({ page }) => {
     await mockLocations(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
@@ -1514,12 +1186,6 @@ test.describe('persisted storage', () => {
     await page.getByTestId('input-location-search').fill('paris');
     await page.getByTestId('location-option-0').click();
     await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
-
-    // Voice interaction with a mocked transcript.
-    await page.getByTestId('button-ask-daymark').click();
-    await emitRecognitionResult(page, 'Will it rain later?');
-    await emitRecognitionEnd(page);
-    await expect(page.getByTestId('ask-answer')).toBeVisible();
 
     // Language was never changed, so no localStorage entries at all are valid.
     const state = await page.evaluate(() => ({
@@ -1531,7 +1197,7 @@ test.describe('persisted storage', () => {
     expect(state.keys).toEqual([]);
     expect(state.sessionKeys).toEqual([]);
     expect(state.cookie).toBe('');
-    for (const forbidden of ['Paris', '48.85', 'latitude', 'longitude', 'rain later', 'transcript', 'weather']) {
+    for (const forbidden of ['Paris', '48.85', 'latitude', 'longitude', 'weather']) {
       expect(state.dump).not.toContain(forbidden);
     }
   });
@@ -1580,30 +1246,6 @@ test.describe('negative input / XSS', () => {
     expect(await page.evaluate(() => (window as any).__xss)).toBe(0);
   });
 
-  test('renders a malicious speech transcript as inert text', async ({ page }) => {
-    await page.addInitScript(() => {
-      (window as any).__xss = 0;
-      window.alert = () => {
-        (window as any).__xss = 1;
-      };
-    });
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
-    await mockOpenMeteo(page);
-    await page.goto('/');
-
-    await page.getByTestId('button-ask-daymark').click();
-    await emitRecognitionResult(page, '<img src=x onerror="window.__xss=1">');
-    await emitRecognitionEnd(page);
-
-    // The displayed question is the normalized transcript (no markup characters).
-    const question = page.getByTestId('ask-question');
-    await expect(question).toContainText('img src x onerror');
-    expect(await question.evaluate((element) => element.textContent ?? '')).not.toContain('<');
-    await expect(page.getByTestId('ask-answer')).toContainText('I can help');
-    expect(await page.locator('img[src="x"]').count()).toBe(0);
-    expect(await page.evaluate(() => (window as any).__xss)).toBe(0);
-  });
 
   test('treats URL-like input as plain text with no navigation sink', async ({ page }) => {
     await page.addInitScript(() => {
@@ -1639,65 +1281,54 @@ test.describe('negative input / XSS', () => {
 });
 
 test.describe('hero action hierarchy', () => {
-  test('keeps all four actions with Hear today under the cue and search first in the tools row', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
+  test('keeps the web weather controls and exposes no voice controls', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.goto('/');
 
     await expect(page.getByTestId('input-location-search')).toBeVisible();
     await expect(page.getByTestId('button-refresh-location')).toBeVisible();
-    await expect(page.getByTestId('button-hear-today')).toBeVisible();
-    await expect(page.getByTestId('button-ask-daymark')).toBeVisible();
+    await expect(page.getByTestId('button-hear-today')).toHaveCount(0);
+    await expect(page.getByTestId('button-ask-daymark')).toHaveCount(0);
+    await expect(page.getByTestId('web-demo-note')).toBeVisible();
 
-    const cuePrecedesHearToday = await page.evaluate(() => {
-      const cue = document.querySelector('[data-testid="day-cue"]');
-      const hear = document.querySelector('[data-testid="button-hear-today"]');
-      if (!cue || !hear) return false;
-      return (cue.compareDocumentPosition(hear) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-    });
-    expect(cuePrecedesHearToday).toBe(true);
-
-    const searchPrecedesTools = await page.evaluate(() => {
+    const searchPrecedesLocate = await page.evaluate(() => {
       const search = document.querySelector('[data-testid="input-location-search"]');
-      const tools = ['button-refresh-location', 'button-ask-daymark']
-        .map((id) => document.querySelector(`[data-testid="${id}"]`));
-      if (!search || tools.some((node) => !node)) return false;
-      return tools.every((node) => (search.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+      const locate = document.querySelector('[data-testid="button-refresh-location"]');
+      if (!search || !locate) return false;
+      return (search.compareDocumentPosition(locate) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
     });
-    expect(searchPrecedesTools).toBe(true);
+    expect(searchPrecedesLocate).toBe(true);
   });
 
-  test('keeps every hero control visible and unclipped at 320px', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
+  test('keeps the web weather controls visible and unclipped at 320px', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.setViewportSize({ width: 320, height: 900 });
     await page.goto('/');
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
-    for (const id of ['input-location-search', 'button-refresh-location', 'button-hear-today', 'button-ask-daymark']) {
+    for (const id of ['input-location-search', 'button-refresh-location', 'web-demo-note']) {
       await expect(page.getByTestId(id)).toBeVisible();
     }
-    await expect(page.getByTestId('ask-privacy')).toBeVisible();
+    await expect(page.getByTestId('button-hear-today')).toHaveCount(0);
+    await expect(page.getByTestId('button-ask-daymark')).toHaveCount(0);
   });
 
-  test('keeps localized hero labels visible in French and Spanish', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
+  test('keeps localized web labels visible without advertising web voice', async ({ page }) => {
     await mockOpenMeteo(page);
     await page.goto('/');
 
     await page.getByTestId('select-language').selectOption('fr');
     await expect(page.getByTestId('button-refresh-location')).toHaveText(/Utiliser ma position/);
-    await expect(page.getByTestId('button-hear-today')).toContainText(/Écouter/);
-    await expect(page.getByTestId('button-ask-daymark')).toContainText(/Demander à Daymark/);
+    await expect(page.getByTestId('web-demo-note')).toContainText(/Démo web/);
+    await expect(page.getByTestId('button-hear-today')).toHaveCount(0);
+    await expect(page.getByTestId('button-ask-daymark')).toHaveCount(0);
 
     await page.getByTestId('select-language').selectOption('es');
     await expect(page.getByTestId('button-refresh-location')).toHaveText(/Usar mi ubicación/);
-    await expect(page.getByTestId('button-hear-today')).toContainText(/Escuchar/);
-    await expect(page.getByTestId('button-ask-daymark')).toContainText(/Preguntar a Daymark/);
+    await expect(page.getByTestId('web-demo-note')).toContainText(/Demo web/);
+    await expect(page.getByTestId('button-hear-today')).toHaveCount(0);
+    await expect(page.getByTestId('button-ask-daymark')).toHaveCount(0);
   });
 });
 
@@ -1856,8 +1487,6 @@ test.describe('mobile touch targets and legibility', () => {
   }
 
   test('key mobile controls meet the ~40px target at 390px and 320px', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
     await mockOpenMeteo(page);
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 900 });
@@ -1867,8 +1496,6 @@ test.describe('mobile touch targets and legibility', () => {
         '.icon-button',
         '.location-search-field',
         '[data-testid="button-refresh-location"]',
-        '[data-testid="button-hear-today"]',
-        '[data-testid="button-ask-daymark"]',
       ]) {
         await expectMinHeight(page, selector, 40);
       }
@@ -1879,9 +1506,7 @@ test.describe('mobile touch targets and legibility', () => {
     }
   });
 
-  test('alert disclaimer, severity and voice privacy note are at least 11px', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
+  test('alert disclaimer, severity and web demo note are at least 11px', async ({ page }) => {
     await mockOpenMeteo(page, { forecast: WINDY_FORECAST });
     await page.goto('/');
 
@@ -1894,8 +1519,8 @@ test.describe('mobile touch targets and legibility', () => {
     const severitySize = await page.locator('.alert-severity').first().evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
     expect(severitySize, 'alert severity font size').toBeGreaterThanOrEqual(11);
 
-    const privacySize = await page.getByTestId('ask-privacy').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
-    expect(privacySize, 'voice privacy note font size').toBeGreaterThanOrEqual(11);
+    const demoNoteSize = await page.getByTestId('web-demo-note').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+    expect(demoNoteSize, 'web demo note font size').toBeGreaterThanOrEqual(11);
   });
 
   test('search options are tappable and remain keyboard-selectable', async ({ page }) => {
@@ -2082,7 +1707,7 @@ test.describe('privacy policy page', () => {
     for (const policy of policies) {
       await page.goto(policy.path);
       const text = await page.getByTestId('page-privacy').innerText();
-      expect(text).toContain('Sami Belhadj');
+      expect(text).toContain('Sami');
       expect(text).toContain('skylinelabdev@gmail.com');
     }
   });
@@ -2097,41 +1722,44 @@ test.describe('privacy policy page', () => {
     }
   });
 
-  test('states the verified data practices in every language', async ({ page }) => {
+  test('states the current web and Android data practices in every language', async ({ page }) => {
     const expectations = {
       en: {
-        location: 'requests approximate location only',
+        location: 'ACCESS_COARSE_LOCATION',
+        grid: '0.025-degree grid',
         speech: 'Parakeet TDT 0.6B v3',
-        localSpeech: 'transcribes your speech locally',
-        webSpeech: 'may send your audio to the browser or platform provider',
-        webTranscript: 'browser returns a transcript to Daymark',
-        leavesDevice: 'leave your device and are sent to Open-Meteo',
-        offlineVoice: 'does not require a network connection',
-        audience: 'general-audience weather utility',
+        memory: 'held in memory',
+        webDemo: 'limited weather demo',
+        browserSpeech: 'does not invoke browser speech-recognition',
+        offlineVoice: 'not available in V2',
+        audience: 'adults aged 18 and over',
+        ipMetadata: 'source IP address and requested URL',
         versionNote: 'Daymark 1.0.0',
         precisePermission: 'ACCESS_FINE_LOCATION',
       },
       fr: {
-        location: 'demande uniquement une localisation approximative',
+        location: 'ACCESS_COARSE_LOCATION',
+        grid: 'grille de 0,025 degré',
         speech: 'Parakeet TDT 0.6B v3',
-        localSpeech: 'transcrit votre parole localement',
-        webSpeech: 'peut envoyer votre audio au fournisseur du navigateur ou de la plateforme',
-        webTranscript: 'le navigateur lui transmet une transcription',
-        leavesDevice: 'quittent votre appareil et sont envoyés à Open-Meteo',
-        offlineVoice: 'ne nécessite pas de connexion réseau',
-        audience: 'grand public',
+        memory: 'conservé en mémoire',
+        webDemo: 'démo météo limitée',
+        browserSpeech: 'API de reconnaissance ou de synthèse vocale',
+        offlineVoice: 'pas disponible dans V2',
+        audience: 'adultes âgés de 18 ans ou plus',
+        ipMetadata: 'adresse IP source et l’URL demandée',
         versionNote: 'Daymark 1.0.0',
         precisePermission: 'ACCESS_FINE_LOCATION',
       },
       es: {
-        location: 'solicita únicamente ubicación aproximada',
+        location: 'ACCESS_COARSE_LOCATION',
+        grid: 'cuadrícula de 0,025 grados',
         speech: 'Parakeet TDT 0.6B v3',
-        localSpeech: 'transcribe tu habla localmente',
-        webSpeech: 'puede enviar tu audio al proveedor del navegador o de la plataforma',
-        webTranscript: 'el navegador le devuelve una transcripción',
-        leavesDevice: 'salen de tu dispositivo y se envían a Open-Meteo',
-        offlineVoice: 'no requiera conexión de red',
-        audience: 'público general',
+        memory: 'mantiene en memoria',
+        webDemo: 'demo meteorológica limitada',
+        browserSpeech: 'API de reconocimiento ni de síntesis de voz',
+        offlineVoice: 'no está disponible en V2',
+        audience: 'adultos de 18 años o más',
+        ipMetadata: 'dirección IP de origen y la URL solicitada',
         versionNote: 'Daymark 1.0.0',
         precisePermission: 'ACCESS_FINE_LOCATION',
       },
@@ -2144,14 +1772,17 @@ test.describe('privacy policy page', () => {
       }
       expect(text).toContain('Open-Meteo');
       expect(text).toContain('daymark.locale');
+      expect(text).toContain('daymark.permissions');
+      expect(text).toContain('microphone-requested');
       expect(text).toContain(expectations[policy.lang].location);
+      expect(text).toContain(expectations[policy.lang].grid);
       expect(text).toContain(expectations[policy.lang].speech);
-      expect(text).toContain(expectations[policy.lang].localSpeech);
-      expect(text).toContain(expectations[policy.lang].webSpeech);
-      expect(text).toContain(expectations[policy.lang].webTranscript);
-      expect(text).toContain(expectations[policy.lang].leavesDevice);
+      expect(text).toContain(expectations[policy.lang].memory);
+      expect(text).toContain(expectations[policy.lang].webDemo);
+      expect(text).toContain(expectations[policy.lang].browserSpeech);
       expect(text).toContain(expectations[policy.lang].offlineVoice);
       expect(text).toContain(expectations[policy.lang].audience);
+      expect(text).toContain(expectations[policy.lang].ipMetadata);
       expect(text).toContain(expectations[policy.lang].versionNote);
       expect(text).toContain(expectations[policy.lang].precisePermission);
       expect(text).not.toMatch(/collects? no data/i);
@@ -2290,8 +1921,8 @@ test.describe('geolocation flow', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await failGeolocation(page, 3);
-    await expect(page.getByTestId('toast')).toContainText('took too long');
-    await expect(page.getByTestId('toast')).not.toContainText('Allow location access');
+    await expect(page.getByTestId('location-notice')).toContainText('took too long');
+    await expect(page.getByTestId('location-notice')).not.toContainText('Allow location access');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
   });
 
@@ -2303,8 +1934,8 @@ test.describe('geolocation flow', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await failGeolocation(page, 2);
-    await expect(page.getByTestId('toast')).toContainText('determine your location');
-    await expect(page.getByTestId('toast')).not.toContainText('Allow location access');
+    await expect(page.getByTestId('location-notice')).toContainText('determine your location');
+    await expect(page.getByTestId('location-notice')).not.toContainText('Allow location access');
   });
 
   test('keeps the existing permission-denied message for code 1', async ({ page }) => {
@@ -2315,7 +1946,7 @@ test.describe('geolocation flow', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await failGeolocation(page, 1);
-    await expect(page.getByTestId('toast')).toContainText('Allow location access');
+    await expect(page.getByTestId('location-notice')).toContainText('Allow location access');
   });
 
   test('retry after a denial recovers once permission is granted, without any precise-location request', async ({ browser }) => {
@@ -2365,15 +1996,22 @@ test.describe('geolocation flow', () => {
     });
     const requests: string[] = [];
     page.on('request', (request) => requests.push(request.url()));
+    // The default London micro-climate request starts after the first
+    // weather payload and is independent of the geolocation flow. Wait for
+    // it before taking the post-denial request snapshot.
+    const initialMicroClimate = page.waitForResponse((response) =>
+      response.url().includes('api.open-meteo.com') &&
+      response.url().includes('models=ukmo_seamless'));
     await mockOpenMeteo(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await initialMicroClimate;
     expect(await page.evaluate(() => (window as any).__geoSurface.calls), 'no location request on load').toBe(0);
 
     // First attempt: the context denies geolocation (code 1), no prompt shown.
     requests.length = 0;
     await page.getByTestId('button-refresh-location').click();
-    await expect(page.getByTestId('toast')).toContainText('Allow location access');
+    await expect(page.getByTestId('location-notice')).toContainText('Allow location access');
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
     expect(await page.evaluate(() => (window as any).__geoSurface.calls)).toBe(1);
@@ -2386,7 +2024,7 @@ test.describe('geolocation flow', () => {
     await page.getByTestId('button-refresh-location').click();
     await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
-    await expect(page.getByTestId('toast')).toBeHidden();
+    await expect(page.getByTestId('location-notice')).toBeHidden();
     const forecasts = requests.filter((url) => new URL(url).hostname === 'api.open-meteo.com');
     expect(forecasts.length).toBeGreaterThan(0);
     // The web platform snaps the fix to the privacy grid (Android passes the
@@ -2442,7 +2080,7 @@ test.describe('geolocation flow', () => {
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
 
     await page.getByTestId('button-refresh-location').click();
-    await expect(page.getByTestId('toast')).toContainText('took too long');
+    await expect(page.getByTestId('location-notice')).toContainText('took too long');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
   });
@@ -2494,7 +2132,7 @@ test.describe('geolocation flow', () => {
       await page.getByTestId('button-refresh-location').click();
       await expect(page.getByTestId('button-refresh-location')).toHaveText('Finding you…');
       await failGeolocation(page, code);
-      await expect(page.getByTestId('toast')).toBeVisible();
+      await expect(page.getByTestId('location-notice')).toBeVisible();
       await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
     }
   });
@@ -2551,8 +2189,6 @@ test.describe('mobile layout', () => {
   });
 
   test('hero actions meet 44px and never clip their labels in EN/FR/ES', async ({ page }) => {
-    await stubSpeechRecognition(page);
-    await stubSpeechPlayback(page);
     await mockOpenMeteo(page);
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto('/');
@@ -2561,7 +2197,7 @@ test.describe('mobile layout', () => {
       await page.getByTestId('select-language').selectOption(locale);
       const buttons = page.locator('.today-hero .local-button');
       const count = await buttons.count();
-      expect(count, `${locale} action count`).toBeGreaterThanOrEqual(3);
+      expect(count, `${locale} action count`).toBeGreaterThanOrEqual(1);
       for (let index = 0; index < count; index += 1) {
         const button = buttons.nth(index);
         const box = await button.boundingBox();
@@ -2741,7 +2377,7 @@ test.describe('non-destructive weather refresh', () => {
     await expect(page.locator('.loading-layout')).toHaveCount(0);
   });
 
-  test('a successful location clears the previous location error toast', async ({ page }) => {
+  test('a successful location clears the previous location error notice', async ({ page }) => {
     await mockOpenMeteo(page);
     await stubDeferredGeolocation(page);
     await page.goto('/');
@@ -2749,13 +2385,13 @@ test.describe('non-destructive weather refresh', () => {
 
     await page.getByTestId('button-refresh-location').click();
     await failGeolocation(page, 1);
-    await expect(page.getByTestId('toast')).toBeVisible();
+    await expect(page.getByTestId('location-notice')).toBeVisible();
 
     await page.getByTestId('button-refresh-location').click();
-    await expect(page.getByTestId('toast')).toHaveCount(0);
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
     await resolveGeolocation(page);
     await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
-    await expect(page.getByTestId('toast')).toHaveCount(0);
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
   });
 
   test('both location controls refresh without a reload', async ({ page }) => {
@@ -3023,4 +2659,37 @@ test.describe('store promo gallery', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
+});
+
+test('console boundary redacts synthetic recognition payloads', async ({ page }) => {
+  const messages: string[] = [];
+  page.on('console', (message) => messages.push(message.text()));
+  await mockOpenMeteo(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    console.log(JSON.stringify({ sessionId: 42, transcript: 'SYNTHETIC_SENTINEL_ALPHA', code: 'result' }));
+    console.log({ sessionId: 43, transcript: 'SYNTHETIC_SENTINEL_BETA', audio: 'RAW_AUDIO_SENTINEL' });
+  });
+  await page.waitForTimeout(150);
+  const logged = messages.join('\n');
+  expect(logged).not.toContain('SYNTHETIC_SENTINEL');
+  expect(logged).not.toContain('RAW_AUDIO_SENTINEL');
+  expect(logged).toContain('sessionId');
+});
+
+test('repeated location denial keeps the notice and recovery route without a prompt loop', async ({ browser }) => {
+  const context = await browser.newContext({ permissions: [] });
+  const page = await context.newPage();
+  await mockOpenMeteo(page);
+  await page.goto('/');
+  await page.getByTestId('button-refresh-location').click();
+  await expect(page.getByTestId('location-notice')).toBeVisible();
+  // Retry is denied again: the notice must stay stable, not disappear or loop.
+  await page.getByTestId('button-location-retry').click();
+  await expect(page.getByTestId('location-notice')).toBeVisible();
+  await page.getByTestId('button-refresh-location').click();
+  await expect(page.getByTestId('location-notice')).toBeVisible();
+  await expect(page.getByTestId('button-location-retry')).toBeVisible();
+  await expect(page.getByTestId('text-current-city')).toHaveText('London');
+  await context.close();
 });

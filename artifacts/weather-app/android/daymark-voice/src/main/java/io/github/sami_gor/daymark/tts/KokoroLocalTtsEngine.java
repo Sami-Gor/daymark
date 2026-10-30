@@ -40,6 +40,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private static final int FIRST_CHUNK_TRIM_CAP_MS = 300;
     private static final int SEGMENT_LEAD_KEEP_MS = 100;
     private static final int SEGMENT_TRIM_CAP_MS = 600;
+    /** Pinned size/digest of the packaged model (also checked by the fetch script). */
+    private static final long MODEL_BYTES = 92_361_116L;
+    private static final String MODEL_SHA256 =
+            "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478";
+    /** Pinned size/digest of the packaged voice. */
+    private static final long VOICE_BYTES = 522_240L;
+    private static final String VOICE_SHA256 =
+            "f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1";
 
     static {
         System.loadLibrary("kokoro_jni");
@@ -86,8 +94,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         Log.i(TAG, "initialize: removed legacy " + LEGACY_VOICE_FILE);
                     }
                     long copyStart = SystemClock.elapsedRealtime();
-                    File modelFile = copyAssetIfNeeded(MODEL_ASSET, "model_quantized.onnx");
-                    File voiceFile = copyAssetIfNeeded(VOICE_ASSET, VOICE_NAME + ".bin");
+                    File modelFile = copyAssetIfNeeded(MODEL_ASSET, "model_quantized.onnx", MODEL_BYTES, MODEL_SHA256);
+                    File voiceFile = copyAssetIfNeeded(VOICE_ASSET, VOICE_NAME + ".bin", VOICE_BYTES, VOICE_SHA256);
                     Log.i(TAG, "initialize: assets ready in " + (SystemClock.elapsedRealtime() - copyStart)
                             + "ms modelBytes=" + modelFile.length() + " voiceBytes=" + voiceFile.length());
 
@@ -182,24 +190,68 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         state = State.UNINITIALIZED;
     }
 
-    private File copyAssetIfNeeded(String assetPath, String fileName) throws Exception {
+    /**
+     * Materialises one packaged Kokoro asset and verifies its pinned digest.
+     *
+     * <p>An existing file is reused only after its bytes match the pinned
+     * SHA-256. Otherwise the asset is copied to a temporary file, synced,
+     * verified and renamed into place, so a crash never leaves a partial file at
+     * the final path and a same-size tampered file is rejected.
+     */
+    private File copyAssetIfNeeded(
+            String assetPath,
+            String fileName,
+            long expectedBytes,
+            String expectedSha256) throws Exception {
         File directory = new File(appContext.getFilesDir(), "kokoro");
         if (!directory.exists() && !directory.mkdirs()) {
             throw new IllegalStateException("Cannot create " + directory);
         }
         File target = new File(directory, fileName);
-        try (InputStream input = appContext.getAssets().open(assetPath)) {
-            int expected = input.available();
-            if (target.exists() && expected > 0 && target.length() == expected) {
-                return target;
-            }
-            try (OutputStream output = new FileOutputStream(target)) {
-                byte[] buffer = new byte[1 << 16];
-                int read;
-                while ((read = input.read(buffer)) != -1) {
-                    output.write(buffer, 0, read);
+        if (KokoroAssetIntegrity.matches(target, expectedBytes, expectedSha256)) {
+            return target;
+        }
+
+        File temp = new File(directory, fileName + ".part");
+        if (temp.exists() && !temp.delete()) {
+            throw new IllegalStateException("Cannot remove stale " + temp);
+        }
+        java.security.MessageDigest digest = KokoroAssetIntegrity.newSha256();
+        long copied = 0L;
+        try (InputStream input = appContext.getAssets().open(assetPath);
+             FileOutputStream output = new FileOutputStream(temp)) {
+            byte[] buffer = new byte[1 << 16];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                if (read == 0) {
+                    continue;
                 }
+                output.write(buffer, 0, read);
+                digest.update(buffer, 0, read);
+                copied += read;
             }
+            output.flush();
+            output.getFD().sync();
+        } catch (Exception copyFailed) {
+            temp.delete();
+            throw copyFailed;
+        }
+
+        String actual = KokoroAssetIntegrity.hex(digest.digest());
+        if (copied != expectedBytes || !actual.equals(expectedSha256)) {
+            temp.delete();
+            throw new IllegalStateException(
+                    "Kokoro asset integrity mismatch for " + fileName
+                            + ": expected " + expectedBytes + " bytes/" + expectedSha256
+                            + ", copied " + copied + " bytes/" + actual);
+        }
+        if (target.exists() && !target.delete()) {
+            temp.delete();
+            throw new IllegalStateException("Cannot replace " + target);
+        }
+        if (!temp.renameTo(target)) {
+            temp.delete();
+            throw new IllegalStateException("Cannot atomically install " + target);
         }
         return target;
     }

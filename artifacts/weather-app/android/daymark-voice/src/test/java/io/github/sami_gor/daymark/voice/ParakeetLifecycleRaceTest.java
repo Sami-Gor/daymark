@@ -530,6 +530,8 @@ public class ParakeetLifecycleRaceTest {
         volatile boolean startSucceeds = true;
         volatile boolean runtimeExceptionOnRead;
         volatile boolean securityExceptionOnRead;
+        /** Number of frames returned per read; -1 uses the whole buffer. */
+        volatile int readSize = -1;
         volatile int[] script = new int[0];
         volatile Runnable duringStart;
         volatile Runnable duringRead;
@@ -564,8 +566,11 @@ public class ParakeetLifecycleRaceTest {
             if (level < 0) {
                 return level;
             }
-            Arrays.fill(buffer, (short) level);
-            return buffer.length;
+            final int size = readSize > 0
+                    ? Math.min(readSize, buffer.length)
+                    : buffer.length;
+            Arrays.fill(buffer, 0, size, (short) level);
+            return size;
         }
 
         @Override

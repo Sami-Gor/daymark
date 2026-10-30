@@ -40,4 +40,31 @@ public class WebViewCompatibilityTest {
         assertTrue(WebViewCompatibility.isSupportedVersionName("91.0.4472.114"));
         assertFalse(WebViewCompatibility.isSupportedVersionName(null));
     }
+
+    @Test
+    public void parsesLeadingDigitsAndIgnoresTrailingText() {
+        assertEquals(Integer.valueOf(90), WebViewCompatibility.parseMajorVersion("90beta"));
+        assertEquals(Integer.valueOf(90), WebViewCompatibility.parseMajorVersion("90.1.2"));
+        assertEquals(Integer.valueOf(90), WebViewCompatibility.parseMajorVersion("090"));
+        assertEquals(Integer.valueOf(91), WebViewCompatibility.parseMajorVersion("\t91\n"));
+    }
+
+    @Test
+    public void rejectsOverflowSignedAndEmptyVersions() {
+        assertNull(WebViewCompatibility.parseMajorVersion("999999999999999999999"));
+        assertNull(WebViewCompatibility.parseMajorVersion("-1"));
+        assertNull(WebViewCompatibility.parseMajorVersion("+90"));
+        assertNull(WebViewCompatibility.parseMajorVersion("."));
+        assertNull(WebViewCompatibility.parseMajorVersion("   "));
+    }
+
+    @Test
+    public void keepsTheMinimumAtNinetyInclusive() {
+        assertEquals(90, WebViewCompatibility.MINIMUM_WEBVIEW_MAJOR);
+        assertFalse(WebViewCompatibility.isSupported(0));
+        assertFalse(WebViewCompatibility.isSupported(89));
+        assertTrue(WebViewCompatibility.isSupported(90));
+        assertTrue(WebViewCompatibility.isSupportedVersionName("90.0.0.0"));
+        assertFalse(WebViewCompatibility.isSupportedVersionName("89.9.9"));
+    }
 }

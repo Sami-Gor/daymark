@@ -26,7 +26,6 @@ import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig;
 import com.k2fsa.sherpa.onnx.QnnConfig;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
@@ -85,9 +84,11 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
 
     /** Sample rate the evaluated model was measured at. */
     private static final int SAMPLE_RATE = 16000;
+    /** AudioRecord is configured for mono, so each PCM short is one frame. */
+    private static final int AUDIO_CHANNEL_COUNT = 1;
     /** Feature dimension the evaluated model was measured with. */
     private static final int FEATURE_DIMENSION = 80;
-    /** 20 ms of audio per chunk. */
+    /** 20 ms of audio per read buffer. */
     private static final int CHUNK_SAMPLES = 320;
     /** Hard cap on a single utterance. */
     private static final int MAX_CAPTURE_MS = 30000;
@@ -100,9 +101,9 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
     /** Root-mean-square amplitude at or above which a chunk counts as speech. */
     private static final float SPEECH_THRESHOLD = 0.02f;
     /** 60 ms of speech needed before the utterance is considered started. */
-    private static final int ONSET_CHUNKS = 3;
-    /** 500 ms of quiet needed after speech to end the utterance. */
-    private static final int HANGOVER_CHUNKS = 25;
+    private static final int ONSET_MS = 60;
+    /** 1500 ms of quiet needed after speech to end the utterance. */
+    private static final int HANGOVER_MS = 1500;
     /** CPU threads used for inference. */
     private static final int NUM_THREADS = 2;
     /**
@@ -128,7 +129,7 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
      * {@link AudioRecord}-backed device.
      */
     volatile Supplier<SpeechCaptureDevice> captureDeviceSupplier =
-            () -> new AudioSpeechCaptureDevice(SAMPLE_RATE);
+            () -> new AudioSpeechCaptureDevice(getContext(), SAMPLE_RATE);
 
     /** Injection point for the clock used by capture deadlines and durations. */
     volatile LongSupplier clock = SystemClock::elapsedRealtime;
@@ -474,7 +475,8 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
 
             final long captureStartMs = clock.getAsLong();
             SpeechEndpointDetector detector =
-                    new SpeechEndpointDetector(SPEECH_THRESHOLD, ONSET_CHUNKS, HANGOVER_CHUNKS);
+                    new SpeechEndpointDetector(
+                            SPEECH_THRESHOLD, SAMPLE_RATE, ONSET_MS, HANGOVER_MS);
             short[] chunk = new short[CHUNK_SAMPLES];
             long deadline = clock.getAsLong() + MAX_CAPTURE_MS;
             boolean reachedLimit = false;
@@ -497,7 +499,9 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
                 }
                 if (read > 0) {
                     samples.append(chunk, read);
-                    if (detector.accept(rootMeanSquare(chunk, read))) {
+                    final int frameCount = read / AUDIO_CHANNEL_COUNT;
+                    if (frameCount > 0
+                            && detector.accept(rootMeanSquare(chunk, read), frameCount)) {
                         break;
                     }
                 }
@@ -580,6 +584,9 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
             // The start call resolves only now that the microphone is live.
             session.settleSuccess();
         }
+        // Non-payload lifecycle metadata for the device test harness. The
+        // transcript, audio and any other recognition content is never logged.
+        logSession("session " + session.id + " capture started");
         return true;
     }
 
@@ -602,6 +609,19 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
      * only one terminal outcome is ever emitted, whichever of cancel, destroy or
      * the worker gets here first.
      */
+    /**
+     * Writes non-payload lifecycle metadata. The JVM lifecycle tests run
+     * against stub Android classes, where Log throws; the catch keeps those
+     * tests exercising the real plugin code without weakening device logging.
+     */
+    private static void logSession(String message) {
+        try {
+            Log.i(TAG, message);
+        } catch (RuntimeException notAndroidRuntime) {
+            // Unit-test JVM only; on Android Log is always present.
+        }
+    }
+
     private void finishWithError(Session session, String code) {
         synchronized (stateLock) {
             if (activeSession == session) {
@@ -610,6 +630,7 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
             if (!session.terminal.compareAndSet(false, true)) {
                 return;
             }
+            logSession("session " + session.id + " ended error " + code);
             notifyError(session.id, code);
             // The start call is settled last so the terminal event, which
             // carries the exact code, is what the web layer sees first.
@@ -631,6 +652,7 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
             if (!session.terminal.compareAndSet(false, true)) {
                 return;
             }
+            logSession("session " + session.id + " ended result");
             session.settleSuccess();
             notifyResult(session.id, transcript);
         }
@@ -687,25 +709,63 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
      * <p>The model is materialised into the app's private files directory so ONNX
      * Runtime can memory-map it. That keeps the resident footprint of a 640 MB
      * model small, at the cost of one copy on disk.
+     *
+     * <p>Every file is verified against a pinned SHA-256 digest before it may be
+     * loaded. Materialisation writes a temporary file in the model directory,
+     * syncs it, verifies it and renames it into place, so a crash cannot leave a
+     * partial file at a final path. A verification marker lets later starts skip
+     * the hash pass without ever trusting a marker that does not match the
+     * pinned model version, sizes and digests.
      */
     private void prepareModel() {
         preparation.execute(() -> {
-            try {
-                synchronized (stateLock) {
-                    if (released) {
-                        return;
-                    }
-                }
-                if (!assetsPresent()) {
-                    synchronized (stateLock) {
-                        modelReady = false;
-                        unavailableReason = ParakeetModelAssets.REASON_MODEL_MISSING;
-                    }
+            synchronized (stateLock) {
+                if (released) {
                     return;
                 }
-                if (!modelFilesPresent()) {
-                    materialiseModel();
+            }
+            if (!assetsPresent()) {
+                synchronized (stateLock) {
+                    modelReady = false;
+                    unavailableReason = ParakeetModelAssets.REASON_MODEL_MISSING;
                 }
+                return;
+            }
+
+            File directory = modelDirectory();
+            try {
+                ParakeetModelIntegrity.Result integrity = ParakeetModelIntegrity.verify(
+                        directory,
+                        ParakeetModelAssets.MODEL_VERSION,
+                        ParakeetModelAssets.MODEL_FILE_NAMES,
+                        ParakeetModelAssets.MODEL_FILE_SIZES,
+                        ParakeetModelAssets.MODEL_FILE_SHA256);
+                if (!integrity.isOk()) {
+                    Log.w(TAG, "model integrity: " + integrity.reason());
+                    ParakeetModelInstaller.install(
+                            directory,
+                            integrity,
+                            ParakeetModelAssets.MODEL_VERSION,
+                            ParakeetModelAssets.MODEL_FILE_NAMES,
+                            ParakeetModelAssets.MODEL_FILE_SIZES,
+                            ParakeetModelAssets.MODEL_FILE_SHA256,
+                            fileName -> getContext().getAssets().open(
+                                    ParakeetModelAssets.assetPath(fileName)));
+                }
+            } catch (Throwable error) {
+                Log.e(TAG, "model materialisation failed", error);
+                // Repair rather than load: never leave unverified material at a
+                // final path. The next start retries the copy from the assets.
+                ParakeetModelInstaller.deleteModelFiles(
+                        directory, ParakeetModelAssets.MODEL_FILE_NAMES);
+                synchronized (stateLock) {
+                    modelReady = false;
+                    unavailableReason = ParakeetModelAssets.REASON_MODEL_CORRUPT;
+                }
+                return;
+            }
+
+            try {
                 // The build can complete after the plugin was released (the
                 // activity was destroyed during the first-run copy);
                 // installRecognizer re-checks and discards instead of
@@ -770,50 +830,8 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
         return true;
     }
 
-    private boolean modelFilesPresent() {
-        File directory = modelDirectory();
-        for (int index = 0; index < ParakeetModelAssets.MODEL_FILE_NAMES.length; index++) {
-            File file = new File(directory, ParakeetModelAssets.MODEL_FILE_NAMES[index]);
-            if (!file.isFile()
-                    || file.length() != ParakeetModelAssets.MODEL_FILE_SIZES[index]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private File modelDirectory() {
         return new File(getContext().getFilesDir(), ParakeetModelAssets.MODEL_DIRECTORY);
-    }
-
-    private void materialiseModel() throws IOException {
-        File directory = modelDirectory();
-        if (!directory.isDirectory() && !directory.mkdirs()) {
-            throw new IOException("cannot create the model directory");
-        }
-        AssetManager assets = getContext().getAssets();
-        for (int index = 0; index < ParakeetModelAssets.MODEL_FILE_NAMES.length; index++) {
-            String fileName = ParakeetModelAssets.MODEL_FILE_NAMES[index];
-            long expected = ParakeetModelAssets.MODEL_FILE_SIZES[index];
-            File target = new File(directory, fileName);
-            if (target.isFile() && target.length() == expected) {
-                continue;
-            }
-            if (target.exists() && !target.delete()) {
-                throw new IOException("cannot remove a partial model file");
-            }
-            try (InputStream input = assets.open(ParakeetModelAssets.assetPath(fileName));
-                 FileOutputStream output = new FileOutputStream(target)) {
-                byte[] buffer = new byte[1024 * 1024];
-                int read;
-                while ((read = input.read(buffer)) >= 0) {
-                    output.write(buffer, 0, read);
-                }
-            }
-            if (target.length() != expected) {
-                throw new IOException("model file length mismatch after copy");
-            }
-        }
     }
 
     private OfflineRecognizer buildRecognizer() {

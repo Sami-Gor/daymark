@@ -1,9 +1,13 @@
 # Daymark Version 2 — privacy hardening
 
-Status: implementation in progress on `v2/privacy-hardened-voice` (draft PR #36).
+Status: implementation in progress on `release/v2-candidate` at
+`30ff64b5…`. Open pull-request status is not evidence that the candidate has
+passed verification. V2.2 road-map items are not current V2 behaviour.
+
 This document tracks candidate Version 2 behaviour. It is not evidence that the
 candidate has passed device verification and must not be used to update the
-published Data safety answers until the gates below are complete.
+published Data safety answers until the gates below are complete. Historical
+test entries below retain their original dates and are not current-tree results.
 
 **Document scope.** `README.md`, `SECURITY.md`,
 `docs/release/android-production-readiness.md` and
@@ -38,24 +42,38 @@ sources for the candidate.
   ONNX Runtime can memory-map it, and the model is delivered to the device by
   Google Play. Inference never requires a network connection.
 - English narration remains on the bundled local Kokoro engine.
-- French and Spanish Android narration must use an installed Android TTS voice
-  for which `Voice.isNetworkConnectionRequired()` is false. If no such voice
-  exists, the plugin rejects with `system-tts-offline-unavailable` (surfaced in
-  the interface as `offline-voice-unavailable`) instead of switching engines.
+- French and Spanish narration is unavailable in V2 and is planned for V2.2.
+  The app shows an explicit unavailable message. The Android system-TTS plugin
+  is not registered, so there is no system-TTS, network-voice or browser
+  fallback.
+- The web/PWA demo has no Ask Daymark, Hear today, browser recognition or
+  browser synthesis path.
 - Android declares `ACCESS_COARSE_LOCATION` only and does not declare
-  `ACCESS_FINE_LOCATION`. Use the approximate coordinate returned by Android
-  without additional decimal rounding. On web/PWA platforms without the same
-  permission-level approximation guarantee, snap device-derived coordinates
-  to a 0.025-degree grid before weather requests.
+  `ACCESS_FINE_LOCATION`. Both Android and web/PWA snap device-derived
+  coordinates to the same latitude-aware grid on the device before weather
+  requests; the latitude step has a 0.025° minimum and longitude widens only to
+  preserve at least 3 km², with no raw-fix bypass.
 - Typed place search remains separate: user-entered queries still go to
   Open-Meteo geocoding.
 - The bundled GeoNames locality data remains reverse-lookup only. Forward
   offline place search is a separate investigation and is not included in this
   release unless an indexed prototype passes its own acceptance criteria.
 
+## Audience assessment
+
+The owner has selected **Ages 18+ only** as the Google Play target audience. It
+is a store declaration, not a technical access restriction: the app has no age
+gate and does not prove that minors cannot access it. The UK Children's Code /
+Age Appropriate Design Code must be assessed separately where it applies;
+selecting 18+ does not resolve those UK obligations. Open-Meteo's published
+terms are silent on child-directed use. The provider is neither declared
+approved nor prohibited for child users, and no provider contact was made.
+This is not a separate child-targeting blocker for the adult-only design;
+the final store-listing/content check remains the relevant content check.
+
 ## Compatibility
 
-- Keep `minSdk 24`, `targetSdk 36`, and `compileSdk 36`.
+- Keep `minSdk 29`, `targetSdk 36`, and `compileSdk 36`.
 - The bundled Parakeet TDT 0.6B v3 int8 model is introduced by this slice.
   It is the speech-to-text engine for the Android app, not an experiment: the
   earlier `v2test` build type and its unprotected test receiver are retired.
@@ -95,24 +113,20 @@ considered in Data safety.
 
 ## Approximate device-location evaluation
 
-Android is configured to request only `ACCESS_COARSE_LOCATION`. Android's
-documentation describes approximate location as an estimate at roughly
-3 km² accuracy and recommends requesting coarse permission only when this
-meets the feature's needs. Daymark should use the OS-returned approximate
-coordinate as-is rather than applying a second, much coarser rounding step.
-
-For web/PWA use, `location-privacy.ts` snaps device-derived coordinates to a
-0.025-degree grid. Around London this grid cell is approximately 2.8 km
-north/south by 1.7 km east/west (about 4.8 km²). This is a fallback policy for
-platforms that do not expose Android's permission-level approximate mode; it
-is not a universal guarantee of the same physical cell area at every latitude.
+Android requests only `ACCESS_COARSE_LOCATION`; the V2 app also applies the
+same latitude-aware on-device grid as web/PWA before sending a location-derived
+weather request. The latitude step has a 0.025° minimum; above the latitude
+where a 0.025° longitude cell would be below 3 km², the longitude step widens
+just enough to keep the represented area at or above the Play approximate
+floor. Around London the cell is approximately 2.8 km north/south by 1.7 km
+east/west (about 4.8 km²). The web/PWA uses the identical policy.
 
 The user can also choose a city/place manually and deny GPS permission. Typed
 place search remains a separate path and goes to Open-Meteo geocoding; it is
 not made local by the GPS permission change.
 
-Forecast impact: Android's OS-derived approximate location and the web/PWA grid
-should preserve more regional detail than 0.1-degree rounding. Coastal,
+Forecast impact: the shared latitude-aware grid, together with Android's coarse
+permission, should preserve more regional detail than 0.1-degree rounding. Coastal,
 elevation and urban differences can still affect the selected forecast point.
 Test representative London, coastal and elevated UK locations. Confirm that
 regional comparison labels do not imply street-level precision.
@@ -125,7 +139,7 @@ state that server logs can contain geographical coordinates and are kept up to
 coordinates are transmitted. Validate the final Data safety answers against
 the shipped code and provider behaviour.
 
-## Data safety reconciliation — 21 October 2026
+## Data safety reconciliation — public evidence as at 27 October 2026
 
 The Play Console dashboard was not accessible read-only from the audit
 environment; the public storefront and its Data safety page were readable. On
@@ -136,20 +150,23 @@ history**, all Optional / App functionality, with encryption in transit and
 
 That does not match the released v1.0.0 code, which declares
 `ACCESS_FINE_LOCATION` and sends a two-decimal coordinate (below Play's 3 km²
-threshold). Either the live answer is wrong for the released build, or v1.0.0
-has been withdrawn from distribution; the public listing does not expose the
-track contents or the highest version code. The live form's "No data shared"
+threshold). The owner states that v1.0.0 remains available until the full V2
+production release, so the live saved answer appears wrong for the released
+build; the public listing does not expose the track contents or the highest
+version code. Confirm this in Console rather than withdrawing V1 during this
+audit. The live form's "No data shared"
 answer also depends on Play's user-initiated-action exception for the
 Open-Meteo transfer; that analysis is not recorded in the Console export
 because no export is available. The field-by-field proposal, the full matrix
 and the open manual decisions are in
 [`data-safety-v1-v2.md`](data-safety-v1-v2.md).
 
-The live privacy page was also checked: on 21 October 2026 it still showed the
+The live privacy pages (`/privacy`, `/fr/privacy`, `/es/privacy`) were checked
+on 21 October 2026 and again on 27 October 2026: they still showed the
 11 September 2026 policy text, not the V2 wording in this branch. The source
 pages are therefore ahead of both the website and the shipped AAB. Do not
-describe the V2 policy as published until the website is deployed and a
-matching Android bundle is released.
+describe the V2 policy as published until the website is deployed and a matching
+Android bundle is released.
 
 ## Release gates
 
@@ -176,18 +193,14 @@ matching Android bundle is released.
       `offline-unavailable` behaviour without touching system packages, and a
       source-level check that the Android path contains no
       `android.speech.SpeechRecognizer`.
-- [ ] Android API 24–30 test: voice input works with the bundled model, and no
+- [ ] Android API 29–30 test: voice input works with the bundled model, and no
       network recognizer is invoked.
 - [ ] Cancel, timeout, error, app backgrounding, route unmount and repeated
       attempts invalidate sessions, clear transient handlers and destroy native
       recognition sessions. No recognition payload appears in logcat.
-- [ ] French and Spanish narration: an installed local voice is selected; with
-      only network-dependent voices available, narration fails with the explicit
-      offline-unavailable state. Deferred: suitable local voices are not
-      installed on the test device; not claimed as physically tested. The
-      `offline-voice-unavailable` error chain (plugin gating → hook errorCode →
-      localized `voice-error` UI) is verified by inspection and pinned locale
-      strings only.
+- [ ] French and Spanish narration: **not available in V2**; the app must show
+      the explicit unavailable message and must not invoke system/network TTS.
+      The V2.2 on-device plan is not a current capability.
 - [ ] English Kokoro works in airplane mode and does not use system TTS.
       **Partial — code inspection plus an airplane-mode playback observation.**
       A local observation on 2026-10-15 (device `Nothing A059P`, Android 16,
@@ -200,61 +213,60 @@ matching Android bundle is released.
       POC, so it needs its own measurement. English narration is unchanged from
       v1.0.0, where the same behaviour is recorded in
       `docs/release/android-production-readiness.md`; that record does not
-      evidence this candidate. This gate stays open until a redacted traffic
-      capture or a packet-level capture is attached.
-- [ ] Network instrumentation on a physical device during voice input and
-      narration records no speech service traffic. Outstanding: logcat showed
-      no recognizer errors or payloads, but absence of log messages is not
-      treated as proof of no traffic. Preserve redacted test evidence and
-      confirm no payload is sent to weather/geocoding endpoints.
-- [ ] Android device test confirms Daymark runs with only
-      `ACCESS_COARSE_LOCATION` and sends the OS-provided approximate fix
-      without an additional rounding step.
-      **Half satisfied by the branch, half pending.** The permission half is
-      verifiable from the branch itself: the merged manifest declares
-      `ACCESS_COARSE_LOCATION` and does not declare `ACCESS_FINE_LOCATION`,
-      and the Android code path sends the OS-provided fix unmodified. The
-      device half is **pending**: a local observation on 2026-10-15 (device
-      `Nothing A059P`, Android 16) reported `FINE` ignored, `COARSE` granted
-      foreground, an earlier transient `POSITION_UNAVAILABLE` resolving on
-      retry, and local weather displayed. That is a maintainer-attested
-      observation with no retained logcat or request-URL artefact, and it does
-      not by itself demonstrate the transmitted coordinate. The retained
-      test-build artefact is dated 2026-10-19, so the observation cannot be
-      attributed to a build product of that date. Confirm API responses are
-      useful at that precision, and attach a request-URL capture or a server
-      log showing the coordinate actually transmitted. The specific test area
-      is withheld from this public record.
-- [x] Web/PWA test confirms that only the 0.025-degree-grid coordinates are sent
-      for device-derived location, and no raw GPS values appear in requests.
-      Covered by the Playwright test "granted web geolocation loads weather
-      from grid-rounded coordinates without reverse geocoding", which asserts
-      the grid coordinates in the outgoing request URL and asserts that the raw
-      value is absent. The geolocation provider is mocked; this is not a
-      physical-device GPS test.
-- [ ] Test representative UK microclimate locations and confirm the final Play
-      Data safety classification against the actual data flow and provider path.
+      evidence this candidate. Privacy-path evidence is closed by source and
+      tests; the remaining item is a measured cold-start performance check, not
+      a packet-capture gate.
+- [x] Source/data-flow review and regression tests establish the V2 speech
+      boundary: audio/transcript values are not sent to network clients,
+      analytics, telemetry or persisted history. Packet capture is not a
+      standalone release gate. This does not claim universal zero network
+      traffic; forecast requests remain separate. Live microphone behaviour
+      remains a device-quality check.
+- [x] Web/PWA and Android code tests confirm device-derived coordinates are
+      snapped to the latitude-aware grid before weather requests. The Playwright
+      tests inspect outgoing request URLs; the Android-path test sets the
+      Capacitor Android platform and asserts the same policy, so the raw browser
+      fix is not used. Area tests cover UK and high-latitude boundaries. This is
+      not a physical-device GPS test.
+- [x] Deterministic location tests cover UK, high-latitude and pole boundaries;
+      physical microclimate testing remains optional device-quality coverage.
 - [x] Existing test suite remains green; resolve any unrelated regression before
       release. 19 test files / 244 unit tests and 153 browser tests pass on
       the branch head this record was written against (`fe18893`, 2026-10-19).
 - [ ] Reconcile store privacy policy and Data safety answers only after the
       shipped candidate's actual behaviour is verified. This includes the
       in-app privacy pages (`src/pages/privacy.tsx` and the FR/ES variants),
-      which now state that Android speech input is transcribed on-device by the
-      bundled Parakeet model, distinguish the Android app from the web/PWA
-      browser-speech path, disclose that typed geocoding/weather requests and
-      approximate location are sent to Open-Meteo, state the
-      installed-offline-voice constraint for French/Spanish narration, and carry
-      a version note for 1.0.0 users. Those source edits are not published and
+      which now describe the web/PWA as a limited demo with no voice,
+      distinguish Android on-device Parakeet input and local English Kokoro
+      narration, disclose that typed geocoding/weather requests and
+      approximate location are sent to Open-Meteo, state that French/Spanish
+      narration is unavailable in V2, and carry the 1.0.0 transition note. Those source edits are not published and
       are not in a shipped AAB: the live page still showed the 11 September 2026
-      text on 21 October 2026. This gate remains open.
+      text on 27 October 2026. This gate remains open.
 - [ ] Re-check the Play Data safety form against Play's multi-version rule.
       The Data safety section describes the **sum** of data collection and
       sharing across **all versions currently distributed** on Google Play.
       While v1.0.0 (which declares `ACCESS_FINE_LOCATION` and transmits a
       two-decimal fix) remains distributed, an Approximate-location-only answer
-      would be inaccurate. Either withdraw v1.0.0 from Play or declare both
-      location types until it is gone.
+      would be inaccurate. V1 is intentionally left available until the full V2
+      production release; do not withdraw it as part of this documentation task.
+      Declare the combined V1 + V2 practices until V1 is no longer distributed
+      on any non-internal track.
+- [ ] **Target audience / Data Safety gate:** the owner has settled the Play
+      target audience at **Ages 18+ only**. No child age group is selected; do
+      not enter a Families child-audience declaration. Confirm Data Safety,
+      target audience and content rating agree, and record whether any Play
+      minor-access restriction is configured. The app does not implement an age
+      gate in code, so do not claim that 18+ is technically enforced or that
+      minors cannot access the app. Assess the UK Children's Code / Age
+      Appropriate Design Code separately where applicable. Open-Meteo's terms
+      are silent on child-directed use; do not claim approval or prohibition.
+      Console was not edited.
+- [ ] **Global V1 declaration:** while V1 remains currently distributed, the
+      Data Safety sum must include V1's precise two-decimal location, browser
+      speech recognition, system TTS and search behavior. V1 track inventory
+      and provider/transport evidence remain outstanding. Do not submit a
+      V2-only form. See `data-safety-v1-v2.md`.
 - [ ] Increment `versionCode` / `versionName`, build and verify the signed AAB,
       distribute the candidate via closed testing, then submit the production
       release only after review.

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { createBrowserRecognitionController, describeRecognitionError } from '@/lib/voice-input-browser';
+import { describeRecognitionError } from '@/lib/speech-errors';
 import { createParakeetRecognitionController } from '@/lib/voice-input-native';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
@@ -22,24 +22,26 @@ type RecognitionController = {
 };
 
 /*
- * Android uses the native on-device recognizer only; if the OS cannot provide
- * a compatible local recognizer, the feature is unavailable. Other platforms
- * preserve their previous browser-based behaviour.
+ * Android uses the bundled on-device recognizer only; if it cannot start, the
+ * feature is unavailable. The web/PWA demo has no recognition path and this
+ * hook never constructs a browser SpeechRecognition controller.
  */
 export function useSpeechRecognition() {
   const androidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-  const controller = useMemo<RecognitionController>(() => {
-    if (androidNative) {
-      return createParakeetRecognitionController();
-    }
-    return createBrowserRecognitionController();
+  const controller = useMemo<RecognitionController | null>(() => {
+    return androidNative ? createParakeetRecognitionController() : null;
   }, [androidNative]);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
-  const [supported, setSupported] = useState(controller.supported);
-  const [supportResolved, setSupportResolved] = useState(!controller.initialize);
+  const [supported, setSupported] = useState(controller?.supported ?? false);
+  const [supportResolved, setSupportResolved] = useState(!controller?.initialize);
 
   useEffect(() => {
+    if (!controller) {
+      setSupported(false);
+      setSupportResolved(true);
+      return;
+    }
     let active = true;
     let appStateHandle: PluginListenerHandle | undefined;
 
@@ -95,7 +97,7 @@ export function useSpeechRecognition() {
 
   const start = useCallback((options: { onTranscript?: (transcript: string) => void; lang?: string; locale?: Locale } = {}) => {
     setError('');
-    if (!supported) {
+    if (!controller || !supported) {
       setError(describeRecognitionError('offline-unavailable', options.locale ?? DEFAULT_LOCALE));
       return false;
     }
@@ -108,14 +110,11 @@ export function useSpeechRecognition() {
       },
       onEnd: () => setIsListening(false),
     }, options.lang);
-    // Browser recognition has no native "started" event; keep its existing
-    // immediate UI state. Android waits for the native capture-start event.
-    if (started && !androidNative) setIsListening(true);
     return started;
-  }, [controller, supported, androidNative]);
+  }, [controller, supported]);
 
   const stop = useCallback(() => {
-    controller.stop();
+    controller?.stop();
     setIsListening(false);
   }, [controller]);
 

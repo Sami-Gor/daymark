@@ -3,78 +3,36 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 
 import { DaymarkVoice } from '@/lib/daymark-voice';
-import type { BrowserSpeechAdapter } from '@/lib/speech-router';
-import { pickFallbackAdapter } from '@/lib/speech-adapters';
 import type { SpeechEngine } from '@/lib/speech-engine';
 import { createSpeechRouter } from '@/lib/speech-router';
 import { initialSpeechUiState, reduceSpeechUi } from '@/lib/speech-ui-state';
-import { SystemSpeech } from '@/lib/system-speech';
-import { createBrowserSpeechController } from '@/lib/voice-browser';
 
 /*
- * Unified Daymark speech hook.
+ * Android narration hook.
  *
- * Keeps the existing UI contract (supported / speak / stop) and adds an
- * explicit status machine: idle → preparing (local engine loading) → speaking
- * → idle, plus a localized error flag when narration cannot start.
- *
- * Routing rules (see speech-router): English on Android only ever uses the
- * local Kokoro engine; French/Spanish use the system TTS; the web keeps the
- * Web Speech API.
+ * The web/PWA demo has no voice features. On Android, English narration uses
+ * the bundled Kokoro engine. French and Spanish narration is unavailable in
+ * V2 (planned V2.2) and intentionally has no Android system-TTS or browser
+ * fallback.
  */
 export function useDaymarkSpeech() {
-  const controller = useMemo(() => createBrowserSpeechController(), []);
-  const systemSpeech = useMemo<BrowserSpeechAdapter>(
-    () => ({
-      supported: Capacitor.isNativePlatform(),
-      speak: (text, handlers, lang) => {
-        SystemSpeech.speak({ text, lang })
-          .then(() => handlers?.onEnd?.())
-          .catch((error: unknown) => {
-            const message = error instanceof Error ? error.message : String(error ?? '');
-            handlers?.onError?.(
-              message.includes('system-tts-offline-unavailable')
-                ? 'offline-voice-unavailable'
-                : 'system-tts-failed',
-            );
-          });
-        return true;
-      },
-      stop: () => {
-        void SystemSpeech.stop();
-      },
-    }),
-    [],
-  );
-  const fallback = useMemo(
-    () =>
-      pickFallbackAdapter({
-        isNativePlatform: Capacitor.isNativePlatform(),
-        platform: Capacitor.getPlatform(),
-        webSpeech: controller,
-        systemSpeech,
-      }),
-    [controller, systemSpeech],
-  );
+  const androidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   const router = useMemo(
-    () =>
-      createSpeechRouter(
-        {
-          isNativePlatform: Capacitor.isNativePlatform(),
-          platform: Capacitor.getPlatform(),
-        },
-        fallback,
-        {
-          isAvailable: async () => (await DaymarkVoice.isAvailable()).available,
-          speak: async (text, lang, segments) => {
-            await DaymarkVoice.speak({ text, lang, segments });
+    () => androidNative
+      ? createSpeechRouter(
+          { isNativePlatform: true, platform: 'android' },
+          {
+            isAvailable: async () => (await DaymarkVoice.isAvailable()).available,
+            speak: async (text, lang, segments) => {
+              await DaymarkVoice.speak({ text, lang, segments });
+            },
+            stop: async () => {
+              await DaymarkVoice.stop();
+            },
           },
-          stop: async () => {
-            await DaymarkVoice.stop();
-          },
-        },
-      ),
-    [fallback],
+        )
+      : null,
+    [androidNative],
   );
 
   const [ui, dispatch] = useReducer(reduceSpeechUi, initialSpeechUiState);
@@ -84,7 +42,7 @@ export function useDaymarkSpeech() {
   // The native engine reports when synthesis actually starts, which moves the
   // UI out of the "Preparing voice…" state.
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (!androidNative) return;
     let active = true;
     let handle: PluginListenerHandle | undefined;
     void DaymarkVoice.addListener('stateChanged', (event) => {
@@ -100,19 +58,21 @@ export function useDaymarkSpeech() {
       active = false;
       void handle?.remove();
     };
-  }, []);
+  }, [androidNative]);
 
-  useEffect(() => () => router.stop(), [router]);
+  useEffect(() => () => router?.stop(), [router]);
 
   const speak = useCallback(
     (text: string, lang?: string) => {
       const spoken = text?.trim();
-      if (!spoken) return false;
+      if (!router || !spoken) return false;
       setErrorCode('');
       void router.speak(spoken, lang, {
         onEngine: (selection) => {
           setEngine(selection.engine);
-          dispatch({ type: 'speakStarted', engine: selection.engine });
+          if (selection.engine === 'kokoro') {
+            dispatch({ type: 'speakStarted', engine: 'kokoro' });
+          }
         },
         onEnd: () => dispatch({ type: 'finished' }),
         onError: (reason) => {
@@ -126,13 +86,13 @@ export function useDaymarkSpeech() {
   );
 
   const stop = useCallback(() => {
-    router.stop();
+    router?.stop();
     setErrorCode('');
     dispatch({ type: 'stopped' });
   }, [router]);
 
   return {
-    supported: router.supported(),
+    supported: router?.supported() ?? false,
     status: ui.status,
     error: ui.error,
     errorCode,

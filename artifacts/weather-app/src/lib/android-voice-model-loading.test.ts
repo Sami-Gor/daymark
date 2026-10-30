@@ -75,12 +75,13 @@ describe('android speech model loading and failure handling', () => {
 
   it('checks asset presence before use', () => {
     expect(plugin).toContain('assetsPresent()');
-    expect(plugin).toContain('modelFilesPresent()');
+    expect(plugin).toContain('ParakeetModelIntegrity.verify');
   });
 
-  it('materialises the model and verifies byte length after copy', () => {
-    expect(plugin).toContain('materialiseModel()');
-    expect(plugin).toContain('target.length() != expected');
+  it('materialises the model through the verified installer', () => {
+    expect(plugin).toContain('ParakeetModelIntegrity.verify');
+    expect(plugin).toContain('ParakeetModelInstaller.install');
+    expect(plugin).toContain('ParakeetModelInstaller.deleteModelFiles');
   });
 
   it('reports controlled errors instead of throwing', () => {
@@ -110,8 +111,8 @@ describe('android speech model loading and failure handling', () => {
     // usage is materialising the model pack, which is not user audio.
     expect(plugin).toContain('final SampleBuffer samples = new SampleBuffer()');
     const audioWrites = plugin.match(/new FileOutputStream/g) ?? [];
-    // Only the model materialisation writes a file; captured audio must never
-    // be persisted (it lives in SampleBuffer, in-memory).
-    expect(audioWrites.length).toBe(1);
+    // Captured audio must never be persisted (it lives in SampleBuffer,
+    // in-memory). Model materialisation now lives in ParakeetModelInstaller.
+    expect(audioWrites.length).toBe(0);
   });
 });

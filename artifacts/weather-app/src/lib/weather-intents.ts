@@ -34,6 +34,7 @@ export const DAYMARK_INTENTS = {
   today: 'daymark.today',
   current: 'daymark.current',
   rain: 'daymark.rain',
+  wind: 'daymark.wind',
   uv: 'daymark.uv',
   airQuality: 'daymark.air_quality',
   alerts: 'daymark.alerts',
@@ -49,6 +50,8 @@ export type IntentData = string | number | boolean | null | IntentData[] | { [ke
 
 export type DaymarkIntentResponse = {
   intent: DaymarkIntentId;
+  /** All intents answered by this response (compound questions return several). */
+  intents?: DaymarkIntentId[];
   title: string;
   spokenText: string;
   displayText: string;
@@ -263,6 +266,59 @@ export function getRainSummary(weather: WeatherPayload, context: IntentContext =
     displayText: t('intent.rain.displayNone'),
     priority: 'low',
     data,
+  };
+}
+
+export function getWindSummary(weather: WeatherPayload, context: IntentContext = {}): DaymarkIntentResponse {
+  const { t } = translator(context);
+  const rawSpeed = weather.current?.wind_speed_10m;
+  const rawGusts = weather.current?.wind_gusts_10m;
+  const rawDirection = weather.current?.wind_direction_10m;
+  // Third-party payloads are schema-validated at the network boundary, but a
+  // non-number must never be rounded into a fabricated value here either.
+  const speed = typeof rawSpeed === 'number' && Number.isFinite(rawSpeed) ? rawSpeed : null;
+  const gusts = typeof rawGusts === 'number' && Number.isFinite(rawGusts) ? rawGusts : null;
+  const direction = typeof rawDirection === 'number' && Number.isFinite(rawDirection) ? rawDirection : null;
+
+  if (speed == null) {
+    return unavailableResponse(
+      DAYMARK_INTENTS.wind,
+      t('intent.title.wind'),
+      t('intent.wind.unavailable'),
+      t('intent.wind.displayUnavailable'),
+    );
+  }
+
+  const roundedSpeed = Math.round(speed);
+  const roundedGusts = gusts == null ? null : Math.round(gusts);
+  // Gusts are only worth speaking when they are meaningfully above the mean
+  // wind; otherwise the two numbers are noise.
+  const hasGusts = roundedGusts != null && roundedGusts >= roundedSpeed + 10;
+  let spoken: string;
+  let display: string;
+  if (roundedSpeed < 5) {
+    spoken = t('intent.wind.calm');
+    display = t('intent.wind.displayCalm');
+  } else if (hasGusts && roundedGusts != null) {
+    spoken = t('intent.wind.gusts', { speed: roundedSpeed, gusts: roundedGusts });
+    display = t('intent.wind.displayGusts', { speed: roundedSpeed, gusts: roundedGusts });
+  } else {
+    spoken = t('intent.wind.base', { speed: roundedSpeed });
+    display = t('intent.wind.display', { speed: roundedSpeed });
+  }
+
+  return {
+    intent: DAYMARK_INTENTS.wind,
+    title: t('intent.title.wind'),
+    spokenText: spoken,
+    displayText: display,
+    priority: roundedSpeed >= 40 || (roundedGusts ?? 0) >= 60 ? 'high' : 'normal',
+    data: {
+      available: true,
+      speedKph: roundedSpeed,
+      gustsKph: roundedGusts,
+      directionDegrees: direction == null || Number.isNaN(direction) ? null : Math.round(direction),
+    },
   };
 }
 
@@ -649,6 +705,8 @@ export function getIntentResponse(
       return getCurrentConditions(weather, context);
     case DAYMARK_INTENTS.rain:
       return getRainSummary(weather, context);
+    case DAYMARK_INTENTS.wind:
+      return getWindSummary(weather, context);
     case DAYMARK_INTENTS.uv:
       return getUVSummary(weather, context);
     case DAYMARK_INTENTS.airQuality:
@@ -672,6 +730,9 @@ export const INTENT_COMMANDS: Record<string, DaymarkIntentId> = {
   current: DAYMARK_INTENTS.current,
   now: DAYMARK_INTENTS.current,
   rain: DAYMARK_INTENTS.rain,
+  wind: DAYMARK_INTENTS.wind,
+  windy: DAYMARK_INTENTS.wind,
+  gusts: DAYMARK_INTENTS.wind,
   uv: DAYMARK_INTENTS.uv,
   'air-quality': DAYMARK_INTENTS.airQuality,
   air: DAYMARK_INTENTS.airQuality,
@@ -688,6 +749,7 @@ export const INTENT_QUERY_VALUES: Record<DaymarkIntentId, string> = {
   [DAYMARK_INTENTS.today]: 'today',
   [DAYMARK_INTENTS.current]: 'current',
   [DAYMARK_INTENTS.rain]: 'rain',
+  [DAYMARK_INTENTS.wind]: 'wind',
   [DAYMARK_INTENTS.uv]: 'uv',
   [DAYMARK_INTENTS.airQuality]: 'air-quality',
   [DAYMARK_INTENTS.alerts]: 'alerts',
@@ -706,7 +768,51 @@ export function getIntentQueryValue(intent: DaymarkIntentId): string {
 }
 
 export const UNKNOWN_INTENT_MESSAGE =
-  "I can help with today's weather, rain, UV, air quality, the next few hours, or tomorrow.";
+  "I can help with today's weather, rain, wind, UV, air quality, the next few hours, or tomorrow.";
+
+/**
+ * Answers several intents in one response, preserving the order the caller
+ * asked for. Single-intent questions keep the exact behaviour of
+ * {@link getIntentResponse}.
+ */
+export function getCombinedIntentResponse(
+  intents: readonly DaymarkIntentId[],
+  weather: WeatherPayload,
+  context: IntentContext = {},
+): DaymarkIntentResponse {
+  const unique: DaymarkIntentId[] = [];
+  for (const intent of intents) {
+    if (!unique.includes(intent)) unique.push(intent);
+  }
+  if (!unique.length) {
+    throw new Error('getCombinedIntentResponse requires at least one intent');
+  }
+  const responses = unique.map((intent) => getIntentResponse(intent, weather, context));
+  if (responses.length === 1) return responses[0];
+
+  const priority: IntentPriority = responses.some((response) => response.priority === 'high')
+    ? 'high'
+    : responses.some((response) => response.priority === 'normal')
+      ? 'normal'
+      : 'low';
+
+  return {
+    intent: unique[0],
+    intents: unique,
+    title: responses.map((response) => response.title).join(' · '),
+    spokenText: responses.map((response) => response.spokenText).join(' '),
+    displayText: responses.map((response) => response.displayText).join(' · '),
+    priority,
+    data: {
+      available: responses.every((response) => response.data?.available !== false),
+      intents: unique,
+      responses: responses.map((response) => ({
+        intent: response.intent,
+        data: response.data ?? null,
+      })),
+    },
+  };
+}
 
 /*
  * Deterministic transcript understanding for "Ask Daymark".
@@ -731,6 +837,7 @@ const TRANSCRIPT_RULES: ReadonlyArray<{ intent: DaymarkIntentId; matches: RegExp
   { intent: DAYMARK_INTENTS.tomorrow, matches: /\btomorrow\b|\bdemain\b|\bmanana\b/ },
   { intent: DAYMARK_INTENTS.alerts, matches: /\balerts?\b|\bwarnings?\b|\bsevere weather\b|\bdangerous\b|\bdanger\b|\balerte?s?\b|\bdangereux?\b|\balertas?\b|\bpeligro\b|\bpeligroso\b/ },
   { intent: DAYMARK_INTENTS.rain, matches: /\brain(?:ing|y|s)?\b|\bumbrella\b|\bshowers?\b|\bdrizzle\b|\bstorm(?:y|s)?\b|\bpluie\b|\bpleuvoir\b|\bparapluie\b|\baverses?\b|\blluvia\b|\bllover\b|\bparaguas\b|\bchubascos?\b/ },
+  { intent: DAYMARK_INTENTS.wind, matches: /\bwind(?:y|s)?\b|\bgusts?\b|\bgusty\b|\bvent\b|\bventeux\b|\bviento\b|\brachas?\b|\brafagas?\b/ },
   { intent: DAYMARK_INTENTS.uv, matches: /\buv\b|\bsun protection\b|\bsunscreen\b|\bsun cream\b|\bsunblock\b|\bsunburn\b|\bburn\b|\bprotection solaire\b|\bcreme solaire\b|\bprotector solar\b|\bcrema solar\b|\bquemadura\b/ },
   { intent: DAYMARK_INTENTS.airQuality, matches: /\bair quality\b|\baqi\b|\bpollution\b|\bpollutants?\b|\bsmog\b|\bair\b|\bqualite de l'?air\b|\bcalidad del aire\b|\bcontaminacion\b/ },
   { intent: DAYMARK_INTENTS.hours, matches: /\bnext few hours\b|\bnext hours\b|\blater\b|\bthis afternoon\b|\bthis evening\b|\btonight\b|\bnext few\b|\bprochaines heures\b|\bce soir\b|\bcet apres midi\b|\bproximas horas\b|\besta tarde\b|\besta noche\b/ },
@@ -738,12 +845,30 @@ const TRANSCRIPT_RULES: ReadonlyArray<{ intent: DaymarkIntentId; matches: RegExp
   { intent: DAYMARK_INTENTS.today, matches: /\btoday\b|\bweather\b|\bforecast\b|\bbriefing\b|\baujourd'?hui\b|\bmeteo\b|\bhoy\b|\btiempo\b|\bpronostico\b/ },
 ];
 
-export function resolveIntentTranscript(transcript: string | null | undefined): DaymarkIntentId | null {
-  if (!transcript) return null;
+/**
+ * Every intent named by the transcript, in rule order and without duplicates.
+ *
+ * A compound question ("will it rain, how warm is it and how windy is it")
+ * returns rain + current + wind. The umbrella `today` intent is dropped when
+ * the user asked for specific subjects, because its briefing already includes
+ * them and would repeat the same facts.
+ */
+export function resolveIntentTranscripts(transcript: string | null | undefined): DaymarkIntentId[] {
+  if (!transcript) return [];
   const normalized = normalizeTranscript(transcript);
-  if (!normalized) return null;
+  if (!normalized) return [];
+  const found: DaymarkIntentId[] = [];
   for (const rule of TRANSCRIPT_RULES) {
-    if (rule.matches.test(normalized)) return rule.intent;
+    if (rule.matches.test(normalized) && !found.includes(rule.intent)) found.push(rule.intent);
   }
-  return null;
+  if (found.length > 1) {
+    const umbrella = found.indexOf(DAYMARK_INTENTS.today);
+    if (umbrella !== -1) found.splice(umbrella, 1);
+  }
+  return found;
+}
+
+/** The primary intent (first match). Kept for single-intent callers. */
+export function resolveIntentTranscript(transcript: string | null | undefined): DaymarkIntentId | null {
+  return resolveIntentTranscripts(transcript)[0] ?? null;
 }

@@ -7,8 +7,10 @@ import es from '@/locales/es';
  * plain `translate()` function with no framework dependency. The React binding
  * lives in hooks/use-locale.tsx.
  *
- * The only thing persisted is the language code (`daymark.locale`), which is a
- * non-sensitive display preference — never location, queries or identity.
+ * The only thing the web/PWA persists is the language code (`daymark.locale`),
+ * a non-sensitive display preference — never location, queries or identity.
+ * The Android voice module separately keeps a private microphone-requested flag
+ * in SharedPreferences (`daymark.permissions`), documented in the privacy policy.
  */
 
 export type Locale = 'en' | 'fr' | 'es';

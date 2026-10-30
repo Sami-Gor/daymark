@@ -10,6 +10,9 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
+    // Never mirror WebView console output (which can include native plugin
+    // result payloads) into logcat. Do not rely on the debug-build default.
+    loggingBehavior: 'none',
   },
 };
 
