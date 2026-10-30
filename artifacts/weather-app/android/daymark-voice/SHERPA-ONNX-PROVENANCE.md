@@ -13,8 +13,8 @@ original `release/v2-candidate` baseline AAR is not this artifact.
 | Field | Value |
 |---|---|
 | AAR | `sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar` |
-| AAR SHA-256 | `e39d54aea9b17ab7a35fa1586e444f8c76bf93fdfb764c24e35c434b3d7e1d28` |
-| `libsherpa-onnx-jni.so` SHA-256 | `f431d38b1381220e10d158d5e429f2f2b56614eff91d99295a4588350219b00d` |
+| AAR SHA-256 | `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8` |
+| `libsherpa-onnx-jni.so` SHA-256 | `9a730e8e70f40e6b3662a1481d5b166cc9db16f717e8a3e74e3a12a8ff525485` |
 | `libonnxruntime.so` SHA-256 (AAR) | `33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1` |
 | `libonnxruntime.so` SHA-256 (APK after AGP strip) | `7a2fb92eb67037837c3f0e428bd732fd0d05ced0546d9e740090c07573d8249a` |
 | ABI | `arm64-v8a` only |
@@ -23,7 +23,7 @@ original `release/v2-candidate` baseline AAR is not this artifact.
 | Patch SHA-256 | `fd58558bdb9a7b82be8c2bfe7890890ca01edfedd95797e285d313b0bacd9f99` |
 | NDK / CMake / ORT | `29.0.14206865` / `3.22.1` / `1.28.2` |
 | AAR Gradle / AGP | `8.6` / `8.4.0` |
-| AAR size | 10,213,251 bytes |
+| AAR size | 10,214,077 bytes |
 
 The rebuilt AAR is tracked in this branch at
 `artifacts/weather-app/android/daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar`.
@@ -119,7 +119,7 @@ ANDROID_HOME=/Users/m1/.bubblewrap/android_sdk \
 
 The resulting AAR contains only:
 
-- `jni/arm64-v8a/libsherpa-onnx-jni.so` (5,023,800 bytes)
+- `jni/arm64-v8a/libsherpa-onnx-jni.so` (5,035,144 bytes)
 - `jni/arm64-v8a/libonnxruntime.so` (22,249,560 bytes)
 
 plus normal AAR metadata. Both files are ELF64 AArch64 shared objects with the
@@ -129,9 +129,13 @@ expected SONAMEs; the JNI library depends on `libandroid.so`, `liblog.so`,
 ## Verification
 
 - Native suite: **24/24 passed** in the normal build and **24/24 passed** in the
-  AddressSanitizer build. This was a fresh run on 2026-10-29 using
+  AddressSanitizer build. This was a fresh run on 2026-10-30 using
   `tests/run-native-tests.sh` against a separate clean v1.13.8 checkout with
   the tracked patch.
+- Guard-removal negative test: removing the width-range guard from a disposable
+  copy caused the normal regression binary to fail and abort (`exit 138`);
+  malformed-model rejection tests failed, demonstrating that the guard is
+  security-relevant rather than dead code.
 - Patch diagnostics are present in the packaged JNI, including
   `Invalid modified-beam decoder metadata`, `joiner output width is outside the
   expected range`, `TDT joiner output width ... does not contain any duration
@@ -141,9 +145,9 @@ expected SONAMEs; the JNI library depends on `libandroid.so`, `liblog.so`,
 - The disposable Daymark checkout built successfully with
   `cd artifacts/weather-app/android && ./gradlew :app:assembleDebug` after
   `pnpm run sync:android-web`; the web-asset verifier and Parakeet integrity
-  task both passed. That debug build does not imply that
-  `:daymark-voice:lintDebug` passes: lint was not rerun for this rebuild, and
-  this document makes no claim that it passes.
+  task both passed. `:daymark-voice:lintDebug` was rerun for this rebuild and
+  completed with **0 errors / 4 warnings** (the expected arm64-only ChromeOS
+  ABI warning plus three obsolete SDK checks).
 - Existing CVE/QA documentation records a pre-existing `MissingPermission`
   finding at `AudioSpeechCaptureDevice.java:50`. The CVE patch does not
   introduce or suppress that finding, and this rebuild does not change the

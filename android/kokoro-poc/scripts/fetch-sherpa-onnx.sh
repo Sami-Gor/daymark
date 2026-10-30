@@ -18,7 +18,7 @@ MODULE="$REPO/artifacts/weather-app/android/daymark-voice"
 LIBS="$MODULE/libs"
 
 AAR_NAME="sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar"
-AAR_SHA256="e39d54aea9b17ab7a35fa1586e444f8c76bf93fdfb764c24e35c434b3d7e1d28"
+AAR_SHA256="5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8"
 # Optional: a URL for the reviewed patched artifact when it is published.
 # Without it, the artifact must already be provisioned in libs/.
 AAR_URL="${SHERPA_ONNX_PATCHED_AAR_URL:-}"
