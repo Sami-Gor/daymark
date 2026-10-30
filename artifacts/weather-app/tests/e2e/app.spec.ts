@@ -1996,9 +1996,16 @@ test.describe('geolocation flow', () => {
     });
     const requests: string[] = [];
     page.on('request', (request) => requests.push(request.url()));
+    // The default London micro-climate request starts after the first
+    // weather payload and is independent of the geolocation flow. Wait for
+    // it before taking the post-denial request snapshot.
+    const initialMicroClimate = page.waitForResponse((response) =>
+      response.url().includes('api.open-meteo.com') &&
+      response.url().includes('models=ukmo_seamless'));
     await mockOpenMeteo(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+    await initialMicroClimate;
     expect(await page.evaluate(() => (window as any).__geoSurface.calls), 'no location request on load').toBe(0);
 
     // First attempt: the context denies geolocation (code 1), no prompt shown.
