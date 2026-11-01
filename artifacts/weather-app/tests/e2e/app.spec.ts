@@ -2693,3 +2693,98 @@ test('repeated location denial keeps the notice and recovery route without a pro
   await expect(page.getByTestId('text-current-city')).toHaveText('London');
   await context.close();
 });
+
+test('Ask Daymark answers every requested subject through the Android bridge', async ({ page }) => {
+  // The browser demo has no voice controls. This test supplies the native
+  // Capacitor bridge shape only for the duration of the page, so the real
+  // AskDaymark UI and intent composition run unchanged.
+  await page.addInitScript(() => {
+    const listeners: Record<string, (payload: unknown) => void> = {};
+    const voiceListeners: Record<string, (payload: unknown) => void> = {};
+    (window as unknown as { CapacitorCustomPlatform: { name: string } }).CapacitorCustomPlatform = {
+      name: 'android',
+    };
+    (window as any).Capacitor = {
+      PluginHeaders: [
+        {
+          name: 'ParakeetSpeechRecognition',
+          methods: [
+            { name: 'isAvailable', rtype: 'promise' },
+            { name: 'start', rtype: 'promise' },
+            { name: 'cancel', rtype: 'promise' },
+            { name: 'addListener', rtype: 'callback' },
+            { name: 'removeListener', rtype: 'callback' },
+          ],
+        },
+        {
+          name: 'DaymarkVoice',
+          methods: [
+            { name: 'isAvailable', rtype: 'promise' },
+            { name: 'speak', rtype: 'promise' },
+            { name: 'stop', rtype: 'promise' },
+            { name: 'addListener', rtype: 'callback' },
+            { name: 'removeListener', rtype: 'callback' },
+          ],
+        },
+      ],
+      nativePromise: (plugin: string, method: string, options: { sessionId?: number }) => {
+        if (plugin === 'ParakeetSpeechRecognition') {
+          if (method === 'isAvailable') return Promise.resolve({ available: true, reason: '' });
+          if (method === 'start') {
+            const sessionId = options.sessionId;
+            window.setTimeout(() => {
+              listeners.started?.({ sessionId });
+              window.setTimeout(() => {
+                listeners.captureEnd?.({ sessionId, capturedMs: 1200 });
+                listeners.result?.({
+                  sessionId,
+                  transcript: 'will it rain, what is the temperature and how windy is it?',
+                });
+              }, 30);
+            }, 0);
+            return Promise.resolve();
+          }
+          if (method === 'cancel') return Promise.resolve();
+        }
+        if (plugin === 'DaymarkVoice') {
+          if (method === 'isAvailable') return Promise.resolve({ available: true });
+          if (method === 'speak' || method === 'stop') return Promise.resolve();
+        }
+        return Promise.resolve();
+      },
+      nativeCallback: (
+        plugin: string,
+        method: string,
+        options: { eventName?: string },
+        callback: (payload: unknown) => void,
+      ) => {
+        if (method === 'addListener' && options.eventName) {
+          if (plugin === 'ParakeetSpeechRecognition') listeners[options.eventName] = callback;
+          if (plugin === 'DaymarkVoice') voiceListeners[options.eventName] = callback;
+        }
+        return Promise.resolve('listener-id');
+      },
+    };
+  });
+
+  await mockOpenMeteo(page, {
+    forecast: {
+      ...FORECAST,
+      current: {
+        ...FORECAST.current,
+        wind_speed_10m: 14,
+        wind_gusts_10m: 22,
+      },
+    },
+  });
+  await page.goto('/');
+  await expect(page.getByTestId('button-ask-daymark')).toBeVisible();
+  await page.getByTestId('button-ask-daymark').click();
+
+  const answer = page.getByTestId('ask-answer');
+  await expect(answer).toBeVisible();
+  await expect(answer).toContainText('rain');
+  await expect(answer).toContainText('20');
+  await expect(answer).toContainText('14');
+  await expect(answer).not.toContainText('undefined');
+});

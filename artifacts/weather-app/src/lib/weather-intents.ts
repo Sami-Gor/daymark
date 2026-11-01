@@ -40,6 +40,10 @@ export const DAYMARK_INTENTS = {
   alerts: 'daymark.alerts',
   hours: 'daymark.hours',
   tomorrow: 'daymark.tomorrow',
+  snow: 'daymark.snow',
+  fog: 'daymark.fog',
+  humidity: 'daymark.humidity',
+  cloud: 'daymark.cloud',
 } as const;
 
 export type DaymarkIntentId = (typeof DAYMARK_INTENTS)[keyof typeof DAYMARK_INTENTS];
@@ -77,6 +81,11 @@ function convertTemperature(value: number | null | undefined, unit: Unit): numbe
   if (value == null || Number.isNaN(value)) return null;
   const converted = unit === 'fahrenheit' ? (value * 9) / 5 + 32 : value;
   return Math.round(converted);
+}
+
+/** Numeric field guard: malformed values become "unavailable", never NaN. */
+function numeric(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function spokenTemperature(value: number | null | undefined, unit: Unit): string | null {
@@ -164,6 +173,102 @@ export function getCurrentConditions(weather: WeatherPayload, context: IntentCon
       humidity: current.relative_humidity_2m ?? null,
       precipitationMm: current.precipitation ?? null,
     },
+  };
+}
+
+export function getSnowSummary(weather: WeatherPayload, context: IntentContext = {}): DaymarkIntentResponse {
+  const { t } = translator(context);
+  const current = weather.current ?? {};
+  const code = numeric(current.weather_code);
+  const snowfall = numeric(current.snowfall);
+  if (code == null && snowfall == null) {
+    return unavailableResponse(
+      DAYMARK_INTENTS.snow,
+      t('intent.title.snow'),
+      t('intent.snow.unavailable'),
+      t('intent.snow.displayUnavailable'),
+    );
+  }
+  const snowCode = code != null && ((code >= 71 && code <= 77) || code === 85 || code === 86);
+  const snowing = snowCode || (snowfall ?? 0) > 0;
+  return {
+    intent: DAYMARK_INTENTS.snow,
+    title: t('intent.title.snow'),
+    spokenText: snowing ? t('intent.snow.now') : t('intent.snow.none'),
+    displayText: snowing ? t('intent.snow.displayNow') : t('intent.snow.displayNone'),
+    priority: snowing ? 'normal' : 'low',
+    data: { available: true, snowing, snowfallCm: snowfall, weatherCode: code },
+  };
+}
+
+export function getFogSummary(weather: WeatherPayload, context: IntentContext = {}): DaymarkIntentResponse {
+  const { t } = translator(context);
+  const code = numeric(weather.current?.weather_code);
+  if (code == null) {
+    return unavailableResponse(
+      DAYMARK_INTENTS.fog,
+      t('intent.title.fog'),
+      t('intent.fog.unavailable'),
+      t('intent.fog.displayUnavailable'),
+    );
+  }
+  const foggy = code === 45 || code === 48;
+  return {
+    intent: DAYMARK_INTENTS.fog,
+    title: t('intent.title.fog'),
+    spokenText: foggy ? t('intent.fog.now') : t('intent.fog.none'),
+    displayText: foggy ? t('intent.fog.displayNow') : t('intent.fog.displayNone'),
+    priority: 'low',
+    data: { available: true, foggy, weatherCode: code },
+  };
+}
+
+export function getHumiditySummary(weather: WeatherPayload, context: IntentContext = {}): DaymarkIntentResponse {
+  const { t } = translator(context);
+  const humidity = numeric(weather.current?.relative_humidity_2m);
+  if (humidity == null) {
+    return unavailableResponse(
+      DAYMARK_INTENTS.humidity,
+      t('intent.title.humidity'),
+      t('intent.humidity.unavailable'),
+      t('intent.humidity.displayUnavailable'),
+    );
+  }
+  return {
+    intent: DAYMARK_INTENTS.humidity,
+    title: t('intent.title.humidity'),
+    spokenText: t('intent.humidity.current', { percent: Math.round(humidity) }),
+    displayText: t('intent.humidity.display', { percent: Math.round(humidity) }),
+    priority: 'low',
+    data: { available: true, humidity: Math.round(humidity) },
+  };
+}
+
+export function getCloudSummary(weather: WeatherPayload, context: IntentContext = {}): DaymarkIntentResponse {
+  const { t, locale } = translator(context);
+  const cloudCover = numeric(weather.current?.cloud_cover);
+  if (cloudCover == null) {
+    return unavailableResponse(
+      DAYMARK_INTENTS.cloud,
+      t('intent.title.cloud'),
+      t('intent.cloud.unavailable'),
+      t('intent.cloud.displayUnavailable'),
+    );
+  }
+  const code = numeric(weather.current?.weather_code);
+  const condition = code == null ? null : weatherCopy(code, locale);
+  const percent = Math.round(cloudCover);
+  return {
+    intent: DAYMARK_INTENTS.cloud,
+    title: t('intent.title.cloud'),
+    spokenText: condition
+      ? t('intent.cloud.current', { percent, condition: condition.toLowerCase() })
+      : t('intent.cloud.currentNoCondition', { percent }),
+    displayText: condition
+      ? t('intent.cloud.display', { percent, condition })
+      : t('intent.cloud.displayNoCondition', { percent }),
+    priority: 'low',
+    data: { available: true, cloudCover: percent, condition: condition ?? null, weatherCode: code },
   };
 }
 
@@ -717,6 +822,14 @@ export function getIntentResponse(
       return getHourlySummary(weather, context);
     case DAYMARK_INTENTS.tomorrow:
       return getTomorrowSummary(weather, context);
+    case DAYMARK_INTENTS.snow:
+      return getSnowSummary(weather, context);
+    case DAYMARK_INTENTS.fog:
+      return getFogSummary(weather, context);
+    case DAYMARK_INTENTS.humidity:
+      return getHumiditySummary(weather, context);
+    case DAYMARK_INTENTS.cloud:
+      return getCloudSummary(weather, context);
   }
 }
 
@@ -743,6 +856,13 @@ export const INTENT_COMMANDS: Record<string, DaymarkIntentId> = {
   hours: DAYMARK_INTENTS.hours,
   hourly: DAYMARK_INTENTS.hours,
   tomorrow: DAYMARK_INTENTS.tomorrow,
+  snow: DAYMARK_INTENTS.snow,
+  fog: DAYMARK_INTENTS.fog,
+  humidity: DAYMARK_INTENTS.humidity,
+  humid: DAYMARK_INTENTS.humidity,
+  cloud: DAYMARK_INTENTS.cloud,
+  cloudy: DAYMARK_INTENTS.cloud,
+  'cloud-cover': DAYMARK_INTENTS.cloud,
 };
 
 export const INTENT_QUERY_VALUES: Record<DaymarkIntentId, string> = {
@@ -755,6 +875,10 @@ export const INTENT_QUERY_VALUES: Record<DaymarkIntentId, string> = {
   [DAYMARK_INTENTS.alerts]: 'alerts',
   [DAYMARK_INTENTS.hours]: 'hours',
   [DAYMARK_INTENTS.tomorrow]: 'tomorrow',
+  [DAYMARK_INTENTS.snow]: 'snow',
+  [DAYMARK_INTENTS.fog]: 'fog',
+  [DAYMARK_INTENTS.humidity]: 'humidity',
+  [DAYMARK_INTENTS.cloud]: 'cloud',
 };
 
 export function resolveIntentCommand(command: string | null | undefined): DaymarkIntentId | null {
@@ -768,12 +892,51 @@ export function getIntentQueryValue(intent: DaymarkIntentId): string {
 }
 
 export const UNKNOWN_INTENT_MESSAGE =
-  "I can help with today's weather, rain, wind, UV, air quality, the next few hours, or tomorrow.";
+  "I can help with today's weather, rain, snow, fog, wind, humidity, cloud cover, UV, air quality, the next few hours, or tomorrow.";
+
+function sentenceParts(text: string): string[] {
+  return (text.match(/[^.!?]+[.!?]?/g) ?? [])
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function dedupeSpokenText(parts: readonly string[]): string {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const part of parts) {
+    for (const sentence of sentenceParts(part)) {
+      const key = sentence.toLowerCase().replace(/\s+/g, ' ').replace(/[.!?]+$/, '').trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      output.push(sentence);
+    }
+  }
+  return output.join(' ');
+}
+
+function dedupeDisplayText(parts: readonly string[]): string {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const part of parts) {
+    for (const clause of part.split(' · ').map((value) => value.trim()).filter(Boolean)) {
+      const key = clause.toLowerCase().replace(/\s+/g, ' ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      output.push(clause);
+    }
+  }
+  return output.join(' · ');
+}
 
 /**
  * Answers several intents in one response, preserving the order the caller
  * asked for. Single-intent questions keep the exact behaviour of
  * {@link getIntentResponse}.
+ *
+ * Compound answers remove repeated exact sentences and display clauses. When
+ * rain is requested alongside current conditions, the current-conditions
+ * "raining now" suffix is omitted so the rain fact is stated once by the rain
+ * intent.
  */
 export function getCombinedIntentResponse(
   intents: readonly DaymarkIntentId[],
@@ -787,7 +950,18 @@ export function getCombinedIntentResponse(
   if (!unique.length) {
     throw new Error('getCombinedIntentResponse requires at least one intent');
   }
-  const responses = unique.map((intent) => getIntentResponse(intent, weather, context));
+  const { t } = translator(context);
+  const responses = unique.map((intent) => {
+    const response = getIntentResponse(intent, weather, context);
+    if (intent !== DAYMARK_INTENTS.current || !unique.includes(DAYMARK_INTENTS.rain)) {
+      return response;
+    }
+    const rainNow = t('intent.current.raining').trim();
+    const spokenText = rainNow
+      ? response.spokenText.replace(rainNow, '').replace(/\s+/g, ' ').trim()
+      : response.spokenText;
+    return { ...response, spokenText };
+  });
   if (responses.length === 1) return responses[0];
 
   const priority: IntentPriority = responses.some((response) => response.priority === 'high')
@@ -799,9 +973,9 @@ export function getCombinedIntentResponse(
   return {
     intent: unique[0],
     intents: unique,
-    title: responses.map((response) => response.title).join(' · '),
-    spokenText: responses.map((response) => response.spokenText).join(' '),
-    displayText: responses.map((response) => response.displayText).join(' · '),
+    title: [...new Set(responses.map((response) => response.title))].join(' · '),
+    spokenText: dedupeSpokenText(responses.map((response) => response.spokenText)),
+    displayText: dedupeDisplayText(responses.map((response) => response.displayText)),
     priority,
     data: {
       available: responses.every((response) => response.data?.available !== false),
@@ -842,6 +1016,10 @@ const TRANSCRIPT_RULES: ReadonlyArray<{ intent: DaymarkIntentId; matches: RegExp
   { intent: DAYMARK_INTENTS.airQuality, matches: /\bair quality\b|\baqi\b|\bpollution\b|\bpollutants?\b|\bsmog\b|\bair\b|\bqualite de l'?air\b|\bcalidad del aire\b|\bcontaminacion\b/ },
   { intent: DAYMARK_INTENTS.hours, matches: /\bnext few hours\b|\bnext hours\b|\blater\b|\bthis afternoon\b|\bthis evening\b|\btonight\b|\bnext few\b|\bprochaines heures\b|\bce soir\b|\bcet apres midi\b|\bproximas horas\b|\besta tarde\b|\besta noche\b/ },
   { intent: DAYMARK_INTENTS.current, matches: /\bnow\b|\bright now\b|\bcurrently\b|\btemperature\b|\bhow (?:hot|cold|warm)\b|\bcurrent conditions?\b|\bwhat'?s it like\b|\bwhat is it like\b|\bmaintenant\b|\btemperature\b|\bquel temps\b|\bahora\b|\btemperatura\b|\bque tiempo\b/ },
+  { intent: DAYMARK_INTENTS.snow, matches: /\bsnow(?:ing|y|s)?\b|\bblizzard\b|\bneige\b|\bneiger\b|\bnieve\b|\bnevando\b|\bnevar\b/ },
+  { intent: DAYMARK_INTENTS.fog, matches: /\bfog(?:gy|s)?\b|\bmist(?:y|s)?\b|\bbrume\b|\bbrouillard\b|\bniebla\b/ },
+  { intent: DAYMARK_INTENTS.humidity, matches: /\bhumidity\b|\bhumid\b|\bmuggy\b|\bhumidite\b|\bhumedo\b|\bhumedad\b/ },
+  { intent: DAYMARK_INTENTS.cloud, matches: /\bcloud(?:s|y|iness)?\b|\bcloud cover\b|\bovercast\b|\bnuage(?:s|ux)?\b|\bnublado\b|\bnubes\b/ },
   { intent: DAYMARK_INTENTS.today, matches: /\btoday\b|\bweather\b|\bforecast\b|\bbriefing\b|\baujourd'?hui\b|\bmeteo\b|\bhoy\b|\btiempo\b|\bpronostico\b/ },
 ];
 

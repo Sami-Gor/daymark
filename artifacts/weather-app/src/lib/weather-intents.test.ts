@@ -5,12 +5,16 @@ import {
   UNKNOWN_INTENT_MESSAGE,
   getAirQualitySummary,
   getAlertsSummary,
+  getCloudSummary,
   getCurrentConditions,
+  getFogSummary,
   getHourlySummary,
+  getHumiditySummary,
   getIntentQueryValue,
   getCombinedIntentResponse,
   getIntentResponse,
   getRainSummary,
+  getSnowSummary,
   getWindSummary,
   getTodayBriefing,
   getTomorrowSummary,
@@ -107,6 +111,10 @@ describe('intent vocabulary', () => {
       alerts: 'daymark.alerts',
       hours: 'daymark.hours',
       tomorrow: 'daymark.tomorrow',
+      snow: 'daymark.snow',
+      fog: 'daymark.fog',
+      humidity: 'daymark.humidity',
+      cloud: 'daymark.cloud',
     });
   });
 
@@ -127,6 +135,7 @@ describe('intent vocabulary', () => {
     expect(getIntentQueryValue(DAYMARK_INTENTS.airQuality)).toBe('air-quality');
     expect(Object.values(INTENT_QUERY_VALUES)).toEqual([
       'today', 'current', 'rain', 'wind', 'uv', 'air-quality', 'alerts', 'hours', 'tomorrow',
+      'snow', 'fog', 'humidity', 'cloud',
     ]);
   });
 
@@ -170,6 +179,54 @@ describe('getCurrentConditions', () => {
     expect(response.spokenText).toContain('unavailable');
     expect(response.priority).toBe('low');
     expect(response.data?.available).toBe(false);
+  });
+});
+
+describe('snow, fog, humidity and cloud summaries', () => {
+  it('reports snow from a snow weather code', () => {
+    const response = getSnowSummary(buildWeather({
+      current: { ...DEFAULT_CURRENT, weather_code: 71, snowfall: 0.4 },
+    }));
+    expect(response.intent).toBe(DAYMARK_INTENTS.snow);
+    expect(response.spokenText).toContain('snowing');
+    expect(response.data?.snowing).toBe(true);
+  });
+
+  it('reports no snow without inventing a value', () => {
+    const response = getSnowSummary(buildWeather({ current: { ...DEFAULT_CURRENT, weather_code: 3 } }));
+    expect(response.spokenText).toContain('No snow');
+    expect(response.data?.snowing).toBe(false);
+  });
+
+  it('reports fog only for fog/mist weather codes', () => {
+    const fog = getFogSummary(buildWeather({ current: { ...DEFAULT_CURRENT, weather_code: 45 } }));
+    const clear = getFogSummary(buildWeather({ current: { ...DEFAULT_CURRENT, weather_code: 0 } }));
+    expect(fog.spokenText).toContain('foggy');
+    expect(fog.data?.foggy).toBe(true);
+    expect(clear.spokenText).toContain('No fog');
+    expect(clear.data?.foggy).toBe(false);
+  });
+
+  it('reports humidity and cloud cover', () => {
+    const humidity = getHumiditySummary(buildWeather());
+    const cloud = getCloudSummary(buildWeather());
+    expect(humidity.spokenText).toContain('62%');
+    expect(humidity.data?.humidity).toBe(62);
+    expect(cloud.spokenText).toContain('80%');
+    expect(cloud.data?.cloudCover).toBe(80);
+  });
+
+  it('marks snow, fog, humidity and cloud unavailable when their fields are missing', () => {
+    const weather = buildWeather({ current: { time: '2026-09-11T13:00' } });
+    for (const response of [
+      getSnowSummary(weather),
+      getFogSummary(weather),
+      getHumiditySummary(weather),
+      getCloudSummary(weather),
+    ]) {
+      expect(response.data?.available).toBe(false);
+      expect(response.spokenText.toLowerCase()).toContain('unavailable');
+    }
   });
 });
 
@@ -513,6 +570,31 @@ describe('compound transcript intents', () => {
     expect(intents).toEqual([DAYMARK_INTENTS.rain, DAYMARK_INTENTS.wind, DAYMARK_INTENTS.current]);
   });
 
+  it('keeps rain and temperature without adding the umbrella briefing', () => {
+    expect(resolveIntentTranscripts('will it rain and what is the temperature?'))
+      .toEqual([DAYMARK_INTENTS.rain, DAYMARK_INTENTS.current]);
+  });
+
+  it('keeps wind, UV and air quality together', () => {
+    expect(resolveIntentTranscripts('how windy is it, what is the UV and air quality?'))
+      .toEqual([DAYMARK_INTENTS.wind, DAYMARK_INTENTS.uv, DAYMARK_INTENTS.airQuality]);
+  });
+
+  it('keeps tomorrow and rain together', () => {
+    expect(resolveIntentTranscripts('will it rain tomorrow?'))
+      .toEqual([DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain]);
+  });
+
+  it('recognises snow, fog, humidity and cloud conditions in one question', () => {
+    expect(resolveIntentTranscripts('is it snowing, foggy or cloudy and what is the humidity?'))
+      .toEqual([DAYMARK_INTENTS.snow, DAYMARK_INTENTS.fog, DAYMARK_INTENTS.humidity, DAYMARK_INTENTS.cloud]);
+  });
+
+  it('removes repeated subjects without changing the first occurrence order', () => {
+    expect(resolveIntentTranscripts('rain, rain, temperature and wind and rain'))
+      .toEqual([DAYMARK_INTENTS.rain, DAYMARK_INTENTS.wind, DAYMARK_INTENTS.current]);
+  });
+
   it('drops the umbrella today intent when specific subjects were asked', () => {
     expect(resolveIntentTranscripts("what's the weather and will it rain?"))
       .toEqual([DAYMARK_INTENTS.rain]);
@@ -550,6 +632,94 @@ describe('getCombinedIntentResponse', () => {
     const single = getCombinedIntentResponse([DAYMARK_INTENTS.rain], buildWeather(), { locale: 'en' });
     const direct = getIntentResponse(DAYMARK_INTENTS.rain, buildWeather(), { locale: 'en' });
     expect(single).toEqual(direct);
+  });
+
+  it('answers each subject in a rain, temperature and wind compound', () => {
+    const intents = [DAYMARK_INTENTS.rain, DAYMARK_INTENTS.current, DAYMARK_INTENTS.wind];
+    const response = getCombinedIntentResponse(intents, buildWeather(), { locale: 'en' });
+    const data = response.data as { responses?: Array<{ intent: string; data?: { available?: boolean } }> };
+    expect(response.intents).toEqual(intents);
+    expect(data.responses?.map((entry) => entry.intent)).toEqual(intents);
+    expect(response.spokenText.toLowerCase()).toContain('rain');
+    expect(response.spokenText).toContain('18');
+    expect(response.spokenText).toContain('14');
+  });
+
+  it('answers tomorrow and rain together', () => {
+    const intents = [DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain];
+    const response = getCombinedIntentResponse(intents, buildWeather(), { locale: 'en' });
+    expect(response.intents).toEqual(intents);
+    expect(response.spokenText).toContain('Tomorrow');
+    expect(response.spokenText.toLowerCase()).toContain('rain');
+  });
+
+  it('answers wind, UV and air quality without dropping a subject', () => {
+    const intents = [DAYMARK_INTENTS.wind, DAYMARK_INTENTS.uv, DAYMARK_INTENTS.airQuality];
+    const response = getCombinedIntentResponse(intents, buildWeather(), { locale: 'en' });
+    expect(response.intents).toEqual(intents);
+    expect(response.spokenText.toLowerCase()).toContain('wind');
+    expect(response.spokenText.toLowerCase()).toContain('uv');
+    expect(response.spokenText.toLowerCase()).toContain('air quality');
+  });
+
+  it('answers snow, fog, humidity and cloud together', () => {
+    const intents = [
+      DAYMARK_INTENTS.snow,
+      DAYMARK_INTENTS.fog,
+      DAYMARK_INTENTS.humidity,
+      DAYMARK_INTENTS.cloud,
+    ];
+    const response = getCombinedIntentResponse(intents, buildWeather({
+      current: { ...DEFAULT_CURRENT, weather_code: 45, snowfall: 0 },
+    }), { locale: 'en' });
+    expect(response.intents).toEqual(intents);
+    expect(response.spokenText).toContain('No snow');
+    expect(response.spokenText).toContain('foggy');
+    expect(response.spokenText).toContain('62%');
+    expect(response.spokenText).toContain('80%');
+  });
+
+  it('states unavailable data for every requested subject without inventing values', () => {
+    const intents = [
+      DAYMARK_INTENTS.rain,
+      DAYMARK_INTENTS.current,
+      DAYMARK_INTENTS.wind,
+      DAYMARK_INTENTS.uv,
+      DAYMARK_INTENTS.airQuality,
+      DAYMARK_INTENTS.snow,
+      DAYMARK_INTENTS.fog,
+      DAYMARK_INTENTS.humidity,
+      DAYMARK_INTENTS.cloud,
+    ];
+    const response = getCombinedIntentResponse(
+      intents,
+      buildWeather({ current: { temperature_2m: 18 }, hourly: {}, airQuality: null }),
+      { locale: 'en' },
+    );
+    const data = response.data as { available?: boolean; responses?: Array<{ intent: string; data?: { available?: boolean } }> };
+    expect(data.available).toBe(false);
+    expect(data.responses).toHaveLength(intents.length);
+    expect(response.spokenText).toContain('Hourly rain data is unavailable');
+    expect(response.spokenText).toContain('Wind data is unavailable');
+    expect(response.spokenText).toContain('UV detail is unavailable');
+    expect(response.spokenText).toContain('Air-quality detail is unavailable');
+    expect(response.spokenText).toContain('Snow data is unavailable');
+    expect(response.spokenText).toContain('Fog data is unavailable');
+    expect(response.spokenText).toContain('Humidity data is unavailable');
+    expect(response.spokenText).toContain('Cloud-cover data is unavailable');
+    expect(response.spokenText).toContain('18');
+  });
+
+  it('suppresses repeated intents and the duplicated current-rain clause', () => {
+    const intents = [DAYMARK_INTENTS.rain, DAYMARK_INTENTS.current, DAYMARK_INTENTS.rain];
+    const response = getCombinedIntentResponse(
+      intents,
+      buildWeather({ current: { ...DEFAULT_CURRENT, precipitation: 0.6 } }),
+      { locale: 'en' },
+    );
+    expect(response.intents).toEqual([DAYMARK_INTENTS.rain, DAYMARK_INTENTS.current]);
+    expect((response.spokenText.match(/raining/gi) ?? []).length).toBe(1);
+    expect((response.spokenText.match(/rain is falling/gi) ?? []).length).toBe(0);
   });
 });
 
