@@ -16,7 +16,7 @@ column is the `v2/privacy-hardened-voice` branch, which is **not released**.
 | Kokoro model weights (`model_quantized.onnx`) | `kokoro-en` 0.1.5 | Apache-2.0 (upstream repository) | v1.0.0 and V2 candidate | SHA-256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478`. |
 | `bm_fable.bin` narration voice | — | Apache-2.0 (per the model repository) | v1.0.0 and V2 candidate | SHA-256 `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1`. Per-voice training-data provenance is not documented upstream; unresolved, low risk. |
 | `ff_siwis.bin` French narration voice | — | **CC BY 4.0** via the SIWIS corpus | multilingual Android POC | SHA-256 `a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861`. Derived from the [SIWIS corpus](https://datashare.ed.ac.uk/handle/10283/2353); attribution is required. Attribution text is included below. |
-| `em_alex.bin` Spanish narration voice | — | **Unresolved** | multilingual Android POC | SHA-256 `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95`. Upstream documents the voice but not a clear training-data provenance/redistribution basis. **Distribution blocker; not cleared.** |
+| `em_alex.bin` Spanish narration voice | — | **Apache-2.0 (conditional)** | multilingual Android POC | SHA-256 `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95`. Exact `hexgrad/Kokoro-82M` voice style converted by `onnx-community/Kokoro-82M-v1.0-ONNX`; Apache-2.0 notice and change-statement conditions apply. Speaker/training-data provenance remains undocumented and is not cleared. See [`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md). |
 | [espeak-ng](https://github.com/espeak-ng/espeak-ng) | — | GPL-3.0 | **not included** | Verified absent: the Kokoro build uses the lean configuration without bundled eSpeak. |
 | [Rust](https://www.rust-lang.org/) standard library and crates (`tokio`, `jni`, `log`, `android_logger`, `bincode`, `fancy-regex`, `regex`, `futures`, `pin-project`, `ndarray`, `num2words`, `unicode-segmentation`, `miette`, `language-tokenizer`, `quick-xml`) | see `android/kokoro-poc/README.md` | MIT / Apache-2.0 | multilingual Android POC | Compiled into the Kokoro native library. `language-tokenizer` is WTFPL-2.0 and ships its own licence file. |
 | [piper-plus-g2p](https://github.com/ayutaz/piper-plus) | 0.5.3, commit `751e5dfe3fac760ac1993083b93ad34d057ae80d` | **MIT** | multilingual Android POC | French and Latin American Spanish G2P; no eSpeak, no model. The published crate does not contain a standalone `LICENSE` file; the exact upstream MIT text is reproduced below. |
@@ -60,10 +60,30 @@ attributed in the app's privacy pages.
 
 ### `em_alex` (Spanish)
 
-`em_alex.bin` is the Spanish voice style published in the Kokoro model
-repository. Its upstream training-data provenance and redistribution basis are
-**not clearly documented**. It remains a **distribution blocker** for the
-multilingual Android build and is not cleared by this POC.
+`em_alex.bin` is the Spanish voice style published by **hexgrad** in the
+**Kokoro-82M** model repository and converted to ONNX `.bin` format by
+**onnx-community/Kokoro-82M-v1.0-ONNX**. The exact redistributed file has
+SHA-256 `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95`;
+the base `voices/em_alex.pt` has SHA-256
+`5eac53f767c3f31a081918ba531969aea850bed18fe56419b804d642c6973431`.
+
+The asset is distributed under the **Apache License 2.0** declared by both
+model repositories, subject to the licence-copy, attribution and
+change-statement conditions. Daymark does not modify the voice bytes.
+
+> Kokoro-82M Spanish voice `em_alex` — published by
+> [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), converted to
+> ONNX `.bin` by
+> [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX),
+> redistributed unmodified under the
+> [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+> Daymark does not claim speaker endorsement or identity.
+
+The publisher does not document the original speaker, recording, training
+dataset, consent, or voice-likeness rights for this individual voice. That
+provenance remains unresolved and is not cleared by the Apache-2.0 grant. The
+voice remains provisional; see
+[`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md).
 
 ## Verifying the redistributed files
 
