@@ -42,6 +42,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // The POC debug APK is installed alongside the production app.
+            // Release builds keep the production application ID.
+            applicationIdSuffix ".pocmultilingual"
+        }
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -60,6 +65,41 @@ android {
         // them out of the APK assets on first initialization.
         noCompress += ['onnx', 'bin']
     }
+}
+
+/*
+ * The POC debug APK is installed alongside the production app, so the
+ * effective application IDs must stay distinct. Assert the resolved variant
+ * IDs (not just the Gradle text) so a later change cannot silently
+ * reintroduce a package collision.
+ */
+def expectedApplicationIds = [
+    debug  : 'io.github.sami_gor.daymark.pocmultilingual',
+    release: 'io.github.sami_gor.daymark',
+]
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def expected = expectedApplicationIds[variant.buildType]
+        if (expected == null) {
+            return
+        }
+        tasks.register("verify${variant.name.capitalize()}ApplicationId") {
+            group = 'verification'
+            description = "Fails unless the ${variant.name} variant resolves to ${expected}."
+            doLast {
+                def actual = variant.applicationId.get()
+                if (actual != expected) {
+                    throw new GradleException(
+                        "Unexpected ${variant.name} application ID: ${actual} (expected ${expected}).")
+                }
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == 'preBuild' || it.name == 'check' }.configureEach {
+    dependsOn 'verifyDebugApplicationId', 'verifyReleaseApplicationId'
 }
 
 repositories {
