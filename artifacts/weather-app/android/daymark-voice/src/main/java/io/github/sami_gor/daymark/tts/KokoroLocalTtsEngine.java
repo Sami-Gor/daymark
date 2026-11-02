@@ -140,16 +140,18 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     long elapsedMs = SystemClock.elapsedRealtime() - start;
                     if (error != null) {
                         Log.e(TAG, "initialize: failed: " + error);
-                        setState(State.ERROR);
+                        // Notify before the terminal state so the bridge can
+                        // preserve the specific asset/model reason for the UI.
                         notifyError("Initialization failed: " + error);
+                        setState(State.ERROR);
                         return;
                     }
                     Log.i(TAG, "initialize: model loaded in " + elapsedMs + "ms defaultVoice=" + DEFAULT_VOICE_NAME);
                     setState(State.READY);
                 } catch (Throwable failure) {
                     Log.e(TAG, "initialize: failed: " + failure.getMessage(), failure);
-                    setState(State.ERROR);
                     notifyError("Initialization failed: " + failure.getMessage());
+                    setState(State.ERROR);
                 }
             }
         });
