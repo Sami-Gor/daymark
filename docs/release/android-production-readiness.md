@@ -29,6 +29,11 @@ have. Where the two differ, both are stated.
 > French/Spanish narration is unavailable in V2 and the system-TTS plugin is
 > not registered. Both Android and web/PWA apply the same latitude-aware grid
 > with a 0.025-degree minimum step.
+> **V2.1 POC update (2 November 2026):** English narration remains the
+> streamed Kokoro path. French and Spanish are debug-POC-only and use the
+> whole-text `nativeSynth` path; production release builds reject them. The
+> legacy `SystemSpeech` plugin remains unregistered. There is no
+> system/browser/network TTS fallback.
 > Rows below that describe v1 browser speech or system TTS are retained as v1
 > evidence, not as current V2 behaviour.
 
@@ -347,8 +352,9 @@ VERIFIED/READY:
 - Model/voice load from `filesDir` copies of bundled assets; hashes match.
 - JNI returns error strings/nulls; Java falls back to whole-text synthesis if a
   segment plan does not match, then to the monolithic path if streaming cannot
-  start; French/Spanish use the system engine by design, while English
-  narration failures surface an error and never fall back to system TTS.
+  start. English uses the stream. French/Spanish are debug-POC-only and, on
+  that path, use whole-text `nativeSynth`; production release builds reject
+  them. No narration path falls back to system, browser, or network TTS.
 - AudioTrack is created per narration and released in `finally`; Stop pauses and
   flushes immediately, clears the pending stream, resolves the pending call.
 - Pause stops narration; audio focus (`GAIN_TRANSIENT`) is requested per
@@ -367,10 +373,13 @@ Notes:
   as a residual risk covered by device testing.
 - Bluetooth/headphone routing relies on default AudioTrack routing; untested.
 
-**v2 candidate:** French/Spanish narration is unavailable and is planned for
-V2.2. The UI shows an explicit unavailable message; the SystemSpeech plugin is
-not registered, so there is no Android system-TTS, network-voice or browser
-fallback.
+**v2 candidate / V2.1 POC:** French/Spanish narration is unavailable in the
+current public release. The multilingual work is an unreleased debug POC and
+must not be advertised as a released capability. Debug POC builds use local
+Kokoro (whole-text `nativeSynth`); production release builds reject French and
+Spanish before synthesis. The SystemSpeech plugin is not registered, so there
+is no Android system-TTS, network-voice or browser fallback. No future release
+version is promised here.
 
 **Core narration already tested on a physical device:** playback, Stop,
 restart without overlap, and basic lifecycle handling passed (§18).
@@ -577,11 +586,11 @@ responses by design.
 |---|---|
 | No location permission / unavailable / timeout | distinct friendly copy, retryable, no crash (denial/timeout edge-case tests are additional coverage) |
 | Network unavailable / API timeout / malformed response | validated response → retry UI, no infinite loading |
-| Kokoro init failure | English surfaces the narration error (no system fallback); fr/es keep their system-TTS path |
+| Kokoro init failure | English surfaces the narration error (no system fallback); fr/es are unavailable in a production release |
 | Kokoro synth/playback failure | error state, listener notified, no crash |
 | Microphone denied / recognition unavailable | UI error; no crash (denial/unavailable edge-case tests are additional coverage) |
-| System TTS unavailable | speak rejection surfaces as a state reset; no crash |
-| Unsupported language | fr/es use system TTS; if unavailable the narration error is shown |
+| System TTS unavailable | Legacy SystemSpeech is unregistered; no runtime system-TTS path exists |
+| Unsupported language | Explicit unsupported-language error; no system/browser/network fallback |
 | Low memory / process restart | cold start; engine re-initializes; in-memory briefing regenerated |
 
 ## 18. Physical-device test matrix
@@ -618,7 +627,7 @@ release risk makes one necessary.
 | 19 | Low-memory kill while backgrounded | ✓ | ✓ | ✓ | relaunch cold-starts cleanly |
 | 20 | Rotation while idle/narrating | ✓ | ✓ | ✓ | no audio glitch; layout intact |
 | 21 | TalkBack + 200% font | ✓ | ✓ | ✓ | controls announced; no clipping |
-| 22 | French/Spanish narration | ✓ | ✓ | ✓ | system TTS used; voice data present; clear error if absent |
+| 22 | French/Spanish narration | ✓ | ✓ | ✓ | unavailable in production; debug POC uses local Kokoro whole-text synthesis only |
 
 ### Brief physical-device validation — 14 September 2026
 
@@ -648,7 +657,7 @@ merge-confidence pass.
 
 Not covered by this brief pass: broader coverage across classes A/B/C,
 TalkBack, a 10-minute thermal soak, call/music interruption, screen lock,
-rotation, low-memory kill, French/Spanish system-TTS voice data, a
+rotation, low-memory kill, debug-POC French/Spanish narration, a
 Google-Play-distributed install, verified App Links, and upgrade install.
 This is a record of scope, not a requirement to rerun already-passed tests.
 Additional cases may be tested if broader assurance is wanted or a concrete
@@ -716,8 +725,8 @@ Launch/weather, location use, voice input, local Kokoro narration, stop/restart,
 lifecycle handling, enlarged-font usability and short stability checks passed.
 **The core physical-device test is complete; do not repeat it.** The matrix
 retains optional extended QA for other device classes, TalkBack, longer thermal
-soak, call/music interruption, Bluetooth routing, French/Spanish system TTS,
-verified App Links, upgrade install and Play-distributed install. Consider these
+soak, call/music interruption, Bluetooth routing, debug-POC French/Spanish
+narration, verified App Links, upgrade install and Play-distributed install. Consider these
 only if additional assurance is needed or a specific release risk warrants them.
 
 ### C. READY NOW

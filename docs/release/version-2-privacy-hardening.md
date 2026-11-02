@@ -42,7 +42,7 @@ sources for the candidate.
   ONNX Runtime can memory-map it, and the model is delivered to the device by
   Google Play. Inference never requires a network connection.
 - English narration remains on the bundled local Kokoro engine.
-- French and Spanish narration is unavailable in V2 and is planned for V2.2.
+- French and Spanish narration is unavailable in the current public release; the multilingual work is an unreleased development POC.
   The app shows an explicit unavailable message. The Android system-TTS plugin
   is not registered, so there is no system-TTS, network-voice or browser
   fallback.

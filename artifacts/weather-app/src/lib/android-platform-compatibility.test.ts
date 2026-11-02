@@ -68,4 +68,24 @@ describe('Android platform compatibility contract', () => {
     expect(screen).toContain('public/index.html');
     expect(screen).toContain('showRecovery');
   });
+
+  it('keeps native recovery as an overlay and reloads the attached WebView in place', () => {
+    const activity = read('app', 'src', 'main', 'java', 'io', 'github', 'sami_gor', 'daymark', 'MainActivity.java');
+    const screen = read('app', 'src', 'main', 'java', 'io', 'github', 'sami_gor', 'daymark', 'WebViewCompatibilityScreen.java');
+    expect(activity).not.toContain('setContentView(bridge.getWebView())');
+    expect(activity).toContain('bridge.reload()');
+    expect(screen).toContain('android.R.id.content');
+    expect(screen).toContain('content.addView');
+    expect(activity).toContain('removeView(overlay)');
+  });
+
+  it('keeps renderer death off the live-reload path and gates readiness on rendered content', () => {
+    const client = read('app', 'src', 'main', 'java', 'io', 'github', 'sami_gor', 'daymark', 'DaymarkWebViewClient.java');
+    const screen = read('app', 'src', 'main', 'java', 'io', 'github', 'sami_gor', 'daymark', 'WebViewCompatibilityScreen.java');
+    expect(client).toContain('onWebViewRendererGone');
+    expect(client).toContain("getElementById('root')");
+    expect(client).toContain('childElementCount');
+    expect(screen).toContain('showRendererUnavailable');
+    expect(screen).toMatch(/showRendererUnavailable[\s\S]*?null\)/);
+  });
 });
