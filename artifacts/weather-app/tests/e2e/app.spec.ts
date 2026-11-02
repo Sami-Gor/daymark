@@ -688,6 +688,20 @@ test.describe('PWA + service worker (production build)', () => {
     await page.reload();
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
   });
+
+  test('leaves Vite preload errors to the browser instead of cancelling them', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    const prevented = await page.evaluate(() => {
+      const event = new Event('vite:preloadError', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+
+    expect(prevented, 'the web/PWA build has no native recovery screen to take over').toBe(false);
+  });
 });
 
 test.describe('security headers (preview environment)', () => {
@@ -1875,6 +1889,32 @@ test.describe('geolocation flow', () => {
     );
   }
 
+  /**
+   * Holds the weather forecast for the grid-rounded device fix (51.5, -0.125)
+   * until the test releases it. Other forecasts and requests fall through to
+   * the default fixtures so the test controls only the location response.
+   */
+  async function holdLocationForecast(page: Page) {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let intercepted!: () => void;
+    const seen = new Promise<void>((resolve) => { intercepted = resolve; });
+    let delivered!: () => void;
+    const fulfilled = new Promise<void>((resolve) => { delivered = resolve; });
+    await page.route('**/api.open-meteo.com/**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('latitude') !== '51.5' || url.searchParams.has('models')) {
+        await route.fallback();
+        return;
+      }
+      intercepted();
+      await held;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FORECAST) });
+      delivered();
+    });
+    return { release, seen, fulfilled };
+  }
+
   test('a search made while geolocation is pending is not overwritten by the older location result', async ({ page }) => {
     await mockOpenMeteo(page);
     await routeSearchGeocoding(page, PARIS);
@@ -1988,6 +2028,68 @@ test.describe('geolocation flow', () => {
     await page.waitForTimeout(250);
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
     await expect(page.getByTestId('location-notice')).toHaveCount(0);
+  });
+
+  test('backgrounding drops an in-flight location weather result', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('refresh-indicator')).toHaveCount(0);
+
+    // Hold only the location forecast so the response can be released after
+    // the page is hidden; everything else keeps using the default fixtures.
+    const held = await holdLocationForecast(page);
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await held.seen;
+    await expect(page.getByTestId('refresh-indicator')).toBeVisible();
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+
+    held.release();
+    // The indicator disappears only when the held response finishes, which is
+    // the deterministic signal that its commit path ran.
+    await expect(page.getByTestId('refresh-indicator')).toHaveCount(0);
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
+  });
+
+  test('a search selection supersedes an in-flight location weather result', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeSearchGeocoding(page, PARIS);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+
+    const held = await holdLocationForecast(page);
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await held.seen;
+
+    // The newer search must win even though the location response arrives last.
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+
+    held.release();
+    await held.fulfilled;
+    // Drain the render queued by the released response before asserting the
+    // newer selection is still displayed.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+    await expect(page.getByTestId('refresh-indicator')).toHaveCount(0);
   });
 
   test('reports position-unavailable distinctly from permission denial', async ({ page }) => {

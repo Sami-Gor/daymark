@@ -6,9 +6,14 @@ type RecoveryPlugin = {
 
 const NativeRecovery = registerPlugin<RecoveryPlugin>('DaymarkRecovery');
 
+/** The Android host is the only platform with a native recovery screen. */
+function hasNativeRecovery(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+}
+
 /** Ask the native host to show the local-asset recovery screen, if present. */
 export function reportAssetFailure(kind: string): void {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+  if (!hasNativeRecovery()) return;
   void NativeRecovery.reportAssetFailure({ kind }).catch(() => {
     // The native WebViewClient is the fallback when the bridge cannot report.
   });
@@ -79,6 +84,43 @@ export function createAssetRecoveryReporter({
   };
 }
 
+type AssetRecoveryHandlerOptions = {
+  reporter: AssetRecoveryReporter;
+  /** True only when the native host can show the recovery screen. */
+  nativeRecovery: boolean;
+};
+
+export type AssetRecoveryHandlers = {
+  onPreloadError: (event: Event) => void;
+  onResourceError: (event: Event) => void;
+  onUnhandledRejection: (event: PromiseRejectionEvent) => void;
+};
+
+/**
+ * Browser listeners for asset failures. A Vite preload error is cancelled only
+ * when the Android host can recover; on the web/PWA the event is left alone so
+ * Vite and the browser keep their normal error handling instead of the failure
+ * being swallowed.
+ */
+export function createAssetRecoveryHandlers({
+  reporter,
+  nativeRecovery,
+}: AssetRecoveryHandlerOptions): AssetRecoveryHandlers {
+  return {
+    onPreloadError(event) {
+      if (!nativeRecovery) return;
+      event.preventDefault();
+      reporter.handlePreloadFailure();
+    },
+    onResourceError(event) {
+      reporter.handleResourceFailure(event.target);
+    },
+    onUnhandledRejection(event) {
+      reporter.handleRejection(event.reason);
+    },
+  };
+}
+
 /** Install local application-asset failure reporting inside the native shell. */
 export function installAssetRecovery(): () => void {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -89,25 +131,18 @@ export function installAssetRecovery(): () => void {
     origin: window.location.origin,
     report: reportAssetFailure,
   });
+  const handlers = createAssetRecoveryHandlers({
+    reporter,
+    nativeRecovery: hasNativeRecovery(),
+  });
 
-  const onPreloadError = (event: Event) => {
-    event.preventDefault();
-    reporter.handlePreloadFailure();
-  };
-  const onResourceError = (event: Event) => {
-    reporter.handleResourceFailure(event.target);
-  };
-  const onUnhandledRejection = (event: PromiseRejectionEvent) => {
-    reporter.handleRejection(event.reason);
-  };
-
-  window.addEventListener('vite:preloadError', onPreloadError);
-  window.addEventListener('error', onResourceError, true);
-  window.addEventListener('unhandledrejection', onUnhandledRejection);
+  window.addEventListener('vite:preloadError', handlers.onPreloadError);
+  window.addEventListener('error', handlers.onResourceError, true);
+  window.addEventListener('unhandledrejection', handlers.onUnhandledRejection);
 
   return () => {
-    window.removeEventListener('vite:preloadError', onPreloadError);
-    window.removeEventListener('error', onResourceError, true);
-    window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    window.removeEventListener('vite:preloadError', handlers.onPreloadError);
+    window.removeEventListener('error', handlers.onResourceError, true);
+    window.removeEventListener('unhandledrejection', handlers.onUnhandledRejection);
   };
 }

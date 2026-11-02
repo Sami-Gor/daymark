@@ -1,12 +1,28 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  createAssetRecoveryHandlers,
   createAssetRecoveryReporter,
+  installAssetRecovery,
   isAssetLoadError,
   isLocalAssetUrl,
 } from './asset-recovery';
 
 const ORIGIN = 'https://localhost';
+
+const platform = vi.hoisted(() => ({
+  native: false,
+  name: 'web',
+  reportNative: vi.fn(async () => undefined),
+}));
+
+vi.mock('@capacitor/core', () => ({
+  Capacitor: {
+    isNativePlatform: () => platform.native,
+    getPlatform: () => platform.name,
+  },
+  registerPlugin: () => ({ reportAssetFailure: platform.reportNative }),
+}));
 
 describe('local application asset recovery', () => {
   it('recognises only same-origin application assets', () => {
@@ -63,5 +79,87 @@ describe('local application asset recovery', () => {
 
     expect(report).toHaveBeenCalledTimes(1);
     expect(report).toHaveBeenCalledWith('dynamic-import');
+  });
+});
+
+describe('Vite preload error handling by platform', () => {
+  beforeEach(() => {
+    platform.native = false;
+    platform.name = 'web';
+    vi.clearAllMocks();
+  });
+
+  it('leaves Vite preload errors untouched in a browser/PWA', () => {
+    const report = vi.fn();
+    const reporter = createAssetRecoveryReporter({ origin: ORIGIN, report });
+    const handlers = createAssetRecoveryHandlers({ reporter, nativeRecovery: false });
+    const event = new Event('vite:preloadError', { cancelable: true });
+
+    handlers.onPreloadError(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it('cancels and reports a Vite preload error when Android can recover', () => {
+    const report = vi.fn();
+    const reporter = createAssetRecoveryReporter({ origin: ORIGIN, report });
+    const handlers = createAssetRecoveryHandlers({ reporter, nativeRecovery: true });
+    const event = new Event('vite:preloadError', { cancelable: true });
+
+    handlers.onPreloadError(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(report).toHaveBeenCalledWith('vite-preload');
+  });
+
+  it('does not cancel preload errors when the installed host is a browser', () => {
+    const fakeWindow = Object.assign(new EventTarget(), { location: { origin: ORIGIN } });
+    vi.stubGlobal('window', fakeWindow);
+    vi.stubGlobal('document', {});
+
+    const uninstall = installAssetRecovery();
+    const event = new Event('vite:preloadError', { cancelable: true });
+    fakeWindow.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(platform.reportNative).not.toHaveBeenCalled();
+    uninstall();
+    vi.unstubAllGlobals();
+  });
+
+  it('cancels preload errors and asks the Android host to recover', () => {
+    platform.native = true;
+    platform.name = 'android';
+    const fakeWindow = Object.assign(new EventTarget(), { location: { origin: ORIGIN } });
+    vi.stubGlobal('window', fakeWindow);
+    vi.stubGlobal('document', {});
+
+    const uninstall = installAssetRecovery();
+    const event = new Event('vite:preloadError', { cancelable: true });
+    fakeWindow.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(platform.reportNative).toHaveBeenCalledWith({ kind: 'vite-preload' });
+    uninstall();
+    vi.unstubAllGlobals();
+  });
+
+  it('does not cancel preload errors on a non-Android native host', () => {
+    platform.native = true;
+    platform.name = 'ios';
+    const fakeWindow = Object.assign(new EventTarget(), { location: { origin: ORIGIN } });
+    vi.stubGlobal('window', fakeWindow);
+    vi.stubGlobal('document', {});
+
+    const uninstall = installAssetRecovery();
+    const event = new Event('vite:preloadError', { cancelable: true });
+    fakeWindow.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(platform.reportNative).not.toHaveBeenCalled();
+    uninstall();
+    vi.unstubAllGlobals();
   });
 });

@@ -40,6 +40,7 @@ import {
   type LocationFailure,
 } from '@/lib/location-feedback';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
+import { createWeatherRequestGate } from '@/lib/weather-requests';
 import { useLocale } from '@/hooks/use-locale';
 
 const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 };
@@ -53,29 +54,40 @@ function Home() {
   const [error, setError] = useState<WeatherErrorCode | ''>('');
   const [isLocating, setIsLocating] = useState(false);
   const [locationFailure, setLocationFailure] = useState<LocationFailure | null>(null);
-  const requestId = useRef(0);
+  const requestGate = useRef(createWeatherRequestGate()).current;
   const selectionId = useRef(0);
   const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
-  const loadWeather = useCallback(async (nextPlace: Place): Promise<boolean> => {
-    const id = ++requestId.current;
+  const loadWeather = useCallback(async (
+    nextPlace: Place,
+    isCurrent: () => boolean = () => true,
+  ): Promise<boolean> => {
+    const request = requestGate.begin(isCurrent);
     setIsLoading(true);
     setError('');
     try {
       const result = await fetchWeather(nextPlace);
-      if (id !== requestId.current) return false;
+      // The newest request wins; a location request also requires its
+      // selection to still be current, so a hidden or superseded location
+      // attempt cannot replace the displayed place.
+      if (!requestGate.isCurrent(request)) return false;
       // Atomic swap: the new place and its payload land together, and the
       // previous render stays mounted until they do.
       setPlace(nextPlace);
       setWeather(result);
       return true;
     } catch (err) {
-      if (id === requestId.current) setError(err instanceof WeatherFetchError ? err.code : 'unknown');
+      if (requestGate.isCurrent(request)) {
+        setError(err instanceof WeatherFetchError ? err.code : 'unknown');
+      }
       return false;
     } finally {
-      if (id === requestId.current) setIsLoading(false);
+      // Only the newest request owns the shared loading state. An invalidated
+      // location request still clears it when no newer request exists (for
+      // example after backgrounding), so the indicator never sticks.
+      if (requestGate.ownsLoading(request)) setIsLoading(false);
     }
-  }, []);
+  }, [requestGate]);
 
   const selectPlace = useCallback((nextPlace: Place) => {
     // A newer selection supersedes any in-flight "Use my location" request
@@ -122,7 +134,10 @@ function Home() {
         const fallbackName = t('current.yourLocation');
         // Weather starts immediately from the privacy-filtered coordinates; naming is
         // enhancement-only and is resolved locally while weather loads.
-        const loaded = await loadWeather({ name: fallbackName, latitude, longitude });
+        const loaded = await loadWeather(
+          { name: fallbackName, latitude, longitude },
+          () => id === selectionId.current,
+        );
         if (!loaded || id !== selectionId.current) return;
         // A successful fix clears any earlier denial/timeout notice.
         setLocationFailure(null);
