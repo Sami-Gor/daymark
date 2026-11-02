@@ -11,4 +11,8 @@
     <string name="webview_recovery_title">Daymark couldn’t finish loading</string>
     <string name="webview_recovery_message">Part of Daymark could not be loaded. Reload the app. If loading still fails, reinstall Daymark or update Android System WebView from Google Play.</string>
     <string name="webview_recovery_reload">Reload Daymark</string>
+    <string name="webview_recovery_terminal_title">Daymark needs to be reinstalled</string>
+    <string name="webview_recovery_terminal_message">Daymark could not recover. Reinstall Daymark or update Android System WebView from Google Play, then reopen the app.</string>
+    <string name="webview_renderer_title">Daymark stopped responding</string>
+    <string name="webview_renderer_message">The page renderer stopped. Close and reopen Daymark. If this keeps happening, update Android System WebView from Google Play.</string>
 </resources>

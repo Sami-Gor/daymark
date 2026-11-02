@@ -7,4 +7,8 @@
     <string name="webview_recovery_title">Daymark no pudo terminar de cargar</string>
     <string name="webview_recovery_message">No se pudo cargar una parte de Daymark. Recarga la aplicación. Si sigue fallando, reinstala Daymark o actualiza Android System WebView desde Google Play.</string>
     <string name="webview_recovery_reload">Recargar Daymark</string>
+    <string name="webview_recovery_terminal_title">Daymark necesita reinstalarse</string>
+    <string name="webview_recovery_terminal_message">Daymark no pudo recuperarse. Reinstala Daymark o actualiza Android System WebView desde Google Play y vuelve a abrir la aplicación.</string>
+    <string name="webview_renderer_title">Daymark dejó de responder</string>
+    <string name="webview_renderer_message">El motor de la página se detuvo. Cierra y vuelve a abrir Daymark. Si sigue ocurriendo, actualiza Android System WebView desde Google Play.</string>
 </resources>
