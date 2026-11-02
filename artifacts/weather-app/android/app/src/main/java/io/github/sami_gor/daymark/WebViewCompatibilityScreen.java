@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -47,14 +48,19 @@ public final class WebViewCompatibilityScreen {
     }
 
     public static void show(Activity activity) {
-        show(activity, R.string.webview_required_title, R.string.webview_required_message);
+        show(activity, R.string.webview_required_title, R.string.webview_required_message, null);
     }
 
     public static void showMissingAssets(Activity activity) {
-        show(activity, R.string.webview_assets_missing_title, R.string.webview_assets_missing_message);
+        show(activity, R.string.webview_assets_missing_title, R.string.webview_assets_missing_message, null);
     }
 
-    private static void show(Activity activity, int titleRes, int messageRes) {
+    /** Native recovery for a local chunk/application asset failure after bridge start. */
+    public static void showRecovery(Activity activity, Runnable retry) {
+        show(activity, R.string.webview_recovery_title, R.string.webview_recovery_message, retry);
+    }
+
+    private static void show(Activity activity, int titleRes, int messageRes, Runnable retry) {
         float density = activity.getResources().getDisplayMetrics().density;
         int padding = (int) (24 * density);
 
@@ -82,6 +88,17 @@ public final class WebViewCompatibilityScreen {
 
         layout.addView(title);
         layout.addView(message);
+        if (retry != null) {
+            Button reload = new Button(activity);
+            reload.setText(R.string.webview_recovery_reload);
+            reload.setAllCaps(false);
+            LinearLayout.LayoutParams reloadParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            reloadParams.topMargin = (int) (20 * density);
+            reload.setLayoutParams(reloadParams);
+            reload.setOnClickListener(view -> retry.run());
+            layout.addView(reload);
+        }
         activity.setContentView(layout);
     }
 }

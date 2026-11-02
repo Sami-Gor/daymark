@@ -44,6 +44,9 @@ describe('Android platform compatibility contract', () => {
       expect(strings, values).toContain('name="webview_required_message"');
       expect(strings, values).toContain('name="webview_assets_missing_title"');
       expect(strings, values).toContain('name="webview_assets_missing_message"');
+      expect(strings, values).toContain('name="webview_recovery_title"');
+      expect(strings, values).toContain('name="webview_recovery_message"');
+      expect(strings, values).toContain('name="webview_recovery_reload"');
     }
   });
 
@@ -60,6 +63,9 @@ describe('Android platform compatibility contract', () => {
     const screen = read('app', 'src', 'main', 'java', 'io', 'github', 'sami_gor', 'daymark', 'WebViewCompatibilityScreen.java');
     expect(activity).toContain('hasRequiredAssets');
     expect(activity).toContain('showMissingAssets');
+    expect(activity).toContain('registerPlugin(DaymarkRecoveryPlugin.class)');
+    expect(activity).toContain('new DaymarkWebViewClient');
     expect(screen).toContain('public/index.html');
+    expect(screen).toContain('showRecovery');
   });
 });

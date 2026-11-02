@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { createRoot } from 'react-dom/client';
 
 import App from './App';
+import { installAssetRecovery } from '@/lib/asset-recovery';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { installSafeConsole } from '@/lib/safe-console';
 import { LocaleProvider } from '@/hooks/use-locale';
@@ -11,6 +12,10 @@ import './index.css';
 // Redact recognition payloads before anything can reach the platform console
 // (Capacitor mirrors plugin listener results into the WebView console).
 installSafeConsole();
+
+// Report only local bundle/chunk failures to the native recovery host. External
+// API failures remain in the ordinary weather error path.
+installAssetRecovery();
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.

@@ -5,6 +5,8 @@ import {
   type ReactNode,
 } from 'react';
 
+import { isAssetLoadError, reportAssetFailure } from '@/lib/asset-recovery';
+
 export interface ErrorFallbackProps {
   error: Error;
   resetError: () => void;
@@ -75,11 +77,17 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo): void {
+    const caught = toError(error);
     console.error(
       'ErrorBoundary caught an error:',
-      toError(error),
+      caught,
       info.componentStack,
     );
+    // A local chunk/preload failure caught here should recover natively. An
+    // ordinary render/data error must remain inside the web error boundary.
+    if (isAssetLoadError(caught)) {
+      reportAssetFailure('react-boundary');
+    }
   }
 
   componentDidUpdate(prevProps: ErrorBoundaryProps): void {

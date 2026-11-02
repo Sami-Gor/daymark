@@ -4,4 +4,7 @@
     <string name="webview_required_message">Mettez à jour Android System WebView depuis Google Play, puis rouvrez Daymark.</string>
     <string name="webview_assets_missing_title">Daymark n’a pas pu charger son interface locale</string>
     <string name="webview_assets_missing_message">Réinstallez Daymark ou mettez à jour Android System WebView depuis Google Play, puis rouvrez l’application.</string>
+    <string name="webview_recovery_title">Daymark n’a pas pu terminer le chargement</string>
+    <string name="webview_recovery_message">Une partie de Daymark n’a pas pu être chargée. Rechargez l’application. Si le chargement échoue encore, réinstallez Daymark ou mettez à jour Android System WebView depuis Google Play.</string>
+    <string name="webview_recovery_reload">Recharger Daymark</string>
 </resources>
