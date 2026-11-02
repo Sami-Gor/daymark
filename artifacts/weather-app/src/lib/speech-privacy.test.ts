@@ -28,6 +28,7 @@ const speechSources = [
   'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetSpeechRecognitionPlugin.java',
   'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/AudioSpeechCaptureDevice.java',
   'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/DaymarkVoicePlugin.java',
+  'src/lib/speech-number-normalizer.ts',
 ];
 
 const read = (relative: string) => readFileSync(path.join(appRoot, relative), 'utf8');
@@ -75,6 +76,16 @@ describe('V2 speech privacy boundary', () => {
     expect(ask).toContain('normalizeTranscript(transcript)');
     expect(ask).toContain('resolveIntentTranscripts(question)');
     expect(ask).not.toMatch(/(?:fetch|XMLHttpRequest|axios|localStorage|sendBeacon)/);
+  });
+
+
+  it('does not log narration text or derived IPA in the Rust multilingual path', () => {
+    const rustRoot = path.resolve(appRoot, '..', '..', 'android', 'kokoro-poc', 'rust', 'src');
+    const lib = readFileSync(path.join(rustRoot, 'lib.rs'), 'utf8');
+    const piper = readFileSync(path.join(rustRoot, 'piper_g2p.rs'), 'utf8');
+    expect(lib).not.toContain('ipa={ipa:?}');
+    expect(lib).not.toContain('text={:?}');
+    expect(piper).not.toMatch(/ipa=|text=/);
   });
 
   it('does not expose a browser speech fallback from the V2 hook', () => {

@@ -3,6 +3,7 @@ import {
   DEFAULT_LOCALE,
   LOCALE_STORAGE_KEY,
   SPEECH_LANGS,
+  TTS_LANGS,
   detectLocale,
   formatDecimal,
   formatPercent,
@@ -42,8 +43,9 @@ describe('locale detection and fallback', () => {
     expect(Object.keys(es).sort()).toEqual(Object.keys(en).sort());
   });
 
-  it('documents speech language tags', () => {
+  it('documents speech and narration language tags', () => {
     expect(SPEECH_LANGS).toEqual({ en: 'en-GB', fr: 'fr-FR', es: 'es-ES' });
+    expect(TTS_LANGS).toEqual({ en: 'en-GB', fr: 'fr-FR', es: 'es-419' });
   });
 });
 

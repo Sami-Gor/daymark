@@ -19,22 +19,23 @@ import java.util.List;
 /**
  * Kokoro (pguso/kokoro) implementation of {@link LocalTtsEngine}.
  *
- * The 92 MB quantized model and the single British male voice (bm_fable) ship
- * as APK assets; on first initialization they are copied into the app's files
- * directory because Kokoro loads them from paths. Synthesis runs through a
- * minimal Rust JNI bridge (libkokoro_jni.so) with ONNX Runtime statically
- * linked; nothing is downloaded at runtime.
+ * The 92 MB quantized model and the English, French and Latin American
+ * Spanish voice packs ship as APK assets; on first initialization they are
+ * copied into the app's files directory because Kokoro loads them from paths.
+ * Synthesis runs through a minimal Rust JNI bridge (libkokoro_jni.so) with
+ * ONNX Runtime statically linked; nothing is downloaded at runtime.
  *
- * This is a separate proof of concept and does not replace the existing
- * Web Speech API narration or the Sherpa POC.
+ * English keeps the existing bm_fable/Misaki path. French and Spanish use
+ * piper-plus-g2p 0.5.3 and the ff_siwis/em_alex voice packs. This is a POC,
+ * not a production declaration.
  */
 public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     private static final String TAG = "DaymarkKokoroTts";
-    private static final String VOICE_NAME = "bm_fable";
+    private static final String DEFAULT_VOICE_NAME = "bm_fable";
     private static final String LEGACY_VOICE_FILE = "bm_george.bin";
     private static final String MODEL_ASSET = "kokoro/model_quantized.onnx";
-    private static final String VOICE_ASSET = "kokoro/bm_fable.bin";
+    private static final String VOICE_ASSET_PREFIX = "kokoro/";
     private static final int SAMPLE_RATE = 24000;
     private static final float SILENCE_THRESHOLD = 0.004f;
     private static final int FIRST_CHUNK_TRIM_CAP_MS = 300;
@@ -44,10 +45,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private static final long MODEL_BYTES = 92_361_116L;
     private static final String MODEL_SHA256 =
             "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478";
-    /** Pinned size/digest of the packaged voice. */
     private static final long VOICE_BYTES = 522_240L;
-    private static final String VOICE_SHA256 =
-            "f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1";
+
+    private static final String[] VOICE_NAMES = {"bm_fable", "ff_siwis", "em_alex"};
+    private static final String[] VOICE_SHA256 = {
+            "f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1",
+            "a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861",
+            "27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95",
+    };
 
     static {
         System.loadLibrary("kokoro_jni");
@@ -64,14 +69,34 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private volatile AudioTrack audioTrack;
     private int synthesisCount;
 
-    private native String nativeInit(String modelPath, String voicePath, String voiceName);
-    private native float[] nativeSynth(String text);
-    private native String nativeStreamStart(String text);
+    private native String nativeInit(String modelPath, String voicesPath, String voiceName);
+    private native float[] nativeSynth(String text, String lang, String voiceName);
+    private native String nativeStreamStart(String text, String lang, String voiceName);
     private native void nativeStreamPush(String text);
     private native void nativeStreamFinish();
     private native float[] nativeStreamNext();
     private native void nativeStreamClear();
     private native void nativeRelease();
+
+    private static String languageBase(String lang) {
+        if (lang == null || lang.trim().isEmpty()) {
+            return "en";
+        }
+        return lang.trim().toLowerCase().split("[-_]", 2)[0];
+    }
+
+    private static String voiceForLanguage(String lang) {
+        switch (languageBase(lang)) {
+            case "en":
+                return "bm_fable";
+            case "fr":
+                return "ff_siwis";
+            case "es":
+                return "em_alex";
+            default:
+                return null;
+        }
+    }
 
     public KokoroLocalTtsEngine(Context context) {
         this.appContext = context.getApplicationContext();
@@ -95,12 +120,23 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     }
                     long copyStart = SystemClock.elapsedRealtime();
                     File modelFile = copyAssetIfNeeded(MODEL_ASSET, "model_quantized.onnx", MODEL_BYTES, MODEL_SHA256);
-                    File voiceFile = copyAssetIfNeeded(VOICE_ASSET, VOICE_NAME + ".bin", VOICE_BYTES, VOICE_SHA256);
+                    File voicesDir = new File(appContext.getFilesDir(), "kokoro");
+                    for (int i = 0; i < VOICE_NAMES.length; i++) {
+                        copyAssetIfNeeded(
+                                VOICE_ASSET_PREFIX + VOICE_NAMES[i] + ".bin",
+                                VOICE_NAMES[i] + ".bin",
+                                VOICE_BYTES,
+                                VOICE_SHA256[i]);
+                    }
                     Log.i(TAG, "initialize: assets ready in " + (SystemClock.elapsedRealtime() - copyStart)
-                            + "ms modelBytes=" + modelFile.length() + " voiceBytes=" + voiceFile.length());
+                            + "ms modelBytes=" + modelFile.length()
+                            + " voices=" + String.join(",", VOICE_NAMES));
 
                     long start = SystemClock.elapsedRealtime();
-                    String error = nativeInit(modelFile.getAbsolutePath(), voiceFile.getAbsolutePath(), VOICE_NAME);
+                    String error = nativeInit(
+                            modelFile.getAbsolutePath(),
+                            voicesDir.getAbsolutePath(),
+                            DEFAULT_VOICE_NAME);
                     long elapsedMs = SystemClock.elapsedRealtime() - start;
                     if (error != null) {
                         Log.e(TAG, "initialize: failed: " + error);
@@ -108,7 +144,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         notifyError("Initialization failed: " + error);
                         return;
                     }
-                    Log.i(TAG, "initialize: model loaded in " + elapsedMs + "ms voice=" + VOICE_NAME);
+                    Log.i(TAG, "initialize: model loaded in " + elapsedMs + "ms defaultVoice=" + DEFAULT_VOICE_NAME);
                     setState(State.READY);
                 } catch (Throwable failure) {
                     Log.e(TAG, "initialize: failed: " + failure.getMessage(), failure);
@@ -119,19 +155,25 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         });
     }
 
-    @Override
     public void speak(final String text) {
-        speak(text, null);
+        speak(text, "en-GB", null);
     }
 
     /**
+     * @param lang locale used for voice and phonemisation routing.
      * @param segments optional TTS-only segmentation plan; must concatenate to
      *                 {@code text} exactly, otherwise whole-text synthesis is used.
      */
-    public void speak(final String text, final List<String> segments) {
+    @Override
+    public void speak(final String text, final String lang, final List<String> segments) {
         if (state != State.READY && state != State.STOPPED) {
             setState(State.ERROR);
             notifyError("Engine is not ready");
+            return;
+        }
+        final String voice = voiceForLanguage(lang);
+        if (voice == null) {
+            notifyError("Unsupported narration language: " + lang);
             return;
         }
         if (isSpeaking()) {
@@ -143,7 +185,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         worker.post(new Runnable() {
             @Override
             public void run() {
-                synthesizeAndPlay(text, segments, callTimeMs);
+                synthesizeAndPlay(text, lang, voice, segments, callTimeMs);
             }
         });
     }
@@ -256,7 +298,12 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return target;
     }
 
-    private void synthesizeAndPlay(String text, List<String> segments, long callTimeMs) {
+    private void synthesizeAndPlay(
+            String text,
+            String lang,
+            String voice,
+            List<String> segments,
+            long callTimeMs) {
         final long synthesisNumber = ++synthesisCount;
         boolean useSegments = segments != null && segments.size() > 1 && segmentsMatch(text, segments);
         if (segments != null && !useSegments) {
@@ -264,7 +311,9 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         }
         String streamError = null;
         try {
-            streamError = useSegments ? startSegmentedStream(segments) : startWholeStream(text);
+            streamError = useSegments
+                    ? startSegmentedStream(segments, lang, voice)
+                    : startWholeStream(text, lang, voice);
         } catch (Throwable failure) {
             streamError = failure.getMessage();
         }
@@ -274,7 +323,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         }
         Log.w(TAG, "stream: unavailable (" + streamError + "); falling back to monolithic synth");
         try {
-            float[] samples = nativeSynth(text);
+            float[] samples = nativeSynth(text, lang, voice);
             if (samples == null || samples.length == 0) {
                 setState(State.ERROR);
                 notifyError("Synthesis returned no audio");
@@ -309,16 +358,16 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return text.equals(joined.toString());
     }
 
-    private String startWholeStream(String text) {
-        String error = nativeStreamStart(text);
+    private String startWholeStream(String text, String lang, String voice) {
+        String error = nativeStreamStart(text, lang, voice);
         if (error == null) {
             nativeStreamFinish();
         }
         return error;
     }
 
-    private String startSegmentedStream(List<String> segments) {
-        String error = nativeStreamStart(segments.get(0));
+    private String startSegmentedStream(List<String> segments, String lang, String voice) {
+        String error = nativeStreamStart(segments.get(0), lang, voice);
         if (error != null) {
             return error;
         }

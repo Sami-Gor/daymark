@@ -4,8 +4,8 @@
  * `preparing` is used while the local Kokoro engine is still initializing;
  * `speaking` means audio has actually started. Stop works from both active
  * states, and a failure returns to idle with an error flag the UI can announce.
- * The web/PWA demo has no narration controls; French/Spanish Android narration
- * reports unavailable without starting an engine.
+ * The web/PWA demo has no narration controls; Android English, French and
+ * Spanish narration all use the local engine.
  */
 
 export type SpeechUiStatus = 'idle' | 'preparing' | 'speaking';

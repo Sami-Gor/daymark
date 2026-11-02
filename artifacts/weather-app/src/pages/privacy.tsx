@@ -117,10 +117,9 @@ export default function Privacy() {
 
       <h2>Android narration</h2>
       <p>
-        English narration is generated on your device by the bundled Kokoro model. Daymark does not
-        store narration text. French and Spanish narration is not available in V2 and is planned for
-        V2.2; Daymark shows an unavailable message and does not fall back to Android system TTS, a
-        network voice, or browser speech synthesis.
+        English, French and Latin American Spanish narration is generated on your device by the bundled Kokoro model,
+        using the selected locale and voice. Daymark does not store narration text and does not fall
+        back to Android system TTS, a network voice, or browser speech synthesis.
       </p>
 
       <h2>Information stored on your device</h2>

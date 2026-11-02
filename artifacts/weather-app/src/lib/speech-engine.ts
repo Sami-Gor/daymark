@@ -1,9 +1,11 @@
 /*
  * Pure engine-selection rules for Daymark narration.
  *
- * V2 narration is Android-only:
- * - English uses the bundled Kokoro engine when it is available.
- * - French and Spanish narration is not available in V2 and is planned for V2.2.
+ * V2.1 narration is Android-only and offline:
+ * - English uses the bundled Kokoro engine and the existing bm_fable path.
+ * - French uses the bundled Kokoro engine and ff_siwis.
+ * - Spanish uses the bundled Kokoro engine and em_alex with Latin American
+ *   Spanish phonemisation.
  * - The web/PWA demo has no narration or speech-synthesis path.
  *
  * Returning `unavailable` is intentional: callers must surface an explicit
@@ -11,6 +13,7 @@
  */
 
 export type SpeechEngine = 'kokoro' | 'unavailable';
+export type SpeechLocale = 'en' | 'fr' | 'es';
 
 export type SpeechSelectionInputs = {
   isNativePlatform: boolean;
@@ -24,8 +27,17 @@ export type SpeechSelection = {
   reason: string;
 };
 
+export function speechLocale(lang?: string): SpeechLocale | null {
+  const base = (lang ?? '').trim().toLowerCase().split(/[-_]/)[0];
+  return base === 'en' || base === 'fr' || base === 'es' ? base : null;
+}
+
 export function isEnglish(lang?: string): boolean {
-  return (lang ?? '').trim().toLowerCase().startsWith('en');
+  return speechLocale(lang) === 'en';
+}
+
+export function isSupportedSpeechLocale(lang?: string): boolean {
+  return speechLocale(lang) !== null;
 }
 
 export function selectSpeechEngine({
@@ -37,11 +49,13 @@ export function selectSpeechEngine({
   if (!isNativePlatform || platform !== 'android') {
     return { engine: 'unavailable', reason: 'not-android' };
   }
-  if (!isEnglish(lang)) {
-    return { engine: 'unavailable', reason: 'non-english-unavailable' };
+  const locale = speechLocale(lang);
+  if (!locale) {
+    return { engine: 'unavailable', reason: 'unsupported-language' };
   }
   if (!nativeAvailable) {
     return { engine: 'unavailable', reason: 'native-unavailable' };
   }
-  return { engine: 'kokoro', reason: 'native-english' };
+  const label = locale === 'en' ? 'english' : locale === 'fr' ? 'french' : 'spanish';
+  return { engine: 'kokoro', reason: `native-${label}` };
 }

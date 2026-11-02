@@ -1,13 +1,15 @@
 import { selectSpeechEngine, type SpeechEngine, type SpeechSelection } from './speech-engine';
+import { normalizeNarrationText } from './speech-number-normalizer';
 import { segmentForSpeech } from './tts-segmentation';
 
 /*
  * Routes narration to the bundled Android Kokoro engine only.
  *
- * The web/PWA demo has no narration path. Android French/Spanish narration is
- * deliberately unavailable in V2; there is no browser-speech or Android
- * system-TTS fallback. The router is injectable so engine selection and
- * cancellation can be tested without React or Capacitor.
+ * English keeps the existing Misaki path. French and Spanish are normalized
+ * (including numeric weather values) and routed to the same local engine with
+ * their own voices. There is no browser-speech or Android system-TTS fallback.
+ * The router is injectable so engine selection and cancellation can be tested
+ * without React or Capacitor.
  */
 
 export type SpeechHandlers = {
@@ -85,15 +87,16 @@ export function createSpeechRouter(
       const token = ++generation;
       active = 'kokoro';
       handlers.onStart?.();
+      const narration = normalizeNarrationText(spoken, lang);
       let segments: string[] | undefined;
       try {
-        const plan = segmentForSpeech(spoken);
+        const plan = segmentForSpeech(narration);
         segments = plan.length > 1 ? plan : undefined;
       } catch (error) {
         console.warn('DaymarkSpeech segmentation failed; using whole-text synthesis', error);
       }
       try {
-        await native.speak(spoken, lang, segments);
+        await native.speak(narration, lang, segments);
         if (generation === token) {
           active = null;
           handlers.onEnd?.();

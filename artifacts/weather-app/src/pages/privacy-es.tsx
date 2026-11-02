@@ -4,7 +4,7 @@ import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
  * Spanish privacy policy for Daymark V2 (2.0.0). Meaning-for-meaning
  * translation of the English policy: web/PWA is a limited weather demo without
  * voice; Android has on-device Parakeet input and local English Kokoro
- * narration; French/Spanish narration is unavailable in V2.
+ * narration in English, French and Spanish.
  */
 
 export default function PrivacyEs() {
@@ -119,10 +119,9 @@ export default function PrivacyEs() {
 
       <h2>Narración Android</h2>
       <p>
-        La narración en inglés se genera en tu dispositivo con el modelo Kokoro integrado. Daymark no
-        almacena el texto de la narración. La narración en francés y español no está disponible en V2 y
-        está prevista para V2.2; Daymark muestra un mensaje de indisponibilidad y no recurre a la
-        síntesis de voz Android, a una voz de red ni a la síntesis del navegador.
+        La narración en inglés, francés y español latinoamericano se genera en tu dispositivo con el modelo Kokoro
+        integrado, según la lengua y la voz elegidas. Daymark no almacena el texto de la narración y no
+        recurre a la síntesis de voz Android, a una voz de red ni a la síntesis del navegador.
       </p>
 
       <h2>Información almacenada en tu dispositivo</h2>

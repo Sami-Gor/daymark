@@ -19,11 +19,22 @@ export const LOCALES: Locale[] = ['en', 'fr', 'es'];
 export const DEFAULT_LOCALE: Locale = 'en';
 export const LOCALE_STORAGE_KEY = 'daymark.locale';
 
-/* Language tag used for SpeechSynthesisUtterance.lang and recognition.lang. */
+/* Language tag used by existing UI and recognition paths. */
 export const SPEECH_LANGS: Record<Locale, string> = {
   en: 'en-GB',
   fr: 'fr-FR',
   es: 'es-ES',
+};
+
+/*
+ * Narration-only language profile. Spanish uses es-419 internally so the
+ * selected em_alex voice is always routed through the Latin American seseo
+ * profile, while the existing UI/recognition locale remains es-ES.
+ */
+export const TTS_LANGS: Record<Locale, string> = {
+  en: 'en-GB',
+  fr: 'fr-FR',
+  es: 'es-419',
 };
 
 const DICTIONARIES: Record<Locale, Record<TranslationKey, string>> = { en, fr, es };

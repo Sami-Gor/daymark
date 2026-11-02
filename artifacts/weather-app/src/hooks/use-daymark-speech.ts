@@ -10,10 +10,10 @@ import { initialSpeechUiState, reduceSpeechUi } from '@/lib/speech-ui-state';
 /*
  * Android narration hook.
  *
- * The web/PWA demo has no voice features. On Android, English narration uses
- * the bundled Kokoro engine. French and Spanish narration is unavailable in
- * V2 (planned V2.2) and intentionally has no Android system-TTS or browser
- * fallback.
+ * The web/PWA demo has no voice features. On Android, English, French and
+ * Spanish narration use the bundled Kokoro engine with locale-specific
+ * phonemisation and voices. There is intentionally no Android system-TTS or
+ * browser fallback.
  */
 export function useDaymarkSpeech() {
   const androidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';

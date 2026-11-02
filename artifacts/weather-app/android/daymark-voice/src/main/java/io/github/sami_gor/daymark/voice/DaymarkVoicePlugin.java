@@ -45,6 +45,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
 
     private PluginCall pendingSpeak;
     private String queuedText;
+    private String queuedLang;
     private List<String> queuedSegments;
 
     private final Runnable readyTimeout = () -> {
@@ -52,6 +53,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             PluginCall call = pendingSpeak;
             pendingSpeak = null;
             queuedText = null;
+            queuedLang = null;
             queuedSegments = null;
             call.reject("engine not ready in time");
         }
@@ -86,6 +88,10 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             call.reject("text is required");
             return;
         }
+        String lang = call.getString("lang");
+        if (lang == null || lang.trim().isEmpty()) {
+            lang = "en-GB";
+        }
         if (engine == null || state == LocalTtsEngine.State.ERROR) {
             call.reject("native engine unavailable");
             return;
@@ -95,6 +101,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         if (state == LocalTtsEngine.State.UNINITIALIZED || state == LocalTtsEngine.State.LOADING) {
             // Wait for READY instead of racing initialization.
             queuedText = text;
+            queuedLang = lang;
             queuedSegments = segments;
             pendingSpeak = call;
             scheduleReadyTimeout();
@@ -102,7 +109,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         }
         pendingSpeak = call;
         requestAudioFocus();
-        engine.speak(text, segments);
+        engine.speak(text, lang, segments);
     }
 
     private List<String> readSegments(PluginCall call) {
@@ -154,11 +161,13 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         notifyListeners("stateChanged", stateEvent);
         if (next == LocalTtsEngine.State.READY && queuedText != null && pendingSpeak != null) {
             String text = queuedText;
+            String lang = queuedLang;
             List<String> segments = queuedSegments;
             queuedText = null;
+            queuedLang = null;
             queuedSegments = null;
             requestAudioFocus();
-            engine.speak(text, segments);
+            engine.speak(text, lang, segments);
             return;
         }
         if (next == LocalTtsEngine.State.READY || next == LocalTtsEngine.State.STOPPED) {
@@ -217,6 +226,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         PluginCall call = pendingSpeak;
         pendingSpeak = null;
         queuedText = null;
+        queuedLang = null;
         queuedSegments = null;
         if (call != null) {
             call.resolve();
@@ -227,6 +237,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         PluginCall call = pendingSpeak;
         pendingSpeak = null;
         queuedText = null;
+        queuedLang = null;
         queuedSegments = null;
         if (call != null) {
             call.reject(message);
