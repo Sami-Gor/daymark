@@ -25,6 +25,11 @@ public class MainActivity extends BridgeActivity {
             WebViewCompatibilityScreen.show(this);
             return;
         }
+        if (!WebViewCompatibilityScreen.hasRequiredAssets(this)) {
+            super.onCreate(savedInstanceState);
+            WebViewCompatibilityScreen.showMissingAssets(this);
+            return;
+        }
         registerPlugin(DaymarkVoicePlugin.class);
         registerPlugin(ParakeetSpeechRecognitionPlugin.class);
         super.onCreate(savedInstanceState);

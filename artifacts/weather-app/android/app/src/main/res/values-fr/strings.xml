@@ -2,4 +2,6 @@
 <resources>
     <string name="webview_required_title">Daymark nécessite une version plus récente d’Android System WebView</string>
     <string name="webview_required_message">Mettez à jour Android System WebView depuis Google Play, puis rouvrez Daymark.</string>
+    <string name="webview_assets_missing_title">Daymark n’a pas pu charger son interface locale</string>
+    <string name="webview_assets_missing_message">Réinstallez Daymark ou mettez à jour Android System WebView depuis Google Play, puis rouvrez l’application.</string>
 </resources>

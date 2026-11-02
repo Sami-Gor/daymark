@@ -10,6 +10,9 @@ import android.widget.TextView;
 
 import androidx.webkit.WebViewCompat;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 /**
  * Native fallback screen for devices whose Android System WebView is too old
  * to run the Daymark bundle. Shown instead of a blank WebView so the user gets
@@ -34,7 +37,24 @@ public final class WebViewCompatibilityScreen {
         return WebViewCompatibility.isSupported(installedWebViewMajor(activity));
     }
 
+    /** Whether the packaged web entry point exists before Capacitor starts. */
+    public static boolean hasRequiredAssets(Activity activity) {
+        try (InputStream input = activity.getAssets().open("public/index.html")) {
+            return input.read() != -1;
+        } catch (IOException missing) {
+            return false;
+        }
+    }
+
     public static void show(Activity activity) {
+        show(activity, R.string.webview_required_title, R.string.webview_required_message);
+    }
+
+    public static void showMissingAssets(Activity activity) {
+        show(activity, R.string.webview_assets_missing_title, R.string.webview_assets_missing_message);
+    }
+
+    private static void show(Activity activity, int titleRes, int messageRes) {
         float density = activity.getResources().getDisplayMetrics().density;
         int padding = (int) (24 * density);
 
@@ -45,13 +65,13 @@ public final class WebViewCompatibilityScreen {
         layout.setBackgroundColor(Color.WHITE);
 
         TextView title = new TextView(activity);
-        title.setText(R.string.webview_required_title);
+        title.setText(titleRes);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
         title.setTextColor(Color.rgb(0x16, 0x2b, 0x38));
         title.setGravity(Gravity.CENTER);
 
         TextView message = new TextView(activity);
-        message.setText(R.string.webview_required_message);
+        message.setText(messageRes);
         message.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         message.setTextColor(Color.rgb(0x3d, 0x52, 0x5e));
         message.setGravity(Gravity.CENTER);

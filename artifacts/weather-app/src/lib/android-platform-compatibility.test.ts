@@ -42,6 +42,8 @@ describe('Android platform compatibility contract', () => {
       const strings = read('app', 'src', 'main', 'res', values, 'strings.xml');
       expect(strings, values).toContain('name="webview_required_title"');
       expect(strings, values).toContain('name="webview_required_message"');
+      expect(strings, values).toContain('name="webview_assets_missing_title"');
+      expect(strings, values).toContain('name="webview_assets_missing_message"');
     }
   });
 
@@ -51,5 +53,13 @@ describe('Android platform compatibility contract', () => {
     expect(manifest).not.toContain('ACCESS_FINE_LOCATION');
     expect(manifest).toContain('android.permission.RECORD_AUDIO');
     expect(manifest).toContain('android.permission.INTERNET');
+  });
+
+  it('checks the packaged web entry point before starting the bridge', () => {
+    const activity = read('app', 'src', 'main', 'java', 'io', 'github', 'sami_gor', 'daymark', 'MainActivity.java');
+    const screen = read('app', 'src', 'main', 'java', 'io', 'github', 'sami_gor', 'daymark', 'WebViewCompatibilityScreen.java');
+    expect(activity).toContain('hasRequiredAssets');
+    expect(activity).toContain('showMissingAssets');
+    expect(screen).toContain('public/index.html');
   });
 });
