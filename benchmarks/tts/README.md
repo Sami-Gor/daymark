@@ -61,8 +61,42 @@ The runner validates fixture hashes/counts, normalization, segment
 reconstruction, expected segment counts, per-segment tokenization, unknown
 phonemes/PUA, audio finiteness and final-segment completion. It records cold
 and warm runs separately, including time to the first generated segment, plus
-clearly labelled artificial-delay runs. The first-audio timestamp is host
-generation time, not Android playback latency.
+clearly labelled artificial-delay runs.
+
+### What each language actually measures
+
+The manifest selects a different synthesis path per language, so the rows are
+not all the same measurement:
+
+- English (`en-stream`) uses `KokoroTts::stream` and calls `stream.next()` per
+  segment. This uses the stream API the Android engine uses for English, though
+  the harness interleaves pushes and reads while the app pushes the segment plan
+  before its playback loop starts reading.
+- French and Spanish (`monolithic`) are still processed **segment by segment**
+  inside the harness: each segment is phonemized with `piper-plus-g2p` and
+  synthesized with `synth_phonemes`, then the audio is concatenated. The mode
+  name means there is no stream API; it does **not** mean the harness makes one
+  whole-text synthesis call. The Android app does make one whole-text
+  `nativeSynth` call for these languages (see
+  `docs/release/v2.1-speech-performance.md` §5), so this benchmark is not a
+  timing model of the app's French/Spanish path.
+
+### `firstAudioMs` scope
+
+`RUN.firstAudioMs` is host generation time measured from the start of a
+repetition, after the model has already initialized. The separate `INIT`
+line records initialization, and the timestamp does not include model loading
+or asset copying. For English it is time to the first streamed segment. For
+French and Spanish it is time to the first per-segment synthesis in the
+harness, not the app's whole-text first audio.
+
+The timestamp stops when samples exist in host memory. It excludes JNI
+marshalling, Android asset materialization, `AudioTrack` creation and start,
+audio focus, buffer filling and device scheduling. It is therefore not a
+time-to-first-audio measurement for the Android app. The French/Spanish value
+is not comparable with the app's first audio even in principle, because the
+benchmark synthesizes a short first segment while the app must finish the
+entire utterance before it can play anything.
 
 The benchmark is host-only macOS CPU measurement. It is not Android
 performance and does not establish human pronunciation quality.
