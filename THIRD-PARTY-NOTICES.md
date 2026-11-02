@@ -4,29 +4,50 @@ Daymark is MIT-licensed (see [LICENSE](LICENSE)). It redistributes the
 third-party components listed below, each under its own licence. None of them
 is relicensed by the MIT licence.
 
-The table records what is redistributed in which build. The "V2 candidate"
-column is the `v2/privacy-hardened-voice` branch, which is **not released**.
+The table records what is redistributed in which build. "V2 Android builds"
+means the Android app produced from this branch (release and debug POC);
+"debug POC only" entries are packaged only in the debug variant and are
+**never** part of a production release.
+
+## Packaged with the app
+
+This notice is not only a repository document. Every Android APK and AAB built
+from `artifacts/weather-app/android` packages a copy of it and a copy of the
+full [Apache License 2.0](licenses/Apache-2.0.txt) at:
+
+```text
+assets/licenses/THIRD-PARTY-NOTICES.md
+assets/licenses/Apache-2.0.txt
+```
+
+Debug POC builds additionally package
+`assets/licenses/MULTILINGUAL-VOICE-NOTICE.txt`, which carries the French and
+Spanish voice attribution. `:app:generateLicenseAssets` copies the tracked
+files into the build; `:app:verifyDebugPackagedLicenses`,
+`:app:verifyReleasePackagedLicenses` and `:app:verifyReleaseBundleContents`
+open the actual APK/AAB and fail the build if the notices are absent. Those
+tests inspect the archive, not the source tree.
 
 | Component | Version | Licence | Redistributed in | Notes |
 |---|---|---|---|---|
-| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
-| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (Android AAR) | 1.13.8 | **Apache-2.0** | V2 candidate (Android) | Fetched at build time by `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` from the [v1.13.8 release](https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar), SHA-256 `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96`. Contains the sherpa-onnx JNI libraries and, in turn, the ONNX Runtime libraries below. |
-| [ONNX Runtime](https://github.com/microsoft/onnxruntime) (bundled in the sherpa-onnx AAR) | 1.18.1 (as shipped in the AAR) | **MIT** | V2 candidate (Android) | `libonnxruntime.so` and the sherpa JNI libraries, arm64-v8a only. |
-| [pguso/kokoro](https://github.com/pguso/kokoro) runtime | `kokoro-en` 0.1.5, commit `b42bd5cf915163607cb51984cabf273dcf09755e` | Apache-2.0 | v1.0.0 and V2 candidate | `android/kokoro-poc/README.md` has the full build and licence matrix. |
-| Kokoro model weights (`model_quantized.onnx`) | `kokoro-en` 0.1.5 | Apache-2.0 (upstream repository) | v1.0.0 and V2 candidate | SHA-256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478`. |
-| `bm_fable.bin` narration voice | — | Apache-2.0 (per the model repository) | v1.0.0 and V2 candidate | SHA-256 `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1`. Per-voice training-data provenance is not documented upstream; unresolved, low risk. |
-| `ff_siwis.bin` French narration voice | — | **CC BY 4.0** via the SIWIS corpus | multilingual Android POC | SHA-256 `a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861`. Derived from the [SIWIS corpus](https://datashare.ed.ac.uk/handle/10283/2353); attribution is required. Attribution text is included below. |
-| `em_alex.bin` Spanish narration voice | — | **Apache-2.0 (conditional)** | multilingual Android POC | SHA-256 `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95`. Exact `hexgrad/Kokoro-82M` voice style converted by `onnx-community/Kokoro-82M-v1.0-ONNX`; Apache-2.0 notice and change-statement conditions apply. Speaker/training-data provenance remains undocumented and is not cleared. See [`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md). |
+| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 Android builds (install-time asset pack, release and debug POC) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
+| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (Android AAR) | 1.13.8 | **Apache-2.0** | V2 Android builds (release and debug POC) | Fetched at build time by `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` from the [v1.13.8 release](https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar), SHA-256 `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96`. Contains the sherpa-onnx JNI libraries and, in turn, the ONNX Runtime libraries below. |
+| [ONNX Runtime](https://github.com/microsoft/onnxruntime) (bundled in the sherpa-onnx AAR) | 1.18.1 (as shipped in the AAR) | **MIT** | V2 Android builds (release and debug POC) | `libonnxruntime.so` and the sherpa JNI libraries, arm64-v8a only. |
+| [pguso/kokoro](https://github.com/pguso/kokoro) runtime | `kokoro-en` 0.1.5, commit `b42bd5cf915163607cb51984cabf273dcf09755e` | Apache-2.0 | v1.0.0 and V2 Android builds (release and debug POC) | `android/kokoro-poc/README.md` has the full build and licence matrix. |
+| Kokoro model weights (`model_quantized.onnx`) | `kokoro-en` 0.1.5 | Apache-2.0 (upstream repository) | v1.0.0 and V2 Android builds (release and debug POC) | SHA-256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478`. |
+| `bm_fable.bin` narration voice | — | Apache-2.0 (per the model repository) | v1.0.0 and V2 Android builds (release and debug POC) | SHA-256 `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1`. Per-voice training-data provenance is not documented upstream; unresolved, low risk. |
+| `ff_siwis.bin` French narration voice | — | **CC BY 4.0** via the SIWIS corpus | **debug POC only — never a production release** | SHA-256 `a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861`. Derived from the [SIWIS corpus](https://datashare.ed.ac.uk/handle/10283/2353); attribution is required. Attribution text is included below. Staged by `fetch-kokoro-assets.sh` into the debug source set only; `:app:verifyReleaseNarrationAssets` fails a release that contains it. |
+| `em_alex.bin` Spanish narration voice | — | **Apache-2.0 (conditional)** | **debug POC only — never a production release** | SHA-256 `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95`. Exact `hexgrad/Kokoro-82M` voice style converted by `onnx-community/Kokoro-82M-v1.0-ONNX`; Apache-2.0 notice and change-statement conditions apply. Speaker/training-data provenance remains undocumented and is not cleared. Staged by `fetch-kokoro-assets.sh` into the debug source set only; `:app:verifyReleaseNarrationAssets` fails a release that contains it. See [`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md). |
 | [espeak-ng](https://github.com/espeak-ng/espeak-ng) | — | GPL-3.0 | **not included** | Verified absent: the Kokoro build uses the lean configuration without bundled eSpeak. |
-| [Rust](https://www.rust-lang.org/) standard library and crates (`tokio`, `jni`, `log`, `android_logger`, `bincode`, `fancy-regex`, `regex`, `futures`, `pin-project`, `ndarray`, `num2words`, `unicode-segmentation`, `miette`, `language-tokenizer`, `quick-xml`) | see `android/kokoro-poc/README.md` | MIT / Apache-2.0 | multilingual Android POC | Compiled into the Kokoro native library. `language-tokenizer` is WTFPL-2.0 and ships its own licence file. |
-| [piper-plus-g2p](https://github.com/ayutaz/piper-plus) | 0.5.3, commit `751e5dfe3fac760ac1993083b93ad34d057ae80d` | **MIT** | multilingual Android POC | French and Latin American Spanish G2P; no eSpeak, no model. The published crate does not contain a standalone `LICENSE` file; the exact upstream MIT text is reproduced below. |
-| [quick-xml](https://github.com/tafia/quick-xml) | 0.41.0 | **MIT** | multilingual Android POC | Direct `piper-plus-g2p` dependency; exact MIT text reproduced below. |
+| [Rust](https://www.rust-lang.org/) standard library and crates (`tokio`, `jni`, `log`, `android_logger`, `bincode`, `fancy-regex`, `regex`, `futures`, `pin-project`, `ndarray`, `num2words`, `unicode-segmentation`, `miette`, `language-tokenizer`, `quick-xml`) | see `android/kokoro-poc/README.md` | MIT / Apache-2.0 | V2 Android builds (compiled into the native library; release and debug POC) | Compiled into the Kokoro native library, which both variants load. `language-tokenizer` is WTFPL-2.0 and ships its own licence file upstream. |
+| [piper-plus-g2p](https://github.com/ayutaz/piper-plus) | 0.5.3, commit `751e5dfe3fac760ac1993083b93ad34d057ae80d` | **MIT** | V2 Android builds (compiled into the native library; release and debug POC) | French and Latin American Spanish G2P; no eSpeak, no model. The published crate does not contain a standalone `LICENSE` file; the exact upstream MIT text is reproduced below. |
+| [quick-xml](https://github.com/tafia/quick-xml) | 0.41.0 | **MIT** | V2 Android builds (compiled into the native library; release and debug POC) | Direct `piper-plus-g2p` dependency; exact MIT text reproduced below. |
 | [jpreprocess](https://github.com/jpreprocess/jpreprocess) | 0.9.1 | **BSD-3-Clause** | not enabled | Optional Japanese-only dependency; the previous notice incorrectly said MIT. Exact BSD-3-Clause terms reproduced below. Not compiled in the French/Spanish build. |
-| [Fraunces](https://github.com/undercasetype/Fraunces), [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans), [DM Mono](https://github.com/googlefonts/dm-mono) | — | SIL Open Font License 1.1 | v1.0.0 and V2 candidate | Self-hosted; licence files in `artifacts/weather-app/src/fonts/LICENSE.md`. |
-| [GeoNames](https://www.geonames.org/) locality dataset | — | **CC BY 4.0** | v1.0.0 and V2 candidate | `localities-v1.json`, shipped as a static asset and looked up on the device. Attribution is shown in the app's privacy pages. |
+| [Fraunces](https://github.com/undercasetype/Fraunces), [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans), [DM Mono](https://github.com/googlefonts/dm-mono) | — | SIL Open Font License 1.1 | v1.0.0 and V2 Android builds | Self-hosted; licence files in `artifacts/weather-app/src/fonts/LICENSE.md`. |
+| [GeoNames](https://www.geonames.org/) locality dataset | — | **CC BY 4.0** | v1.0.0 and V2 Android builds | `localities-v1.json`, shipped as a static asset and looked up on the device. Attribution is shown in the app's privacy pages. |
 | [Open-Meteo](https://open-meteo.com/) weather, air-quality and geocoding APIs | — | CC BY 4.0 | not redistributed; queried at runtime | Attribution requested in the app. |
-| [Capacitor](https://capacitorjs.com/) core, CLI and Android | 8.5.1 / 8.1.1 | MIT | v1.0.0 and V2 candidate | |
-| AndroidX and Google libraries | see `artifacts/weather-app/android/variables.gradle` | Apache-2.0 | v1.0.0 and V2 candidate | |
+| [Capacitor](https://capacitorjs.com/) core, CLI and Android | 8.5.1 / 8.1.1 | MIT | v1.0.0 and V2 Android builds | |
+| AndroidX and Google libraries | see `artifacts/weather-app/android/variables.gradle` | Apache-2.0 | v1.0.0 and V2 Android builds | |
 
 ## Attribution required by CC BY 4.0
 
@@ -85,6 +106,43 @@ provenance remains unresolved and is not cleared by the Apache-2.0 grant. The
 voice remains provisional; see
 [`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md).
 
+## Release gate and open blockers
+
+French and Spanish narration is a debug-POC capability. It is not part of a
+production release:
+
+- `daymark-voice` compiles `BuildConfig.MULTILINGUAL_NARRATION = false` for the
+  release variant and `true` for debug. `NarrationVoicePolicy` therefore
+  rejects `fr`/`es` in release before any synthesis, and the release engine
+  materialises only the English `bm_fable` voice.
+- `fetch-kokoro-assets.sh` stages the English model and `bm_fable` in the main
+  source set and stages `ff_siwis`/`em_alex` only in the debug source set.
+- `:app:verifyReleaseNarrationSources` and
+  `:app:verifyReleaseNarrationAssets` fail a release that would package a
+  French or Spanish voice, whether it came from a source set, a generated
+  directory or a dependency.
+- `:app:verifyReleasePackagedLicenses` and
+  `:app:verifyReleaseBundleContents` inspect the actual release APK/AAB.
+
+The following are **open release blockers**, not resolved by this file or by
+the packaged Apache-2.0 copy:
+
+1. **`em_alex` speaker and training-data provenance.** The model publisher does
+   not document the speaker, recording, dataset, consent or voice-likeness
+   rights. Apache-2.0 is a copyright and patent grant; it is not a
+   representation about those rights. A production release must not include
+   `em_alex` until a per-voice written provenance/consent statement is obtained
+   or the voice is removed. The debug POC is not a production release.
+2. **`ff_siwis` attribution.** Redistribution is CC BY 4.0 and requires the
+   SIWIS attribution in this file. It is debug-only and remains a blocker for
+   any release that includes it.
+3. **Notice completeness.** The packaged notice reproduces the direct
+   third-party notices recorded here. It is not a substitute for a full
+   transitive dependency scan; obtain one before a release that changes the
+   native dependency set.
+4. **Not legal advice.** This is an engineering record of the licences and
+   evidence found, not a legal opinion.
+
 ## Verifying the redistributed files
 
 The build-time fetch scripts pin and verify every downloaded artefact:
@@ -102,6 +160,10 @@ The build-time fetch scripts pin and verify every downloaded artefact:
 
 
 ## Exact third-party licence texts
+
+The full Apache License 2.0 text is kept in
+[`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt) and is packaged with every
+APK/AAB. It covers the sherpa-onnx runtime and the `em_alex` debug-POC voice.
 
 ### piper-plus-g2p — MIT
 

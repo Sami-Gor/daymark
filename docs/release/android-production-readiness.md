@@ -85,7 +85,9 @@ Clean-build instructions (verified path, network required for downloads):
 
 pnpm install
 
-# 1. Kokoro assets (downloads model + bm_fable, verifies SHA-256)
+# 1. Kokoro assets (downloads the model + English, French and Spanish voices,
+#    then stages bm_fable in the main source set and ff_siwis/em_alex in the
+#    debug source set only, verifying every SHA-256)
 android/kokoro-poc/scripts/fetch-kokoro-assets.sh
 
 # 2. Rust JNI library (clones pguso/kokoro at the pinned commit, cross-compiles,
@@ -109,6 +111,19 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bu
 
 Generated material (`daymark-voice/src/main/assets/kokoro`, `jniLibs`,
 `app/src/main/assets/public`) is gitignored and reproduced by steps 1–3.
+
+**Narration and notice gate (V2.1 branch).** Release builds compile
+`MULTILINGUAL_NARRATION = false`; the engine materialises only `bm_fable` and
+rejects `fr`/`es`. `:app:verifyReleaseNarrationSources` and
+`:app:verifyReleaseNarrationAssets` fail a release that would package
+`ff_siwis.bin` or `em_alex.bin`. Every APK/AAB packages
+`assets/licenses/THIRD-PARTY-NOTICES.md` and
+`assets/licenses/Apache-2.0.txt`; debug APKs also package
+`assets/licenses/MULTILINGUAL-VOICE-NOTICE.txt`.
+`:app:verifyDebugPackagedLicenses`, `:app:verifyReleasePackagedLicenses` and
+`:app:verifyReleaseBundleContents` open the built archive and check the entries.
+The unresolved `em_alex` speaker/training-data provenance remains an explicit
+release blocker; see `THIRD-PARTY-NOTICES.md`.
 
 ## 2. Google Play requirements
 

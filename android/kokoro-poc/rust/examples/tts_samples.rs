@@ -61,7 +61,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 async fn run() -> Result<(), Box<dyn Error>> {
     std::env::set_var("KOKORO_G2P_SEGMENT_ESPEAK", "0");
     let model = Path::new(ROOT).join("../../../artifacts/weather-app/android/daymark-voice/src/main/assets/kokoro/model_quantized.onnx");
-    let voices = Path::new(ROOT).join("../../../artifacts/weather-app/android/daymark-voice/src/main/assets/kokoro");
+    let release_voices = Path::new(ROOT).join("../../../artifacts/weather-app/android/daymark-voice/src/main/assets/kokoro");
+    let debug_voices = Path::new(ROOT).join("../../../artifacts/weather-app/android/daymark-voice/src/debug/assets/kokoro");
+    let voices = if debug_voices.is_dir() { debug_voices } else { release_voices };
     let tts = KokoroTts::new(&model, &voices).await?;
     let fr = [
         ("fr-12", "Il fait douze degrés."),

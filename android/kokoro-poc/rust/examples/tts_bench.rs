@@ -23,6 +23,13 @@ fn default_assets() -> PathBuf {
         .join("../../../artifacts/weather-app/android/daymark-voice/src/main/assets/kokoro")
 }
 
+/// French/Spanish voices are debug-POC material and are staged in the debug
+/// source set, so release packaging cannot pick them up.
+fn debug_voices() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../artifacts/weather-app/android/daymark-voice/src/debug/assets/kokoro")
+}
+
 #[derive(Debug)]
 struct Args {
     lang: String,
@@ -146,7 +153,14 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| assets.join("model_quantized.onnx"));
     let voices = env::var_os("DAYMARK_KOKORO_VOICES")
         .map(PathBuf::from)
-        .unwrap_or(assets);
+        .unwrap_or_else(|| {
+            let multilingual = debug_voices();
+            if multilingual.is_dir() {
+                multilingual
+            } else {
+                assets
+            }
+        });
 
     println!("MAX_PHONEME_CHARS={MAX_PHONEME_CHARS}");
     let init_start = Instant::now();

@@ -16,6 +16,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
+import io.github.sami_gor.daymark.voice.BuildConfig;
+
 /**
  * Kokoro (pguso/kokoro) implementation of {@link LocalTtsEngine}.
  *
@@ -26,13 +28,14 @@ import java.util.List;
  * ONNX Runtime statically linked; nothing is downloaded at runtime.
  *
  * English keeps the existing bm_fable/Misaki path. French and Spanish use
- * piper-plus-g2p 0.5.3 and the ff_siwis/em_alex voice packs. This is a POC,
- * not a production declaration.
+ * piper-plus-g2p 0.5.3 and the ff_siwis/em_alex voice packs. That is a debug
+ * POC only: release builds compile {@code MULTILINGUAL_NARRATION = false},
+ * materialise only bm_fable and reject French/Spanish before synthesis.
  */
 public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     private static final String TAG = "DaymarkKokoroTts";
-    private static final String DEFAULT_VOICE_NAME = "bm_fable";
+    private static final String DEFAULT_VOICE_NAME = NarrationVoicePolicy.ENGLISH_VOICE;
     private static final String LEGACY_VOICE_FILE = "bm_george.bin";
     private static final String MODEL_ASSET = "kokoro/model_quantized.onnx";
     private static final String VOICE_ASSET_PREFIX = "kokoro/";
@@ -46,13 +49,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private static final String MODEL_SHA256 =
             "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478";
     private static final long VOICE_BYTES = 522_240L;
-
-    private static final String[] VOICE_NAMES = {"bm_fable", "ff_siwis", "em_alex"};
-    private static final String[] VOICE_SHA256 = {
-            "f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1",
-            "a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861",
-            "27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95",
-    };
 
     static {
         System.loadLibrary("kokoro_jni");
@@ -78,23 +74,16 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private native void nativeStreamClear();
     private native void nativeRelease();
 
-    private static String languageBase(String lang) {
-        if (lang == null || lang.trim().isEmpty()) {
-            return "en";
-        }
-        return lang.trim().toLowerCase().split("[-_]", 2)[0];
-    }
-
-    private static String voiceForLanguage(String lang) {
-        switch (languageBase(lang)) {
-            case "en":
-                return "bm_fable";
-            case "fr":
-                return "ff_siwis";
-            case "es":
-                return "em_alex";
+    private static String voiceSha256(String voiceName) {
+        switch (voiceName) {
+            case NarrationVoicePolicy.ENGLISH_VOICE:
+                return "f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1";
+            case NarrationVoicePolicy.FRENCH_VOICE:
+                return "a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861";
+            case NarrationVoicePolicy.SPANISH_VOICE:
+                return "27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95";
             default:
-                return null;
+                throw new IllegalArgumentException("Unknown narration voice: " + voiceName);
         }
     }
 
@@ -121,16 +110,18 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     long copyStart = SystemClock.elapsedRealtime();
                     File modelFile = copyAssetIfNeeded(MODEL_ASSET, "model_quantized.onnx", MODEL_BYTES, MODEL_SHA256);
                     File voicesDir = new File(appContext.getFilesDir(), "kokoro");
-                    for (int i = 0; i < VOICE_NAMES.length; i++) {
+                    List<String> voices = NarrationVoicePolicy.packagedVoices(
+                            BuildConfig.MULTILINGUAL_NARRATION);
+                    for (String voice : voices) {
                         copyAssetIfNeeded(
-                                VOICE_ASSET_PREFIX + VOICE_NAMES[i] + ".bin",
-                                VOICE_NAMES[i] + ".bin",
+                                VOICE_ASSET_PREFIX + voice + ".bin",
+                                voice + ".bin",
                                 VOICE_BYTES,
-                                VOICE_SHA256[i]);
+                                voiceSha256(voice));
                     }
                     Log.i(TAG, "initialize: assets ready in " + (SystemClock.elapsedRealtime() - copyStart)
                             + "ms modelBytes=" + modelFile.length()
-                            + " voices=" + String.join(",", VOICE_NAMES));
+                            + " voices=" + String.join(",", voices));
 
                     long start = SystemClock.elapsedRealtime();
                     String error = nativeInit(
@@ -172,7 +163,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             notifyError("engine not ready");
             return;
         }
-        final String voice = voiceForLanguage(lang);
+        final String voice = NarrationVoicePolicy.voiceForLanguage(
+                lang, BuildConfig.MULTILINGUAL_NARRATION);
         if (voice == null) {
             notifyError("Unsupported narration language: " + lang);
             return;

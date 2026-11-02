@@ -14,6 +14,26 @@ android {
         }
     }
 
+    buildFeatures {
+        // The narration gate is compiled into the variant, not read from the
+        // web layer or a runtime setting.
+        buildConfig true
+    }
+
+    buildTypes {
+        debug {
+            // Multilingual narration is the debug-POC capability. Debug
+            // packages ff_siwis/em_alex from src/debug/assets.
+            buildConfigField "boolean", "MULTILINGUAL_NARRATION", "true"
+        }
+        release {
+            // Production builds must never expose French/Spanish narration.
+            // NarrationVoicePolicy returns null for fr/es when this is false,
+            // and the engine materialises only the English voice.
+            buildConfigField "boolean", "MULTILINGUAL_NARRATION", "false"
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -31,3 +51,40 @@ dependencies {
 
     testImplementation "junit:junit:$junitVersion"
 }
+
+/*
+ * Assert the compiled narration gate, not merely the text in this file.
+ * A finalizer on BuildConfig generation checks the generated Java for the
+ * variant, so a missing/renamed field or a mistaken build-type assignment
+ * fails the build.
+ */
+def verifyMultilingualGate = { String variant, boolean expected ->
+    def taskName = "verify${variant.capitalize()}MultilingualGate"
+    tasks.register(taskName) {
+        group = 'verification'
+        description = "Fails unless ${variant} compiles MULTILINGUAL_NARRATION = ${expected}."
+        doLast {
+            def generated = fileTree("$buildDir/generated/source/buildConfig/$variant") {
+                include '**/BuildConfig.java'
+            }.files
+            def buildConfig = generated.find { it.text.contains('MULTILINGUAL_NARRATION') }
+            if (buildConfig == null) {
+                throw new GradleException(
+                        "No ${variant} BuildConfig.java with MULTILINGUAL_NARRATION was generated.")
+            }
+            def expectedLine = "MULTILINGUAL_NARRATION = ${expected}"
+            if (!buildConfig.text.contains(expectedLine)) {
+                throw new GradleException(
+                        "${variant} BuildConfig does not compile ${expectedLine}: " +
+                        "multilingual narration gate is not enforced.")
+            }
+            logger.lifecycle("${variant} narration gate verified: ${expectedLine}")
+        }
+    }
+    tasks.matching { it.name == "generate${variant.capitalize()}BuildConfig" }.configureEach {
+        finalizedBy taskName
+    }
+}
+
+verifyMultilingualGate('debug', true)
+verifyMultilingualGate('release', false)

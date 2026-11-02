@@ -1,0 +1,39 @@
+Daymark multilingual narration voices — debug POC only
+
+This file is packaged only in debug builds. It is not present in a production
+release, and French or Spanish narration is not available in a production
+release. See THIRD-PARTY-NOTICES.md and Apache-2.0.txt in this directory.
+
+ff_siwis (French)
+-----------------
+Voice style: ff_siwis. Source corpus: SIWIS, University of Edinburgh DataShare
+record 10283/2353, https://datashare.ed.ac.uk/handle/10283/2353, licensed under
+the Creative Commons Attribution 4.0 International licence,
+https://creativecommons.org/licenses/by/4.0/.
+
+Daymark redistributes the voice style file published in the Kokoro model
+repository. No claim is made that the upstream voice or corpus has been
+modified. Redistributed file SHA-256:
+a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861.
+
+em_alex (Spanish)
+-----------------
+Kokoro-82M Spanish voice em_alex — voice style published by hexgrad in
+Kokoro-82M, https://huggingface.co/hexgrad/Kokoro-82M, converted to ONNX .bin
+by onnx-community/Kokoro-82M-v1.0-ONNX,
+https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX, and redistributed
+unmodified by Daymark under the Apache License 2.0,
+https://www.apache.org/licenses/LICENSE-2.0.
+
+Source voice file: voices/em_alex.pt, SHA-256
+5eac53f767c3f31a081918ba531969aea850bed18fe56419b804d642c6973431.
+Redistributed ONNX voice file SHA-256:
+27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95.
+
+Daymark does not claim speaker endorsement or identity.
+
+The publisher does not document the original speaker, recording, training
+dataset, consent, or voice-likeness rights for this voice. That provenance
+remains unresolved and is not cleared by the Apache-2.0 grant. The voice is a
+provisional debug-POC asset and is a release blocker. See
+docs/release/v2.1-em-alex-license-review.md in the Daymark repository.

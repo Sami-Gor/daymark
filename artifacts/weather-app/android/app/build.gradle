@@ -68,6 +68,218 @@ android {
 }
 
 /*
+ * Package the licence notices into every APK/AAB, not just the repository.
+ *
+ * The tracked files are the single source of truth: the build copies the root
+ * THIRD-PARTY-NOTICES.md and the Apache-2.0 text into assets/licenses, where
+ * they travel with the app. The packaged-archive checks below open the real
+ * APK/AAB and fail the build if either is missing.
+ */
+def repoRootDir = rootProject.file('../../..')
+def generatedLicenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
+
+tasks.register('generateLicenseAssets', Copy) {
+    group = 'build'
+    description = 'Copies the third-party notices and Apache-2.0 text into Android assets.'
+    from(repoRootDir) {
+        include 'THIRD-PARTY-NOTICES.md'
+        into 'licenses'
+    }
+    from(new File(repoRootDir, 'licenses/Apache-2.0.txt')) {
+        into 'licenses'
+    }
+    into generatedLicenseAssets
+}
+
+android.sourceSets.main.assets.srcDir(generatedLicenseAssets)
+
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn tasks.named('generateLicenseAssets')
+}
+tasks.matching { it.name == 'mergeDebugAssets' || it.name == 'mergeReleaseAssets' }.configureEach {
+    dependsOn tasks.named('generateLicenseAssets')
+}
+
+/*
+ * Release narration gate.
+ *
+ * French/Spanish voice files are debug-POC only. The fetch script stages them
+ * in daymark-voice/src/debug/assets, which release packaging never reads. This
+ * source check catches a file added to main/release assets, and the merged
+ * assets check catches one arriving from a dependency or generated directory.
+ * Both fail the release instead of shipping multilingual narration.
+ */
+def multilingualVoiceFiles = ['ff_siwis.bin', 'em_alex.bin']
+def multilingualSourceDirs = [
+        file('../daymark-voice/src/main/assets/kokoro'),
+        file('../daymark-voice/src/release/assets/kokoro'),
+        file('src/main/assets/kokoro'),
+        file('src/release/assets/kokoro'),
+]
+
+tasks.register('verifyReleaseNarrationSources') {
+    group = 'verification'
+    description = 'Fails if multilingual voice files are staged for a release variant.'
+    doLast {
+        def found = []
+        multilingualSourceDirs.each { directory ->
+            multilingualVoiceFiles.each { name ->
+                def candidate = new File(directory, name)
+                if (candidate.isFile()) {
+                    found << candidate.absolutePath
+                }
+            }
+        }
+        if (!found.isEmpty()) {
+            throw new GradleException(
+                    "Multilingual narration voices are staged for release:\n  " +
+                    found.join("\n  ") +
+                    "\nThey belong in daymark-voice/src/debug/assets/kokoro only; " +
+                    "run android/kokoro-poc/scripts/fetch-kokoro-assets.sh to restage.")
+        }
+    }
+}
+
+tasks.register('verifyReleaseNarrationAssets') {
+    group = 'verification'
+    description = 'Fails if the merged release assets contain French or Spanish narration voices.'
+    dependsOn 'mergeReleaseAssets'
+    doLast {
+        def mergedAssets = layout.buildDirectory
+                .dir('intermediates/assets/release/mergeReleaseAssets').get().asFile
+        if (!mergedAssets.isDirectory()) {
+            throw new GradleException("Release merged assets are missing: ${mergedAssets}")
+        }
+        def forbidden = multilingualVoiceFiles.findAll {
+            new File(mergedAssets, "kokoro/${it}").isFile()
+        }
+        if (!forbidden.isEmpty()) {
+            throw new GradleException(
+                    "Release assets contain debug-only narration voices: ${forbidden.join(', ')}. " +
+                    "A production release must package only kokoro/bm_fable.bin.")
+        }
+        logger.lifecycle("Release narration assets verified: no French/Spanish voices packaged.")
+    }
+}
+
+tasks.matching { it.name == 'preReleaseBuild' }.configureEach {
+    dependsOn tasks.named('verifyReleaseNarrationSources')
+}
+tasks.matching {
+    it.name == 'packageRelease' || it.name == 'bundleRelease' || it.name == 'packageReleaseBundle'
+}.configureEach {
+    dependsOn tasks.named('verifyReleaseNarrationAssets')
+}
+
+/*
+ * Archive-level checks. These open the built APK/AAB, so a notice that exists
+ * only in the source tree cannot satisfy them.
+ */
+def verifyArchive = { String label, File archive, boolean release ->
+    if (!archive.isFile()) {
+        throw new GradleException("${label}: archive not found: ${archive}")
+    }
+    def entries = [:]
+    new java.util.zip.ZipFile(archive).withCloseable { zip ->
+        zip.entries().each { entry ->
+            if (!entry.isDirectory() && entry.size > 0) {
+                def name = entry.name
+                // APK: assets/...; AAB: base/assets/...
+                def licenseKey = name =~ /(^|\/)assets\/licenses\/([^\/]+)$/
+                if (licenseKey.find()) {
+                    entries[licenseKey.group(2)] = zip.getInputStream(entry).getText('UTF-8')
+                }
+                if (release && name ==~ /(^|\/)assets\/kokoro\/(ff_siwis|em_alex)\.bin$/) {
+                    throw new GradleException(
+                            "${label}: release archive contains debug-only voice ${name}")
+                }
+            }
+        }
+    }
+    def required = [
+            'THIRD-PARTY-NOTICES.md': ['em_alex', 'SIWIS', 'Apache-2.0'],
+            'Apache-2.0.txt': ['Apache License', 'Version 2.0, January 2004'],
+    ]
+    required.each { name, needles ->
+        def text = entries[name]
+        if (text == null) {
+            throw new GradleException(
+                    "${label}: assets/licenses/${name} is missing from the archive. " +
+                    "Found: ${entries.keySet().sort()}")
+        }
+        needles.each { needle ->
+            if (!text.contains(needle)) {
+                throw new GradleException(
+                        "${label}: assets/licenses/${name} does not contain '${needle}'.")
+            }
+        }
+    }
+    if (!release && !entries.containsKey('MULTILINGUAL-VOICE-NOTICE.txt')) {
+        throw new GradleException(
+                "${label}: debug archive is missing the multilingual voice notice.")
+    }
+    logger.lifecycle("${label}: packaged licence notices verified (${entries.keySet().sort()}).")
+}
+
+def firstArchive = { File directory, String extension ->
+    if (!directory.isDirectory()) {
+        return null
+    }
+    def files = directory.listFiles({ file ->
+        file.isFile() && file.name.endsWith(extension)
+    } as FileFilter)
+    return files == null ? null : (files.sort { it.name } ? files[0] : null)
+}
+
+tasks.register('verifyDebugPackagedLicenses') {
+    group = 'verification'
+    description = 'Opens the debug APK and verifies the packaged licence notices.'
+    dependsOn 'packageDebug'
+    doLast {
+        def apk = firstArchive(layout.buildDirectory.dir('outputs/apk/debug').get().asFile, '.apk')
+        if (apk == null) {
+            throw new GradleException('No debug APK was produced for licence verification.')
+        }
+        verifyArchive('debug APK', apk, false)
+    }
+}
+
+tasks.register('verifyReleasePackagedLicenses') {
+    group = 'verification'
+    description = 'Opens the release APK and verifies notices and the narration gate.'
+    dependsOn 'packageRelease'
+    doLast {
+        def apk = firstArchive(layout.buildDirectory.dir('outputs/apk/release').get().asFile, '.apk')
+        if (apk == null) {
+            throw new GradleException('No release APK was produced for licence verification.')
+        }
+        verifyArchive('release APK', apk, true)
+    }
+}
+
+tasks.register('verifyReleaseBundleContents') {
+    group = 'verification'
+    description = 'Opens the release AAB and verifies notices and the narration gate.'
+    doLast {
+        def bundle = firstArchive(layout.buildDirectory.dir('outputs/bundle/release').get().asFile, '.aab')
+        if (bundle == null) {
+            throw new GradleException('No release AAB was produced for licence verification.')
+        }
+        verifyArchive('release AAB', bundle, true)
+    }
+}
+
+tasks.matching { it.name == 'assembleDebug' }.configureEach {
+    finalizedBy 'verifyDebugPackagedLicenses'
+}
+tasks.matching { it.name == 'assembleRelease' }.configureEach {
+    finalizedBy 'verifyReleasePackagedLicenses'
+}
+tasks.matching { it.name == 'bundleRelease' }.configureEach {
+    finalizedBy 'verifyReleaseBundleContents'
+}
+
+/*
  * The POC debug APK is installed alongside the production app, so the
  * effective application IDs must stay distinct. Assert the resolved variant
  * IDs (not just the Gradle text) so a later change cannot silently
