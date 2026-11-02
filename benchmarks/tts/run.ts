@@ -53,6 +53,7 @@ type RunOutput = {
     average: number;
     lastSamples: number;
     rssKb: number;
+    firstAudioMs: number;
   }>;
   segments: Array<{
     run: number;
@@ -108,6 +109,7 @@ function parseNative(stdout: string, stderr: string, wallMs: number, repetitions
         ipaChars: Number(f[7]), tokenCount: Number(f[8]), unknownCount: Number(f[9]),
         wallMs: Number(f[10]), finite: f[11] === 'true', peak: Number(f[12]),
         average: Number(f[13]), lastSamples: Number(f[14]), rssKb: Number(f[15]),
+        firstAudioMs: Number(f[16] ?? 0),
       });
     } else if (f[0] === 'TOTAL') {
       output.totalMs = Number(f[1]);
@@ -307,12 +309,14 @@ const summary = [
   `Run: ${runId}`,
   `Host: ${process.platform}/${process.arch}, Node ${process.version}`,
   '',
-  '| Fixture | Words raw/norm | Segments | Cold init ms | Cold RTF | Warm mean RTF | Warm peak RSS MB |',
-  '|---|---:|---:|---:|---:|---:|---:|',
+  '| Fixture | Words raw/norm | Segments | Cold init ms | Cold RTF | Warm first audio ms | Warm mean RTF | Warm peak RSS MB |',
+  '|---|---:|---:|---:|---:|---:|---:|---:|',
   ...results.fixtures.map((fixture: any) => {
     const warmRtf = fixture.warm.perRun.map((run: any) => run.synthMs / (run.durationSeconds * 1000));
     const meanWarmRtf = warmRtf.reduce((a: number, b: number) => a + b, 0) / warmRtf.length;
-    return `| ${fixture.fixtureId} | ${fixture.wordCountRaw}/${fixture.wordCountNormalized} | ${fixture.expectedSegmentCount} | ${fixture.cold.initMs.toFixed(1)} | ${(fixture.cold.perRun[0].synthMs / (fixture.cold.perRun[0].durationSeconds * 1000)).toFixed(4)} | ${meanWarmRtf.toFixed(4)} | ${(fixture.warm.peakRssKb / 1024).toFixed(1)} |`;
+    const warmFirstAudio = fixture.warm.perRun.map((run: any) => run.firstAudioMs);
+    const meanWarmFirstAudio = warmFirstAudio.reduce((a: number, b: number) => a + b, 0) / warmFirstAudio.length;
+    return `| ${fixture.fixtureId} | ${fixture.wordCountRaw}/${fixture.wordCountNormalized} | ${fixture.expectedSegmentCount} | ${fixture.cold.initMs.toFixed(1)} | ${(fixture.cold.perRun[0].synthMs / (fixture.cold.perRun[0].durationSeconds * 1000)).toFixed(4)} | ${meanWarmFirstAudio.toFixed(1)} | ${meanWarmRtf.toFixed(4)} | ${(fixture.warm.peakRssKb / 1024).toFixed(1)} |`;
   }),
   '',
   'Artificial delay runs are recorded separately in results.json and are not real performance measurements.',

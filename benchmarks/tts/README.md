@@ -60,7 +60,9 @@ directory or binary path.
 The runner validates fixture hashes/counts, normalization, segment
 reconstruction, expected segment counts, per-segment tokenization, unknown
 phonemes/PUA, audio finiteness and final-segment completion. It records cold
-and warm runs separately, plus clearly labelled artificial-delay runs.
+and warm runs separately, including time to the first generated segment, plus
+clearly labelled artificial-delay runs. The first-audio timestamp is host
+generation time, not Android playback latency.
 
 The benchmark is host-only macOS CPU measurement. It is not Android
 performance and does not establish human pronunciation quality.

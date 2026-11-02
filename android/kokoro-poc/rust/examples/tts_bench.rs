@@ -164,6 +164,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
     let total_start = Instant::now();
     for run_index in 0..args.repeats {
         let run_start = Instant::now();
+        let mut first_audio_ms: Option<f64> = None;
         let mut run_samples = Vec::new();
         let mut run_g2p_ms = 0.0;
         let mut run_token_ms = 0.0;
@@ -202,6 +203,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 run_token_count += tokens.len();
                 run_unknown += unknown.len();
                 last_samples = samples.len();
+                if first_audio_ms.is_none() {
+                    first_audio_ms = Some(run_start.elapsed().as_secs_f64() * 1000.0);
+                }
                 run_samples.extend_from_slice(&samples);
                 println!(
                     "SEG\t{run_index}\t{index}\t{g2p_ms:.3}\t{token_ms:.3}\t{synth_ms:.3}\t{}\t{}\t{}\t{}\t{}",
@@ -239,6 +243,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 run_token_count += tokens.len();
                 run_unknown += unknown.len();
                 last_samples = samples.len();
+                if first_audio_ms.is_none() {
+                    first_audio_ms = Some(run_start.elapsed().as_secs_f64() * 1000.0);
+                }
                 run_samples.extend_from_slice(&samples);
                 println!(
                     "SEG\t{run_index}\t{index}\t{g2p_ms:.3}\t{token_ms:.3}\t{synth_ms:.3}\t{}\t{}\t{}\t{}\t{}",
@@ -258,7 +265,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         let run_ms = run_start.elapsed().as_secs_f64() * 1000.0;
         let duration = run_samples.len() as f64 / f64::from(SAMPLE_RATE);
         println!(
-            "RUN\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "RUN\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             run_index,
             run_samples.len(),
             duration,
@@ -273,7 +280,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
             peak(&run_samples),
             avg(&run_samples),
             last_samples,
-            rss_kb().unwrap_or(0)
+            rss_kb().unwrap_or(0),
+            first_audio_ms.unwrap_or(0.0)
         );
         all_samples = run_samples;
         if run_index == 0 {
