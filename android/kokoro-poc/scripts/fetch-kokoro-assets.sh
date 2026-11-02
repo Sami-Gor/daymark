@@ -62,6 +62,9 @@ cp "$ASSETS/model_quantized.onnx" "$CAPACITOR_ASSETS/model_quantized.onnx"
 cp "$ASSETS/bm_fable.bin" "$CAPACITOR_ASSETS/bm_fable.bin"
 rm -f "$CAPACITOR_ASSETS/ff_siwis.bin" "$CAPACITOR_ASSETS/em_alex.bin"
 # Debug-POC material: French/Spanish voices, never visible to release merges.
+# Keep the English voice here too so the host benchmark's single voice
+# directory remains complete; Android merges the duplicate debug/main entry.
+cp "$ASSETS/bm_fable.bin" "$CAPACITOR_DEBUG_ASSETS/bm_fable.bin"
 for voice in "${MULTILINGUAL_VOICES[@]}"; do
   cp "$ASSETS/$voice.bin" "$CAPACITOR_DEBUG_ASSETS/$voice.bin"
 done
