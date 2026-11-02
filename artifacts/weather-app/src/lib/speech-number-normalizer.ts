@@ -179,6 +179,17 @@ function spanishBelow100(value: number): string {
   return unit === 0 ? tens : `${tens} y ${SPANISH_UNITS[unit]}`;
 }
 
+/**
+ * Numeral form used before a masculine noun (grados, kilómetros...):
+ * uno -> un, veintiuno -> veintiún, treinta y uno -> treinta y un.
+ */
+function spanishIntegerApocopated(value: number): string {
+  const words = spanishInteger(value);
+  if (words === 'uno') return 'un';
+  if (words === 'veintiuno') return 'veintiún';
+  return words.replace(/ uno$/, ' un');
+}
+
 function spanishInteger(value: number): string {
   if (value < 100) return spanishBelow100(value);
   if (value < 1000) {
@@ -200,13 +211,17 @@ function spanishInteger(value: number): string {
   return remainder === 0 ? prefix : `${prefix} ${spanishInteger(remainder)}`;
 }
 
-function decimalWords(locale: 'fr' | 'es', raw: string): string {
+function decimalWords(locale: 'fr' | 'es', raw: string, spanishApocope = false): string {
   const negative = raw.startsWith('-');
   const unsigned = negative ? raw.slice(1) : raw;
   const separator = unsigned.includes(',') ? ',' : '.';
   const [wholeText, fractionText = ''] = unsigned.split(separator);
   const whole = Number.parseInt(wholeText, 10);
-  const words = locale === 'fr' ? frenchInteger(whole) : spanishInteger(whole);
+  const words = locale === 'fr'
+    ? frenchInteger(whole)
+    : spanishApocope && !fractionText
+      ? spanishIntegerApocopated(whole)
+      : spanishInteger(whole);
   const fraction = fractionText
     ? fractionText
         .split('')
@@ -221,8 +236,19 @@ function decimalWords(locale: 'fr' | 'es', raw: string): string {
 function frenchTime(hour: number, minute: number): string {
   if (hour === 0 && minute === 0) return 'minuit';
   if (hour === 12 && minute === 0) return 'midi';
-  const hourText = hour === 1 ? 'une heure' : `${frenchInteger(hour)} heures`;
+  // "heures" is feminine: 21:00 is "vingt et une heures", not "vingt et un".
+  const hourWords = hour === 1 ? 'une' : frenchInteger(hour).replace(/un$/, 'une');
+  const hourText = `${hourWords} heure${hour === 1 ? '' : 's'}`;
   return minute === 0 ? hourText : `${hourText} ${frenchInteger(minute)}`;
+}
+
+function spanishTemperaturePhrase(raw: string, unit: string): string {
+  const value = Number(raw.replace(',', '.'));
+  const hasFraction = /[.,]/.test(raw);
+  const words = decimalWords('es', raw, !hasFraction);
+  const noun = !hasFraction && Math.abs(value) === 1 ? 'grado' : 'grados';
+  const scale = /°\s*C/i.test(unit) ? ' Celsius' : /°\s*F/i.test(unit) ? ' Fahrenheit' : '';
+  return `${words} ${noun}${scale}`;
 }
 
 function spanishPeriod(hour: number): string {
@@ -327,6 +353,15 @@ export function normalizeNarrationText(
     .replace(/\s*\bkm\s*\/\s*h\b/gi, locale === 'fr' ? ' kilomètres par heure' : ' kilómetros por hora')
     .replace(/\s*\bmph\b/gi, locale === 'fr' ? ' miles par heure' : ' millas por hora')
     .replace(/\s*%/g, locale === 'fr' ? ' pour cent' : ' por ciento');
+
+  if (locale === 'es') {
+    // Temperature nouns need numeral agreement: 1 -> "un grado",
+    // 21 -> "veintiún grados". Decimals keep the full numeral form.
+    result = result.replace(
+      /(?<![\w])(-?\d+(?:[.,]\d+)?)\s*(grados?|°(?:\s*[CF])?)/gi,
+      (_raw, numberText: string, unit: string) => spanishTemperaturePhrase(numberText, unit),
+    );
+  }
 
   result = result.replace(/(?<![\w])-?\d+(?:[.,]\d+)?(?![\w])/g, (raw) => decimalWords(locale, raw));
 

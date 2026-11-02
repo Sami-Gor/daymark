@@ -5,6 +5,8 @@ export function describeNarrationError(error: string | null | undefined, locale:
   switch (error) {
     case 'unsupported-language':
       return translate(locale, 'voice.error.unsupportedLanguage');
+    case 'french-spanish-unavailable':
+      return translate(locale, 'voice.error.frenchSpanishUnavailable');
     case 'native-unavailable':
       return translate(locale, 'voice.error.nativeUnavailable');
     case 'model-init-failed':

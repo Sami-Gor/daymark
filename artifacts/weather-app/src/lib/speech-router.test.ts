@@ -1,4 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const { getInfoMock } = vi.hoisted(() => ({ getInfoMock: vi.fn() }));
+
+vi.mock('@capacitor/app', () => ({
+  App: { getInfo: getInfoMock },
+}));
 
 import { classifyNativeNarrationFailure, createSpeechRouter } from './speech-router';
 
@@ -20,9 +26,17 @@ function makeNative(available = true, reason?: string) {
   };
 }
 
+const pocApplicationId = 'io.github.sami_gor.daymark.pocmultilingual';
+const productionApplicationId = 'io.github.sami_gor.daymark';
 const android = { isNativePlatform: true, platform: 'android' };
+const androidPoc = { ...android, applicationId: pocApplicationId };
+const androidRelease = { ...android, applicationId: productionApplicationId };
 
 describe('createSpeechRouter', () => {
+  afterEach(() => {
+    getInfoMock.mockReset();
+  });
+
   it('is supported only on Android', () => {
     expect(createSpeechRouter(android, makeNative()).supported()).toBe(true);
     expect(createSpeechRouter({ isNativePlatform: false, platform: 'web' }, makeNative()).supported()).toBe(false);
@@ -66,7 +80,7 @@ describe('createSpeechRouter', () => {
 
   it('routes French narration to the local engine with its locale', async () => {
     const native = makeNative();
-    const router = createSpeechRouter(android, native);
+    const router = createSpeechRouter(androidPoc, native);
     const onError = vi.fn();
     const onEngine = vi.fn();
 
@@ -78,7 +92,7 @@ describe('createSpeechRouter', () => {
 
   it('routes Spanish narration to the local engine with its locale', async () => {
     const native = makeNative();
-    const router = createSpeechRouter(android, native);
+    const router = createSpeechRouter(androidPoc, native);
     const onError = vi.fn();
     await router.speak('Buenos días.', 'es-419', { onError });
     expect(onError).not.toHaveBeenCalled();
@@ -87,7 +101,7 @@ describe('createSpeechRouter', () => {
 
   it('normalises French numbers before native phonemisation', async () => {
     const native = makeNative();
-    const router = createSpeechRouter(android, native);
+    const router = createSpeechRouter(androidPoc, native);
     await router.speak('Il fait 12 degrés avec 25 km/h.', 'fr-FR', {});
     expect(native.speak).toHaveBeenCalledWith(
       'Il fait douze degrés avec vingt-cinq kilomètres par heure.',
@@ -98,7 +112,7 @@ describe('createSpeechRouter', () => {
 
   it('normalises Spanish numbers before native phonemisation', async () => {
     const native = makeNative();
-    const router = createSpeechRouter(android, native);
+    const router = createSpeechRouter(androidPoc, native);
     await router.speak('Hace 12 grados con 25 km/h.', 'es-419', {});
     expect(native.speak).toHaveBeenCalledWith(
       'Hace doce grados con veinticinco kilómetros por hora.',
@@ -111,7 +125,7 @@ describe('createSpeechRouter', () => {
     const availability = deferred<{ available: boolean }>();
     const native = makeNative();
     native.isAvailable.mockReturnValue(availability.promise);
-    const router = createSpeechRouter(android, native);
+    const router = createSpeechRouter(androidPoc, native);
     void router.speak('Bonjour.', 'fr-FR', {});
     router.stop();
     availability.resolve({ available: true });
@@ -123,7 +137,7 @@ describe('createSpeechRouter', () => {
   it('surfaces a Spanish native failure without a fallback', async () => {
     const native = makeNative();
     native.speak.mockRejectedValue(new Error('engine error'));
-    const router = createSpeechRouter(android, native);
+    const router = createSpeechRouter(androidPoc, native);
     const onError = vi.fn();
     await router.speak('Buenos días.', 'es-419', { onError });
     expect(onError).toHaveBeenCalledWith('native-failed');
@@ -137,6 +151,61 @@ describe('createSpeechRouter', () => {
     await router.speak('Guten Morgen.', 'de-DE', { onError, onEngine });
     expect(onError).toHaveBeenCalledWith('unsupported-language');
     expect(onEngine).toHaveBeenCalledWith({ engine: 'unavailable', reason: 'unsupported-language' });
+    expect(native.speak).not.toHaveBeenCalled();
+  });
+
+  it('keeps unsupported languages explicit inside the multilingual POC', async () => {
+    const native = makeNative();
+    const router = createSpeechRouter(androidPoc, native);
+    const onError = vi.fn();
+    await router.speak('Guten Morgen.', 'de-DE', { onError });
+    expect(onError).toHaveBeenCalledWith('unsupported-language');
+    expect(native.speak).not.toHaveBeenCalled();
+  });
+
+  it('keeps French and Spanish narration disabled in a production release', async () => {
+    for (const [text, lang] of [['Bonjour.', 'fr-FR'], ['Buenos días.', 'es-419']] as const) {
+      const native = makeNative();
+      const router = createSpeechRouter(androidRelease, native);
+      const onError = vi.fn();
+      const onEngine = vi.fn();
+      await router.speak(text, lang, { onError, onEngine });
+      expect(onEngine).toHaveBeenCalledWith({ engine: 'unavailable', reason: 'french-spanish-unavailable' });
+      expect(onError).toHaveBeenCalledWith('french-spanish-unavailable');
+      expect(native.speak).not.toHaveBeenCalled();
+    }
+  });
+
+  it('keeps English narration available in a production release', async () => {
+    const native = makeNative();
+    const router = createSpeechRouter(androidRelease, native);
+    const onError = vi.fn();
+    await router.speak('Good morning.', 'en-GB', { onError });
+    expect(onError).not.toHaveBeenCalled();
+    expect(native.speak).toHaveBeenCalledWith('Good morning.', 'en-GB', undefined);
+  });
+
+  it('reads the installed application ID from the native App plugin', async () => {
+    getInfoMock.mockResolvedValue({
+      id: pocApplicationId,
+      name: 'Daymark',
+      build: '2',
+      version: '2.0.0',
+    });
+    const native = makeNative();
+    const router = createSpeechRouter(android, native);
+    await router.speak('Bonjour.', 'fr-FR', {});
+    expect(getInfoMock).toHaveBeenCalledTimes(1);
+    expect(native.speak).toHaveBeenCalledWith('Bonjour.', 'fr-FR', undefined);
+  });
+
+  it('fails closed when the installed application ID cannot be read', async () => {
+    getInfoMock.mockRejectedValue(new Error('unavailable'));
+    const native = makeNative();
+    const router = createSpeechRouter(android, native);
+    const onError = vi.fn();
+    await router.speak('Bonjour.', 'fr-FR', { onError });
+    expect(onError).toHaveBeenCalledWith('french-spanish-unavailable');
     expect(native.speak).not.toHaveBeenCalled();
   });
 
@@ -172,6 +241,31 @@ describe('createSpeechRouter', () => {
     expect(classifyNativeNarrationFailure(new Error('engine not ready')))
       .toBe('model-init-failed');
     expect(classifyNativeNarrationFailure(new Error('opaque failure'))).toBe('native-failed');
+  });
+
+  it('passes stable native failure codes through classification unchanged', () => {
+    const codes = [
+      'unsupported-language',
+      'voice-asset-invalid',
+      'playback-failed',
+      'synthesis-failed',
+      'model-init-failed',
+      'native-unavailable',
+      'native-failed',
+    ];
+    for (const code of codes) {
+      expect(classifyNativeNarrationFailure(new Error(code))).toBe(code);
+      expect(classifyNativeNarrationFailure(code)).toBe(code);
+    }
+  });
+
+  it('surfaces a stable native rejection code unchanged', async () => {
+    const native = makeNative();
+    native.speak.mockRejectedValue(new Error('model-init-failed'));
+    const router = createSpeechRouter(androidRelease, native);
+    const onError = vi.fn();
+    await router.speak('Good morning.', 'en-GB', { onError });
+    expect(onError).toHaveBeenCalledWith('model-init-failed');
   });
 
   it('surfaces an error when native playback fails', async () => {

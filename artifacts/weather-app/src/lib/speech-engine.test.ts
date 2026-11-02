@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { isEnglish, isSupportedSpeechLocale, selectSpeechEngine } from './speech-engine';
 
 const android = { isNativePlatform: true, platform: 'android' };
+const pocApplicationId = 'io.github.sami_gor.daymark.pocmultilingual';
+const productionApplicationId = 'io.github.sami_gor.daymark';
 
 describe('selectSpeechEngine', () => {
   it('selects Kokoro for English when the native engine is available on Android', () => {
@@ -11,16 +13,57 @@ describe('selectSpeechEngine', () => {
     expect(selection.reason).toBe('native-english');
   });
 
-  it('routes French to the local Kokoro engine', () => {
-    const selection = selectSpeechEngine({ ...android, lang: 'fr-FR', nativeAvailable: true });
+  it('routes French to the local Kokoro engine in the POC debug build', () => {
+    const selection = selectSpeechEngine({
+      ...android,
+      lang: 'fr-FR',
+      nativeAvailable: true,
+      applicationId: pocApplicationId,
+    });
     expect(selection).toEqual({ engine: 'kokoro', reason: 'native-french' });
   });
 
-  it('routes Latin American Spanish to the local Kokoro engine', () => {
-    const selection = selectSpeechEngine({ ...android, lang: 'es-419', nativeAvailable: true });
+  it('routes Latin American Spanish to the local Kokoro engine in the POC debug build', () => {
+    const selection = selectSpeechEngine({
+      ...android,
+      lang: 'es-419',
+      nativeAvailable: true,
+      applicationId: pocApplicationId,
+    });
     expect(selection).toEqual({ engine: 'kokoro', reason: 'native-spanish' });
-    expect(selectSpeechEngine({ ...android, lang: 'es-ES', nativeAvailable: true }))
-      .toEqual({ engine: 'kokoro', reason: 'native-spanish' });
+    expect(selectSpeechEngine({
+      ...android,
+      lang: 'es-ES',
+      nativeAvailable: true,
+      applicationId: pocApplicationId,
+    })).toEqual({ engine: 'kokoro', reason: 'native-spanish' });
+  });
+
+  it('keeps French and Spanish unavailable in a production release', () => {
+    for (const lang of ['fr-FR', 'es-419']) {
+      expect(selectSpeechEngine({
+        ...android,
+        lang,
+        nativeAvailable: true,
+        applicationId: productionApplicationId,
+      })).toEqual({ engine: 'unavailable', reason: 'french-spanish-unavailable' });
+    }
+  });
+
+  it('fails closed for French and Spanish when the application identity is unknown', () => {
+    expect(selectSpeechEngine({ ...android, lang: 'fr-FR', nativeAvailable: true }))
+      .toEqual({ engine: 'unavailable', reason: 'french-spanish-unavailable' });
+    expect(selectSpeechEngine({ ...android, lang: 'es-419', nativeAvailable: true }))
+      .toEqual({ engine: 'unavailable', reason: 'french-spanish-unavailable' });
+  });
+
+  it('leaves English narration unaffected by the POC release gate', () => {
+    expect(selectSpeechEngine({
+      ...android,
+      lang: 'en-GB',
+      nativeAvailable: true,
+      applicationId: productionApplicationId,
+    })).toEqual({ engine: 'kokoro', reason: 'native-english' });
   });
 
   it('returns unavailable, not browser speech, when native Kokoro is unavailable', () => {

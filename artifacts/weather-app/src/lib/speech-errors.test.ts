@@ -6,6 +6,7 @@ describe('narration failure copy', () => {
   it('maps every stable narration failure to distinct, localized copy', () => {
     const codes = [
       'unsupported-language',
+      'french-spanish-unavailable',
       'native-unavailable',
       'model-init-failed',
       'voice-asset-invalid',

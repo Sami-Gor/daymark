@@ -1,4 +1,6 @@
-import { selectSpeechEngine, type SpeechEngine, type SpeechSelection } from './speech-engine';
+import { App as CapacitorApp } from '@capacitor/app';
+
+import { selectSpeechEngine, speechLocale, type SpeechEngine, type SpeechSelection } from './speech-engine';
 import { normalizeNarrationText } from './speech-number-normalizer';
 import { segmentForSpeech } from './tts-segmentation';
 
@@ -30,9 +32,28 @@ export type NativeSpeechAdapter = {
   stop: () => Promise<void>;
 };
 
+/**
+ * Failure codes the native plugin already emits. They must pass through
+ * classification unchanged so a stable code is never re-derived by message
+ * heuristics (for example `model-init-failed` contains no "initializ").
+ */
+const NATIVE_NARRATION_FAILURE_CODES = new Set([
+  'unsupported-language',
+  'french-spanish-unavailable',
+  'voice-asset-invalid',
+  'playback-failed',
+  'synthesis-failed',
+  'model-init-failed',
+  'native-unavailable',
+  'native-failed',
+]);
+
 /** Maps a native rejection to a stable, user-facing narration failure code. */
 export function classifyNativeNarrationFailure(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error ?? '');
+  const message = (error instanceof Error ? error.message : String(error ?? '')).trim();
+  if (NATIVE_NARRATION_FAILURE_CODES.has(message)) {
+    return message;
+  }
   const normalized = message.toLowerCase();
   if (/unsupported narration language|unsupported-language|unsupported language/.test(normalized)) {
     return 'unsupported-language';
@@ -55,7 +76,31 @@ export function classifyNativeNarrationFailure(error: unknown): string {
 export type SpeechEnvironment = {
   isNativePlatform: boolean;
   platform: string;
+  /**
+   * Effective Android application ID. Tests and embedders may provide it;
+   * otherwise the router reads it from the native App plugin. Without a known
+   * ID the multilingual POC gate fails closed.
+   */
+  applicationId?: string;
 };
+
+async function resolveApplicationId(
+  env: SpeechEnvironment,
+  lang: string | undefined,
+): Promise<string | undefined> {
+  if (env.applicationId) return env.applicationId;
+  const locale = speechLocale(lang);
+  if (!env.isNativePlatform || env.platform !== 'android' || !locale || locale === 'en') {
+    return undefined;
+  }
+  try {
+    const info = await CapacitorApp.getInfo();
+    return info.id;
+  } catch {
+    // Unknown application identity: the engine gate keeps French/Spanish off.
+    return undefined;
+  }
+}
 
 export type SpeechRouter = {
   supported: () => boolean;
@@ -85,12 +130,17 @@ export function createSpeechRouter(
         nativeReason = 'native-unavailable';
       }
     }
+    const locale = speechLocale(lang);
+    const applicationId = locale && locale !== 'en'
+      ? await resolveApplicationId(env, lang)
+      : env.applicationId;
     return selectSpeechEngine({
       isNativePlatform: env.isNativePlatform,
       platform: env.platform,
       lang,
       nativeAvailable,
       nativeReason,
+      applicationId,
     });
   }
 

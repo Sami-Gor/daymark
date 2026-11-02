@@ -45,6 +45,12 @@ describe('normalizeNarrationText', () => {
     expect(normalizeNarrationText('17:30.', 'fr-FR')).toBe('dix-sept heures trente.');
   });
 
+  it('uses feminine hour agreement for French 21:00 and 21:30', () => {
+    expect(normalizeNarrationText('21:00.', 'fr-FR')).toBe('vingt et une heures.');
+    expect(normalizeNarrationText('21:30.', 'fr-FR')).toBe('vingt et une heures trente.');
+    expect(normalizeNarrationText('01:00.', 'fr-FR')).toBe('une heure.');
+  });
+
   it('uses natural Latin American Spanish 12-hour time expressions', () => {
     expect(normalizeNarrationText('00:00, 12:00, 17:00.', 'es-419')).toBe(
       'medianoche, mediodía, las cinco de la tarde.',
@@ -62,6 +68,17 @@ describe('normalizeNarrationText', () => {
     expect(normalizeNarrationText('21, 25, 100, 101', 'es-419')).toBe(
       'veintiuno, veinticinco, cien, ciento uno',
     );
+  });
+
+  it('applies Spanish numeral and noun agreement to temperatures', () => {
+    expect(normalizeNarrationText('Hace 1 grados.', 'es-419')).toBe('Hace un grado.');
+    expect(normalizeNarrationText('Hace 1 grado.', 'es-419')).toBe('Hace un grado.');
+    expect(normalizeNarrationText('Hace 21 grados.', 'es-419')).toBe('Hace veintiún grados.');
+    expect(normalizeNarrationText('Hace 31 grados.', 'es-419')).toBe('Hace treinta y un grados.');
+    expect(normalizeNarrationText('Hace -1 grados.', 'es-419')).toBe('Hace menos un grado.');
+    expect(normalizeNarrationText('Hace 21,5 grados.', 'es-419')).toBe('Hace veintiuno coma cinco grados.');
+    expect(normalizeNarrationText('Hace 1°C.', 'es-419')).toBe('Hace un grado Celsius.');
+    expect(normalizeNarrationText('Hace 21 °C.', 'es-419')).toBe('Hace veintiún grados Celsius.');
   });
 
   it('does not guess an ambiguous numeric date without source context', () => {
