@@ -1731,7 +1731,12 @@ test.describe('privacy policy page', () => {
         memory: 'held in memory',
         webDemo: 'limited weather demo',
         browserSpeech: 'does not invoke browser speech-recognition',
-        offlineVoice: 'not available in V2',
+        currentNarration: 'English Kokoro narration is available in the current public Daymark V2.0.0 release',
+        localNarration: 'generated on your device by the bundled Kokoro model',
+        unavailableNarration: 'French and Spanish narration are not available in the current public release',
+        poc: 'unreleased development proof of concept',
+        futureUpdate: 'This policy will be updated before any future release that makes French or Spanish narration available',
+        notClaimedAvailable: 'English, French and Latin American Spanish narration is generated',
         audience: 'adults aged 18 and over',
         ipMetadata: 'source IP address and requested URL',
         versionNote: 'Daymark 1.0.0',
@@ -1744,7 +1749,12 @@ test.describe('privacy policy page', () => {
         memory: 'conservé en mémoire',
         webDemo: 'démo météo limitée',
         browserSpeech: 'API de reconnaissance ou de synthèse vocale',
-        offlineVoice: 'pas disponible dans V2',
+        currentNarration: 'La narration en anglais est disponible dans la version publique actuelle de Daymark V2.0.0',
+        localNarration: 'est générée sur votre appareil par le modèle Kokoro intégré',
+        unavailableNarration: 'La narration en français et en espagnol n’est pas disponible dans la version publique actuelle',
+        poc: 'prototype de développement non publié',
+        futureUpdate: 'Cette politique sera mise à jour avant toute future version',
+        notClaimedAvailable: 'La narration en anglais, en français et en espagnol latino-américain est générée',
         audience: 'adultes âgés de 18 ans ou plus',
         ipMetadata: 'adresse IP source et l’URL demandée',
         versionNote: 'Daymark 1.0.0',
@@ -1757,7 +1767,12 @@ test.describe('privacy policy page', () => {
         memory: 'mantiene en memoria',
         webDemo: 'demo meteorológica limitada',
         browserSpeech: 'API de reconocimiento ni de síntesis de voz',
-        offlineVoice: 'no está disponible en V2',
+        currentNarration: 'La narración en inglés está disponible en la versión pública actual de Daymark V2.0.0',
+        localNarration: 'se genera en tu dispositivo con el modelo Kokoro integrado',
+        unavailableNarration: 'La narración en francés y español no está disponible en la versión pública actual',
+        poc: 'prueba de concepto de desarrollo no publicada',
+        futureUpdate: 'Esta política se actualizará antes de cualquier futura versión',
+        notClaimedAvailable: 'La narración en inglés, francés y español latinoamericano se genera',
         audience: 'adultos de 18 años o más',
         ipMetadata: 'dirección IP de origen y la URL solicitada',
         versionNote: 'Daymark 1.0.0',
@@ -1771,6 +1786,7 @@ test.describe('privacy policy page', () => {
         expect(text).toContain(host);
       }
       expect(text).toContain('Open-Meteo');
+      expect(text).toContain('Cloudflare');
       expect(text).toContain('daymark.locale');
       expect(text).toContain('daymark.permissions');
       expect(text).toContain('microphone-requested');
@@ -1780,7 +1796,12 @@ test.describe('privacy policy page', () => {
       expect(text).toContain(expectations[policy.lang].memory);
       expect(text).toContain(expectations[policy.lang].webDemo);
       expect(text).toContain(expectations[policy.lang].browserSpeech);
-      expect(text).toContain(expectations[policy.lang].offlineVoice);
+      expect(text).toContain(expectations[policy.lang].currentNarration);
+      expect(text).toContain(expectations[policy.lang].localNarration);
+      expect(text).toContain(expectations[policy.lang].unavailableNarration);
+      expect(text).toContain(expectations[policy.lang].poc);
+      expect(text).toContain(expectations[policy.lang].futureUpdate);
+      expect(text).not.toContain(expectations[policy.lang].notClaimedAvailable);
       expect(text).toContain(expectations[policy.lang].audience);
       expect(text).toContain(expectations[policy.lang].ipMetadata);
       expect(text).toContain(expectations[policy.lang].versionNote);

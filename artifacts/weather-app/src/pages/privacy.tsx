@@ -3,10 +3,11 @@ import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
 /*
  * English privacy policy for Daymark V2 (2.0.0).
  *
- * This page is the source for the web/PWA and Android policy. It deliberately
- * separates Daymark-controlled processing from direct Open-Meteo requests and
- * web-host request metadata, and it does not present V2.2 plans as current
- * capabilities.
+ * This page is the source for the web/PWA and Android policy. It describes the
+ * current public release: English Kokoro narration is available, while French
+ * and Spanish narration remain an unreleased development proof of concept. It
+ * deliberately separates Daymark-controlled processing from direct Open-Meteo
+ * requests and web-host request metadata.
  */
 
 export default function Privacy() {
@@ -117,9 +118,14 @@ export default function Privacy() {
 
       <h2>Android narration</h2>
       <p>
-        English, French and Latin American Spanish narration is generated on your device by the bundled Kokoro model,
-        using the selected locale and voice. Daymark does not store narration text and does not fall
-        back to Android system TTS, a network voice, or browser speech synthesis.
+        English Kokoro narration is available in the current public Daymark V2.0.0 release and is
+        generated on your device by the bundled Kokoro model. French and Spanish narration are not
+        available in the current public release. The multilingual implementation, including Latin
+        American Spanish, is an unreleased development proof of concept. Daymark does not store
+        narration text. Daymark shows an unavailable message when French or Spanish narration is
+        selected and does not fall back to Android system TTS, a network voice, or browser speech
+        synthesis. This policy will be updated before any future release that makes French or Spanish
+        narration available.
       </p>
 
       <h2>Information stored on your device</h2>
