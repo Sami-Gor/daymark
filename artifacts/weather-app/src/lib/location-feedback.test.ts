@@ -17,6 +17,11 @@ describe('location failure feedback', () => {
     expect(locationFailureKey('unsupported', false)).toBe('current.locationUnsupported');
   });
 
+  it('has a distinct recovery message for an invalid fix', () => {
+    expect(locationFailureKey('invalid', false)).toBe('current.locationInvalid');
+    expect(locationFailureKey('invalid', true)).toBe('current.locationInvalid');
+  });
+
   it('uses an Android-specific denial message that names the default place and recovery', () => {
     expect(locationFailureKey('denied', true)).toBe('current.locationDeniedAndroid');
     expect(locationFailureKey('denied', false)).toBe('current.locationDenied');

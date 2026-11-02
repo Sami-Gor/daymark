@@ -65,7 +65,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     private volatile Listener listener;
     private volatile State state = State.UNINITIALIZED;
-    private volatile boolean stopRequested;
+    private final PlaybackGeneration playbackGeneration = new PlaybackGeneration();
     private volatile AudioTrack audioTrack;
     private int synthesisCount;
 
@@ -167,8 +167,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     @Override
     public void speak(final String text, final String lang, final List<String> segments) {
         if (state != State.READY && state != State.STOPPED) {
-            setState(State.ERROR);
-            notifyError("Engine is not ready");
+            notifyError("engine not ready");
             return;
         }
         final String voice = voiceForLanguage(lang);
@@ -179,20 +178,20 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         if (isSpeaking()) {
             stop();
         }
-        stopRequested = false;
+        final int generation = playbackGeneration.begin();
         final long callTimeMs = SystemClock.elapsedRealtime();
         setState(State.SPEAKING);
         worker.post(new Runnable() {
             @Override
             public void run() {
-                synthesizeAndPlay(text, lang, voice, segments, callTimeMs);
+                synthesizeAndPlay(text, lang, voice, segments, callTimeMs, generation);
             }
         });
     }
 
     @Override
     public void stop() {
-        stopRequested = true;
+        playbackGeneration.invalidate();
         AudioTrack track = audioTrack;
         if (track != null) {
             try {
@@ -216,7 +215,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     @Override
     public void shutdown() {
-        stopRequested = true;
         stop();
         worker.post(new Runnable() {
             @Override
@@ -303,7 +301,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             String lang,
             String voice,
             List<String> segments,
-            long callTimeMs) {
+            long callTimeMs,
+            int generation) {
+        if (!isCurrent(generation)) {
+            return;
+        }
         final long synthesisNumber = ++synthesisCount;
         boolean useSegments = segments != null && segments.size() > 1 && segmentsMatch(text, segments);
         if (segments != null && !useSegments) {
@@ -318,15 +320,21 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             streamError = failure.getMessage();
         }
         if (streamError == null) {
-            streamAndPlay(synthesisNumber, callTimeMs);
+            streamAndPlay(synthesisNumber, callTimeMs, generation);
+            return;
+        }
+        if (!isCurrent(generation)) {
             return;
         }
         Log.w(TAG, "stream: unavailable (" + streamError + "); falling back to monolithic synth");
         try {
             float[] samples = nativeSynth(text, lang, voice);
+            if (!isCurrent(generation)) {
+                return;
+            }
             if (samples == null || samples.length == 0) {
-                setState(State.ERROR);
                 notifyError("Synthesis returned no audio");
+                setState(State.READY);
                 return;
             }
             long audioDurationMs = Math.round(samples.length * 1000.0 / SAMPLE_RATE);
@@ -342,11 +350,13 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 });
             }
 
-            playSamples(samples, callTimeMs);
+            playSamples(samples, callTimeMs, generation);
         } catch (Throwable failure) {
             Log.e(TAG, "synthesis/playback failed: " + failure.getMessage(), failure);
-            setState(State.ERROR);
-            notifyError("Synthesis failed: " + failure.getMessage());
+            if (isCurrent(generation)) {
+                notifyError("Synthesis failed: " + failure.getMessage());
+                setState(State.READY);
+            }
         }
     }
 
@@ -378,7 +388,10 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return null;
     }
 
-    private void streamAndPlay(long synthesisNumber, long callTimeMs) {
+    private void streamAndPlay(long synthesisNumber, long callTimeMs, int generation) {
+        if (!isCurrent(generation)) {
+            return;
+        }
         AudioTrack track = null;
         short[] chunk = new short[2048];
         long totalSamples = 0;
@@ -390,7 +403,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             track.play();
 
             boolean firstWrite = true;
-            while (!stopRequested) {
+            while (isCurrent(generation)) {
                 float[] samples = nativeStreamNext();
                 if (samples == null) {
                     break;
@@ -402,7 +415,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 int leadSilence = leadingSilenceSamples(samples);
                 int skipSamples = trimLeadingSilence(leadSilence, chunks == 1);
                 totalSamples += samples.length - skipSamples;
-                for (int offset = skipSamples; offset < samples.length && !stopRequested; offset += chunk.length) {
+                for (int offset = skipSamples; offset < samples.length && isCurrent(generation); offset += chunk.length) {
                     int count = Math.min(chunk.length, samples.length - offset);
                     for (int i = 0; i < count; i++) {
                         float value = Math.max(-1f, Math.min(1f, samples[offset + i]));
@@ -420,10 +433,12 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 }
             }
 
-            stopped = stopRequested;
+            stopped = !isCurrent(generation);
             if (chunks == 0) {
-                setState(State.ERROR);
-                notifyError("Synthesis returned no audio");
+                if (isCurrent(generation)) {
+                    notifyError("Synthesis returned no audio");
+                    setState(State.READY);
+                }
                 return;
             }
             long audioDurationMs = Math.round(totalSamples * 1000.0 / SAMPLE_RATE);
@@ -440,13 +455,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             }
 
             if (!stopped) {
-                waitForPlaybackEnd(track, totalSamples);
-                stopped = stopRequested;
+                waitForPlaybackEnd(track, totalSamples, generation);
+                stopped = !isCurrent(generation);
             }
         } catch (Throwable failure) {
             Log.e(TAG, "stream playback failed: " + failure.getMessage(), failure);
-            setState(State.ERROR);
-            notifyError("Synthesis failed: " + failure.getMessage());
+            if (isCurrent(generation)) {
+                notifyError("Synthesis failed: " + failure.getMessage());
+                setState(State.READY);
+            }
             return;
         } finally {
             try {
@@ -454,7 +471,9 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             } catch (Throwable ignored) {
                 // Instrumentation only.
             }
-            audioTrack = null;
+            if (audioTrack == track) {
+                audioTrack = null;
+            }
             if (track != null) {
                 try {
                     track.stop();
@@ -463,8 +482,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 }
                 track.release();
             }
-            if (state != State.ERROR) {
-                setState(stopped ? State.STOPPED : State.READY);
+            if (isCurrent(generation)) {
+                setState(State.READY);
             }
             Log.i(TAG, "playback: finished stopped=" + stopped + " streamChunks=" + chunks);
         }
@@ -513,14 +532,17 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 .build();
     }
 
-    private void waitForPlaybackEnd(AudioTrack track, long totalFrames) {
+    private void waitForPlaybackEnd(AudioTrack track, long totalFrames, int generation) {
         long deadlineMs = SystemClock.elapsedRealtime() + 5000;
-        while (!stopRequested && track.getPlaybackHeadPosition() < totalFrames && SystemClock.elapsedRealtime() < deadlineMs) {
+        while (isCurrent(generation) && track.getPlaybackHeadPosition() < totalFrames && SystemClock.elapsedRealtime() < deadlineMs) {
             SystemClock.sleep(20);
         }
     }
 
-    private void playSamples(float[] samples, long callTimeMs) {
+    private void playSamples(float[] samples, long callTimeMs, int generation) {
+        if (!isCurrent(generation)) {
+            return;
+        }
         AudioTrack track = null;
         boolean stopped = false;
         try {
@@ -530,7 +552,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
             short[] chunk = new short[2048];
             boolean firstWrite = true;
-            for (int offset = 0; offset < samples.length && !stopRequested; offset += chunk.length) {
+            for (int offset = 0; offset < samples.length && isCurrent(generation); offset += chunk.length) {
                 int count = Math.min(chunk.length, samples.length - offset);
                 for (int i = 0; i < count; i++) {
                     float value = Math.max(-1f, Math.min(1f, samples[offset + i]));
@@ -545,18 +567,22 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     Log.i(TAG, "playback: first audio buffer written " + (SystemClock.elapsedRealtime() - callTimeMs) + "ms after speak()");
                 }
             }
-            stopped = stopRequested;
+            stopped = !isCurrent(generation);
             if (!stopped) {
-                waitForPlaybackEnd(track, samples.length);
-                stopped = stopRequested;
+                waitForPlaybackEnd(track, samples.length, generation);
+                stopped = !isCurrent(generation);
             }
         } catch (Throwable failure) {
             Log.e(TAG, "playback failed: " + failure.getMessage(), failure);
-            setState(State.ERROR);
-            notifyError("Playback failed: " + failure.getMessage());
+            if (isCurrent(generation)) {
+                notifyError("Playback failed: " + failure.getMessage());
+                setState(State.READY);
+            }
             return;
         } finally {
-            audioTrack = null;
+            if (audioTrack == track) {
+                audioTrack = null;
+            }
             if (track != null) {
                 try {
                     track.stop();
@@ -565,11 +591,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 }
                 track.release();
             }
-            if (state != State.ERROR) {
-                setState(stopped ? State.STOPPED : State.READY);
+            if (isCurrent(generation)) {
+                setState(State.READY);
             }
             Log.i(TAG, "playback: finished stopped=" + stopped);
         }
+    }
+
+    private boolean isCurrent(int generation) {
+        return playbackGeneration.isCurrent(generation);
     }
 
     private void setState(final State next) {

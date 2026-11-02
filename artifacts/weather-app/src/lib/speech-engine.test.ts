@@ -29,6 +29,15 @@ describe('selectSpeechEngine', () => {
     expect(selection.reason).toBe('native-unavailable');
   });
 
+  it('keeps a native availability reason for actionable UI', () => {
+    expect(selectSpeechEngine({
+      ...android,
+      lang: 'en',
+      nativeAvailable: false,
+      nativeReason: 'voice-asset-invalid',
+    })).toEqual({ engine: 'unavailable', reason: 'voice-asset-invalid' });
+  });
+
   it('rejects unsupported languages explicitly', () => {
     const selection = selectSpeechEngine({ ...android, lang: 'de-DE', nativeAvailable: true });
     expect(selection).toEqual({ engine: 'unavailable', reason: 'unsupported-language' });

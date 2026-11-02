@@ -22,7 +22,13 @@ export function useDaymarkSpeech() {
       ? createSpeechRouter(
           { isNativePlatform: true, platform: 'android' },
           {
-            isAvailable: async () => (await DaymarkVoice.isAvailable()).available,
+            isAvailable: async () => {
+              const availability = await DaymarkVoice.isAvailable();
+              return {
+                available: availability.available === true,
+                reason: availability.reason,
+              };
+            },
             speak: async (text, lang, segments) => {
               await DaymarkVoice.speak({ text, lang, segments });
             },
@@ -52,6 +58,11 @@ export function useDaymarkSpeech() {
         handle = created;
       } else {
         void created.remove();
+      }
+    }).catch(() => {
+      if (active) {
+        setErrorCode('native-unavailable');
+        dispatch({ type: 'failed' });
       }
     });
     return () => {

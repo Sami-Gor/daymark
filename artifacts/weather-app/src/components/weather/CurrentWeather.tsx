@@ -6,6 +6,7 @@ import { DAYMARK_INTENTS, getIntentResponse } from '@/lib/weather-intents';
 import type { DayCueResult } from '@/lib/day-cue';
 import { TTS_LANGS } from '@/lib/i18n';
 import { isSupportedSpeechLocale } from '@/lib/speech-engine';
+import { describeNarrationError } from '@/lib/speech-errors';
 import { useDaymarkSpeech } from '@/hooks/use-daymark-speech';
 import { useLocale } from '@/hooks/use-locale';
 import { AskDaymark } from '@/components/weather/AskDaymark';
@@ -76,9 +77,7 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
         )}
         {isAndroidNative && speech.error && (
           <p className="voice-error" role="alert" data-testid="voice-error">
-            {speech.errorCode === 'offline-voice-unavailable'
-              ? t('voice.error.offlineUnavailable')
-              : t('voice.error.unavailable')}
+            {describeNarrationError(speech.errorCode, locale)}
           </p>
         )}
       </div>

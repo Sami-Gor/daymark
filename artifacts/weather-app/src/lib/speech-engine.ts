@@ -20,6 +20,7 @@ export type SpeechSelectionInputs = {
   platform: string;
   lang?: string;
   nativeAvailable: boolean;
+  nativeReason?: string;
 };
 
 export type SpeechSelection = {
@@ -45,6 +46,7 @@ export function selectSpeechEngine({
   platform,
   lang,
   nativeAvailable,
+  nativeReason,
 }: SpeechSelectionInputs): SpeechSelection {
   if (!isNativePlatform || platform !== 'android') {
     return { engine: 'unavailable', reason: 'not-android' };
@@ -54,7 +56,7 @@ export function selectSpeechEngine({
     return { engine: 'unavailable', reason: 'unsupported-language' };
   }
   if (!nativeAvailable) {
-    return { engine: 'unavailable', reason: 'native-unavailable' };
+    return { engine: 'unavailable', reason: nativeReason || 'native-unavailable' };
   }
   const label = locale === 'en' ? 'english' : locale === 'fr' ? 'french' : 'spanish';
   return { engine: 'kokoro', reason: `native-${label}` };

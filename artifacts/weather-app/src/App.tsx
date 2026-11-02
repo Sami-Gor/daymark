@@ -97,16 +97,25 @@ function Home() {
     setError('');
     // The locality dataset loads in parallel with the GPS fix; it only ever
     // improves the place label and never delays weather (see below).
-    void ensureLocalityIndex();
+    void ensureLocalityIndex().catch(() => undefined);
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       // Both Android and web/PWA apply the same latitude-aware on-device grid
       // (0.025° latitude minimum; longitude widens where needed to preserve
       // 3 km²). Android additionally requests only ACCESS_COARSE_LOCATION, so
       // no unrounded fix is used for a weather request.
-      const { latitude, longitude } = resolveDeviceLocation(
-        coords.latitude,
-        coords.longitude,
-      );
+      let fix: { latitude: number; longitude: number };
+      try {
+        fix = resolveDeviceLocation(coords.latitude, coords.longitude);
+      } catch {
+        // A malformed or non-finite fix must not leave the button stuck in
+        // "Finding you…" or reach Open-Meteo.
+        if (id === selectionId.current) {
+          setIsLocating(false);
+          setLocationFailure('invalid');
+        }
+        return;
+      }
+      const { latitude, longitude } = fix;
       try {
         // A newer search or location interaction wins over this older one.
         if (id !== selectionId.current) return;
@@ -117,7 +126,13 @@ function Home() {
         if (!loaded || id !== selectionId.current) return;
         // A successful fix clears any earlier denial/timeout notice.
         setLocationFailure(null);
-        const match = await lookupLocality(latitude, longitude);
+        let match: Awaited<ReturnType<typeof lookupLocality>> = null;
+        try {
+          match = await lookupLocality(latitude, longitude);
+        } catch {
+          // Locality naming is enhancement-only; the weather fix already loaded.
+          return;
+        }
         if (!match || match.confidence === 'low' || id !== selectionId.current) return;
         // Update only the label, only for the current intent, and only while
         // the GPS fallback is still displayed. Weather is never refetched.
@@ -147,6 +162,19 @@ function Home() {
   // opens on the default location and only asks when the user presses the
   // location button.
   useEffect(() => { void loadWeather(LONDON); }, [loadWeather]);
+
+  // A fix that arrives after the app was backgrounded is stale. Invalidate the
+  // pending location intent so it cannot replace a later user action or update
+  // the UI while the app is no longer in front. No permission is requested here.
+  useEffect(() => {
+    const cancelLocationOnHide = () => {
+      if (document.visibilityState !== 'hidden') return;
+      selectionId.current += 1;
+      setIsLocating(false);
+    };
+    document.addEventListener('visibilitychange', cancelLocationOnHide);
+    return () => document.removeEventListener('visibilitychange', cancelLocationOnHide);
+  }, []);
 
   const showInitialLoading = isLoading && !weather;
   const isRefreshing = isLoading && Boolean(weather);

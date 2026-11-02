@@ -1947,6 +1947,49 @@ test.describe('geolocation flow', () => {
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
   });
 
+  test('an invalid fix shows recovery copy and never sends coordinates', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    let forecastRequests = 0;
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.hostname === 'api.open-meteo.com' && !request.url().includes('ukmo')) forecastRequests += 1;
+    });
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page, 100, 0);
+    await expect(page.getByTestId('location-notice')).toContainText('invalid');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await page.waitForTimeout(250);
+    expect(forecastRequests, 'an invalid fix must not reach Open-Meteo').toBe(0);
+  });
+
+  test('a fix that arrives after backgrounding is ignored', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await page.waitForTimeout(250);
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
+  });
+
   test('reports position-unavailable distinctly from permission denial', async ({ page }) => {
     await mockOpenMeteo(page);
     await stubDeferredGeolocation(page);

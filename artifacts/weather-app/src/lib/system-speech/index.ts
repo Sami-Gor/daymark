@@ -1,9 +1,9 @@
 import { registerPlugin } from '@capacitor/core';
 
 /*
- * Platform TextToSpeech bridge. Used as the fallback for languages without a
- * bundled DaymarkVoice (French, Spanish) on Android, where the Capacitor
- * WebView has no speechSynthesis.
+ * Legacy platform TextToSpeech wrapper, retained only for source-level offline
+ * voice guards. It is not imported by the narration path and must not be used
+ * as a fallback: Daymark has no system-TTS or browser-speech narration path.
  */
 
 export interface SystemSpeechPlugin {

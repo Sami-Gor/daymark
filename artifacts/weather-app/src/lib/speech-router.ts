@@ -19,11 +19,38 @@ export type SpeechHandlers = {
   onEngine?: (selection: SpeechSelection) => void;
 };
 
+export type NativeSpeechAvailability = {
+  available: boolean;
+  reason?: string;
+};
+
 export type NativeSpeechAdapter = {
-  isAvailable: () => Promise<boolean>;
+  isAvailable: () => Promise<NativeSpeechAvailability>;
   speak: (text: string, lang?: string, segments?: string[]) => Promise<void>;
   stop: () => Promise<void>;
 };
+
+/** Maps a native rejection to a stable, user-facing narration failure code. */
+export function classifyNativeNarrationFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const normalized = message.toLowerCase();
+  if (/unsupported narration language|unsupported-language|unsupported language/.test(normalized)) {
+    return 'unsupported-language';
+  }
+  if (/integrity|asset.*(invalid|mismatch)|voice.*(invalid|missing|mismatch)/.test(normalized)) {
+    return 'voice-asset-invalid';
+  }
+  if (/playback|audiotrack|audio track/.test(normalized)) {
+    return 'playback-failed';
+  }
+  if (/synthesis|no audio|returned no audio/.test(normalized)) {
+    return 'synthesis-failed';
+  }
+  if (/initializ|model.*(load|missing)|engine.*(not ready|unavailable)|not ready/.test(normalized)) {
+    return 'model-init-failed';
+  }
+  return 'native-failed';
+}
 
 export type SpeechEnvironment = {
   isNativePlatform: boolean;
@@ -47,11 +74,15 @@ export function createSpeechRouter(
 
   async function select(lang?: string): Promise<SpeechSelection> {
     let nativeAvailable = false;
+    let nativeReason: string | undefined;
     if (env.isNativePlatform && env.platform === 'android') {
       try {
-        nativeAvailable = await native.isAvailable();
+        const availability = await native.isAvailable();
+        nativeAvailable = availability?.available === true;
+        nativeReason = availability?.reason;
       } catch {
         nativeAvailable = false;
+        nativeReason = 'native-unavailable';
       }
     }
     return selectSpeechEngine({
@@ -59,6 +90,7 @@ export function createSpeechRouter(
       platform: env.platform,
       lang,
       nativeAvailable,
+      nativeReason,
     });
   }
 
@@ -109,7 +141,7 @@ export function createSpeechRouter(
         active = null;
         // Never fall back to system or network speech. Surface the failure.
         console.warn('DaymarkSpeech native speak failed', error);
-        handlers.onError?.('native-failed');
+        handlers.onError?.(classifyNativeNarrationFailure(error));
         return false;
       }
     },
