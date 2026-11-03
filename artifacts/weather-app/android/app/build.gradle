@@ -180,6 +180,7 @@ def verifyArchive = { String label, File archive, boolean release ->
         throw new GradleException("${label}: archive not found: ${archive}")
     }
     def entries = [:]
+    def capacitorPlugins = null
     new java.util.zip.ZipFile(archive).withCloseable { zip ->
         zip.entries().each { entry ->
             if (!entry.isDirectory() && entry.size > 0) {
@@ -189,12 +190,20 @@ def verifyArchive = { String label, File archive, boolean release ->
                 if (licenseKey.find()) {
                     entries[licenseKey.group(2)] = zip.getInputStream(entry).getText('UTF-8')
                 }
+                if (name ==~ /(^|\/)assets\/capacitor\.plugins\.json$/) {
+                    capacitorPlugins = zip.getInputStream(entry).getText('UTF-8')
+                }
                 if (release && name ==~ /(^|\/)assets\/kokoro\/(ff_siwis|em_alex)\.bin$/) {
                     throw new GradleException(
                             "${label}: release archive contains debug-only voice ${name}")
                 }
             }
         }
+    }
+    if (capacitorPlugins == null || !capacitorPlugins.contains('@capacitor/app')) {
+        throw new GradleException(
+                "${label}: assets/capacitor.plugins.json is missing or does not register " +
+                "@capacitor/app. Run: pnpm --filter @workspace/weather-app exec cap sync android")
     }
     def required = [
             'THIRD-PARTY-NOTICES.md': ['em_alex', 'SIWIS', 'Apache-2.0'],
