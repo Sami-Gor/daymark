@@ -1,7 +1,7 @@
 # Daymark TTS benchmark corpus
 
 This directory contains the canonical long-utterance corpus, manifest and
-host-side runner/scorer for the multilingual Kokoro POC.
+host-side runner and validator for the multilingual Kokoro POC.
 
 ## Corpus
 
@@ -35,14 +35,21 @@ node --experimental-strip-types benchmarks/tts/build-manifest.ts
 
 ## Benchmark run
 
-Build the host runner once:
+From the repository root, stage the Kokoro model and voices once with
+`android/kokoro-poc/scripts/fetch-kokoro-assets.sh`, then build the host runner:
 
 ```sh
-cd android/kokoro-poc/rust
-cargo build --release --example tts_bench
+(cd android/kokoro-poc/rust && cargo build --release --example tts_bench)
 ```
 
-Run all languages and lengths:
+The example depends on the pinned `kokoro-en` checkout at
+`android/kokoro-poc/.build/kokoro-src`, which is gitignored.
+`android/kokoro-poc/scripts/build-kokoro-android.sh` clones that checkout at the
+pinned commit before cross-compiling; the checkout must exist even for a
+host-only build. The runner reads the staged app assets unless
+`DAYMARK_KOKORO_MODEL` or `DAYMARK_KOKORO_VOICES` points elsewhere.
+
+Run all languages and lengths from the repository root:
 
 ```sh
 node --experimental-strip-types benchmarks/tts/run.ts
@@ -58,10 +65,10 @@ Use `DAYMARK_TTS_RESULTS_DIR` or `DAYMARK_TTS_BENCH_BIN` to override the output
 directory or binary path.
 
 The runner validates fixture hashes/counts, normalization, segment
-reconstruction, expected segment counts, per-segment tokenization, unknown
-phonemes/PUA, audio finiteness and final-segment completion. It records cold
-and warm runs separately, including time to the first generated segment, plus
-clearly labelled artificial-delay runs.
+reconstruction, expected segment counts, unknown phonemes/PUA, audio finiteness
+and final-segment completion. It records per-segment token counts, cold and
+warm runs separately, time to the first generated segment, and clearly labelled
+artificial-delay runs.
 
 ### What each language actually measures
 
@@ -75,9 +82,9 @@ not all the same measurement:
 - French and Spanish (`monolithic`) are still processed **segment by segment**
   inside the harness: each segment is phonemized with `piper-plus-g2p` and
   synthesized with `synth_phonemes`, then the audio is concatenated. The mode
-  name means there is no stream API; it does **not** mean the harness makes one
-  whole-text synthesis call. The Android app does make one whole-text
-  `nativeSynth` call for these languages (see
+  name means the harness does not use the stream API; it does **not** mean the
+  harness makes one whole-text synthesis call. The Android app does make one
+  whole-text `nativeSynth` call for these languages (see
   `docs/release/v2.1-speech-performance.md` §5), so this benchmark is not a
   timing model of the app's French/Spanish path.
 
@@ -98,7 +105,13 @@ is not comparable with the app's first audio even in principle, because the
 benchmark synthesizes a short first segment while the app must finish the
 entire utterance before it can play anything.
 
-The benchmark is host-only macOS CPU measurement. It is not Android
+`summary.md` reports RTF computed from the `synthMs` and `durationSeconds`
+values in `results.json`: acoustic synthesis time divided by the duration of
+the generated audio. It excludes G2P, tokenization, JNI and playback. RTF below
+1.0 means synthesis outpaces real time; it says nothing about when playback
+starts.
+
+The recorded benchmark is a host-only macOS CPU measurement. It is not Android
 performance and does not establish human pronunciation quality.
 
 ## Pinned Kokoro chunk limit
