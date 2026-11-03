@@ -6,14 +6,20 @@ release. See THIRD-PARTY-NOTICES.md and Apache-2.0.txt in this directory.
 
 ff_siwis (French)
 -----------------
-Voice style: ff_siwis. Source corpus: SIWIS, University of Edinburgh DataShare
-record 10283/2353, https://datashare.ed.ac.uk/handle/10283/2353, licensed under
-the Creative Commons Attribution 4.0 International licence,
-https://creativecommons.org/licenses/by/4.0/.
+Voice style: ff_siwis. Source corpus: The SIWIS French Speech Synthesis
+Database (2016) by Junichi Yamagishi, Pierre-Edouard Honnet, Philip Garner and
+Alexandros Lazaridis, University of Edinburgh, School of Informatics, The
+Centre for Speech Technology Research, https://doi.org/10.7488/ds/1705
+(DataShare record 10283/2353), licensed under the Creative Commons Attribution
+4.0 International licence, https://creativecommons.org/licenses/by/4.0/.
 
-Daymark redistributes the voice style file published in the Kokoro model
-repository. No claim is made that the upstream voice or corpus has been
-modified. Redistributed file SHA-256:
+The voice style is published by hexgrad in Kokoro-82M,
+https://huggingface.co/hexgrad/Kokoro-82M, and converted to ONNX .bin by
+onnx-community/Kokoro-82M-v1.0-ONNX,
+https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX. Daymark
+redistributes the exact .bin file unmodified; the only known transformation is
+the upstream voice-style conversion. Daymark does not claim that the voice or
+corpus was modified for Daymark. Redistributed file SHA-256:
 a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861.
 
 em_alex (Spanish)

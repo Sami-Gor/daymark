@@ -509,8 +509,9 @@ OPTIONAL hardening:
   clean, and CI now enforces `pnpm audit --audit-level critical`.
 - Gradle: AGP 8.13.0, Gradle 8.14.3, JDK 21 required; Capacitor/AndroidX from
   Google Maven; no unexpected repositories.
-- Rust: `Cargo.lock` committed; `ort 2.0.0-rc.13` + ONNX Runtime 1.28.2
-  downloaded at build time by `ort-sys` (build-time network dependency).
+- Rust: `Cargo.lock` committed; `ort 2.0.0-rc.13` + ONNX Runtime 1.28.0
+  downloaded at build time by `ort-sys` (build-time network dependency). The
+  sherpa-onnx AAR separately bundles ONNX Runtime 1.28.2.
 - Kokoro: cloned by script at pinned commit
   `b42bd5cf915163607cb51984cabf273dcf09755e` (network at build time).
 - No git dependencies beyond the pinned clone; no postinstall scripts in added
@@ -522,15 +523,17 @@ OPTIONAL hardening:
 
 | Component | License | Redistributed | Notes |
 |---|---|---|---|
-| pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | compiled | attribution in README |
+| pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | compiled | modified by Daymark (`kokoro-synth-phonemes.patch`); change statement in README and `THIRD-PARTY-NOTICES.md` |
 | Kokoro model weights | Apache-2.0 (upstream repo) | asset | verify upstream card |
 | `bm_fable.bin` voice | Apache-2.0 (per model repo) | asset | per-voice training provenance not documented upstream — unresolved, low risk |
-| ONNX Runtime 1.28.2 | MIT | linked | build-time download |
+| ONNX Runtime 1.28.0 (static in `libkokoro_jni.so`) | MIT | linked | build-time download by `ort-sys` 2.0.0-rc.13 |
+| ONNX Runtime 1.28.2 (bundled in the patched sherpa-onnx AAR) | MIT | linked | separate copy for ASR |
 | `ort`/`ort-sys` | MIT OR Apache-2.0 | compiled | |
 | Rust crates (tokio, jni, log, android_logger, bincode, fancy-regex, regex, futures, pin-project, ndarray, num2words, unicode-segmentation, misaki-rs, cmudict-fast, waken_snowball) | MIT/Apache-2.0/BSD-3 | compiled | permissive |
 | `language-tokenizer` 0.1.0 | **WTFPL-2.0** via `license-file` | compiled | previously flagged as missing license; the crate ships `LICENSE.md` (WTFPL v2), a permissive license — **cleared** |
 | espeak-ng | GPL-3.0 | not included | verified absent (Misaki-only G2P) |
-| Capacitor core/cli/android/app | MIT | compiled | |
+| Capacitor core/android 8.5.1 and @capacitor/app 8.1.1 | MIT | compiled | CLI 8.5.1 is build tooling only |
+| sherpa-onnx 1.13.8 (CVE-2026-108954 patch) | Apache-2.0 | linked | modified AAR; change statement in `SHERPA-ONNX-PROVENANCE.md` and `THIRD-PARTY-NOTICES.md` |
 | AndroidX/Google libraries | Apache-2.0 | compiled | |
 | Fonts (Fraunces, Plus Jakarta Sans, DM Mono) | SIL OFL-1.1 | asset | license files in `src/fonts` |
 | GeoNames locality dataset (`localities-v1.json`) | CC BY 4.0 | asset | credited in the privacy pages; attribution obligation |

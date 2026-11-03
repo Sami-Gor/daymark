@@ -39,7 +39,7 @@ adb logcat -s DaymarkKokoroTts
 |---|---|
 | pguso/kokoro (`kokoro-en`) | commit `b42bd5cf915163607cb51984cabf273dcf09755e`, crate 0.1.5 (Rust edition 2024) |
 | `ort` crate | 2.0.0-rc.13 (resolved from the crate's `2.0.0-rc.11` caret) |
-| ONNX Runtime | 1.28.2 for `aarch64-linux-android`, statically linked by `ort-sys` |
+| ONNX Runtime | 1.28.0 for `aarch64-linux-android`, statically linked by `ort-sys` 2.0.0-rc.13 |
 | Rust | 1.98.1 (`aarch64-linux-android` target) |
 | Android NDK | 29.0.14206865 (clang `aarch64-linux-android26`) |
 | Model | `onnx/model_quantized.onnx`, sha256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` (92,361,116 B) |
@@ -190,10 +190,10 @@ work, not part of this pass.
 
 | Component | License | Redistributed | Notes |
 |---|---|---|---|
-| pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | Yes (compiled) | Attribution required |
+| pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | Yes (compiled) | Attribution required; modified by Daymark via `scripts/kokoro-synth-phonemes.patch` (adds `synth_phonemes`, removes narration/phoneme debug logging) |
 | Kokoro model weights (`model_quantized.onnx`) | Apache-2.0 | Yes (asset) | hexgrad/onnx-community release; verify upstream card |
 | `bm_fable.bin` voice | Apache-2.0 (per model repo) | Yes (asset) | Per-voice training-data provenance is not documented upstream — review |
-| ONNX Runtime 1.28.2 (static) | MIT | Yes (linked) | Downloaded by `ort-sys` at build time |
+| ONNX Runtime 1.28.0 (static) | MIT | Yes (linked) | Downloaded by `ort-sys` 2.0.0-rc.13 at build time; the shipped `libkokoro_jni.so` reports `rel-1.28.0` |
 | `ort` / `ort-sys` | MIT OR Apache-2.0 | Yes (compiled) | |
 | tokio, log, android_logger, jni, bincode, fancy-regex, regex, futures, pin-project, ndarray, num2words, unicode-segmentation | MIT / Apache-2.0 | Yes (compiled) | Permissive |
 | misaki-rs 0.3.0 | MIT | Yes (compiled) | Lexicons/tagger embedded; no eSpeak |
