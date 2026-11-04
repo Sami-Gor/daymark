@@ -195,6 +195,16 @@ scripts/                  workspace tooling
 
 Daymark 2.0.0 has been released for Android. Get it on [Google Play](https://play.google.com/store/apps/details?id=io.github.sami_gor.daymark).
 
+**v2.1 — Coming soon**
+
+Daymark 2.1 brings a smarter, more capable Ask Daymark experience.
+
+- **Smarter weather questions** — Ask about several conditions at once, including rain, temperature, wind, snow, fog, humidity and cloud cover.
+- **More complete answers** — Get responses that cover all parts of a multi-part question, rather than answering only the first part.
+- **Improved answer quality** — More natural, organised responses with repeated information removed.
+- **Clearer forecast information** — When requested weather data is unavailable, Daymark tells you instead of guessing.
+- **Expanded language understanding** — Improved recognition of weather-related questions in English, French and Spanish.
+
 **v3.0 — On the horizon**
 
 Further ideas are in exploration as Daymark continues to evolve.
