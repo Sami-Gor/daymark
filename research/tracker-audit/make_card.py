@@ -46,7 +46,7 @@ for a in apps:
     if a["tracker_count"] is None:
         a["tracker_count"] = len(a.get("trackers", []))
 apps.sort(key=lambda x: (-x["tracker_count"], x["name"]))
-rows = [(a["name"], a["tracker_count"]) for a in apps] + [("Daymark", 0)]
+rows = [(a["name"], a["tracker_count"]) for a in apps] + [("Daymark*", 0)]
 
 img = Image.new("RGB", (W * S, H * S), BG)
 d = ImageDraw.Draw(img)
@@ -57,11 +57,12 @@ d.text(((W - m) * S, 58 * S), "DAYMARK", font=sans_b(20), fill=GREEN, anchor="ra
 
 d.text((m * S, 96 * S), "20 weather apps.", font=serif_b(74), fill=INK)
 d.text((m * S, 188 * S), "141 trackers.", font=serif_b(74), fill=GREEN)
-d.text((m * S, 288 * S), "Median 4.5 per app. 17 of 20 can read your ad ID.", font=sans(29), fill=INK)
-d.text((m * S, 330 * S), "Daymark ships none.", font=sans_b(29), fill=INK)
-d.line([(m * S, 372 * S), ((W - m) * S, 372 * S)], fill=(225, 221, 213), width=1 * S)
+d.text((m * S, 288 * S), "Median 4.5 per app. At least 17 of 20 list the ad-ID permission.", font=sans(26), fill=INK)
+d.text((m * S, 330 * S), "Daymark source review: no recognised tracker SDK identified.", font=sans_b(23), fill=INK)
+d.text((m * S, 358 * S), "Daymark was not subjected to an Exodus APK scan.", font=sans(20), fill=MUTED)
+d.line([(m * S, 394 * S), ((W - m) * S, 394 * S)], fill=(225, 221, 213), width=1 * S)
 
-top = 400
+top = 418
 step = 39.0
 bar_h = 18
 left_label = 436
@@ -84,8 +85,9 @@ for i, (name, v) in enumerate(rows):
            fill=(GREEN if is_dm else INK), anchor="lm")
 
 d.text((m * S, 1246 * S), "Daymark declares 5 permissions. The Met Office app declares 35.", font=sans(22), fill=INK)
-d.text((m * S, 1296 * S), "Source: Exodus Privacy static scans of the latest APK per app, Sep–Nov 2026.", font=sans(16), fill=MUTED)
-d.text((m * S, 1318 * S), "Trackers are code signatures detected in the APK, not proof of activity.", font=sans(16), fill=MUTED)
+d.text((m * S, 1272 * S), "Source: Exodus Privacy static APK scans for the 20 applications.", font=sans(16), fill=MUTED)
+d.text((m * S, 1296 * S), "Daymark* is a source inspection, not an Exodus APK scan.", font=sans(16), fill=MUTED)
+d.text((m * S, 1318 * S), "Tracker signatures are not proof of activity; recovered permission names are partial.", font=sans(14), fill=MUTED)
 
 img = img.resize((W, H), Image.LANCZOS)
 img.save("audit-card.png", optimize=True)

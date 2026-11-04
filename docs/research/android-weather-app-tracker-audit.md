@@ -10,13 +10,13 @@ Prepared 2026-11-04 · Dataset: [`research/tracker-audit/raw.json`](../../resear
 
 Twenty Android weather applications were scanned with [Exodus Privacy](https://reports.exodus-privacy.eu.org)'s static APK analysis. Between them they carry **141 tracker detections** — code signatures for advertising, analytics, crash-reporting and profiling SDKs found inside the APK. The median application carries **4.5**; the worst carries **17**.
 
-**17 of the 20** declare access to the advertising ID. **18 of 20** carry at least one detected tracker signature.
+**At least 17 of the 20** applications explicitly list `ACCESS_ADSERVICES_AD_ID` in the permission names recovered from their Exodus reports. The available permission names do not establish whether the remaining three also declare it. **18 of 20** carry at least one detected tracker signature.
 
-Daymark is included as a reference row rather than a scanned subject. Its Android manifest and runtime dependency list contain **no tracker SDK signatures**, it declares **no advertising-ID permission**, and it declares **five permissions**.
+Daymark is included as a reference row rather than a scanned subject. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in Daymark's manifest and 12 declared JavaScript runtime dependencies by source inspection. Daymark was not subjected to an Exodus APK scan. Its manifest declares **no advertising-ID permission** and **five permissions**.
 
 ### Quotation-ready
 
-> An Exodus Privacy static analysis of 20 Android weather applications identified 141 aggregate tracker detections, with a median of 4.5 per application. Seventeen of the 20 applications declared access to the advertising ID. Daymark's manifest and dependency list contain no tracker SDK signatures, and the app declares five permissions.
+> An Exodus Privacy static analysis of 20 Android weather applications identified 141 aggregate tracker detections, with a median of 4.5 per application. At least 17 of the 20 applications explicitly list `ACCESS_ADSERVICES_AD_ID` in the permission names recovered from their Exodus reports. The available permission names do not establish whether the remaining three also declare it. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in Daymark's manifest and 12 declared JavaScript runtime dependencies by source inspection. Daymark was not subjected to an Exodus APK scan.
 
 These findings describe the **specific APK versions listed below**, as recorded in the Exodus Privacy reports at the stated dates. They are not a statement about every version of these applications, past or future.
 
@@ -36,9 +36,9 @@ These findings describe the **specific APK versions listed below**, as recorded 
 | Lowest count | 0 (Breezy Weather, Pixel Weather) |
 | Applications with ≥1 detection | 18 of 20 |
 | Distinct tracker identities across the sample | 46 |
-| Applications declaring advertising-ID access | 17 of 20 |
+| Applications whose recovered Exodus permission names list `ACCESS_ADSERVICES_AD_ID` | At least 17 of 20 |
 | Applications declaring background location | 19 of 20 |
-| Daymark tracker signatures | 0 |
+| Recognised SDKs identified in Daymark source inspection | 0 |
 | Daymark declared permissions | 5 |
 | Met Office declared permissions | 35 |
 
@@ -68,17 +68,13 @@ Only a subset of each application's permission names could be recovered from the
 
 ### Advertising-ID classification
 
-An application is classed as declaring advertising-ID access when its Exodus permission list contains `ACCESS_ADSERVICES_AD_ID` — the Android 13+ advertising-ID permission. In this sample all 17 qualifying applications use that permission; none list the older `com.google.android.gms.permission.AD_ID` by name. Declaring the permission means the app is allowed to read the advertising ID; it does not establish that it does.
+This audit counts an application as explicitly listing advertising-ID access when the recovered Exodus permission names include `ACCESS_ADSERVICES_AD_ID` — the Android 13+ advertising-ID permission. At least 17 applications explicitly list it. The available permission names do not establish whether the remaining three also declare it. Among the recovered names, none of the 17 explicitly listing the newer permission also lists the older `com.google.android.gms.permission.AD_ID`. A permission declaration indicates access is allowed; it does not establish that the app actually reads the advertising ID.
 
 ### Daymark
 
-Daymark is **not** an Exodus scan. Its row is derived from the Android manifest and runtime dependency list in the Daymark source repository:
+Daymark is **not** an Exodus scan. Its row is derived from source inspection of the Android manifest and declared JavaScript runtime dependencies in the Daymark source repository. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in Daymark's manifest and 12 declared JavaScript runtime dependencies by source inspection. Daymark was not subjected to an Exodus APK scan.
 
-- the manifest declares five permissions — `INTERNET`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`;
-- the manifest declares no advertising-ID permission and no background-location permission;
-- the JavaScript dependency list contains no advertising, analytics, crash-reporting or attribution SDK.
-
-"No detected tracker signatures" therefore means "none found in the declared dependencies and manifest by inspection", not "an Exodus scan returned zero". The distinction is stated wherever the comparison appears.
+The manifest declares five permissions — `INTERNET`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS` — and contains no advertising-ID or background-location permission. The source-inspection result is not an Exodus tracker count.
 
 ### Snapshot
 
@@ -88,31 +84,31 @@ Reports were fetched 3–4 November 2026 from the "latest report" page for each 
 
 Sorted by tracker detections, descending, then by application name. This matches the source dataset's order.
 
-| Application | Package | Version | Report date | Trackers | Ad ID | Permissions | Bg location | Exodus report |
+| Application | Package | Version | Report date | Trackers | Ad ID evidence | Permissions | Bg location | Exodus report |
 |---|---|---|---:|---:|---|---:|---|---|
-| Transparent clock & weather | `com.droid27.transparentclockweather` | 9.17.0 | Oct. 6, 2026, 6:29 p.m. | 17 | yes | 27 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.droid27.transparentclockweather/latest/) |
-| The Weather Channel | `com.weather.Weather` | 16.21.1 | Sept. 11, 2026, 3:12 a.m. | 16 | yes | 22 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.weather.Weather/latest/) |
-| WeatherBug | `com.aws.android` | 6.7.0 | Sept. 3, 2026, 7:04 p.m. | 14 | yes | 28 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.aws.android/latest/) |
-| 1Weather | `com.handmark.expressweather` | 12.9.3 | Sept. 19, 2026, 1:29 a.m. | 13 | yes | 25 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.handmark.expressweather/latest/) |
-| Wunderground | `com.wunderground.android.weather` | 6.20.1 | Aug. 29, 2026, 4:57 p.m. | 11 | yes | 18 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.wunderground.android.weather/latest/) |
-| Meteored | `aplicacion.tiempo` | 8.12.8_free | Oct. 31, 2026, 12:52 p.m. | 10 | yes | 27 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/aplicacion.tiempo/latest/) |
-| MyRadar | `com.acmeaom.android.myradar` | 8.73.0 | Aug. 29, 2026, 9:21 p.m. | 10 | yes | 29 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.acmeaom.android.myradar/latest/) |
-| Weather&Radar | `de.wetteronline.wetterapp` | 2026.20 | Oct. 16, 2026, 5:58 a.m. | 10 | yes | 32 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/de.wetteronline.wetterapp/latest/) |
-| YoWindow | `yo.app.free` | 2.59.18 | Aug. 25, 2026, 11:12 a.m. | 10 | yes | 30 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/yo.app.free/latest/) |
-| Met Office | `uk.gov.metoffice.weather.android` | 3.69.0 | Oct. 28, 2026, 6:26 a.m. | 5 | yes | 35 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/uk.gov.metoffice.weather.android/latest/) |
-| AccuWeather | `com.accuweather.android` | 21.2.0 | Oct. 16, 2026, 5:29 p.m. | 4 | yes | 21 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.accuweather.android/latest/) |
-| Today Weather | `mobi.lockdown.weather` | 2.5.1 | Sept. 3, 2026, 7:01 p.m. | 4 | yes | 22 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/mobi.lockdown.weather/latest/) |
-| WeatherPro | `com.mg.android` | 5.6.13 | Oct. 6, 2026, 6:32 p.m. | 4 | yes | 26 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.mg.android/latest/) |
-| Windy.com | `com.windyty.android` | 51.3.2 | Oct. 19, 2026, 5:30 p.m. | 4 | yes | 27 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.windyty.android/latest/) |
-| RainViewer | `com.lucky_apps.RainViewer` | 7.21 | Sept. 14, 2026, 11:36 a.m. | 3 | yes | 25 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.lucky_apps.RainViewer/latest/) |
-| meteoblue | `com.meteoblue.droid` | Cirrus Uncinus 3.1.6 | Oct. 25, 2026, 9:14 p.m. | 3 | yes | 18 | no | [report](https://reports.exodus-privacy.eu.org/en/reports/com.meteoblue.droid/latest/) |
-| Yr | `no.nrk.yr` | 6.7.0 | Oct. 20, 2026, 9:15 a.m. | 2 | yes | 21 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/no.nrk.yr/latest/) |
-| WarnWetter | `de.dwd.warnapp` | 5.4.2 | March 30, 2026, 11:47 a.m. | 1 | no | 17 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/de.dwd.warnapp/latest/) |
-| Breezy Weather | `org.breezyweather` | 6.2.2_freenet | Aug. 26, 2026, 10:42 p.m. | 0 | no | 18 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/org.breezyweather/latest/) |
-| Pixel Weather | `com.google.android.apps.weather` | 1.1.20260716.979549101.release | Sept. 26, 2026, 6:11 p.m. | 0 | no | 21 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.google.android.apps.weather/latest/) |
-| **Daymark** | `io.github.sami_gor.daymark` | not scanned | — | **0** | **no** | **5** | **no** | [manifest](https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/android/app/src/main/AndroidManifest.xml) |
+| Transparent clock & weather | `com.droid27.transparentclockweather` | 9.17.0 | Oct. 6, 2026, 6:29 p.m. | 17 | listed | 27 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.droid27.transparentclockweather/latest/) |
+| The Weather Channel | `com.weather.Weather` | 16.21.1 | Sept. 11, 2026, 3:12 a.m. | 16 | listed | 22 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.weather.Weather/latest/) |
+| WeatherBug | `com.aws.android` | 6.7.0 | Sept. 3, 2026, 7:04 p.m. | 14 | listed | 28 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.aws.android/latest/) |
+| 1Weather | `com.handmark.expressweather` | 12.9.3 | Sept. 19, 2026, 1:29 a.m. | 13 | listed | 25 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.handmark.expressweather/latest/) |
+| Wunderground | `com.wunderground.android.weather` | 6.20.1 | Aug. 29, 2026, 4:57 p.m. | 11 | listed | 18 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.wunderground.android.weather/latest/) |
+| Meteored | `aplicacion.tiempo` | 8.12.8_free | Oct. 31, 2026, 12:52 p.m. | 10 | listed | 27 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/aplicacion.tiempo/latest/) |
+| MyRadar | `com.acmeaom.android.myradar` | 8.73.0 | Aug. 29, 2026, 9:21 p.m. | 10 | listed | 29 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.acmeaom.android.myradar/latest/) |
+| Weather&Radar | `de.wetteronline.wetterapp` | 2026.20 | Oct. 16, 2026, 5:58 a.m. | 10 | listed | 32 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/de.wetteronline.wetterapp/latest/) |
+| YoWindow | `yo.app.free` | 2.59.18 | Aug. 25, 2026, 11:12 a.m. | 10 | listed | 30 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/yo.app.free/latest/) |
+| Met Office | `uk.gov.metoffice.weather.android` | 3.69.0 | Oct. 28, 2026, 6:26 a.m. | 5 | listed | 35 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/uk.gov.metoffice.weather.android/latest/) |
+| AccuWeather | `com.accuweather.android` | 21.2.0 | Oct. 16, 2026, 5:29 p.m. | 4 | listed | 21 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.accuweather.android/latest/) |
+| Today Weather | `mobi.lockdown.weather` | 2.5.1 | Sept. 3, 2026, 7:01 p.m. | 4 | listed | 22 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/mobi.lockdown.weather/latest/) |
+| WeatherPro | `com.mg.android` | 5.6.13 | Oct. 6, 2026, 6:32 p.m. | 4 | listed | 26 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.mg.android/latest/) |
+| Windy.com | `com.windyty.android` | 51.3.2 | Oct. 19, 2026, 5:30 p.m. | 4 | listed | 27 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.windyty.android/latest/) |
+| RainViewer | `com.lucky_apps.RainViewer` | 7.21 | Sept. 14, 2026, 11:36 a.m. | 3 | listed | 25 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.lucky_apps.RainViewer/latest/) |
+| meteoblue | `com.meteoblue.droid` | Cirrus Uncinus 3.1.6 | Oct. 25, 2026, 9:14 p.m. | 3 | listed | 18 | no | [report](https://reports.exodus-privacy.eu.org/en/reports/com.meteoblue.droid/latest/) |
+| Yr | `no.nrk.yr` | 6.7.0 | Oct. 20, 2026, 9:15 a.m. | 2 | listed | 21 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/no.nrk.yr/latest/) |
+| WarnWetter | `de.dwd.warnapp` | 5.4.2 | March 30, 2026, 11:47 a.m. | 1 | not listed | 17 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/de.dwd.warnapp/latest/) |
+| Breezy Weather | `org.breezyweather` | 6.2.2_freenet | Aug. 26, 2026, 10:42 p.m. | 0 | not listed | 18 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/org.breezyweather/latest/) |
+| Pixel Weather | `com.google.android.apps.weather` | 1.1.20260716.979549101.release | Sept. 26, 2026, 6:11 p.m. | 0 | not listed | 21 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.google.android.apps.weather/latest/) |
+| **Daymark** | `io.github.sami_gor.daymark` | not scanned | — | **0*** | absent (manifest) | **5** | **no** | [manifest](https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/android/app/src/main/AndroidManifest.xml) |
 
-The Daymark row is separated because it comes from a different method: manifest and dependency inspection, not an Exodus scan of a published APK.
+The Daymark row is separated because it comes from a different method: manifest and dependency inspection, not an Exodus scan of a published APK. Its `0*` tracker value means no recognised SDK was identified by that source inspection; it is not an Exodus result. For the 20 scanned applications, `listed` means the permission name appears in the recovered Exodus list and `not listed` means only that it was absent from the names available in the report extract. The Daymark `absent (manifest)` entry is based on its own manifest.
 
 ### Fields not recorded
 
@@ -159,7 +155,7 @@ The remaining 20 are counted by Exodus but were not named in the extractable pag
 ## What this does not prove
 
 - **A detected tracker signature does not establish that the tracker executed.** Exodus finds code in the APK. It cannot show whether the SDK initialised, what it sent, or where it sent it.
-- **Zero detected tracker signatures does not prove an application never transmits data.** Daymark ships no tracker SDK, but its forecast requests necessarily reach Open-Meteo, which sees the request and an approximate location.
+- **A source inspection finding no recognised SDK does not prove an application never transmits data.** Daymark's forecast requests necessarily reach Open-Meteo, which sees the request and an approximate location. This audit did not scan a Daymark APK.
 - **Declared permissions do not prove those permissions were exercised.** Nineteen of the twenty apps declare background location, including an open-source one; declaration is what the manifest says, not what the app does.
 - **Findings apply to the tested APK versions and this scan snapshot.** Versions change; a newer build may add or remove SDKs, and Exodus reports are periodically regenerated.
 - **This is a comparative technical snapshot, not a privacy or security certification.** It does not assess server-side collection, encryption, retention, account handling, or vulnerabilities.
@@ -172,7 +168,7 @@ Recorded honestly rather than papered over:
 
 1. **No APK hashes or version codes.** The original scrape captured version names and report dates only. The reports are therefore identified by package, version string and date.
 2. **Permission names are partial.** Each app's declared count exceeds the number of names exposed on the report page (total declared 17–35, named 12–22). Counts are reliable; the named lists are illustrative, not exhaustive.
-3. **Advertising-ID classification rests on the named list.** For the three apps classed "no" (WarnWetter, Breezy Weather, Pixel Weather) the absence is based on the permission names present in the report page. A full manifest dump was not retained.
+3. **Advertising-ID evidence rests on the recovered names.** At least 17 reports explicitly list `ACCESS_ADSERVICES_AD_ID`. For WarnWetter, Breezy Weather and Pixel Weather it was not listed in the permission names exposed by the report page; a full manifest dump was not retained, so their absence is not established.
 4. **One stale report.** WarnWetter's report dates from 30 March 2026, roughly seven months older than the rest of the sample.
 5. **Daymark was not scanned.** Its row is a source inspection, and it is labelled as such throughout.
 

@@ -1,7 +1,6 @@
 # Sources
 
-Every figure in the public report comes from `raw.json`, which was produced by
-scraping Exodus Privacy report pages on 3–4 November 2026.
+The 20-app Exodus findings in the public report come from `raw.json`, which was produced by scraping Exodus Privacy report pages on 3–4 November 2026. Daymark is a separate reference row based on source inspection of the repository's manifest and declared JavaScript runtime dependencies; it is not part of the Exodus dataset.
 
 ## Primary source
 
@@ -65,7 +64,7 @@ Neither was excluded because it looked clean; both were excluded for staleness.
 Daymark was **not** scanned by Exodus. Its figures come from the Daymark repository:
 
 - Manifest: <https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/android/app/src/main/AndroidManifest.xml> — five `uses-permission` entries, no advertising-ID or background-location permission.
-- Dependencies: <https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/package.json> — twelve runtime dependencies, none an advertising, analytics, crash-reporting or attribution SDK.
+- Dependencies: <https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/package.json> — 12 declared JavaScript runtime dependencies. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in the manifest and these dependencies by source inspection. Daymark was not subjected to an Exodus APK scan.
 - Repository state inspected: commit `5ecf9279f365a53393f3b6b77a119633245bc64a` (`main`, 2026-11-04).
 
 Anyone re-checking the Daymark row must repeat it against a specific commit, because
@@ -84,8 +83,7 @@ the manifest can change.
 
 1. Permission **names** are a subset of each app's declared count (Exodus reports a total
    badge and names only some entries). Counts are reliable; name lists are illustrative.
-2. Advertising-ID classification uses the named permission list, so the three "no" apps
-   are classified from what the page exposed, not from a full manifest dump.
+2. At least 17 reports explicitly list `ACCESS_ADSERVICES_AD_ID` in the recovered permission names. It was not listed for WarnWetter, Breezy Weather and Pixel Weather, but the incomplete names do not establish whether those three declare it; no full manifest dump was retained.
 3. WarnWetter's report is from 30 March 2026, older than the rest of the sample.
 4. No APK hashes, version codes or developer names were captured.
 

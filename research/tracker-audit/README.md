@@ -15,10 +15,7 @@ Supporting files for the public report
 
 ## What this is not
 
-Daymark is **not** in `raw.json` and was **not** scanned by Exodus. Its row in the
-report is a source inspection of the Android manifest and the JavaScript dependency
-list, labelled as such in the report and in `SOURCES.md`. `validate.py` checks that
-claim against the repository files rather than against the scan data.
+Daymark is **not** in `raw.json` and was **not** scanned by Exodus. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in Daymark's manifest and 12 declared JavaScript runtime dependencies by source inspection. Daymark was not subjected to an Exodus APK scan. Its row is a separate source inspection, not part of the Exodus results.
 
 ## Validate
 
@@ -32,13 +29,13 @@ It checks, from `raw.json` itself:
 - 20 applications and 20 unique package ids;
 - 141 aggregate tracker detections;
 - median 4.5 (mean of the 10th and 11th ascending counts);
-- 17 applications declaring `ACCESS_ADSERVICES_AD_ID`;
+- at least 17 applications whose recovered Exodus permission names explicitly list `ACCESS_ADSERVICES_AD_ID` (the remaining three are not established as negatives);
 - 19 declaring `ACCESS_BACKGROUND_LOCATION`;
 - Met Office at 35 declared permissions;
 - every per-app `tracker_count` equalling its tracker list length;
 - Daymark absent from the scan, and its manifest declaring 5 permissions with no
   advertising-ID or background-location permission;
-- no advertising/analytics SDK in Daymark's declared dependencies;
+- no recognised advertising, analytics, crash-reporting or attribution SDK identified in Daymark's manifest and 12 declared JavaScript runtime dependencies by source inspection;
 - the PNG being 1080 × 1350.
 
 Exit status is non-zero on any failure, so it can run in CI.
