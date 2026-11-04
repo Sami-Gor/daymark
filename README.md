@@ -191,9 +191,9 @@ scripts/                  workspace tooling
 
 ## Releases & What's Next
 
-**[v2.0.0 — Android release](https://github.com/Sami-Gor/daymark/tree/v2.0.0)**
+**v2.0.0 — Android**
 
-The v2.0.0 Android release build is prepared. The linked tag identifies the exact source snapshot used for this release.
+Daymark 2.0.0 has been released for Android. Get it on [Google Play](https://play.google.com/store/apps/details?id=io.github.sami_gor.daymark).
 
 **v3.0 — On the horizon**
 
