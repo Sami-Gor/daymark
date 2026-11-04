@@ -205,6 +205,15 @@ Daymark 2.1 brings a smarter, more capable Ask Daymark experience.
 - **Clearer forecast information** — When requested weather data is unavailable, Daymark tells you instead of guessing.
 - **Expanded language understanding** — Improved recognition of weather-related questions in English, French and Spanish.
 
+**v2.5 — Planned**
+
+Daymark 2.5 is planned to bring weather directly to your Android home screen with a new native weather widget.
+
+- **At-a-glance weather** — See current weather conditions and your selected location without opening the app.
+- **Automatic widget updates** — The widget periodically refreshes its display using the latest forecast data already saved by Daymark.
+- **Offline awareness** — Retains the last successful forecast and indicates when the information may be out of date.
+- **Privacy-first design** — Uses Daymark's existing location and weather data. The widget does not independently request your location or make background weather requests.
+
 **v3.0 — On the horizon**
 
 Further ideas are in exploration as Daymark continues to evolve.
