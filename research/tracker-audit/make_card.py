@@ -46,7 +46,7 @@ for a in apps:
     if a["tracker_count"] is None:
         a["tracker_count"] = len(a.get("trackers", []))
 apps.sort(key=lambda x: (-x["tracker_count"], x["name"]))
-rows = [(a["name"], a["tracker_count"]) for a in apps] + [("Daymark*", 0)]
+rows = [(a["name"], a["tracker_count"]) for a in apps] + [("Daymark*", None)]
 
 img = Image.new("RGB", (W * S, H * S), BG)
 d = ImageDraw.Draw(img)
@@ -68,7 +68,7 @@ bar_h = 18
 left_label = 436
 bar_x = 456
 maxw = 452
-maxv = max(v for _, v in rows) or 1
+maxv = max((v for _, v in rows if v is not None), default=1) or 1
 
 for i, (name, v) in enumerate(rows):
     y = top + i * step
@@ -78,10 +78,16 @@ for i, (name, v) in enumerate(rows):
         d.rounded_rectangle([(40) * S, (y - 16) * S, (W - 40) * S, (y + bar_h + 16) * S], radius=11 * S, fill=BAND)
     d.text((left_label * S, mid), name, font=(sans_b(24) if is_dm else sans(24)),
            fill=INK, anchor="rm")
-    w = max(3, v / maxv * maxw)
-    d.rounded_rectangle([bar_x * S, y * S, (bar_x + w) * S, (y + bar_h) * S], radius=4 * S,
-                        fill=(GREEN if is_dm else BAR))
-    d.text(((bar_x + w + 14) * S, mid), str(v), font=(sans_b(24) if is_dm else sans_b(24)),
+    if v is not None:
+        w = max(3, v / maxv * maxw)
+        d.rounded_rectangle([bar_x * S, y * S, (bar_x + w) * S, (y + bar_h) * S], radius=4 * S,
+                            fill=(GREEN if is_dm else BAR))
+        value_label = str(v)
+    else:
+        w = 0
+        value_label = "not scanned"
+    d.text(((bar_x + w + 14) * S, mid), value_label,
+           font=(sans_b(20) if is_dm else sans_b(24)),
            fill=(GREEN if is_dm else INK), anchor="lm")
 
 d.text((m * S, 1246 * S), "Daymark declares 5 permissions. The Met Office app declares 35.", font=sans(22), fill=INK)

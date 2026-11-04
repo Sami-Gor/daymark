@@ -106,7 +106,7 @@ Sorted by tracker detections, descending, then by application name. This matches
 | WarnWetter | `de.dwd.warnapp` | 5.4.2 | March 30, 2026, 11:47 a.m. | 1 | not listed | 17 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/de.dwd.warnapp/latest/) |
 | Breezy Weather | `org.breezyweather` | 6.2.2_freenet | Aug. 26, 2026, 10:42 p.m. | 0 | not listed | 18 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/org.breezyweather/latest/) |
 | Pixel Weather | `com.google.android.apps.weather` | 1.1.20260716.979549101.release | Sept. 26, 2026, 6:11 p.m. | 0 | not listed | 21 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.google.android.apps.weather/latest/) |
-| **Daymark** | `io.github.sami_gor.daymark` | not scanned | — | **0*** | absent (manifest) | **5** | **no** | [manifest](https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/android/app/src/main/AndroidManifest.xml) |
+| **Daymark** | `io.github.sami_gor.daymark` | not scanned | — | **Not scanned*** | absent (manifest) | **5** | **no** | [manifest](https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/android/app/src/main/AndroidManifest.xml) |
 
 The Daymark row is separated because it comes from a different method: manifest and dependency inspection, not an Exodus scan of a published APK. Its `0*` tracker value means no recognised SDK was identified by that source inspection; it is not an Exodus result. For the 20 scanned applications, `listed` means the permission name appears in the recovered Exodus list and `not listed` means only that it was absent from the names available in the report extract. The Daymark `absent (manifest)` entry is based on its own manifest.
 
