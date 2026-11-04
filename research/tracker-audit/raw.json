@@ -1,0 +1,1611 @@
+[
+ {
+  "package": "com.droid27.transparentclockweather",
+  "app": "Transparent clock & weather",
+  "version": "9.17.0",
+  "report_date": "Oct. 6, 2026, 6:29 p.m.",
+  "tracker_count": 17,
+  "permission_count": 27,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Amazon Advertisement",
+    "categories": []
+   },
+   {
+    "name": "AppLovin (MAX and SparkLabs)",
+    "categories": [
+     "analytics",
+     "profiling",
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "AppMetrica",
+    "categories": []
+   },
+   {
+    "name": "AppMonet",
+    "categories": []
+   },
+   {
+    "name": "Facebook Ads",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Fyber",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "ironSource",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Mintegral",
+    "categories": [
+     "analytics",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "myTarget",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "myTracker",
+    "categories": []
+   },
+   {
+    "name": "Pangle",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Singular",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Yandex Ad",
+    "categories": [
+     "advertisement"
+    ]
+   }
+  ],
+  "dangerous_count": 7,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "CAMERA",
+   "FOREGROUND_SERVICE",
+   "FOREGROUND_SERVICE_DATA_SYNC",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "QUERY_ALL_PACKAGES",
+   "READ_CALENDAR",
+   "READ_EXTERNAL_STORAGE",
+   "RECEIVE_BOOT_COMPLETED",
+   "SCHEDULE_EXACT_ALARM",
+   "VIBRATE",
+   "WAKE_LOCK",
+   "WRITE_EXTERNAL_STORAGE"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification",
+   "profiling"
+  ],
+  "dangerous": 7
+ },
+ {
+  "package": "com.weather.Weather",
+  "app": "The Weather Channel",
+  "version": "16.21.1",
+  "report_date": "Sept. 11, 2026, 3:12 a.m.",
+  "tracker_count": 16,
+  "permission_count": 22,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Amazon Advertisement",
+    "categories": []
+   },
+   {
+    "name": "Amplitude",
+    "categories": [
+     "analytics",
+     "profiling"
+    ]
+   },
+   {
+    "name": "AppLovin (MAX and SparkLabs)",
+    "categories": [
+     "analytics",
+     "profiling",
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "AppsFlyer",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "ComScore",
+    "categories": [
+     "analytics",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Facebook Ads",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Inmobi",
+    "categories": []
+   },
+   {
+    "name": "MoEngage",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "mParticle",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "New Relic",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Prebid Mobile",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Taboola",
+    "categories": []
+   }
+  ],
+  "dangerous_count": 3,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "AD_SERVICES_CONFIG",
+   "CHANGE_NETWORK_STATE",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "RECEIVE_BOOT_COMPLETED",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification",
+   "profiling"
+  ],
+  "dangerous": 3
+ },
+ {
+  "package": "com.aws.android",
+  "app": "WeatherBug",
+  "version": "6.7.0",
+  "report_date": "Sept. 3, 2026, 7:04 p.m.",
+  "tracker_count": 14,
+  "permission_count": 28,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Amazon Advertisement",
+    "categories": []
+   },
+   {
+    "name": "AppLovin (MAX and SparkLabs)",
+    "categories": [
+     "analytics",
+     "profiling",
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "AppNexus",
+    "categories": []
+   },
+   {
+    "name": "Appodeal Stack",
+    "categories": [
+     "analytics",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "BidMachine",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Facebook Flipper",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "ironSource",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "JW Player",
+    "categories": []
+   },
+   {
+    "name": "Prebid Mobile",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Taboola",
+    "categories": []
+   }
+  ],
+  "dangerous_count": 3,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "AD_SERVICES_CONFIG",
+   "CHANGE_WIFI_STATE",
+   "FOREGROUND_SERVICE",
+   "FOREGROUND_SERVICE_LOCATION",
+   "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_BASIC_PHONE_STATE",
+   "RECEIVE_BOOT_COMPLETED",
+   "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+   "VIBRATE",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification",
+   "profiling"
+  ],
+  "dangerous": 3
+ },
+ {
+  "package": "com.handmark.expressweather",
+  "app": "1Weather",
+  "version": "12.9.3",
+  "report_date": "Sept. 19, 2026, 1:29 a.m.",
+  "tracker_count": 13,
+  "permission_count": 25,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Amazon Advertisement",
+    "categories": []
+   },
+   {
+    "name": "Amazon Mobile Analytics (Amplify)",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "AppLovin (MAX and SparkLabs)",
+    "categories": [
+     "analytics",
+     "profiling",
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "AppsFlyer",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Facebook Ads",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Fyber",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Inmobi",
+    "categories": []
+   },
+   {
+    "name": "MoEngage",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Taboola",
+    "categories": []
+   }
+  ],
+  "dangerous_count": 6,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "CAMERA",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_BASIC_PHONE_STATE",
+   "READ_PHONE_STATE",
+   "RECEIVE_BOOT_COMPLETED",
+   "RECORD_AUDIO",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification",
+   "profiling"
+  ],
+  "dangerous": 6
+ },
+ {
+  "package": "com.wunderground.android.weather",
+  "app": "Wunderground",
+  "version": "6.20.1",
+  "report_date": "Aug. 29, 2026, 4:57 p.m.",
+  "tracker_count": 11,
+  "permission_count": 18,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Amazon Advertisement",
+    "categories": []
+   },
+   {
+    "name": "AppsFlyer",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Flurry",
+    "categories": [
+     "advertisement",
+     "analytics"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Mapbox",
+    "categories": []
+   },
+   {
+    "name": "Moat",
+    "categories": [
+     "analytics",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "mParticle",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Twitter MoPub",
+    "categories": [
+     "analytics",
+     "advertisement"
+    ]
+   }
+  ],
+  "dangerous_count": 3,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "FOREGROUND_SERVICE",
+   "GET_TASKS",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification"
+  ],
+  "dangerous": 3
+ },
+ {
+  "package": "aplicacion.tiempo",
+  "app": "Meteored",
+  "version": "8.12.8_free",
+  "report_date": "Oct. 31, 2026, 12:52 p.m.",
+  "tracker_count": 10,
+  "permission_count": 27,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Adjust",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Amazon Advertisement",
+    "categories": []
+   },
+   {
+    "name": "ComScore",
+    "categories": [
+     "analytics",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Facebook Ads",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Facebook Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Pangle",
+    "categories": [
+     "advertisement"
+    ]
+   }
+  ],
+  "dangerous_count": 5,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_CUSTOM_AUDIENCE",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "AD_SERVICES_CONFIG",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "MODIFY_AUDIO_SETTINGS",
+   "POST_NOTIFICATIONS",
+   "READ_EXTERNAL_STORAGE",
+   "RECEIVE_BOOT_COMPLETED",
+   "RECORD_AUDIO",
+   "VIBRATE",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification"
+  ],
+  "dangerous": 5
+ },
+ {
+  "package": "com.acmeaom.android.myradar",
+  "app": "MyRadar",
+  "version": "8.73.0",
+  "report_date": "Aug. 29, 2026, 9:21 p.m.",
+  "tracker_count": 10,
+  "permission_count": 29,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "AppLovin (MAX and SparkLabs)",
+    "categories": [
+     "analytics",
+     "profiling",
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "AppsFlyer",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Cuebiq",
+    "categories": [
+     "analytics",
+     "location"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Inmobi",
+    "categories": []
+   },
+   {
+    "name": "OpenTelemetry (OpenCensus, OpenTracing)",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Segment",
+    "categories": [
+     "analytics",
+     "profiling"
+    ]
+   }
+  ],
+  "dangerous_count": 4,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "ACTIVITY_RECOGNITION",
+   "AD_SERVICES_CONFIG",
+   "FOREGROUND_SERVICE",
+   "FOREGROUND_SERVICE_LOCATION",
+   "INTERNET",
+   "NFC",
+   "POST_NOTIFICATIONS",
+   "RECEIVE_BOOT_COMPLETED",
+   "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+   "SCHEDULE_EXACT_ALARM",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification",
+   "location",
+   "profiling"
+  ],
+  "dangerous": 4
+ },
+ {
+  "package": "de.wetteronline.wetterapp",
+  "app": "Weather&Radar",
+  "version": "2026.20",
+  "report_date": "Oct. 16, 2026, 5:58 a.m.",
+  "tracker_count": 10,
+  "permission_count": 32,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Amazon Advertisement",
+    "categories": []
+   },
+   {
+    "name": "AppsFlyer",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Batch",
+    "categories": [
+     "analytics",
+     "profiling"
+    ]
+   },
+   {
+    "name": "Facebook Ads",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Facebook Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Prebid Mobile",
+    "categories": [
+     "advertisement"
+    ]
+   }
+  ],
+  "dangerous_count": 7,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "CAMERA",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_EXTERNAL_STORAGE",
+   "RECEIVE_BOOT_COMPLETED",
+   "RECORD_AUDIO",
+   "VIBRATE",
+   "WAKE_LOCK",
+   "WRITE_EXTERNAL_STORAGE"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification",
+   "profiling"
+  ],
+  "dangerous": 7
+ },
+ {
+  "package": "yo.app.free",
+  "app": "YoWindow",
+  "version": "2.59.18",
+  "report_date": "Aug. 25, 2026, 11:12 a.m.",
+  "tracker_count": 10,
+  "permission_count": 30,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "AppMetrica",
+    "categories": []
+   },
+   {
+    "name": "AppMonet",
+    "categories": []
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   },
+   {
+    "name": "ironSource",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "myTarget",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "myTracker",
+    "categories": []
+   },
+   {
+    "name": "Yandex Ad",
+    "categories": [
+     "advertisement"
+    ]
+   }
+  ],
+  "dangerous_count": 8,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "FOREGROUND_SERVICE",
+   "FOREGROUND_SERVICE_LOCATION",
+   "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_EXTERNAL_STORAGE",
+   "READ_PHONE_STATE",
+   "RECEIVE_BOOT_COMPLETED",
+   "SCHEDULE_EXACT_ALARM",
+   "USE_BIOMETRIC",
+   "USE_FINGERPRINT",
+   "USE_FULL_SCREEN_INTENT",
+   "VIBRATE",
+   "WAKE_LOCK",
+   "WRITE_EXTERNAL_STORAGE"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification"
+  ],
+  "dangerous": 8
+ },
+ {
+  "package": "uk.gov.metoffice.weather.android",
+  "app": "Met Office",
+  "version": "3.69.0",
+  "report_date": "Oct. 28, 2026, 6:26 a.m.",
+  "tracker_count": 5,
+  "permission_count": 35,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Amazon Advertisement",
+    "categories": []
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "IAB Open Measurement",
+    "categories": [
+     "identification",
+     "advertisement"
+    ]
+   }
+  ],
+  "dangerous_count": 3,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "AD_SERVICES_CONFIG",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_APP_BADGE",
+   "RECEIVE_BOOT_COMPLETED",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting",
+   "identification"
+  ],
+  "dangerous": 3
+ },
+ {
+  "package": "com.accuweather.android",
+  "app": "AccuWeather",
+  "version": "21.2.0",
+  "report_date": "Oct. 16, 2026, 5:29 p.m.",
+  "tracker_count": 4,
+  "permission_count": 21,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Urbanairship",
+    "categories": []
+   }
+  ],
+  "dangerous_count": 5,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_BASIC_PHONE_STATE",
+   "RECEIVE_BOOT_COMPLETED",
+   "USE_BIOMETRIC",
+   "USE_FINGERPRINT",
+   "VIBRATE",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting"
+  ],
+  "dangerous": 5
+ },
+ {
+  "package": "mobi.lockdown.weather",
+  "app": "Today Weather",
+  "version": "2.5.1",
+  "report_date": "Sept. 3, 2026, 7:01 p.m.",
+  "tracker_count": 4,
+  "permission_count": 22,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Facebook Ads",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   }
+  ],
+  "dangerous_count": 4,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_MEDIA_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "RECEIVE_BOOT_COMPLETED",
+   "SCHEDULE_EXACT_ALARM",
+   "VIBRATE",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting"
+  ],
+  "dangerous": 4
+ },
+ {
+  "package": "com.mg.android",
+  "app": "WeatherPro",
+  "version": "5.6.13",
+  "report_date": "Oct. 6, 2026, 6:32 p.m.",
+  "tracker_count": 4,
+  "permission_count": 26,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Taboola",
+    "categories": []
+   }
+  ],
+  "dangerous_count": 3,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "CHANGE_NETWORK_STATE",
+   "CHANGE_WIFI_STATE",
+   "FOREGROUND_SERVICE",
+   "INTERACT_ACROSS_USERS",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_WALLPAPER_INTERNAL",
+   "RECEIVE_BOOT_COMPLETED",
+   "SET_WALLPAPER",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting"
+  ],
+  "dangerous": 3
+ },
+ {
+  "package": "com.windyty.android",
+  "app": "Windy.com",
+  "version": "51.3.2",
+  "report_date": "Oct. 19, 2026, 5:30 p.m.",
+  "tracker_count": 4,
+  "permission_count": 27,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "AppsFlyer",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Facebook Analytics",
+    "categories": [
+     "analytics"
+    ]
+   },
+   {
+    "name": "Facebook Login",
+    "categories": [
+     "identification"
+    ]
+   },
+   {
+    "name": "Facebook Share",
+    "categories": []
+   }
+  ],
+  "dangerous_count": 5,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_CUSTOM_AUDIENCE",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "FOREGROUND_SERVICE",
+   "FOREGROUND_SERVICE_LOCATION",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "RECEIVE_BOOT_COMPLETED",
+   "SCHEDULE_EXACT_ALARM",
+   "USE_BIOMETRIC",
+   "USE_CREDENTIALS",
+   "USE_FINGERPRINT",
+   "VIBRATE",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "analytics",
+   "identification"
+  ],
+  "dangerous": 5
+ },
+ {
+  "package": "com.lucky_apps.RainViewer",
+  "app": "RainViewer",
+  "version": "7.21",
+  "report_date": "Sept. 14, 2026, 11:36 a.m.",
+  "tracker_count": 3,
+  "permission_count": 25,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   }
+  ],
+  "dangerous_count": 3,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "CHANGE_NETWORK_STATE",
+   "FOREGROUND_SERVICE",
+   "FOREGROUND_SERVICE_LOCATION",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "QUICKBOOT_POWERON",
+   "RECEIVE_BOOT_COMPLETED",
+   "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+   "VIBRATE",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting"
+  ],
+  "dangerous": 3
+ },
+ {
+  "package": "com.meteoblue.droid",
+  "app": "meteoblue",
+  "version": "Cirrus Uncinus 3.1.6",
+  "report_date": "Oct. 25, 2026, 9:14 p.m.",
+  "tracker_count": 3,
+  "permission_count": 18,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Google AdMob",
+    "categories": [
+     "advertisement"
+    ]
+   },
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   }
+  ],
+  "dangerous_count": 3,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_ADSERVICES_TOPICS",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "WAKE_LOCK",
+   "WRITE_EXTERNAL_STORAGE"
+  ],
+  "ad_id": true,
+  "bg_loc": false,
+  "cats": [
+   "advertisement",
+   "analytics",
+   "crash reporting"
+  ],
+  "dangerous": 3
+ },
+ {
+  "package": "no.nrk.yr",
+  "app": "Yr",
+  "version": "6.7.0",
+  "report_date": "Oct. 20, 2026, 9:15 a.m.",
+  "tracker_count": 2,
+  "permission_count": 21,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Google CrashLytics",
+    "categories": [
+     "crash reporting"
+    ]
+   },
+   {
+    "name": "Google Firebase Analytics",
+    "categories": [
+     "analytics"
+    ]
+   }
+  ],
+  "dangerous_count": 4,
+  "permissions": [
+   "ACCESS_ADSERVICES_AD_ID",
+   "ACCESS_ADSERVICES_ATTRIBUTION",
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "AUTHENTICATE_ACCOUNTS",
+   "FOREGROUND_SERVICE",
+   "GET_ACCOUNTS",
+   "INTERNET",
+   "MANAGE_ACCOUNTS",
+   "POST_NOTIFICATIONS",
+   "RECEIVE_BOOT_COMPLETED",
+   "USE_CREDENTIALS",
+   "WAKE_LOCK"
+  ],
+  "ad_id": true,
+  "bg_loc": true,
+  "cats": [
+   "analytics",
+   "crash reporting"
+  ],
+  "dangerous": 4
+ },
+ {
+  "package": "de.dwd.warnapp",
+  "app": "WarnWetter",
+  "version": "5.4.2",
+  "report_date": "March 30, 2026, 11:47 a.m.",
+  "tracker_count": 1,
+  "permission_count": 17,
+  "source": "Google Play",
+  "trackers": [
+   {
+    "name": "Sentry",
+    "categories": [
+     "crash reporting"
+    ]
+   }
+  ],
+  "dangerous_count": 5,
+  "permissions": [
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_MEDIA_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "FOREGROUND_SERVICE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_EXTERNAL_STORAGE",
+   "RECEIVE_BOOT_COMPLETED",
+   "VIBRATE",
+   "WAKE_LOCK"
+  ],
+  "ad_id": false,
+  "bg_loc": true,
+  "cats": [
+   "crash reporting"
+  ],
+  "dangerous": 5
+ },
+ {
+  "package": "org.breezyweather",
+  "app": "Breezy Weather",
+  "version": "6.2.2_freenet",
+  "report_date": "Aug. 26, 2026, 10:42 p.m.",
+  "tracker_count": 0,
+  "permission_count": 18,
+  "source": "F-Droid",
+  "trackers": [],
+  "dangerous_count": 4,
+  "permissions": [
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "EXPAND_STATUS_BAR",
+   "FOREGROUND_SERVICE",
+   "FOREGROUND_SERVICE_DATA_SYNC",
+   "FOREGROUND_SERVICE_SPECIAL_USE",
+   "INTERNET",
+   "POST_NOTIFICATIONS",
+   "READ_APP_SPECIFIC_LOCALES",
+   "READ_EXTERNAL_STORAGE",
+   "RECEIVE_BOOT_COMPLETED",
+   "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+   "WAKE_LOCK"
+  ],
+  "ad_id": false,
+  "bg_loc": true,
+  "cats": [],
+  "dangerous": 4
+ },
+ {
+  "package": "com.google.android.apps.weather",
+  "app": "Pixel Weather",
+  "version": "1.1.20260716.979549101.release",
+  "report_date": "Sept. 26, 2026, 6:11 p.m.",
+  "tracker_count": 0,
+  "permission_count": 21,
+  "source": "Google Play",
+  "trackers": [],
+  "dangerous_count": 3,
+  "permissions": [
+   "ACCESS_BACKGROUND_LOCATION",
+   "ACCESS_COARSE_LOCATION",
+   "ACCESS_FINE_LOCATION",
+   "ACCESS_NETWORK_STATE",
+   "ACCESS_WIFI_STATE",
+   "FOREGROUND_SERVICE",
+   "GET_PACKAGE_SIZE",
+   "INTERNET",
+   "MODIFY_AUDIO_SETTINGS",
+   "PERSONAL_CONTEXT_HOST_INSIGHT_SURFACE",
+   "PERSONAL_CONTEXT_PUBLISH_HINTS",
+   "PERSONAL_CONTEXT_READ_SETTINGS",
+   "PERSONAL_CONTEXT_RECEIVE_INSIGHTS",
+   "POST_NOTIFICATIONS",
+   "RECEIVE_BOOT_COMPLETED",
+   "VIBRATE",
+   "WAKE_LOCK"
+  ],
+  "ad_id": false,
+  "bg_loc": true,
+  "cats": [],
+  "dangerous": 3
+ }
+]
