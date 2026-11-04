@@ -174,7 +174,21 @@ tasks.matching {
 /*
  * Archive-level checks. These open the built APK/AAB, so a notice that exists
  * only in the source tree cannot satisfy them.
+ *
+ * APK entries are rooted at assets/. AAB entries carry the app module prefix,
+ * e.g. base/assets/. Normalize only those two exact layouts before matching so
+ * an unrelated path containing "assets/" cannot satisfy a check.
  */
+def archiveAssetPath = { String name ->
+    if (name.startsWith('assets/')) {
+        return name
+    }
+    if (name.startsWith('base/assets/')) {
+        return name.substring('base/'.length())
+    }
+    return null
+}
+
 def verifyArchive = { String label, File archive, boolean release ->
     if (!archive.isFile()) {
         throw new GradleException("${label}: archive not found: ${archive}")
@@ -183,24 +197,37 @@ def verifyArchive = { String label, File archive, boolean release ->
     def capacitorPlugins = null
     new java.util.zip.ZipFile(archive).withCloseable { zip ->
         zip.entries().each { entry ->
+            def name = entry.name
+            def assetPath = archiveAssetPath(name)
+            // Presence is enough to reject a debug-only voice, even if the
+            // entry is empty or malformed.
+            if (release && (assetPath == 'assets/kokoro/ff_siwis.bin' ||
+                    assetPath == 'assets/kokoro/em_alex.bin')) {
+                throw new GradleException(
+                        "${label}: release archive contains debug-only voice ${assetPath}")
+            }
             if (!entry.isDirectory() && entry.size > 0) {
-                def name = entry.name
-                // APK: assets/...; AAB: base/assets/...
-                def licenseKey = name =~ /(^|\/)assets\/licenses\/([^\/]+)$/
-                if (licenseKey.find()) {
-                    entries[licenseKey.group(2)] = zip.getInputStream(entry).getText('UTF-8')
+                def licenseKey = null
+                if (assetPath != null) {
+                    licenseKey = assetPath =~ /^assets\/licenses\/([^\/]+)$/
                 }
-                if (name ==~ /(^|\/)assets\/capacitor\.plugins\.json$/) {
-                    capacitorPlugins = zip.getInputStream(entry).getText('UTF-8')
+                if (licenseKey != null && licenseKey.find()) {
+                    entries[licenseKey.group(1)] = zip.getInputStream(entry).getText('UTF-8')
                 }
-                if (release && name ==~ /(^|\/)assets\/kokoro\/(ff_siwis|em_alex)\.bin$/) {
-                    throw new GradleException(
-                            "${label}: release archive contains debug-only voice ${name}")
+                if (assetPath == 'assets/capacitor.plugins.json') {
+                    try {
+                        capacitorPlugins = new groovy.json.JsonSlurper().parseText(
+                                zip.getInputStream(entry).getText('UTF-8'))
+                    } catch (Exception e) {
+                        throw new GradleException(
+                                "${label}: assets/capacitor.plugins.json is not valid JSON: ${e.message}")
+                    }
                 }
             }
         }
     }
-    if (capacitorPlugins == null || !capacitorPlugins.contains('@capacitor/app')) {
+    if (capacitorPlugins == null || !(capacitorPlugins instanceof List) ||
+            !capacitorPlugins.any { it instanceof Map && it.pkg == '@capacitor/app' }) {
         throw new GradleException(
                 "${label}: assets/capacitor.plugins.json is missing or does not register " +
                 "@capacitor/app. Run: pnpm --filter @workspace/weather-app exec cap sync android")
@@ -276,6 +303,155 @@ tasks.register('verifyReleaseBundleContents') {
         }
         verifyArchive('release AAB', bundle, true)
     }
+}
+
+/*
+ * Regression coverage for the archive verifier itself. The fixtures are tiny
+ * synthetic ZIPs so they exercise both APK and AAB entry layouts without
+ * packaging a model or a production artefact.
+ */
+tasks.register('testArchiveVerifier') {
+    group = 'verification'
+    description = 'Tests APK/AAB archive matching and release gates.'
+    doLast {
+        def testDir = layout.buildDirectory.dir('tmp/archiveVerifierTests').get().asFile
+        project.delete(testDir)
+        testDir.mkdirs()
+
+        def apache = 'Apache License\nVersion 2.0, January 2004\n'
+        def notices = 'em_alex\nSIWIS\nApache-2.0\n'
+        def validPlugin = '[{"pkg":"@capacitor/app","classpath":"com.capacitorjs.plugins.app.AppPlugin"}]'
+        def apkEntries = [
+                'assets/capacitor.plugins.json': validPlugin,
+                'assets/licenses/Apache-2.0.txt': apache,
+                'assets/licenses/THIRD-PARTY-NOTICES.md': notices,
+                'assets/kokoro/bm_fable.bin': 'english-voice',
+        ]
+        def toAab = { Map entries ->
+            entries.collectEntries { key, value -> ["base/${key}", value] }
+        }
+        def makeZip = { String fileName, Map entries ->
+            def file = new File(testDir, fileName)
+            new java.util.zip.ZipOutputStream(
+                    new java.io.FileOutputStream(file)).withCloseable { zip ->
+                entries.each { entryName, text ->
+                    zip.putNextEntry(new java.util.zip.ZipEntry(entryName))
+                    zip.write(text.getBytes('UTF-8'))
+                    zip.closeEntry()
+                }
+            }
+            return file
+        }
+        def without = { Map entries, String key ->
+            def copy = new LinkedHashMap(entries)
+            copy.remove(key)
+            return copy
+        }
+        def withVoice = { Map entries, String voice ->
+            def copy = new LinkedHashMap(entries)
+            copy["assets/kokoro/${voice}"] = 'debug-only-voice'
+            return copy
+        }
+        def expectPass = { String label, File archive ->
+            try {
+                verifyArchive(label, archive, true)
+            } catch (GradleException e) {
+                throw new GradleException("${label}: expected pass but failed: ${e.message}")
+            }
+        }
+        def expectFail = { String label, File archive, String expected ->
+            boolean failed = false
+            try {
+                verifyArchive(label, archive, true)
+            } catch (GradleException e) {
+                failed = true
+                if (!e.message.contains(expected)) {
+                    throw new GradleException("${label}: unexpected failure: ${e.message}")
+                }
+            }
+            if (!failed) {
+                throw new GradleException("${label}: expected failure containing '${expected}'.")
+            }
+        }
+
+        int cases = 0
+        expectPass('APK layout', makeZip('valid-apk.zip', apkEntries))
+        expectPass('AAB layout', makeZip('valid-aab.zip', toAab(apkEntries)))
+        cases += 2
+
+        def legacyPattern = /(^|\/)assets\/capacitor\.plugins\.json$/
+        if ('base/assets/capacitor.plugins.json' ==~ legacyPattern) {
+            throw new GradleException('legacy APK-only matcher unexpectedly accepted an AAB path')
+        }
+        if (archiveAssetPath('base/assets/capacitor.plugins.json') !=
+                'assets/capacitor.plugins.json') {
+            throw new GradleException('AAB asset path was not normalized')
+        }
+        if (archiveAssetPath('feature/assets/capacitor.plugins.json') != null) {
+            throw new GradleException('unrelated module path was accepted')
+        }
+        cases += 2
+
+        def noRegistration = new LinkedHashMap(apkEntries)
+        noRegistration['assets/capacitor.plugins.json'] = '[]'
+        expectFail('APK missing registration',
+                makeZip('apk-missing-registration.zip', noRegistration), 'does not register')
+        expectFail('AAB missing registration',
+                makeZip('aab-missing-registration.zip', toAab(noRegistration)), 'does not register')
+        cases += 2
+
+        expectFail('APK missing plugin',
+                makeZip('apk-missing-plugin.zip', without(apkEntries, 'assets/capacitor.plugins.json')),
+                'missing or does not register')
+        expectFail('AAB missing plugin',
+                makeZip('aab-missing-plugin.zip',
+                        toAab(without(apkEntries, 'assets/capacitor.plugins.json'))),
+                'missing or does not register')
+        cases += 2
+
+        expectFail('APK missing Apache licence',
+                makeZip('apk-missing-apache.zip', without(apkEntries, 'assets/licenses/Apache-2.0.txt')),
+                'assets/licenses/Apache-2.0.txt is missing')
+        expectFail('AAB missing Apache licence',
+                makeZip('aab-missing-apache.zip',
+                        toAab(without(apkEntries, 'assets/licenses/Apache-2.0.txt'))),
+                'assets/licenses/Apache-2.0.txt is missing')
+        cases += 2
+
+        expectFail('APK missing notices',
+                makeZip('apk-missing-notices.zip',
+                        without(apkEntries, 'assets/licenses/THIRD-PARTY-NOTICES.md')),
+                'assets/licenses/THIRD-PARTY-NOTICES.md is missing')
+        expectFail('AAB missing notices',
+                makeZip('aab-missing-notices.zip',
+                        toAab(without(apkEntries, 'assets/licenses/THIRD-PARTY-NOTICES.md'))),
+                'assets/licenses/THIRD-PARTY-NOTICES.md is missing')
+        cases += 2
+
+        ['ff_siwis.bin', 'em_alex.bin'].each { voice ->
+            expectFail("APK forbidden ${voice}",
+                    makeZip("apk-${voice}.zip", withVoice(apkEntries, voice)),
+                    'debug-only voice')
+            expectFail("AAB forbidden ${voice}",
+                    makeZip("aab-${voice}.zip", toAab(withVoice(apkEntries, voice))),
+                    'debug-only voice')
+            def emptyVoice = new LinkedHashMap(apkEntries)
+            emptyVoice["assets/kokoro/${voice}"] = ''
+            expectFail("APK empty forbidden ${voice}",
+                    makeZip("apk-empty-${voice}.zip", emptyVoice),
+                    'debug-only voice')
+            expectFail("AAB empty forbidden ${voice}",
+                    makeZip("aab-empty-${voice}.zip", toAab(emptyVoice)),
+                    'debug-only voice')
+            cases += 4
+        }
+
+        logger.lifecycle("Archive verifier regression tests passed (${cases} cases).")
+    }
+}
+
+tasks.matching { it.name == 'check' || it.name == 'testDebugUnitTest' }.configureEach {
+    dependsOn 'testArchiveVerifier'
 }
 
 tasks.matching { it.name == 'assembleDebug' }.configureEach {
