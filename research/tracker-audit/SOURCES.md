@@ -1,6 +1,6 @@
 # Sources
 
-The 20-app Exodus findings in the public report come from `raw.json`, which was produced by scraping Exodus Privacy report pages on 3–4 November 2026. Daymark is a separate reference row based on source inspection of the repository's manifest and declared JavaScript runtime dependencies; it is not part of the Exodus dataset.
+The 20-app Exodus findings in the public report come from `raw.json`, which was produced by scraping Exodus Privacy report pages on 3–4 November 2026. Daymark is a separate reference row based on source inspection of the published `v2.0.0` release tag and its release AAB; it is not part of the Exodus dataset.
 
 ## Primary source
 
@@ -42,11 +42,9 @@ version and date above are what this audit actually recorded.
 | Breezy Weather | `org.breezyweather` | 6.2.2_freenet | Aug. 26, 2026, 10:42 p.m. | F-Droid | [latest report](https://reports.exodus-privacy.eu.org/en/reports/org.breezyweather/latest/) |
 | Pixel Weather | `com.google.android.apps.weather` | 1.1.20260716.979549101.release | Sept. 26, 2026, 6:11 p.m. | Google Play | [latest report](https://reports.exodus-privacy.eu.org/en/reports/com.google.android.apps.weather/latest/) |
 
-**APK SHA-256:** not recorded for any application. The original scrape captured
-report metadata only; no APK was downloaded or hashed. Hashes are therefore absent
-rather than omitted, and are not reconstructed here.
+**APK SHA-256:** not recorded for any of the 20 scanned applications. The original scrape captured report metadata only; no APK was downloaded or hashed. Hashes are therefore absent rather than omitted, and are not reconstructed here. (The separate Daymark row records the published release AAB hash above; that is not one of the Exodus-scanned APKs.)
 
-**Version codes:** not recorded. Only the version name string was captured.
+**Version codes:** not recorded for the 20 scanned applications. Only the version name string was captured. (The Daymark row's `versionCode` comes from the tagged release build config.)
 
 **Developer names:** not recorded in the dataset.
 
@@ -61,14 +59,16 @@ Neither was excluded because it looked clean; both were excluded for staleness.
 
 ## Daymark reference row
 
-Daymark was **not** scanned by Exodus. Its figures come from the Daymark repository:
+Daymark was **not** scanned by Exodus. Its figures come from the published `v2.0.0` release source and AAB, not from the working tree or `main`:
 
-- Manifest: <https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/android/app/src/main/AndroidManifest.xml> — five `uses-permission` entries, no advertising-ID or background-location permission.
-- Dependencies: <https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/package.json> — 12 declared JavaScript runtime dependencies. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in the manifest and these dependencies by source inspection. Daymark was not subjected to an Exodus APK scan.
-- Repository state inspected: commit `5ecf9279f365a53393f3b6b77a119633245bc64a` (`main`, 2026-11-04).
+- Tag: [`v2.0.0`](https://github.com/Sami-Gor/daymark/releases/tag/v2.0.0) → commit [`c371300b3908a8f9805078f26159ff1a44f6538a`](https://github.com/Sami-Gor/daymark/commit/c371300b3908a8f9805078f26159ff1a44f6538a).
+- Tagged manifest: <https://github.com/Sami-Gor/daymark/blob/v2.0.0/artifacts/weather-app/android/app/src/main/AndroidManifest.xml> — exactly four `uses-permission` entries: `INTERNET`, `ACCESS_COARSE_LOCATION`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`. No `ACCESS_FINE_LOCATION`, no advertising-ID and no background-location permission. The tagged build config is `versionCode 2`, `versionName "2.0.0"`, package `io.github.sami_gor.daymark`. For history, V1 (`versionCode 1`) declared five permissions including `ACCESS_FINE_LOCATION`.
+- Tagged dependencies: <https://github.com/Sami-Gor/daymark/blob/v2.0.0/artifacts/weather-app/package.json> — 12 declared JavaScript runtime dependencies. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in the manifest and these dependencies by source inspection. Daymark was not subjected to an Exodus APK scan.
+- Release AAB: `app-release.aab` (published `v2.0.0` release asset) SHA-256 `55366377d50c00dfc53e8bc2e049ec298cd5c087e2de0db2eb8353b182f771b4`.
 
-Anyone re-checking the Daymark row must repeat it against a specific commit, because
-the manifest can change.
+**Caveat:** these permissions describe the **verified `v2.0.0` release AAB/source, not an independently verified Play-served bundle**. They do not establish that Google Play currently serves that AAB, or that its Play-served permission display matches it; the Play bundle discrepancy is tracked separately and must not be equated with the GitHub AAB.
+
+Anyone re-checking the Daymark row must repeat it against the `v2.0.0` tag/commit (the validator does this with `git show`), because both the manifest and the release can change. `main` is still the V1 line and declares five permissions, so an inspection of the working tree would describe the wrong version.
 
 ## Dataset provenance
 

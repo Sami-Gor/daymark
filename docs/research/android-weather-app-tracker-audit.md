@@ -12,7 +12,7 @@ Twenty Android weather applications were scanned with [Exodus Privacy](https://r
 
 **At least 17 of the 20** applications explicitly list `ACCESS_ADSERVICES_AD_ID` in the permission names recovered from their Exodus reports. The available permission names do not establish whether the remaining three also declare it. **18 of 20** carry at least one detected tracker signature.
 
-Daymark is included as a reference row rather than a scanned subject. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in Daymark's manifest and 12 declared JavaScript runtime dependencies by source inspection. Daymark was not subjected to an Exodus APK scan. Its manifest declares **no advertising-ID permission** and **five permissions**.
+Daymark is included as a reference row rather than a scanned subject. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in Daymark's tagged `v2.0.0` manifest and 12 declared JavaScript runtime dependencies by source inspection. Daymark was not subjected to an Exodus APK scan. Its tagged `v2.0.0` manifest declares **no advertising-ID permission** and **four permissions**; V1 (`versionCode` 1) declared five, including `ACCESS_FINE_LOCATION`.
 
 ### Quotation-ready
 
@@ -39,7 +39,7 @@ These findings describe the **specific APK versions listed below**, as recorded 
 | Applications whose recovered Exodus permission names list `ACCESS_ADSERVICES_AD_ID` | At least 17 of 20 |
 | Applications declaring background location | 19 of 20 |
 | Recognised SDKs identified in Daymark source inspection | 0 |
-| Daymark declared permissions | 5 |
+| Daymark declared permissions (tagged `v2.0.0` manifest) | 4 |
 | Met Office declared permissions | 35 |
 
 The median is the mean of the 10th and 11th values of the ascending counts (4 and 5), i.e. 4.5. A "tracker detection" is one distinct tracker identity attributed to one application; the same SDK found in ten apps counts ten times, and one app using two SDKs from the same company counts twice. This is **not** a count of tracker companies and **not** a count of tracker executions.
@@ -72,9 +72,11 @@ This audit counts an application as explicitly listing advertising-ID access whe
 
 ### Daymark
 
-Daymark is **not** an Exodus scan. Its row is derived from source inspection of the Android manifest and declared JavaScript runtime dependencies in the Daymark source repository. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in Daymark's manifest and 12 declared JavaScript runtime dependencies by source inspection. Daymark was not subjected to an Exodus APK scan.
+Daymark is **not** an Exodus scan. Its row is derived from source inspection of the Android manifest, build configuration and declared JavaScript runtime dependencies at the published **`v2.0.0`** git tag (commit `c371300b3908a8f9805078f26159ff1a44f6538a`), not from the working tree or `main`. No recognised advertising, analytics, crash-reporting or attribution SDK was identified in Daymark's manifest and 12 declared JavaScript runtime dependencies by source inspection. Daymark was not subjected to an Exodus APK scan.
 
-The manifest declares five permissions — `INTERNET`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS` — and contains no advertising-ID or background-location permission. The source-inspection result is not an Exodus tracker count.
+The tagged `v2.0.0` manifest declares four permissions — `INTERNET`, `ACCESS_COARSE_LOCATION`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS` — and contains no `ACCESS_FINE_LOCATION`, advertising-ID or background-location permission. The release AAB published for `v2.0.0` has SHA-256 `55366377d50c00dfc53e8bc2e049ec298cd5c087e2de0db2eb8353b182f771b4`. These figures describe the verified release AAB and tagged source; they do not establish that Google Play currently serves that bundle, which is tracked separately. The source-inspection result is not an Exodus tracker count.
+
+For history, V1 (`versionCode` 1) declared five permissions, including `ACCESS_FINE_LOCATION`; V2 removed it.
 
 ### Snapshot
 
@@ -106,9 +108,9 @@ Sorted by tracker detections, descending, then by application name. This matches
 | WarnWetter | `de.dwd.warnapp` | 5.4.2 | March 30, 2026, 11:47 a.m. | 1 | not listed | 17 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/de.dwd.warnapp/latest/) |
 | Breezy Weather | `org.breezyweather` | 6.2.2_freenet | Aug. 26, 2026, 10:42 p.m. | 0 | not listed | 18 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/org.breezyweather/latest/) |
 | Pixel Weather | `com.google.android.apps.weather` | 1.1.20260716.979549101.release | Sept. 26, 2026, 6:11 p.m. | 0 | not listed | 21 | yes | [report](https://reports.exodus-privacy.eu.org/en/reports/com.google.android.apps.weather/latest/) |
-| **Daymark** | `io.github.sami_gor.daymark` | not scanned | — | **Not scanned*** | absent (manifest) | **5** | **no** | [manifest](https://github.com/Sami-Gor/daymark/blob/main/artifacts/weather-app/android/app/src/main/AndroidManifest.xml) |
+| **Daymark** | `io.github.sami_gor.daymark` | 2.0.0 (`v2.0.0` tag) | — | **Not scanned*** | absent (manifest) | **4** | **no** | [tagged manifest](https://github.com/Sami-Gor/daymark/blob/v2.0.0/artifacts/weather-app/android/app/src/main/AndroidManifest.xml) |
 
-The Daymark row is separated because it comes from a different method: manifest and dependency inspection, not an Exodus scan of a published APK. Its `0*` tracker value means no recognised SDK was identified by that source inspection; it is not an Exodus result. For the 20 scanned applications, `listed` means the permission name appears in the recovered Exodus list and `not listed` means only that it was absent from the names available in the report extract. The Daymark `absent (manifest)` entry is based on its own manifest.
+The Daymark row is separated because it comes from a different method: inspection of the tagged `v2.0.0` manifest and declared dependencies, not an Exodus scan of a published APK. Its permission figure is pinned to the `v2.0.0` release source/AAB and does not assert what Google Play serves. Its `0*` tracker value means no recognised SDK was identified by that source inspection; it is not an Exodus result. For the 20 scanned applications, `listed` means the permission name appears in the recovered Exodus list and `not listed` means only that it was absent from the names available in the report extract. The Daymark `absent (manifest)` entry is based on its own tagged manifest.
 
 ### Fields not recorded
 
@@ -125,10 +127,10 @@ Adding them would require re-scanning or re-fetching, which would produce a diff
 
 | Application | Declared permissions |
 |---|---:|
-| Daymark | 5 |
+| Daymark (tagged `v2.0.0`) | 4 |
 | Met Office | 35 |
 
-Daymark's five, from its manifest: `INTERNET`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`. Location is requested only when the user taps the location control; the app has no background-location permission.
+Daymark's four, from its tagged `v2.0.0` manifest: `INTERNET`, `ACCESS_COARSE_LOCATION`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`. It does not declare `ACCESS_FINE_LOCATION`, background location or advertising-ID access. (V1, `versionCode` 1, declared five, including `ACCESS_FINE_LOCATION`. These figures describe the verified release AAB/source; an independently verified Play-served bundle is not established.) Location is requested only when the user taps the location control; the app has no background-location permission.
 
 The Met Office application's 35 declared permissions include the following 15 names recoverable from its Exodus report:
 
@@ -160,7 +162,7 @@ The remaining 20 are counted by Exodus but were not named in the extractable pag
 - **Findings apply to the tested APK versions and this scan snapshot.** Versions change; a newer build may add or remove SDKs, and Exodus reports are periodically regenerated.
 - **This is a comparative technical snapshot, not a privacy or security certification.** It does not assess server-side collection, encryption, retention, account handling, or vulnerabilities.
 
-Server-side collection is invisible to this method: IP addresses, API logs and account data never appear in a static scan. Daymark shares that residual exposure — Open-Meteo sees the user's IP and a location rounded to roughly 1 km before transmission.
+Server-side collection is invisible to this method: IP addresses, API logs and account data never appear in a static scan. Daymark shares that residual exposure — Open-Meteo sees the user's IP and an approximate location before transmission (V2 snaps coordinates to a coarse, latitude-aware grid; V1 rounded to roughly 1 km).
 
 ## Coverage gaps
 
@@ -182,7 +184,7 @@ python3 validate.py          # recompute every headline metric from raw.json
 python3 make_card.py         # regenerate audit-card.png (1080x1350)
 ```
 
-`validate.py` reads `raw.json` and the Daymark manifest and fails if any published figure no longer matches. `make_card.py` generates the share card from `raw.json`. Its content and layout are reproducible, but the PNG may not be byte-identical across systems because font rendering can vary. Font rasterisation and platform differences can change individual pixels even when the underlying data and design are unchanged.
+`validate.py` reads `raw.json` and extracts the Daymark manifest, build configuration and dependency list from the published `v2.0.0` git tag, failing loudly if the tag or file is unavailable; it exits non-zero if any published figure no longer matches. `make_card.py` generates the share card from `raw.json`. Its content and layout are reproducible, but the PNG may not be byte-identical across systems because font rendering can vary. Font rasterisation and platform differences can change individual pixels even when the underlying data and design are unchanged.
 
 To extend the sample, add packages to `scrape_exodus.py` and re-run it; that produces a **new** snapshot and the headline figures must be recomputed, not assumed.
 

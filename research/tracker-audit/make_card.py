@@ -90,9 +90,9 @@ for i, (name, v) in enumerate(rows):
            font=(sans_b(20) if is_dm else sans_b(24)),
            fill=(GREEN if is_dm else INK), anchor="lm")
 
-d.text((m * S, 1246 * S), "Daymark declares 5 permissions. The Met Office app declares 35.", font=sans(22), fill=INK)
+d.text((m * S, 1246 * S), "Daymark 2.0.0 declares 4 permissions. The Met Office app declares 35.", font=sans(22), fill=INK)
 d.text((m * S, 1272 * S), "Source: Exodus Privacy static APK scans for the 20 applications.", font=sans(16), fill=MUTED)
-d.text((m * S, 1296 * S), "Daymark* is a source inspection, not an Exodus APK scan.", font=sans(16), fill=MUTED)
+d.text((m * S, 1296 * S), "Daymark* is an inspection of the tagged v2.0.0 release source, not an Exodus APK scan.", font=sans(16), fill=MUTED)
 d.text((m * S, 1318 * S), "Tracker signatures are not proof of activity; recovered permission names are partial.", font=sans(14), fill=MUTED)
 
 img = img.resize((W, H), Image.LANCZOS)
