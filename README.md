@@ -218,10 +218,6 @@ Daymark 2.5 is planned to bring weather directly to your Android home screen wit
 
 Further ideas are in exploration as Daymark continues to evolve.
 
-**v3.0 — On the horizon**
-
-Further ideas are in exploration as Daymark continues to evolve.
-
 ## Known limitations
 
 - Unit preference (°C/°F) is not persisted across reloads (the language preference is)
