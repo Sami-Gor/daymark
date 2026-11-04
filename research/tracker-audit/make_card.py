@@ -73,7 +73,7 @@ maxv = max((v for _, v in rows if v is not None), default=1) or 1
 for i, (name, v) in enumerate(rows):
     y = top + i * step
     mid = (y + bar_h / 2) * S
-    is_dm = name == "Daymark"
+    is_dm = name.startswith("Daymark")
     if is_dm:
         d.rounded_rectangle([(40) * S, (y - 16) * S, (W - 40) * S, (y + bar_h + 16) * S], radius=11 * S, fill=BAND)
     d.text((left_label * S, mid), name, font=(sans_b(24) if is_dm else sans(24)),
