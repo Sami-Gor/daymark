@@ -22,7 +22,7 @@ These findings describe the **specific APK versions listed below**, as recorded 
 
 ![Share card: 20 Android weather apps, 141 tracker detections, median 4.5 per app.](../../research/tracker-audit/audit-card.png)
 
-*Share card — regenerate with `make_card.py`; the figures come from `raw.json`, not from hand-edited pixels.*
+*Share card — generated from `raw.json`. Its content and layout are reproducible; PNG pixels may vary between systems because font rasterisation differs.*
 
 ## Headline figures
 
@@ -182,7 +182,7 @@ python3 validate.py          # recompute every headline metric from raw.json
 python3 make_card.py         # regenerate audit-card.png (1080x1350)
 ```
 
-`validate.py` reads `raw.json` and the Daymark manifest and fails if any published figure no longer matches. `make_card.py` regenerates the share card from the same file, so the image cannot drift from the data.
+`validate.py` reads `raw.json` and the Daymark manifest and fails if any published figure no longer matches. `make_card.py` generates the share card from `raw.json`. Its content and layout are reproducible, but the PNG may not be byte-identical across systems because font rendering can vary. Font rasterisation and platform differences can change individual pixels even when the underlying data and design are unchanged.
 
 To extend the sample, add packages to `scrape_exodus.py` and re-run it; that produces a **new** snapshot and the headline figures must be recomputed, not assumed.
 
