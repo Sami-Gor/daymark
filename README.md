@@ -189,11 +189,11 @@ scripts/                  workspace tooling
 - [Android production readiness](docs/release/android-production-readiness.md) and the [Play release checklist](docs/release/play-console-checklist.md)
 - [Privacy policy](https://daymark-weather.pages.dev/privacy), also available in the app at `/privacy`, `/fr/privacy` and `/es/privacy`
 
-## What's Coming
+## Releases & What's Next
 
-**v2.0 — Coming soon**
+**[v2.0.0 — Android release](https://github.com/Sami-Gor/daymark/tree/v2.0.0)**
 
-The next evolution of Daymark is in its final stages. Release details to follow.
+The v2.0.0 Android release build is prepared. The linked tag identifies the exact source snapshot used for this release.
 
 **v3.0 — On the horizon**
 
