@@ -9,7 +9,7 @@ Supporting files for the public report
 |---|---|
 | `raw.json` | The dataset. One object per application: package, version, report date, tracker list with Exodus category tags, permission list, and the counts derived from them. |
 | `make_card.py` | Generates `audit-card.png` from `raw.json`. |
-| `audit-card.png` | 1080 × 1350 share card. Byte-identical to the output of `make_card.py`. |
+| `audit-card.png` | 1080 × 1350 share card generated from `raw.json`; pixel-level rendering may vary across systems. |
 | `validate.py` | Recomputes every published figure from `raw.json` and the Daymark source, and fails if any no longer reproduces. |
 | `SOURCES.md` | Per-application Exodus links, report dates, exclusions, and the Daymark source references. |
 
@@ -49,8 +49,12 @@ python3 make_card.py        # writes audit-card.png, 1080x1350
 
 Requires Python 3 and Pillow. `make_card.py` loads macOS system fonts from
 `/System/Library/Fonts/Supplemental/` (Georgia Bold, Arial, Arial Bold); on another
-platform, point `F` at equivalents. With the macOS fonts the output is byte-identical
-to the committed PNG — that is how the committed image was verified.
+platform, point `F` at equivalents.
+
+The card is generated from `raw.json`. Its content and layout are reproducible, but
+the PNG may not be byte-identical across systems because font rendering can vary.
+Font rasterisation and platform differences can change individual pixels even when
+the underlying data and design are unchanged.
 
 The card sorts applications by tracker count descending (ties by name) and appends
 Daymark. Its headline figures, the Daymark/Met Office permission comparison and the
