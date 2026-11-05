@@ -51,7 +51,17 @@ export class RequestLog {
   }
 
   weatherApi(): string[] {
-    return this.matching((url) => url.includes('open-meteo.com'));
+    // Match on the parsed hostname rather than a URL substring: a substring
+    // check can be satisfied by arbitrary hosts such as
+    // "open-meteo.com.evil.example" (CodeQL: incomplete URL sanitization).
+    return this.matching((url) => {
+      try {
+        const { hostname } = new URL(url);
+        return hostname === 'open-meteo.com' || hostname.endsWith('.open-meteo.com');
+      } catch {
+        return false;
+      }
+    });
   }
 
   external(): string[] {
