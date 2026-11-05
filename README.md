@@ -143,14 +143,16 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bu
 
 Release: package `io.github.sami_gor.daymark` (versionCode 1 / versionName 1.0.0). See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
 
-## Test
+## Testing
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (236 tests)
-pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (153 tests)
+pnpm --filter @workspace/weather-app run typecheck    # app source + Playwright tests
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (257 tests)
+pnpm --filter @workspace/weather-app run build        # production build the e2e suite serves
+pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (164 tests in 19 spec files)
 ```
 
-The e2e suite runs against a production build served by `vite preview`, mocks Open-Meteo traffic, and covers function, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), failure paths, the service worker, the served security headers, location search, voice input/output, severe-weather alerts and the English/French/Spanish interface.
+The e2e suite runs in Chromium against a production build served by `vite preview`, with Open-Meteo traffic mocked. It covers first paint and failure paths, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), location search, the service worker, served security headers, voice input/output, severe-weather alerts, the English/French/Spanish interface, and seeded randomised/boundary data. See [docs/TESTING.md](docs/TESTING.md) for the newcomer guide and [docs/TESTING-ARCHITECTURE.md](docs/TESTING-ARCHITECTURE.md) for the page-object and fixture design.
 
 ## Security
 
