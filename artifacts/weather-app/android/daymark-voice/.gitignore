@@ -1,3 +1,7 @@
 # Build-generated Kokoro material (reproduced by the scripts in android/kokoro-poc)
 src/main/assets/kokoro/
+# Multilingual voices are debug-POC material, staged here by
+# android/kokoro-poc/scripts/fetch-kokoro-assets.sh. Release packaging never
+# reads this source set.
+src/debug/assets/kokoro/
 src/main/jniLibs/

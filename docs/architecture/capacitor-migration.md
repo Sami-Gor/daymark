@@ -168,17 +168,22 @@ removeAllListeners(): Promise<void>
 ```
 
 Android implementation: Gradle module `android/daymark-voice` wrapping the
-validated `KokoroLocalTtsEngine` (unchanged Java + Rust JNI + `bm_fable`), plus
-a `SystemSpeech` plugin (Android `TextToSpeech`) used for French/Spanish.
+validated `KokoroLocalTtsEngine` (unchanged Java + Rust JNI + `bm_fable`).
+English uses the existing Misaki stream. French and Spanish are debug-POC-only
+and use whole-text `nativeSynth` after `piper-plus-g2p`; production release
+builds compile the multilingual gate off and reject those locales before
+synthesis. The legacy `SystemSpeech` plugin exists only as unregistered source;
+it is not a fallback.
 
-Before synthesis, `briefing.spokenText` is split by a TTS-only segmenter
+English `briefing.spokenText` is split by a TTS-only segmenter
 (`src/lib/tts-segmentation.ts`): conservative boundaries at sentence endings,
-clauses and safe conjunctions, no change to the wording. Segments are streamed
-into the running Kokoro session (`nativeStreamStart`/`nativeStreamPush`) and
-each sentence is read ahead while the previous one plays. The first segment is
-kept short so AudioTrack starts early; excessive leading silence at segment
-boundaries is trimmed (the first chunk fully, later chunks down to a natural
-lead) while trailing sentence pauses are preserved.
+clauses and safe conjunctions, no change to the wording. English segments are
+streamed into the running Kokoro session
+(`nativeStreamStart`/`nativeStreamPush`) and each sentence is read ahead while
+the previous one plays. The first segment is kept short so AudioTrack starts
+early; excessive leading silence at segment boundaries is trimmed (the first
+chunk fully, later chunks down to a natural lead) while trailing sentence
+pauses are preserved.
 
 Lifecycle and audio:
 
@@ -196,7 +201,7 @@ Engine selection (`src/lib/speech-engine.ts`):
 |---|---|---|
 | Android Capacitor, native available | English | Kokoro `bm_fable` |
 | Android Capacitor, native unavailable | English | Narration error shown; never falls back to system TTS (English stays local-only) |
-| Android Capacitor | French/Spanish | Unavailable in V2 (planned V2.2); no system/network/browser fallback |
+| Android Capacitor | French/Spanish | Unavailable in the current public V2 release; debug POC only, with no system/network/browser fallback |
 | Web/PWA/desktop | any | No voice feature |
 | iOS | any | No voice feature |
 

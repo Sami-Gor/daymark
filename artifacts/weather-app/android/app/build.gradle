@@ -42,6 +42,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // The POC debug APK is installed alongside the production app.
+            // Release builds keep the production application ID.
+            applicationIdSuffix ".pocmultilingual"
+        }
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -60,6 +65,438 @@ android {
         // them out of the APK assets on first initialization.
         noCompress += ['onnx', 'bin']
     }
+}
+
+/*
+ * Package the licence notices into every APK/AAB, not just the repository.
+ *
+ * The tracked files are the single source of truth: the build copies the root
+ * THIRD-PARTY-NOTICES.md and the Apache-2.0 text into assets/licenses, where
+ * they travel with the app. The packaged-archive checks below open the real
+ * APK/AAB and fail the build if either is missing.
+ */
+def repoRootDir = rootProject.file('../../..')
+def generatedLicenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
+
+tasks.register('generateLicenseAssets', Copy) {
+    group = 'build'
+    description = 'Copies the third-party notices and Apache-2.0 text into Android assets.'
+    from(repoRootDir) {
+        include 'THIRD-PARTY-NOTICES.md'
+        into 'licenses'
+    }
+    from(new File(repoRootDir, 'licenses/Apache-2.0.txt')) {
+        into 'licenses'
+    }
+    into generatedLicenseAssets
+}
+
+android.sourceSets.main.assets.srcDir(generatedLicenseAssets)
+
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn tasks.named('generateLicenseAssets')
+}
+tasks.matching { it.name == 'mergeDebugAssets' || it.name == 'mergeReleaseAssets' }.configureEach {
+    dependsOn tasks.named('generateLicenseAssets')
+}
+
+/*
+ * Release narration gate.
+ *
+ * French/Spanish voice files are debug-POC only. The fetch script stages them
+ * in daymark-voice/src/debug/assets, which release packaging never reads. This
+ * source check catches a file added to main/release assets, and the merged
+ * assets check catches one arriving from a dependency or generated directory.
+ * Both fail the release instead of shipping multilingual narration.
+ */
+def multilingualVoiceFiles = ['ff_siwis.bin', 'em_alex.bin']
+def multilingualSourceDirs = [
+        file('../daymark-voice/src/main/assets/kokoro'),
+        file('../daymark-voice/src/release/assets/kokoro'),
+        file('src/main/assets/kokoro'),
+        file('src/release/assets/kokoro'),
+]
+
+tasks.register('verifyReleaseNarrationSources') {
+    group = 'verification'
+    description = 'Fails if multilingual voice files are staged for a release variant.'
+    doLast {
+        def found = []
+        multilingualSourceDirs.each { directory ->
+            multilingualVoiceFiles.each { name ->
+                def candidate = new File(directory, name)
+                if (candidate.isFile()) {
+                    found << candidate.absolutePath
+                }
+            }
+        }
+        if (!found.isEmpty()) {
+            throw new GradleException(
+                    "Multilingual narration voices are staged for release:\n  " +
+                    found.join("\n  ") +
+                    "\nThey belong in daymark-voice/src/debug/assets/kokoro only; " +
+                    "run android/kokoro-poc/scripts/fetch-kokoro-assets.sh to restage.")
+        }
+    }
+}
+
+tasks.register('verifyReleaseNarrationAssets') {
+    group = 'verification'
+    description = 'Fails if the merged release assets contain French or Spanish narration voices.'
+    dependsOn 'mergeReleaseAssets'
+    doLast {
+        def mergedAssets = layout.buildDirectory
+                .dir('intermediates/assets/release/mergeReleaseAssets').get().asFile
+        if (!mergedAssets.isDirectory()) {
+            throw new GradleException("Release merged assets are missing: ${mergedAssets}")
+        }
+        def forbidden = multilingualVoiceFiles.findAll {
+            new File(mergedAssets, "kokoro/${it}").isFile()
+        }
+        if (!forbidden.isEmpty()) {
+            throw new GradleException(
+                    "Release assets contain debug-only narration voices: ${forbidden.join(', ')}. " +
+                    "A production release must package only kokoro/bm_fable.bin.")
+        }
+        logger.lifecycle("Release narration assets verified: no French/Spanish voices packaged.")
+    }
+}
+
+tasks.matching { it.name == 'preReleaseBuild' }.configureEach {
+    dependsOn tasks.named('verifyReleaseNarrationSources')
+}
+tasks.matching {
+    it.name == 'packageRelease' || it.name == 'bundleRelease' || it.name == 'packageReleaseBundle'
+}.configureEach {
+    dependsOn tasks.named('verifyReleaseNarrationAssets')
+}
+
+/*
+ * Archive-level checks. These open the built APK/AAB, so a notice that exists
+ * only in the source tree cannot satisfy them.
+ *
+ * APK entries are rooted at assets/. AAB entries carry the app module prefix,
+ * e.g. base/assets/. Normalize only those two exact layouts before matching so
+ * an unrelated path containing "assets/" cannot satisfy a check.
+ */
+def archiveAssetPath = { String name ->
+    if (name.startsWith('assets/')) {
+        return name
+    }
+    if (name.startsWith('base/assets/')) {
+        return name.substring('base/'.length())
+    }
+    return null
+}
+
+def verifyArchive = { String label, File archive, boolean release ->
+    if (!archive.isFile()) {
+        throw new GradleException("${label}: archive not found: ${archive}")
+    }
+    def entries = [:]
+    def capacitorPlugins = null
+    new java.util.zip.ZipFile(archive).withCloseable { zip ->
+        zip.entries().each { entry ->
+            def name = entry.name
+            def assetPath = archiveAssetPath(name)
+            // Presence is enough to reject a debug-only voice, even if the
+            // entry is empty or malformed.
+            if (release && (assetPath == 'assets/kokoro/ff_siwis.bin' ||
+                    assetPath == 'assets/kokoro/em_alex.bin')) {
+                throw new GradleException(
+                        "${label}: release archive contains debug-only voice ${assetPath}")
+            }
+            if (!entry.isDirectory() && entry.size > 0) {
+                def licenseKey = null
+                if (assetPath != null) {
+                    licenseKey = assetPath =~ /^assets\/licenses\/([^\/]+)$/
+                }
+                if (licenseKey != null && licenseKey.find()) {
+                    entries[licenseKey.group(1)] = zip.getInputStream(entry).getText('UTF-8')
+                }
+                if (assetPath == 'assets/capacitor.plugins.json') {
+                    try {
+                        capacitorPlugins = new groovy.json.JsonSlurper().parseText(
+                                zip.getInputStream(entry).getText('UTF-8'))
+                    } catch (Exception e) {
+                        throw new GradleException(
+                                "${label}: assets/capacitor.plugins.json is not valid JSON: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+    if (capacitorPlugins == null || !(capacitorPlugins instanceof List) ||
+            !capacitorPlugins.any { it instanceof Map && it.pkg == '@capacitor/app' }) {
+        throw new GradleException(
+                "${label}: assets/capacitor.plugins.json is missing or does not register " +
+                "@capacitor/app. Run: pnpm --filter @workspace/weather-app exec cap sync android")
+    }
+    def required = [
+            'THIRD-PARTY-NOTICES.md': ['em_alex', 'SIWIS', 'Apache-2.0'],
+            'Apache-2.0.txt': ['Apache License', 'Version 2.0, January 2004'],
+    ]
+    required.each { name, needles ->
+        def text = entries[name]
+        if (text == null) {
+            throw new GradleException(
+                    "${label}: assets/licenses/${name} is missing from the archive. " +
+                    "Found: ${entries.keySet().sort()}")
+        }
+        needles.each { needle ->
+            if (!text.contains(needle)) {
+                throw new GradleException(
+                        "${label}: assets/licenses/${name} does not contain '${needle}'.")
+            }
+        }
+    }
+    if (!release && !entries.containsKey('MULTILINGUAL-VOICE-NOTICE.txt')) {
+        throw new GradleException(
+                "${label}: debug archive is missing the multilingual voice notice.")
+    }
+    logger.lifecycle("${label}: packaged licence notices verified (${entries.keySet().sort()}).")
+}
+
+def firstArchive = { File directory, String extension ->
+    if (!directory.isDirectory()) {
+        return null
+    }
+    def files = directory.listFiles({ file ->
+        file.isFile() && file.name.endsWith(extension)
+    } as FileFilter)
+    return files == null ? null : (files.sort { it.name } ? files[0] : null)
+}
+
+tasks.register('verifyDebugPackagedLicenses') {
+    group = 'verification'
+    description = 'Opens the debug APK and verifies the packaged licence notices.'
+    dependsOn 'packageDebug'
+    doLast {
+        def apk = firstArchive(layout.buildDirectory.dir('outputs/apk/debug').get().asFile, '.apk')
+        if (apk == null) {
+            throw new GradleException('No debug APK was produced for licence verification.')
+        }
+        verifyArchive('debug APK', apk, false)
+    }
+}
+
+tasks.register('verifyReleasePackagedLicenses') {
+    group = 'verification'
+    description = 'Opens the release APK and verifies notices and the narration gate.'
+    dependsOn 'packageRelease'
+    doLast {
+        def apk = firstArchive(layout.buildDirectory.dir('outputs/apk/release').get().asFile, '.apk')
+        if (apk == null) {
+            throw new GradleException('No release APK was produced for licence verification.')
+        }
+        verifyArchive('release APK', apk, true)
+    }
+}
+
+tasks.register('verifyReleaseBundleContents') {
+    group = 'verification'
+    description = 'Opens the release AAB and verifies notices and the narration gate.'
+    doLast {
+        def bundle = firstArchive(layout.buildDirectory.dir('outputs/bundle/release').get().asFile, '.aab')
+        if (bundle == null) {
+            throw new GradleException('No release AAB was produced for licence verification.')
+        }
+        verifyArchive('release AAB', bundle, true)
+    }
+}
+
+/*
+ * Regression coverage for the archive verifier itself. The fixtures are tiny
+ * synthetic ZIPs so they exercise both APK and AAB entry layouts without
+ * packaging a model or a production artefact.
+ */
+tasks.register('testArchiveVerifier') {
+    group = 'verification'
+    description = 'Tests APK/AAB archive matching and release gates.'
+    doLast {
+        def testDir = layout.buildDirectory.dir('tmp/archiveVerifierTests').get().asFile
+        project.delete(testDir)
+        testDir.mkdirs()
+
+        def apache = 'Apache License\nVersion 2.0, January 2004\n'
+        def notices = 'em_alex\nSIWIS\nApache-2.0\n'
+        def validPlugin = '[{"pkg":"@capacitor/app","classpath":"com.capacitorjs.plugins.app.AppPlugin"}]'
+        def apkEntries = [
+                'assets/capacitor.plugins.json': validPlugin,
+                'assets/licenses/Apache-2.0.txt': apache,
+                'assets/licenses/THIRD-PARTY-NOTICES.md': notices,
+                'assets/kokoro/bm_fable.bin': 'english-voice',
+        ]
+        def toAab = { Map entries ->
+            entries.collectEntries { key, value -> ["base/${key}", value] }
+        }
+        def makeZip = { String fileName, Map entries ->
+            def file = new File(testDir, fileName)
+            new java.util.zip.ZipOutputStream(
+                    new java.io.FileOutputStream(file)).withCloseable { zip ->
+                entries.each { entryName, text ->
+                    zip.putNextEntry(new java.util.zip.ZipEntry(entryName))
+                    zip.write(text.getBytes('UTF-8'))
+                    zip.closeEntry()
+                }
+            }
+            return file
+        }
+        def without = { Map entries, String key ->
+            def copy = new LinkedHashMap(entries)
+            copy.remove(key)
+            return copy
+        }
+        def withVoice = { Map entries, String voice ->
+            def copy = new LinkedHashMap(entries)
+            copy["assets/kokoro/${voice}"] = 'debug-only-voice'
+            return copy
+        }
+        def expectPass = { String label, File archive ->
+            try {
+                verifyArchive(label, archive, true)
+            } catch (GradleException e) {
+                throw new GradleException("${label}: expected pass but failed: ${e.message}")
+            }
+        }
+        def expectFail = { String label, File archive, String expected ->
+            boolean failed = false
+            try {
+                verifyArchive(label, archive, true)
+            } catch (GradleException e) {
+                failed = true
+                if (!e.message.contains(expected)) {
+                    throw new GradleException("${label}: unexpected failure: ${e.message}")
+                }
+            }
+            if (!failed) {
+                throw new GradleException("${label}: expected failure containing '${expected}'.")
+            }
+        }
+
+        int cases = 0
+        expectPass('APK layout', makeZip('valid-apk.zip', apkEntries))
+        expectPass('AAB layout', makeZip('valid-aab.zip', toAab(apkEntries)))
+        cases += 2
+
+        def legacyPattern = /(^|\/)assets\/capacitor\.plugins\.json$/
+        if ('base/assets/capacitor.plugins.json' ==~ legacyPattern) {
+            throw new GradleException('legacy APK-only matcher unexpectedly accepted an AAB path')
+        }
+        if (archiveAssetPath('base/assets/capacitor.plugins.json') !=
+                'assets/capacitor.plugins.json') {
+            throw new GradleException('AAB asset path was not normalized')
+        }
+        if (archiveAssetPath('feature/assets/capacitor.plugins.json') != null) {
+            throw new GradleException('unrelated module path was accepted')
+        }
+        cases += 2
+
+        def noRegistration = new LinkedHashMap(apkEntries)
+        noRegistration['assets/capacitor.plugins.json'] = '[]'
+        expectFail('APK missing registration',
+                makeZip('apk-missing-registration.zip', noRegistration), 'does not register')
+        expectFail('AAB missing registration',
+                makeZip('aab-missing-registration.zip', toAab(noRegistration)), 'does not register')
+        cases += 2
+
+        expectFail('APK missing plugin',
+                makeZip('apk-missing-plugin.zip', without(apkEntries, 'assets/capacitor.plugins.json')),
+                'missing or does not register')
+        expectFail('AAB missing plugin',
+                makeZip('aab-missing-plugin.zip',
+                        toAab(without(apkEntries, 'assets/capacitor.plugins.json'))),
+                'missing or does not register')
+        cases += 2
+
+        expectFail('APK missing Apache licence',
+                makeZip('apk-missing-apache.zip', without(apkEntries, 'assets/licenses/Apache-2.0.txt')),
+                'assets/licenses/Apache-2.0.txt is missing')
+        expectFail('AAB missing Apache licence',
+                makeZip('aab-missing-apache.zip',
+                        toAab(without(apkEntries, 'assets/licenses/Apache-2.0.txt'))),
+                'assets/licenses/Apache-2.0.txt is missing')
+        cases += 2
+
+        expectFail('APK missing notices',
+                makeZip('apk-missing-notices.zip',
+                        without(apkEntries, 'assets/licenses/THIRD-PARTY-NOTICES.md')),
+                'assets/licenses/THIRD-PARTY-NOTICES.md is missing')
+        expectFail('AAB missing notices',
+                makeZip('aab-missing-notices.zip',
+                        toAab(without(apkEntries, 'assets/licenses/THIRD-PARTY-NOTICES.md'))),
+                'assets/licenses/THIRD-PARTY-NOTICES.md is missing')
+        cases += 2
+
+        ['ff_siwis.bin', 'em_alex.bin'].each { voice ->
+            expectFail("APK forbidden ${voice}",
+                    makeZip("apk-${voice}.zip", withVoice(apkEntries, voice)),
+                    'debug-only voice')
+            expectFail("AAB forbidden ${voice}",
+                    makeZip("aab-${voice}.zip", toAab(withVoice(apkEntries, voice))),
+                    'debug-only voice')
+            def emptyVoice = new LinkedHashMap(apkEntries)
+            emptyVoice["assets/kokoro/${voice}"] = ''
+            expectFail("APK empty forbidden ${voice}",
+                    makeZip("apk-empty-${voice}.zip", emptyVoice),
+                    'debug-only voice')
+            expectFail("AAB empty forbidden ${voice}",
+                    makeZip("aab-empty-${voice}.zip", toAab(emptyVoice)),
+                    'debug-only voice')
+            cases += 4
+        }
+
+        logger.lifecycle("Archive verifier regression tests passed (${cases} cases).")
+    }
+}
+
+tasks.matching { it.name == 'check' || it.name == 'testDebugUnitTest' }.configureEach {
+    dependsOn 'testArchiveVerifier'
+}
+
+tasks.matching { it.name == 'assembleDebug' }.configureEach {
+    finalizedBy 'verifyDebugPackagedLicenses'
+}
+tasks.matching { it.name == 'assembleRelease' }.configureEach {
+    finalizedBy 'verifyReleasePackagedLicenses'
+}
+tasks.matching { it.name == 'bundleRelease' }.configureEach {
+    finalizedBy 'verifyReleaseBundleContents'
+}
+
+/*
+ * The POC debug APK is installed alongside the production app, so the
+ * effective application IDs must stay distinct. Assert the resolved variant
+ * IDs (not just the Gradle text) so a later change cannot silently
+ * reintroduce a package collision.
+ */
+def expectedApplicationIds = [
+    debug  : 'io.github.sami_gor.daymark.pocmultilingual',
+    release: 'io.github.sami_gor.daymark',
+]
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def expected = expectedApplicationIds[variant.buildType]
+        if (expected == null) {
+            return
+        }
+        tasks.register("verify${variant.name.capitalize()}ApplicationId") {
+            group = 'verification'
+            description = "Fails unless the ${variant.name} variant resolves to ${expected}."
+            doLast {
+                def actual = variant.applicationId.get()
+                if (actual != expected) {
+                    throw new GradleException(
+                        "Unexpected ${variant.name} application ID: ${actual} (expected ${expected}).")
+                }
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == 'preBuild' || it.name == 'check' }.configureEach {
+    dependsOn 'verifyDebugApplicationId', 'verifyReleaseApplicationId'
 }
 
 repositories {

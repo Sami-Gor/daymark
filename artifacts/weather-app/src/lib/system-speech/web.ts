@@ -3,8 +3,8 @@ import { WebPlugin } from '@capacitor/core';
 import type { SystemSpeechPlugin } from './index';
 
 /*
- * Browser placeholder: system TTS is only used inside the native shell. The
- * web build keeps the Web Speech API instead.
+ * Inert placeholder for the legacy wrapper. The web/PWA has no narration path,
+ * and Daymark never falls back to browser speech or platform TTS.
  */
 export class SystemSpeechWeb extends WebPlugin implements SystemSpeechPlugin {
   async isAvailable(): Promise<{ available: boolean }> {

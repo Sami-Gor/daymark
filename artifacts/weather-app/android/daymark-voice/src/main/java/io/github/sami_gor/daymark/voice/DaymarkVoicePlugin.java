@@ -18,6 +18,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import io.github.sami_gor.daymark.tts.KokoroLocalTtsEngine;
 import io.github.sami_gor.daymark.tts.LocalTtsEngine;
@@ -42,9 +43,11 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     private AudioFocusRequest focusRequest;
     private boolean focusHeld;
     private LocalTtsEngine.State state = LocalTtsEngine.State.UNINITIALIZED;
+    private String lastFailureReason = "";
 
     private PluginCall pendingSpeak;
     private String queuedText;
+    private String queuedLang;
     private List<String> queuedSegments;
 
     private final Runnable readyTimeout = () -> {
@@ -52,6 +55,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             PluginCall call = pendingSpeak;
             pendingSpeak = null;
             queuedText = null;
+            queuedLang = null;
             queuedSegments = null;
             call.reject("engine not ready in time");
         }
@@ -68,7 +72,9 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     @PluginMethod
     public void isAvailable(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("available", engine != null && state != LocalTtsEngine.State.ERROR);
+        boolean available = engine != null && state != LocalTtsEngine.State.ERROR;
+        result.put("available", available);
+        result.put("reason", available ? "" : (lastFailureReason.isEmpty() ? "native-unavailable" : lastFailureReason));
         call.resolve(result);
     }
 
@@ -86,8 +92,12 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             call.reject("text is required");
             return;
         }
+        String lang = call.getString("lang");
+        if (lang == null || lang.trim().isEmpty()) {
+            lang = "en-GB";
+        }
         if (engine == null || state == LocalTtsEngine.State.ERROR) {
-            call.reject("native engine unavailable");
+            call.reject(lastFailureReason.isEmpty() ? "native-unavailable" : lastFailureReason);
             return;
         }
         List<String> segments = readSegments(call);
@@ -95,6 +105,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         if (state == LocalTtsEngine.State.UNINITIALIZED || state == LocalTtsEngine.State.LOADING) {
             // Wait for READY instead of racing initialization.
             queuedText = text;
+            queuedLang = lang;
             queuedSegments = segments;
             pendingSpeak = call;
             scheduleReadyTimeout();
@@ -102,7 +113,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         }
         pendingSpeak = call;
         requestAudioFocus();
-        engine.speak(text, segments);
+        engine.speak(text, lang, segments);
     }
 
     private List<String> readSegments(PluginCall call) {
@@ -154,11 +165,13 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         notifyListeners("stateChanged", stateEvent);
         if (next == LocalTtsEngine.State.READY && queuedText != null && pendingSpeak != null) {
             String text = queuedText;
+            String lang = queuedLang;
             List<String> segments = queuedSegments;
             queuedText = null;
+            queuedLang = null;
             queuedSegments = null;
             requestAudioFocus();
-            engine.speak(text, segments);
+            engine.speak(text, lang, segments);
             return;
         }
         if (next == LocalTtsEngine.State.READY || next == LocalTtsEngine.State.STOPPED) {
@@ -166,18 +179,57 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             abandonAudioFocus();
             resolvePendingSpeak();
         } else if (next == LocalTtsEngine.State.ERROR) {
+            if (lastFailureReason.isEmpty()) {
+                lastFailureReason = "model-init-failed";
+            }
             cancelReadyTimeout();
             abandonAudioFocus();
-            rejectPendingSpeak("native engine error");
+            rejectPendingSpeak(lastFailureReason);
         }
     }
 
     @Override
     public void onError(String message) {
-        state = LocalTtsEngine.State.ERROR;
+        // The engine reports recoverable synthesis/playback failures as an
+        // error followed by READY. Do not pin the plugin in ERROR here, or a
+        // failed utterance would make every later utterance impossible.
+        lastFailureReason = classifyFailure(message);
         cancelReadyTimeout();
         abandonAudioFocus();
-        rejectPendingSpeak(message == null ? "native engine error" : message);
+        rejectPendingSpeak(lastFailureReason);
+    }
+
+    /** Stable failure classification shared with the web narration UI. */
+    static String classifyFailure(String message) {
+        if (message == null) {
+            return "native-failed";
+        }
+        String normalized = message.toLowerCase(Locale.ROOT);
+        if (normalized.contains("unsupported narration language")
+                || normalized.contains("unsupported-language")) {
+            return "unsupported-language";
+        }
+        if (normalized.contains("integrity")
+                || (normalized.contains("asset") && (normalized.contains("invalid")
+                || normalized.contains("mismatch")))
+                || (normalized.contains("voice") && (normalized.contains("invalid")
+                || normalized.contains("missing") || normalized.contains("mismatch")))) {
+            return "voice-asset-invalid";
+        }
+        if (normalized.contains("playback") || normalized.contains("audiotrack")) {
+            return "playback-failed";
+        }
+        if (normalized.contains("synthesis") || normalized.contains("no audio")) {
+            return "synthesis-failed";
+        }
+        if (normalized.contains("initializ")
+                || normalized.contains("model load")
+                || normalized.contains("model missing")
+                || normalized.contains("engine not ready")
+                || normalized.contains("engine unavailable")) {
+            return "model-init-failed";
+        }
+        return "native-failed";
     }
 
     @Override
@@ -217,6 +269,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         PluginCall call = pendingSpeak;
         pendingSpeak = null;
         queuedText = null;
+        queuedLang = null;
         queuedSegments = null;
         if (call != null) {
             call.resolve();
@@ -227,6 +280,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         PluginCall call = pendingSpeak;
         pendingSpeak = null;
         queuedText = null;
+        queuedLang = null;
         queuedSegments = null;
         if (call != null) {
             call.reject(message);

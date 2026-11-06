@@ -4,8 +4,9 @@ import { Navigation, Square, Volume2 } from 'lucide-react';
 import { displayTemp, formatLocationDate, weatherCopy, type Place, type Unit, type WeatherPayload } from '@/lib/weather';
 import { DAYMARK_INTENTS, getIntentResponse } from '@/lib/weather-intents';
 import type { DayCueResult } from '@/lib/day-cue';
-import { SPEECH_LANGS } from '@/lib/i18n';
-import { isEnglish } from '@/lib/speech-engine';
+import { TTS_LANGS } from '@/lib/i18n';
+import { isSupportedSpeechLocale } from '@/lib/speech-engine';
+import { describeNarrationError } from '@/lib/speech-errors';
 import { useDaymarkSpeech } from '@/hooks/use-daymark-speech';
 import { useLocale } from '@/hooks/use-locale';
 import { AskDaymark } from '@/components/weather/AskDaymark';
@@ -27,7 +28,7 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
   const current = weather.current ?? {};
   const currentCode = current.weather_code ?? 0;
   const speech = useDaymarkSpeech();
-  const narrationAvailableInLocale = isEnglish(locale);
+  const narrationAvailableInLocale = isSupportedSpeechLocale(locale);
   const stopSpeech = speech.stop;
   const previousLocale = useRef(locale);
   const briefing = useMemo(
@@ -58,16 +59,11 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
       <DayCueHero cue={dayCue} />
 
       <div className="day-cue-action">
-        {isAndroidNative && !narrationAvailableInLocale && (
-          <p className="voice-unavailable" role="status" data-testid="voice-unavailable">
-            {t('voice.error.frenchSpanishUnavailable')}
-          </p>
-        )}
         {isAndroidNative && narrationAvailableInLocale && speech.supported && (
           <button
             type="button"
             className="local-button primary-speak"
-            onClick={() => (speech.isActive ? stopSpeech() : speech.speak(briefing.spokenText, SPEECH_LANGS[locale]))}
+            onClick={() => (speech.isActive ? stopSpeech() : speech.speak(briefing.spokenText, TTS_LANGS[locale]))}
             aria-label={speech.isPreparing ? t('voice.ariaPreparing') : speech.isSpeaking ? t('voice.ariaStop') : t('voice.ariaStart')}
             aria-pressed={speech.isActive}
             data-testid="button-hear-today"
@@ -81,11 +77,7 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
         )}
         {isAndroidNative && speech.error && (
           <p className="voice-error" role="alert" data-testid="voice-error">
-            {speech.errorCode === 'non-english-unavailable'
-              ? t('voice.error.frenchSpanishUnavailable')
-              : speech.errorCode === 'offline-voice-unavailable'
-                ? t('voice.error.offlineUnavailable')
-                : t('voice.error.unavailable')}
+            {describeNarrationError(speech.errorCode, locale)}
           </p>
         )}
       </div>

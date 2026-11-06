@@ -29,6 +29,11 @@ have. Where the two differ, both are stated.
 > French/Spanish narration is unavailable in V2 and the system-TTS plugin is
 > not registered. Both Android and web/PWA apply the same latitude-aware grid
 > with a 0.025-degree minimum step.
+> **V2.1 POC update (2 November 2026):** English narration remains the
+> streamed Kokoro path. French and Spanish are debug-POC-only and use the
+> whole-text `nativeSynth` path; production release builds reject them. The
+> legacy `SystemSpeech` plugin remains unregistered. There is no
+> system/browser/network TTS fallback.
 > Rows below that describe v1 browser speech or system TTS are retained as v1
 > evidence, not as current V2 behaviour.
 
@@ -85,7 +90,9 @@ Clean-build instructions (verified path, network required for downloads):
 
 pnpm install
 
-# 1. Kokoro assets (downloads model + bm_fable, verifies SHA-256)
+# 1. Kokoro assets (downloads the model + English, French and Spanish voices,
+#    then stages bm_fable in the main source set and ff_siwis/em_alex in the
+#    debug source set only, verifying every SHA-256)
 android/kokoro-poc/scripts/fetch-kokoro-assets.sh
 
 # 2. Rust JNI library (clones pguso/kokoro at the pinned commit, cross-compiles,
@@ -109,6 +116,19 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bu
 
 Generated material (`daymark-voice/src/main/assets/kokoro`, `jniLibs`,
 `app/src/main/assets/public`) is gitignored and reproduced by steps 1–3.
+
+**Narration and notice gate (V2.1 branch).** Release builds compile
+`MULTILINGUAL_NARRATION = false`; the engine materialises only `bm_fable` and
+rejects `fr`/`es`. `:app:verifyReleaseNarrationSources` and
+`:app:verifyReleaseNarrationAssets` fail a release that would package
+`ff_siwis.bin` or `em_alex.bin`. Every APK/AAB packages
+`assets/licenses/THIRD-PARTY-NOTICES.md` and
+`assets/licenses/Apache-2.0.txt`; debug APKs also package
+`assets/licenses/MULTILINGUAL-VOICE-NOTICE.txt`.
+`:app:verifyDebugPackagedLicenses`, `:app:verifyReleasePackagedLicenses` and
+`:app:verifyReleaseBundleContents` open the built archive and check the entries.
+The unresolved `em_alex` speaker/training-data provenance remains an explicit
+release blocker; see `THIRD-PARTY-NOTICES.md`.
 
 ## 2. Google Play requirements
 
@@ -332,8 +352,9 @@ VERIFIED/READY:
 - Model/voice load from `filesDir` copies of bundled assets; hashes match.
 - JNI returns error strings/nulls; Java falls back to whole-text synthesis if a
   segment plan does not match, then to the monolithic path if streaming cannot
-  start; French/Spanish use the system engine by design, while English
-  narration failures surface an error and never fall back to system TTS.
+  start. English uses the stream. French/Spanish are debug-POC-only and, on
+  that path, use whole-text `nativeSynth`; production release builds reject
+  them. No narration path falls back to system, browser, or network TTS.
 - AudioTrack is created per narration and released in `finally`; Stop pauses and
   flushes immediately, clears the pending stream, resolves the pending call.
 - Pause stops narration; audio focus (`GAIN_TRANSIENT`) is requested per
@@ -352,10 +373,13 @@ Notes:
   as a residual risk covered by device testing.
 - Bluetooth/headphone routing relies on default AudioTrack routing; untested.
 
-**v2 candidate:** French/Spanish narration is unavailable and is planned for
-V2.2. The UI shows an explicit unavailable message; the SystemSpeech plugin is
-not registered, so there is no Android system-TTS, network-voice or browser
-fallback.
+**v2 candidate / V2.1 POC:** French/Spanish narration is unavailable in the
+current public release. The multilingual work is an unreleased debug POC and
+must not be advertised as a released capability. Debug POC builds use local
+Kokoro (whole-text `nativeSynth`); production release builds reject French and
+Spanish before synthesis. The SystemSpeech plugin is not registered, so there
+is no Android system-TTS, network-voice or browser fallback. No future release
+version is promised here.
 
 **Core narration already tested on a physical device:** playback, Stop,
 restart without overlap, and basic lifecycle handling passed (§18).
@@ -485,8 +509,9 @@ OPTIONAL hardening:
   clean, and CI now enforces `pnpm audit --audit-level critical`.
 - Gradle: AGP 8.13.0, Gradle 8.14.3, JDK 21 required; Capacitor/AndroidX from
   Google Maven; no unexpected repositories.
-- Rust: `Cargo.lock` committed; `ort 2.0.0-rc.13` + ONNX Runtime 1.28.2
-  downloaded at build time by `ort-sys` (build-time network dependency).
+- Rust: `Cargo.lock` committed; `ort 2.0.0-rc.13` + ONNX Runtime 1.28.0
+  downloaded at build time by `ort-sys` (build-time network dependency). The
+  sherpa-onnx AAR separately bundles ONNX Runtime 1.28.2.
 - Kokoro: cloned by script at pinned commit
   `b42bd5cf915163607cb51984cabf273dcf09755e` (network at build time).
 - No git dependencies beyond the pinned clone; no postinstall scripts in added
@@ -498,15 +523,17 @@ OPTIONAL hardening:
 
 | Component | License | Redistributed | Notes |
 |---|---|---|---|
-| pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | compiled | attribution in README |
+| pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | compiled | modified by Daymark (`kokoro-synth-phonemes.patch`); change statement in README and `THIRD-PARTY-NOTICES.md` |
 | Kokoro model weights | Apache-2.0 (upstream repo) | asset | verify upstream card |
 | `bm_fable.bin` voice | Apache-2.0 (per model repo) | asset | per-voice training provenance not documented upstream — unresolved, low risk |
-| ONNX Runtime 1.28.2 | MIT | linked | build-time download |
+| ONNX Runtime 1.28.0 (static in `libkokoro_jni.so`) | MIT | linked | build-time download by `ort-sys` 2.0.0-rc.13 |
+| ONNX Runtime 1.28.2 (bundled in the patched sherpa-onnx AAR) | MIT | linked | separate copy for ASR |
 | `ort`/`ort-sys` | MIT OR Apache-2.0 | compiled | |
 | Rust crates (tokio, jni, log, android_logger, bincode, fancy-regex, regex, futures, pin-project, ndarray, num2words, unicode-segmentation, misaki-rs, cmudict-fast, waken_snowball) | MIT/Apache-2.0/BSD-3 | compiled | permissive |
 | `language-tokenizer` 0.1.0 | **WTFPL-2.0** via `license-file` | compiled | previously flagged as missing license; the crate ships `LICENSE.md` (WTFPL v2), a permissive license — **cleared** |
 | espeak-ng | GPL-3.0 | not included | verified absent (Misaki-only G2P) |
-| Capacitor core/cli/android/app | MIT | compiled | |
+| Capacitor core/android 8.5.1 and @capacitor/app 8.1.1 | MIT | compiled | CLI 8.5.1 is build tooling only |
+| sherpa-onnx 1.13.8 (CVE-2026-108954 patch) | Apache-2.0 | linked | modified AAR; change statement in `SHERPA-ONNX-PROVENANCE.md` and `THIRD-PARTY-NOTICES.md` |
 | AndroidX/Google libraries | Apache-2.0 | compiled | |
 | Fonts (Fraunces, Plus Jakarta Sans, DM Mono) | SIL OFL-1.1 | asset | license files in `src/fonts` |
 | GeoNames locality dataset (`localities-v1.json`) | CC BY 4.0 | asset | credited in the privacy pages; attribution obligation |
@@ -562,11 +589,11 @@ responses by design.
 |---|---|
 | No location permission / unavailable / timeout | distinct friendly copy, retryable, no crash (denial/timeout edge-case tests are additional coverage) |
 | Network unavailable / API timeout / malformed response | validated response → retry UI, no infinite loading |
-| Kokoro init failure | English surfaces the narration error (no system fallback); fr/es keep their system-TTS path |
+| Kokoro init failure | English surfaces the narration error (no system fallback); fr/es are unavailable in a production release |
 | Kokoro synth/playback failure | error state, listener notified, no crash |
 | Microphone denied / recognition unavailable | UI error; no crash (denial/unavailable edge-case tests are additional coverage) |
-| System TTS unavailable | speak rejection surfaces as a state reset; no crash |
-| Unsupported language | fr/es use system TTS; if unavailable the narration error is shown |
+| System TTS unavailable | Legacy SystemSpeech is unregistered; no runtime system-TTS path exists |
+| Unsupported language | Explicit unsupported-language error; no system/browser/network fallback |
 | Low memory / process restart | cold start; engine re-initializes; in-memory briefing regenerated |
 
 ## 18. Physical-device test matrix
@@ -603,7 +630,7 @@ release risk makes one necessary.
 | 19 | Low-memory kill while backgrounded | ✓ | ✓ | ✓ | relaunch cold-starts cleanly |
 | 20 | Rotation while idle/narrating | ✓ | ✓ | ✓ | no audio glitch; layout intact |
 | 21 | TalkBack + 200% font | ✓ | ✓ | ✓ | controls announced; no clipping |
-| 22 | French/Spanish narration | ✓ | ✓ | ✓ | system TTS used; voice data present; clear error if absent |
+| 22 | French/Spanish narration | ✓ | ✓ | ✓ | unavailable in production; debug POC uses local Kokoro whole-text synthesis only |
 
 ### Brief physical-device validation — 14 September 2026
 
@@ -633,7 +660,7 @@ merge-confidence pass.
 
 Not covered by this brief pass: broader coverage across classes A/B/C,
 TalkBack, a 10-minute thermal soak, call/music interruption, screen lock,
-rotation, low-memory kill, French/Spanish system-TTS voice data, a
+rotation, low-memory kill, debug-POC French/Spanish narration, a
 Google-Play-distributed install, verified App Links, and upgrade install.
 This is a record of scope, not a requirement to rerun already-passed tests.
 Additional cases may be tested if broader assurance is wanted or a concrete
@@ -701,8 +728,8 @@ Launch/weather, location use, voice input, local Kokoro narration, stop/restart,
 lifecycle handling, enlarged-font usability and short stability checks passed.
 **The core physical-device test is complete; do not repeat it.** The matrix
 retains optional extended QA for other device classes, TalkBack, longer thermal
-soak, call/music interruption, Bluetooth routing, French/Spanish system TTS,
-verified App Links, upgrade install and Play-distributed install. Consider these
+soak, call/music interruption, Bluetooth routing, debug-POC French/Spanish
+narration, verified App Links, upgrade install and Play-distributed install. Consider these
 only if additional assurance is needed or a specific release risk warrants them.
 
 ### C. READY NOW

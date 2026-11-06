@@ -85,8 +85,8 @@ describe('android voice input implementation', () => {
     expect(registrations.filter((name) => name.includes('SpeechRecognition'))).toEqual([
       'ParakeetSpeechRecognitionPlugin',
     ]);
-    // V2 does not register a system-TTS fallback; French/Spanish narration is
-    // explicitly unavailable until the planned V2.2 work.
+    // V2 does not register a system-TTS fallback; French and Spanish use the
+    // same bundled Kokoro engine with locale-specific voices.
     expect(registrations).not.toContain('SystemSpeechPlugin');
     // The plugin's own Capacitor name is the one the web layer calls.
     const plugin = readFileSync(

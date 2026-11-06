@@ -12,8 +12,11 @@ artifacts/weather-app/android/daymark-voice/
 Production facts:
 
 - model: `model_quantized.onnx` (SHA-256 verified by the fetch script)
-- voice: `bm_fable` (SHA-256 verified by the fetch script)
-- G2P: Misaki-only, no eSpeak
+- production voice: `bm_fable` (SHA-256 verified by the fetch script)
+- debug-POC voices: `ff_siwis` and `em_alex` (staged only in the debug source
+  set; release builds reject French/Spanish and package only `bm_fable`)
+- G2P: Misaki for English; `piper-plus-g2p` for debug-POC French/Spanish; no
+  eSpeak
 - the scripts populate **both** the production plugin module and the retained
   TWA rollback project, and fail clearly if the `daymark-voice` module is
   missing
@@ -36,7 +39,7 @@ adb logcat -s DaymarkKokoroTts
 |---|---|
 | pguso/kokoro (`kokoro-en`) | commit `b42bd5cf915163607cb51984cabf273dcf09755e`, crate 0.1.5 (Rust edition 2024) |
 | `ort` crate | 2.0.0-rc.13 (resolved from the crate's `2.0.0-rc.11` caret) |
-| ONNX Runtime | 1.28.2 for `aarch64-linux-android`, statically linked by `ort-sys` |
+| ONNX Runtime | 1.28.0 for `aarch64-linux-android`, statically linked by `ort-sys` 2.0.0-rc.13 |
 | Rust | 1.98.1 (`aarch64-linux-android` target) |
 | Android NDK | 29.0.14206865 (clang `aarch64-linux-android26`) |
 | Model | `onnx/model_quantized.onnx`, sha256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` (92,361,116 B) |
@@ -90,9 +93,9 @@ US/GB gold+silver lexicons, the POS tagger data and the OOV table via
 DaymarkVoicePlugin (production, Capacitor) / KokoroTtsTestActivity (legacy)
   -> KokoroLocalTtsEngine  (implements LocalTtsEngine: initialize/speak/stop/isSpeaking/shutdown)
        -> System.loadLibrary("kokoro_jni")
-       -> nativeInit(modelPath, voicePath, "bm_fable") -> error string | null
-       -> nativeSynth(text) -> float[24000 Hz mono PCM]  (fallback path)
-       -> nativeStreamStart(text) -> error string | null  (sentence streaming)
+       -> nativeInit(modelPath, voicesDir, "bm_fable") -> error string | null
+       -> nativeSynth(text, lang, voiceName) -> float[24000 Hz mono PCM]
+       -> nativeStreamStart(text, lang, voiceName) -> error string | null
        -> nativeStreamPush(text)  (additional TTS segments, same stream)
        -> nativeStreamFinish()    (closes segment input)
        -> nativeStreamNext() -> next sentence float[] | null when finished
@@ -103,6 +106,16 @@ DaymarkVoicePlugin (production, Capacitor) / KokoroTtsTestActivity (legacy)
               -> ONNX Runtime (static)
        -> AudioTrack (PCM16, 24 kHz, mono)
 ```
+
+English uses `nativeStreamStart`/`nativeStreamPush`/`nativeStreamNext` with the
+Misaki G2P. `nativeStreamStart` intentionally rejects non-English locales with
+`"prephonemized stream not available"`; the debug-POC Android French/Spanish
+path then calls `nativeSynth(text, lang, voiceName)` once with the whole
+utterance, where Rust uses `piper-plus-g2p` and `synth_phonemes`. Production
+release builds reject French/Spanish and materialise only `bm_fable`. The host
+benchmark and `tts_samples` prefer `daymark-voice/src/debug/assets/kokoro`
+when it exists so English and the debug multilingual voices share one voice
+directory; release assets contain only the English voice.
 
 On first initialization the model and voice are copied from APK assets into
 `filesDir/kokoro/` (Kokoro loads from files); later launches skip the copy.
@@ -177,10 +190,10 @@ work, not part of this pass.
 
 | Component | License | Redistributed | Notes |
 |---|---|---|---|
-| pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | Yes (compiled) | Attribution required |
+| pguso/kokoro (`kokoro-en` 0.1.5) | Apache-2.0 | Yes (compiled) | Attribution required; modified by Daymark via `scripts/kokoro-synth-phonemes.patch` (adds `synth_phonemes`, removes narration/phoneme debug logging) |
 | Kokoro model weights (`model_quantized.onnx`) | Apache-2.0 | Yes (asset) | hexgrad/onnx-community release; verify upstream card |
 | `bm_fable.bin` voice | Apache-2.0 (per model repo) | Yes (asset) | Per-voice training-data provenance is not documented upstream — review |
-| ONNX Runtime 1.28.2 (static) | MIT | Yes (linked) | Downloaded by `ort-sys` at build time |
+| ONNX Runtime 1.28.0 (static) | MIT | Yes (linked) | Downloaded by `ort-sys` 2.0.0-rc.13 at build time; the shipped `libkokoro_jni.so` reports `rel-1.28.0` |
 | `ort` / `ort-sys` | MIT OR Apache-2.0 | Yes (compiled) | |
 | tokio, log, android_logger, jni, bincode, fancy-regex, regex, futures, pin-project, ndarray, num2words, unicode-segmentation | MIT / Apache-2.0 | Yes (compiled) | Permissive |
 | misaki-rs 0.3.0 | MIT | Yes (compiled) | Lexicons/tagger embedded; no eSpeak |

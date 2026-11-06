@@ -1,7 +1,7 @@
 import type { TranslationKey } from '@/locales/en';
 
 /** A user-visible reason why "Use my location" did not produce a fix. */
-export type LocationFailure = 'denied' | 'timeout' | 'unavailable' | 'unsupported';
+export type LocationFailure = 'denied' | 'timeout' | 'unavailable' | 'unsupported' | 'invalid';
 
 /**
  * Maps a GeolocationPositionError code to a stable failure kind.
@@ -27,6 +27,8 @@ export function locationFailureKey(failure: LocationFailure, androidNative: bool
       return 'current.locationTimeout';
     case 'unsupported':
       return 'current.locationUnsupported';
+    case 'invalid':
+      return 'current.locationInvalid';
     default:
       return 'current.locationUnavailable';
   }

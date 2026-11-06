@@ -40,6 +40,7 @@ import {
   type LocationFailure,
 } from '@/lib/location-feedback';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
+import { createWeatherRequestGate } from '@/lib/weather-requests';
 import { useLocale } from '@/hooks/use-locale';
 
 const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 };
@@ -53,29 +54,40 @@ function Home() {
   const [error, setError] = useState<WeatherErrorCode | ''>('');
   const [isLocating, setIsLocating] = useState(false);
   const [locationFailure, setLocationFailure] = useState<LocationFailure | null>(null);
-  const requestId = useRef(0);
+  const requestGate = useRef(createWeatherRequestGate()).current;
   const selectionId = useRef(0);
   const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
-  const loadWeather = useCallback(async (nextPlace: Place): Promise<boolean> => {
-    const id = ++requestId.current;
+  const loadWeather = useCallback(async (
+    nextPlace: Place,
+    isCurrent: () => boolean = () => true,
+  ): Promise<boolean> => {
+    const request = requestGate.begin(isCurrent);
     setIsLoading(true);
     setError('');
     try {
       const result = await fetchWeather(nextPlace);
-      if (id !== requestId.current) return false;
+      // The newest request wins; a location request also requires its
+      // selection to still be current, so a hidden or superseded location
+      // attempt cannot replace the displayed place.
+      if (!requestGate.isCurrent(request)) return false;
       // Atomic swap: the new place and its payload land together, and the
       // previous render stays mounted until they do.
       setPlace(nextPlace);
       setWeather(result);
       return true;
     } catch (err) {
-      if (id === requestId.current) setError(err instanceof WeatherFetchError ? err.code : 'unknown');
+      if (requestGate.isCurrent(request)) {
+        setError(err instanceof WeatherFetchError ? err.code : 'unknown');
+      }
       return false;
     } finally {
-      if (id === requestId.current) setIsLoading(false);
+      // Only the newest request owns the shared loading state. An invalidated
+      // location request still clears it when no newer request exists (for
+      // example after backgrounding), so the indicator never sticks.
+      if (requestGate.ownsLoading(request)) setIsLoading(false);
     }
-  }, []);
+  }, [requestGate]);
 
   const selectPlace = useCallback((nextPlace: Place) => {
     // A newer selection supersedes any in-flight "Use my location" request
@@ -97,27 +109,45 @@ function Home() {
     setError('');
     // The locality dataset loads in parallel with the GPS fix; it only ever
     // improves the place label and never delays weather (see below).
-    void ensureLocalityIndex();
+    void ensureLocalityIndex().catch(() => undefined);
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       // Both Android and web/PWA apply the same latitude-aware on-device grid
       // (0.025° latitude minimum; longitude widens where needed to preserve
       // 3 km²). Android additionally requests only ACCESS_COARSE_LOCATION, so
       // no unrounded fix is used for a weather request.
-      const { latitude, longitude } = resolveDeviceLocation(
-        coords.latitude,
-        coords.longitude,
-      );
+      let fix: { latitude: number; longitude: number };
+      try {
+        fix = resolveDeviceLocation(coords.latitude, coords.longitude);
+      } catch {
+        // A malformed or non-finite fix must not leave the button stuck in
+        // "Finding you…" or reach Open-Meteo.
+        if (id === selectionId.current) {
+          setIsLocating(false);
+          setLocationFailure('invalid');
+        }
+        return;
+      }
+      const { latitude, longitude } = fix;
       try {
         // A newer search or location interaction wins over this older one.
         if (id !== selectionId.current) return;
         const fallbackName = t('current.yourLocation');
         // Weather starts immediately from the privacy-filtered coordinates; naming is
         // enhancement-only and is resolved locally while weather loads.
-        const loaded = await loadWeather({ name: fallbackName, latitude, longitude });
+        const loaded = await loadWeather(
+          { name: fallbackName, latitude, longitude },
+          () => id === selectionId.current,
+        );
         if (!loaded || id !== selectionId.current) return;
         // A successful fix clears any earlier denial/timeout notice.
         setLocationFailure(null);
-        const match = await lookupLocality(latitude, longitude);
+        let match: Awaited<ReturnType<typeof lookupLocality>> = null;
+        try {
+          match = await lookupLocality(latitude, longitude);
+        } catch {
+          // Locality naming is enhancement-only; the weather fix already loaded.
+          return;
+        }
         if (!match || match.confidence === 'low' || id !== selectionId.current) return;
         // Update only the label, only for the current intent, and only while
         // the GPS fallback is still displayed. Weather is never refetched.
@@ -147,6 +177,19 @@ function Home() {
   // opens on the default location and only asks when the user presses the
   // location button.
   useEffect(() => { void loadWeather(LONDON); }, [loadWeather]);
+
+  // A fix that arrives after the app was backgrounded is stale. Invalidate the
+  // pending location intent so it cannot replace a later user action or update
+  // the UI while the app is no longer in front. No permission is requested here.
+  useEffect(() => {
+    const cancelLocationOnHide = () => {
+      if (document.visibilityState !== 'hidden') return;
+      selectionId.current += 1;
+      setIsLocating(false);
+    };
+    document.addEventListener('visibilitychange', cancelLocationOnHide);
+    return () => document.removeEventListener('visibilitychange', cancelLocationOnHide);
+  }, []);
 
   const showInitialLoading = isLoading && !weather;
   const isRefreshing = isLoading && Boolean(weather);

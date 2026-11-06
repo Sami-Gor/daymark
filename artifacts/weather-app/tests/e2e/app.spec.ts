@@ -688,6 +688,20 @@ test.describe('PWA + service worker (production build)', () => {
     await page.reload();
     await expect(page.getByTestId('text-current-temperature')).toBeVisible();
   });
+
+  test('leaves Vite preload errors to the browser instead of cancelling them', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    const prevented = await page.evaluate(() => {
+      const event = new Event('vite:preloadError', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+
+    expect(prevented, 'the web/PWA build has no native recovery screen to take over').toBe(false);
+  });
 });
 
 test.describe('security headers (preview environment)', () => {
@@ -1731,7 +1745,12 @@ test.describe('privacy policy page', () => {
         memory: 'held in memory',
         webDemo: 'limited weather demo',
         browserSpeech: 'does not invoke browser speech-recognition',
-        offlineVoice: 'not available in V2',
+        currentNarration: 'English Kokoro narration is available in the current public Daymark V2.0.0 release',
+        localNarration: 'generated on your device by the bundled Kokoro model',
+        unavailableNarration: 'French and Spanish narration are not available in the current public release',
+        poc: 'unreleased development proof of concept',
+        futureUpdate: 'This policy will be updated before any future release that makes French or Spanish narration available',
+        notClaimedAvailable: 'English, French and Latin American Spanish narration is generated',
         audience: 'adults aged 18 and over',
         ipMetadata: 'source IP address and requested URL',
         versionNote: 'Daymark 1.0.0',
@@ -1744,7 +1763,12 @@ test.describe('privacy policy page', () => {
         memory: 'conservé en mémoire',
         webDemo: 'démo météo limitée',
         browserSpeech: 'API de reconnaissance ou de synthèse vocale',
-        offlineVoice: 'pas disponible dans V2',
+        currentNarration: 'La narration en anglais est disponible dans la version publique actuelle de Daymark V2.0.0',
+        localNarration: 'est générée sur votre appareil par le modèle Kokoro intégré',
+        unavailableNarration: 'La narration en français et en espagnol n’est pas disponible dans la version publique actuelle',
+        poc: 'prototype de développement non publié',
+        futureUpdate: 'Cette politique sera mise à jour avant toute future version',
+        notClaimedAvailable: 'La narration en anglais, en français et en espagnol latino-américain est générée',
         audience: 'adultes âgés de 18 ans ou plus',
         ipMetadata: 'adresse IP source et l’URL demandée',
         versionNote: 'Daymark 1.0.0',
@@ -1757,7 +1781,12 @@ test.describe('privacy policy page', () => {
         memory: 'mantiene en memoria',
         webDemo: 'demo meteorológica limitada',
         browserSpeech: 'API de reconocimiento ni de síntesis de voz',
-        offlineVoice: 'no está disponible en V2',
+        currentNarration: 'La narración en inglés está disponible en la versión pública actual de Daymark V2.0.0',
+        localNarration: 'se genera en tu dispositivo con el modelo Kokoro integrado',
+        unavailableNarration: 'La narración en francés y español no está disponible en la versión pública actual',
+        poc: 'prueba de concepto de desarrollo no publicada',
+        futureUpdate: 'Esta política se actualizará antes de cualquier futura versión',
+        notClaimedAvailable: 'La narración en inglés, francés y español latinoamericano se genera',
         audience: 'adultos de 18 años o más',
         ipMetadata: 'dirección IP de origen y la URL solicitada',
         versionNote: 'Daymark 1.0.0',
@@ -1771,6 +1800,7 @@ test.describe('privacy policy page', () => {
         expect(text).toContain(host);
       }
       expect(text).toContain('Open-Meteo');
+      expect(text).toContain('Cloudflare');
       expect(text).toContain('daymark.locale');
       expect(text).toContain('daymark.permissions');
       expect(text).toContain('microphone-requested');
@@ -1780,7 +1810,12 @@ test.describe('privacy policy page', () => {
       expect(text).toContain(expectations[policy.lang].memory);
       expect(text).toContain(expectations[policy.lang].webDemo);
       expect(text).toContain(expectations[policy.lang].browserSpeech);
-      expect(text).toContain(expectations[policy.lang].offlineVoice);
+      expect(text).toContain(expectations[policy.lang].currentNarration);
+      expect(text).toContain(expectations[policy.lang].localNarration);
+      expect(text).toContain(expectations[policy.lang].unavailableNarration);
+      expect(text).toContain(expectations[policy.lang].poc);
+      expect(text).toContain(expectations[policy.lang].futureUpdate);
+      expect(text).not.toContain(expectations[policy.lang].notClaimedAvailable);
       expect(text).toContain(expectations[policy.lang].audience);
       expect(text).toContain(expectations[policy.lang].ipMetadata);
       expect(text).toContain(expectations[policy.lang].versionNote);
@@ -1854,6 +1889,32 @@ test.describe('geolocation flow', () => {
     );
   }
 
+  /**
+   * Holds the weather forecast for the grid-rounded device fix (51.5, -0.125)
+   * until the test releases it. Other forecasts and requests fall through to
+   * the default fixtures so the test controls only the location response.
+   */
+  async function holdLocationForecast(page: Page) {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let intercepted!: () => void;
+    const seen = new Promise<void>((resolve) => { intercepted = resolve; });
+    let delivered!: () => void;
+    const fulfilled = new Promise<void>((resolve) => { delivered = resolve; });
+    await page.route('**/api.open-meteo.com/**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('latitude') !== '51.5' || url.searchParams.has('models')) {
+        await route.fallback();
+        return;
+      }
+      intercepted();
+      await held;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FORECAST) });
+      delivered();
+    });
+    return { release, seen, fulfilled };
+  }
+
   test('a search made while geolocation is pending is not overwritten by the older location result', async ({ page }) => {
     await mockOpenMeteo(page);
     await routeSearchGeocoding(page, PARIS);
@@ -1924,6 +1985,111 @@ test.describe('geolocation flow', () => {
     await expect(page.getByTestId('location-notice')).toContainText('took too long');
     await expect(page.getByTestId('location-notice')).not.toContainText('Allow location access');
     await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+  });
+
+  test('an invalid fix shows recovery copy and never sends coordinates', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    let forecastRequests = 0;
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.hostname === 'api.open-meteo.com' && !request.url().includes('ukmo')) forecastRequests += 1;
+    });
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page, 100, 0);
+    await expect(page.getByTestId('location-notice')).toContainText('invalid');
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await page.waitForTimeout(250);
+    expect(forecastRequests, 'an invalid fix must not reach Open-Meteo').toBe(0);
+  });
+
+  test('a fix that arrives after backgrounding is ignored', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toBeVisible();
+
+    await page.getByTestId('button-refresh-location').click();
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await page.waitForTimeout(250);
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
+  });
+
+  test('backgrounding drops an in-flight location weather result', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('refresh-indicator')).toHaveCount(0);
+
+    // Hold only the location forecast so the response can be released after
+    // the page is hidden; everything else keeps using the default fixtures.
+    const held = await holdLocationForecast(page);
+
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await held.seen;
+    await expect(page.getByTestId('refresh-indicator')).toBeVisible();
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.getByTestId('button-refresh-location')).toHaveText('Use my location');
+
+    held.release();
+    // The indicator disappears only when the held response finishes, which is
+    // the deterministic signal that its commit path ran.
+    await expect(page.getByTestId('refresh-indicator')).toHaveCount(0);
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await expect(page.getByTestId('location-notice')).toHaveCount(0);
+  });
+
+  test('a search selection supersedes an in-flight location weather result', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await routeSearchGeocoding(page, PARIS);
+    await stubDeferredGeolocation(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-city')).toHaveText('London');
+
+    const held = await holdLocationForecast(page);
+    await page.getByTestId('button-refresh-location').click();
+    await resolveGeolocation(page, 51.5074567, -0.12789012);
+    await held.seen;
+
+    // The newer search must win even though the location response arrives last.
+    await page.getByTestId('input-location-search').fill('paris');
+    await page.getByTestId('location-option-0').click();
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+
+    held.release();
+    await held.fulfilled;
+    // Drain the render queued by the released response before asserting the
+    // newer selection is still displayed.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    await expect(page.getByTestId('text-current-city')).toHaveText('Paris');
+    await expect(page.getByTestId('refresh-indicator')).toHaveCount(0);
   });
 
   test('reports position-unavailable distinctly from permission denial', async ({ page }) => {

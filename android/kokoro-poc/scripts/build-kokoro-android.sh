@@ -28,6 +28,11 @@ if [ ! -d "$KOKORO_SRC/.git" ]; then
 fi
 git -C "$KOKORO_SRC" fetch --depth 1 origin "$KOKORO_COMMIT"
 git -C "$KOKORO_SRC" checkout --detach "$KOKORO_COMMIT"
+# Daymark POC-only prephonemized synthesis entry point. Re-applied after the
+# pinned upstream checkout so the patch is reproducible in a fresh build.
+if ! grep -q 'pub async fn synth_phonemes' "$KOKORO_SRC/src/lib.rs"; then
+  git -C "$KOKORO_SRC" apply "$HERE/kokoro-synth-phonemes.patch"
+fi
 
 # Kokoro's dependency declaration keeps ort's default features, including
 # download-binaries (which supports aarch64-linux-android) and copy-dylibs.
