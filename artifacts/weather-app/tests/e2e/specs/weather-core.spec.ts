@@ -82,19 +82,18 @@ test.describe('weather dashboard', () => {
       }
     });
     await dashboard.goto('/');
-    await expect(dashboard.errorPanel).toBeVisible();
-    await expect(dashboard.errorPanel).toContainText("Weather data isn't available right now");
+    await dashboard.expectWeatherError("Weather data isn't available right now");
 
     failing = false;
     await dashboard.retryWeather();
+    await dashboard.expectWeatherRecovered();
     await dashboard.expectTemperature('20°C');
   });
 
   test('network failure shows friendly copy without raw browser text', async ({ api, dashboard }) => {
     await api.offline();
     await dashboard.goto('/');
-    await expect(dashboard.errorPanel).toBeVisible();
-    await expect(dashboard.errorPanel).toContainText("We couldn't reach the weather service");
+    await dashboard.expectWeatherError("We couldn't reach the weather service");
     await expect(dashboard.errorPanel).not.toContainText('Failed to fetch');
     await expect(dashboard.errorRetryButton).toBeVisible();
   });
@@ -102,10 +101,22 @@ test.describe('weather dashboard', () => {
   test('malformed API data shows a friendly error without crashing the page', async ({ api, dashboard }) => {
     await api.forecast({ current: 'garbage', hourly: 42 });
     await dashboard.goto('/');
-    await expect(dashboard.errorPanel).toBeVisible();
-    await expect(dashboard.errorPanel).toContainText('unexpected shape');
+    await dashboard.expectWeatherError('unexpected shape');
     // The page itself is alive: footer and error controls are present.
     await dashboard.expectBrand();
+  });
+
+  test('HTTP 429 is handled without a retry loop', async ({ page, dashboard }) => {
+    let calls = 0;
+    await page.route('**/api.open-meteo.com/**', async (route) => {
+      calls += 1;
+      await route.fulfill({ status: 429, contentType: 'application/json', body: '{"reason":"rate limited"}' });
+    });
+    await dashboard.goto('/');
+    await dashboard.expectWeatherError("Weather data isn't available right now");
+    // Give the app a moment it would use for an automatic retry, then assert none happened.
+    await page.waitForTimeout(1500);
+    expect(calls).toBeLessThanOrEqual(2); // one forecast + one air-quality request, nothing more
   });
 });
 
