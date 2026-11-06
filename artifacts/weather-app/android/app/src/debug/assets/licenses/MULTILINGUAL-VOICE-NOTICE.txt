@@ -38,8 +38,11 @@ Redistributed ONNX voice file SHA-256:
 
 Daymark does not claim speaker endorsement or identity.
 
-The publisher does not document the original speaker, recording, training
-dataset, consent, or voice-likeness rights for this voice. That provenance
-remains unresolved and is not cleared by the Apache-2.0 grant. The voice is a
-provisional debug-POC asset and is a release blocker. See
-docs/release/v2.1-em-alex-license-review.md in the Daymark repository.
+The owner has confirmed that the required Spanish voice licensing and redistribution
+clearance is complete (2026-11-06). The earlier provisional/release-blocker
+status is closed. Daymark does not claim speaker endorsement or identity.
+
+This notice remains packaged in the debug POC only under the current V2.1
+build configuration. The current release variant continues to exclude French
+and Spanish voices; that is a separate packaging decision, not an outstanding
+licensing restriction. See docs/release/v2.1-em-alex-license-review.md.
