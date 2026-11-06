@@ -38,7 +38,7 @@ tests inspect the archive, not the source tree.
 | Kokoro model weights (`model_quantized.onnx`) | `kokoro-en` 0.1.5 | Apache-2.0 (upstream repository) | v1.0.0 and V2 Android builds (release and debug POC) | SHA-256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478`. |
 | `bm_fable.bin` narration voice | — | Apache-2.0 (per the model repository) | v1.0.0 and V2 Android builds (release and debug POC) | SHA-256 `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1`. Per-voice training-data provenance is not documented upstream; unresolved, low risk. |
 | `ff_siwis.bin` French narration voice | — | **CC BY 4.0** via the SIWIS corpus | **debug POC only — never a production release** | SHA-256 `a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861`. Derived from the [SIWIS corpus](https://datashare.ed.ac.uk/handle/10283/2353); attribution is required. Attribution text is included below. Staged by `fetch-kokoro-assets.sh` into the debug source set only; `:app:verifyReleaseNarrationAssets` fails a release that contains it. |
-| `em_alex.bin` Spanish narration voice | — | **Apache-2.0 (conditional)** | **debug POC only — never a production release** | SHA-256 `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95`. Exact `hexgrad/Kokoro-82M` voice style converted by `onnx-community/Kokoro-82M-v1.0-ONNX`; Apache-2.0 notice and change-statement conditions apply. Speaker/training-data provenance remains undocumented and is not cleared. Staged by `fetch-kokoro-assets.sh` into the debug source set only; `:app:verifyReleaseNarrationAssets` fails a release that contains it. See [`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md). |
+| `em_alex.bin` Spanish narration voice | — | **Apache-2.0** | **debug POC only under current V2.1 build configuration** | SHA-256 `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95`. Exact `hexgrad/Kokoro-82M` voice style converted by `onnx-community/Kokoro-82M-v1.0-ONNX`; licensing/redistribution clearance is **owner-confirmed complete (2026-11-06)**. Apache-2.0 licence-copy, attribution and change-statement conditions remain. The current release variant excludes this asset through build configuration; that packaging choice is separate from licensing clearance. Staged by `fetch-kokoro-assets.sh` into the debug source set only; `:app:verifyReleaseNarrationAssets` rejects it in the current release configuration. See [`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md). |
 | [espeak-ng](https://github.com/espeak-ng/espeak-ng) | — | GPL-3.0 | **not included** | Verified absent: the Kokoro build uses the lean configuration without bundled eSpeak. |
 | [Rust](https://www.rust-lang.org/) standard library and crates (`tokio`, `jni`, `log`, `android_logger`, `bincode`, `fancy-regex`, `regex`, `futures`, `pin-project`, `ndarray`, `num2words`, `unicode-segmentation`, `miette`, `language-tokenizer`, `quick-xml`, `ort`, `ort-sys`, `misaki-rs`, `cmudict-fast`, `waken_snowball`) | see `android/kokoro-poc/README.md` and `Cargo.lock` | MIT / Apache-2.0; `waken_snowball` BSD-3-Clause; `language-tokenizer` WTFPL-2.0 | V2 Android builds (compiled into the native library; release and debug POC) | Compiled into the Kokoro native library, which both variants load. `waken_snowball` is BSD-3-Clause and its notice is reproduced below; `cmudict-fast` embeds CMUdict data under the CMUdict licence reproduced below; `language-tokenizer` ships its own WTFPL licence file upstream. `jpreprocess` is **not** compiled in. |
 | [piper-plus-g2p](https://github.com/ayutaz/piper-plus) | 0.5.3, commit `751e5dfe3fac760ac1993083b93ad34d057ae80d` | **MIT** | V2 Android builds (compiled into the native library; release and debug POC) | French and Latin American Spanish G2P; no eSpeak, no model. The published crate does not contain a standalone `LICENSE` file; the exact upstream MIT text is reproduced below. |
@@ -143,13 +143,9 @@ change-statement conditions. Daymark does not modify the voice bytes.
 > [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 > Daymark does not claim speaker endorsement or identity.
 
-The publisher does not document the original speaker, recording, training
-dataset, consent, or voice-likeness rights for this individual voice. That
-provenance remains unresolved and is not cleared by the Apache-2.0 grant. The
-voice remains provisional; see
-[`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md).
+The public model card does not identify the original speaker or per-voice source recording. The owner has since confirmed that the required licensing and redistribution clearance is complete (2026-11-06); the previous `em_alex` distribution-blocker status is closed. Daymark does not claim speaker endorsement or identity. See the current clearance record in [`docs/release/v2.1-em-alex-license-review.md`](docs/release/v2.1-em-alex-license-review.md).
 
-## Release gate and open blockers
+## Release packaging and remaining third-party conditions
 
 French and Spanish narration is a debug-POC capability. It is not part of a
 production release:
@@ -167,24 +163,12 @@ production release:
 - `:app:verifyReleasePackagedLicenses` and
   `:app:verifyReleaseBundleContents` inspect the actual release APK/AAB.
 
-The following are **open release blockers**, not resolved by this file or by
-the packaged Apache-2.0 copy:
+The `em_alex` licensing item below is closed. The following packaging and third-party notice conditions remain relevant:
 
-1. **`em_alex` speaker and training-data provenance.** The model publisher does
-   not document the speaker, recording, dataset, consent or voice-likeness
-   rights. Apache-2.0 is a copyright and patent grant; it is not a
-   representation about those rights. A production release must not include
-   `em_alex` until a per-voice written provenance/consent statement is obtained
-   or the voice is removed. The debug POC is not a production release.
-2. **`ff_siwis` attribution.** Redistribution is CC BY 4.0 and requires the
-   SIWIS attribution in this file. It is debug-only and remains a blocker for
-   any release that includes it.
-3. **Notice completeness.** The packaged notice reproduces the direct
-   third-party notices recorded here. It is not a substitute for a full
-   transitive dependency scan; obtain one before a release that changes the
-   native dependency set.
-4. **Not legal advice.** This is an engineering record of the licences and
-   evidence found, not a legal opinion.
+1. **`em_alex` Spanish voice licensing and redistribution — COMPLETE.** The owner confirmed clearance on 2026-11-06. It is no longer a V2.1 licensing blocker. The current release build still excludes French/Spanish assets by configuration; enabling them in a production variant would be a separate engineering/release decision.
+2. **`ff_siwis` attribution.** Redistribution is CC BY 4.0 and requires the SIWIS attribution in this file. It is debug-only and remains a requirement for any release that includes it.
+3. **Notice completeness.** The packaged notice reproduces the direct third-party notices recorded here. It is not a substitute for a full transitive dependency scan; obtain one before a release that changes the native dependency set.
+4. **Not legal advice.** This is an engineering record of the licences and evidence found, not a legal opinion.
 
 ## Verifying the redistributed files
 
