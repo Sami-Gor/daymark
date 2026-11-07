@@ -78,10 +78,20 @@ describe('android speech model loading and failure handling', () => {
     expect(plugin).toContain('ParakeetModelIntegrity.verify');
   });
 
+  it('checks free space before materialising the model', () => {
+    expect(plugin).toContain('ModelStoragePreflight.hasRoom');
+    expect(plugin).toContain('ParakeetModelAssets.REASON_INSUFFICIENT_STORAGE');
+  });
+
+  it('classifies materialisation failures instead of flattening them', () => {
+    expect(plugin).toContain('ParakeetModelInstaller.classify');
+    expect(plugin).not.toContain('REASON_MODEL_CORRUPT;\n                }\n                return;');
+  });
+
   it('materialises the model through the verified installer', () => {
     expect(plugin).toContain('ParakeetModelIntegrity.verify');
     expect(plugin).toContain('ParakeetModelInstaller.install');
-    expect(plugin).toContain('ParakeetModelInstaller.deleteModelFiles');
+    expect(plugin).toContain('ParakeetModelInstaller.deleteTemporaryFiles');
   });
 
   it('reports controlled errors instead of throwing', () => {
