@@ -25,6 +25,35 @@ public final class ParakeetModelInstaller {
     /** Suffix of the temporary file used while an asset is being copied. */
     public static final String TEMP_SUFFIX = ".part";
 
+    /** Deletes only in-flight temporary files; verified finals are preserved. */
+    public static void deleteTemporaryFiles(File directory, String[] names) {
+        if (directory == null || names == null) {
+            return;
+        }
+        for (String name : names) {
+            File temp = new File(directory, name + TEMP_SUFFIX);
+            if (temp.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                temp.delete();
+            }
+        }
+    }
+
+    /** Maps a copy failure to a stable reason without flattening every cause. */
+    public static String classify(Throwable failure) {
+        if (failure instanceof InstallException) {
+            return ((InstallException) failure).reason();
+        }
+        if (failure instanceof InterruptedException) {
+            return ParakeetModelAssets.REASON_INSTALLATION_INTERRUPTED;
+        }
+        String message = failure == null ? "" : String.valueOf(failure.getMessage());
+        if (message.contains("ENOSPC") || message.toLowerCase().contains("no space left")) {
+            return ParakeetModelAssets.REASON_INSUFFICIENT_STORAGE;
+        }
+        return ParakeetModelAssets.REASON_STORAGE_WRITE_FAILED;
+    }
+
     private ParakeetModelInstaller() {
     }
 

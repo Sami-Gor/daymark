@@ -751,6 +751,18 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
                         ParakeetModelAssets.MODEL_FILE_SHA256);
                 if (!integrity.isOk()) {
                     Log.w(TAG, "model integrity: " + integrity.reason());
+                    long available = directory.getUsableSpace();
+                    if (!ModelStoragePreflight.hasRoom(available, ParakeetModelAssets.MODEL_FILE_SIZES)) {
+                        Log.e(TAG, "model install: insufficient storage available=" + available
+                                + " required=" + ModelStoragePreflight.requiredBytes(
+                                        ParakeetModelAssets.MODEL_FILE_SIZES));
+                        synchronized (stateLock) {
+                            modelReady = false;
+                            unavailableReason = ParakeetModelAssets.REASON_INSUFFICIENT_STORAGE;
+                        }
+                        // Keep any previously verified model bytes in place.
+                        return;
+                    }
                     ParakeetModelInstaller.install(
                             directory,
                             integrity,
@@ -763,13 +775,16 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
                 }
             } catch (Throwable error) {
                 Log.e(TAG, "model materialisation failed", error);
-                // Repair rather than load: never leave unverified material at a
-                // final path. The next start retries the copy from the assets.
-                ParakeetModelInstaller.deleteModelFiles(
+                // Only in-flight temporaries are removed: files that already
+                // passed verification stay usable for the next attempt, and a
+                // previously working model is never deleted by a failed update.
+                ParakeetModelInstaller.deleteTemporaryFiles(
                         directory, ParakeetModelAssets.MODEL_FILE_NAMES);
+                String reason = ParakeetModelInstaller.classify(error);
+                Log.e(TAG, "model materialisation classified as " + reason);
                 synchronized (stateLock) {
                     modelReady = false;
-                    unavailableReason = ParakeetModelAssets.REASON_MODEL_CORRUPT;
+                    unavailableReason = reason;
                 }
                 return;
             }

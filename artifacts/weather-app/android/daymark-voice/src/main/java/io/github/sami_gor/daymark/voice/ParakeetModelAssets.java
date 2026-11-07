@@ -69,6 +69,15 @@ public final class ParakeetModelAssets {
     /** Reason reported when materialised model content fails verification. */
     public static final String REASON_MODEL_CORRUPT = "model-corrupt";
 
+    /** Not enough free space to materialise the model. */
+    public static final String REASON_INSUFFICIENT_STORAGE = "insufficient-storage";
+
+    /** A write failed for a reason other than running out of space. */
+    public static final String REASON_STORAGE_WRITE_FAILED = "storage-write-failed";
+
+    /** Work was cancelled while the model was being materialised. */
+    public static final String REASON_INSTALLATION_INTERRUPTED = "installation-interrupted";
+
     /** Reason reported when the runtime itself cannot be used. */
     public static final String REASON_RUNTIME_UNAVAILABLE = "runtime-unavailable";
 

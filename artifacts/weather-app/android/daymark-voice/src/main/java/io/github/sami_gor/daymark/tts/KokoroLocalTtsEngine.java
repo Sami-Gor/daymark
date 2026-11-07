@@ -50,10 +50,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478";
     private static final long VOICE_BYTES = 522_240L;
 
-    static {
-        System.loadLibrary("kokoro_jni");
-    }
-
     private final Context appContext;
     private final HandlerThread workerThread;
     private final Handler worker;
@@ -62,6 +58,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private volatile Listener listener;
     private volatile State state = State.UNINITIALIZED;
     private final PlaybackGeneration playbackGeneration = new PlaybackGeneration();
+    /** Ownership token for this instance; stale generations must not release. */
+    private volatile long generation;
     private volatile AudioTrack audioTrack;
     private int synthesisCount;
 
@@ -119,9 +117,20 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     public void initialize(final Listener newListener) {
         this.listener = newListener;
         setState(State.LOADING);
+        generation = EngineOwnership.beginInit();
         worker.post(new Runnable() {
             @Override
             public void run() {
+                if (!NativeLibraryState.ensureLoaded()) {
+                    String reason = NativeLibraryState.failureReason();
+                    Log.e(TAG, "initialize: native library unavailable: " + reason);
+                    // Voice is optional: report a classified failure and leave
+                    // the rest of the app fully usable.
+                    notifyError("Initialization failed: "
+                            + (reason == null ? NativeLibraryState.REASON_NATIVE_UNAVAILABLE : reason));
+                    setState(State.ERROR);
+                    return;
+                }
                 try {
                     File legacyVoice = new File(new File(appContext.getFilesDir(), "kokoro"), LEGACY_VOICE_FILE);
                     if (legacyVoice.exists() && legacyVoice.delete()) {
@@ -234,7 +243,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             @Override
             public void run() {
                 try {
-                    nativeRelease();
+                    if (EngineOwnership.claimRelease(generation)) {
+                        nativeRelease();
+                    } else {
+                        Log.i(TAG, "shutdown: skipped release for superseded generation " + generation);
+                    }
                 } catch (Throwable failure) {
                     Log.w(TAG, "shutdown: release failed: " + failure.getMessage());
                 }
