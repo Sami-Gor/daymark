@@ -148,11 +148,11 @@ expected SONAMEs; the JNI library depends on `libandroid.so`, `liblog.so`,
   task both passed. `:daymark-voice:lintDebug` was rerun for this rebuild and
   completed with **0 errors / 4 warnings** (the expected arm64-only ChromeOS
   ABI warning plus three obsolete SDK checks).
-- Existing CVE/QA documentation records a pre-existing `MissingPermission`
-  finding at `AudioSpeechCaptureDevice.java:50`. The CVE patch does not
-  introduce or suppress that finding, and this rebuild does not change the
-  related lint configuration or audio source. It remains a separate
-  pre-existing Android lint issue.
+- The historical `MissingPermission` finding at `AudioSpeechCaptureDevice.java:50`
+  is **resolved** (2026-11-07): a `checkSelfPermission(RECORD_AUDIO)` guard now
+  runs immediately before `AudioRecord`, failures surface as `SecurityException`,
+  and the site carries a documented `@SuppressLint("MissingPermission")` plus
+  unit-test coverage. It is kept here only as a historical note.
 - The debug APK (`app-debug.apk` SHA-256
   `6d2b395b9a3562cdb00b366fe104df42c312fd75bf0e5558a88bbb9737835c58`)
   contains only `lib/arm64-v8a/libsherpa-onnx-jni.so` and

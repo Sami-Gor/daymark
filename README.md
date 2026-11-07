@@ -166,9 +166,14 @@ Release: package `io.github.sami_gor.daymark` (released v1.0.0: versionCode 1 / 
 ## Test
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (347 tests on the current V2 candidate)
-pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (141 tests on the current V2 candidate)
+# Clean checkout: unit tests read the generated Android web assets.
+pnpm install
+pnpm --filter @workspace/weather-app run sync:android-web   # build + cap copy + asset verifier
+pnpm --filter @workspace/weather-app run test               # Vitest (452 tests)
+pnpm --filter @workspace/weather-app run test:e2e           # Playwright (147 tests)
 ```
+
+`sync:android-web` is mandatory before `test` on a fresh clone: two `network-boundary` tests read `android/app/src/main/assets/public/*`, which are generated and gitignored. CI runs the sync first; a bare `git clone && pnpm test` fails with `ENOENT`.
 
 The e2e suite runs against a production build served by `vite preview`, mocks Open-Meteo traffic, and covers function, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), failure paths, the service worker, the served security headers, location search, the web/PWA no-voice boundary, severe-weather alerts and the English/French/Spanish interface.
 
