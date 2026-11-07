@@ -60,6 +60,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private final PlaybackGeneration playbackGeneration = new PlaybackGeneration();
     /** Ownership token for this instance; stale generations must not release. */
     private volatile long generation;
+    /** True only after nativeInit succeeded, so release never calls into an unloaded library. */
+    private volatile boolean nativeInitialised;
     private volatile AudioTrack audioTrack;
     private int synthesisCount;
 
@@ -163,6 +165,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                                 DEFAULT_VOICE_NAME);
                         if (error == null) {
                             EngineOwnership.commitInit(generation);
+                            nativeInitialised = true;
                         }
                     }
                     long elapsedMs = SystemClock.elapsedRealtime() - start;
@@ -252,7 +255,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             public void run() {
                 try {
                     synchronized (EngineOwnership.NATIVE_LOCK) {
-                        if (EngineOwnership.claimRelease(generation)) {
+                        if (nativeInitialised && EngineOwnership.claimRelease(generation)) {
                             nativeRelease();
                         } else {
                             Log.i(TAG, "shutdown: skipped release for superseded generation "

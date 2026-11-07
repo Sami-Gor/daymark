@@ -65,6 +65,15 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     public void load() {
         Context context = getContext();
         audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        // Resolve the optional native library synchronously so isAvailable()
+        // cannot report voice as ready while the load is still failing.
+        if (!io.github.sami_gor.daymark.tts.NativeLibraryState.ensureLoaded()) {
+            String reason = io.github.sami_gor.daymark.tts.NativeLibraryState.failureReason();
+            state = LocalTtsEngine.State.ERROR;
+            lastFailureReason = reason == null ? "native-unavailable" : reason;
+            Log.e(TAG, "load: native library unavailable: " + lastFailureReason);
+            return;
+        }
         try {
             engine = new KokoroLocalTtsEngine(context);
             engine.initialize(this);
@@ -215,6 +224,13 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             return "native-failed";
         }
         String normalized = message.toLowerCase(Locale.ROOT);
+        if (normalized.contains("native-unavailable") || normalized.contains("native-blocked")) {
+            // Classify before the generic initialization branch so a failed
+            // library is reported as such, not as a model-init failure.
+            // Both mean the optional voice dependency is unavailable; the
+            // distinct cause stays in the log rather than the public code.
+            return "native-unavailable";
+        }
         if (normalized.contains("unsupported narration language")
                 || normalized.contains("unsupported-language")) {
             return "unsupported-language";
