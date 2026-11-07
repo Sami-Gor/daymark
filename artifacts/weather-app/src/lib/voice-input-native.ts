@@ -26,6 +26,21 @@ interface ParakeetSpeechRecognitionPlugin {
 }
 
 /**
+ * Maps a Daymark locale (e.g. `fr`, `fr-FR`, `es-419`) to the BCP-47 tag the
+ * native recogniser expects. Returns null for anything we do not support, so a
+ * missing/unknown language fails visibly instead of silently decoding English.
+ */
+export function normalizeRecognitionLanguage(lang?: string): string | null {
+  const base = (lang ?? '').trim().toLowerCase().split(/[-_]/)[0];
+  switch (base) {
+    case 'en': return 'en-GB';
+    case 'fr': return 'fr-FR';
+    case 'es': return 'es-ES';
+    default: return null;
+  }
+}
+
+/**
  * The Android voice path runs Parakeet TDT 0.6B v3 (int8) through sherpa-onnx,
  * entirely on the device. There is no Android `SpeechRecognizer` behind this
  * plugin and no remote recogniser: if the model is missing or recognition
@@ -187,13 +202,19 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
         void NativeRecognizer.cancel({ sessionId: previous }).catch(() => undefined);
       }
 
+      const recognitionLanguage = normalizeRecognitionLanguage(lang);
+      if (!recognitionLanguage) {
+        handlers.onError?.('unsupported-language');
+        return false;
+      }
+
       const sessionId = ++sessionSequence;
       activeSessionId = sessionId;
       activeHandlers = handlers;
       // No timer yet: the native plugin may be waiting for the user to answer
       // the permission prompt. The capture watchdog starts on the native
       // `started` event and the decode watchdog starts on `captureEnd`.
-      void NativeRecognizer.start({ sessionId, lang: lang?.trim() || 'en-GB' }).catch((error: unknown) => {
+      void NativeRecognizer.start({ sessionId, lang: recognitionLanguage }).catch((error: unknown) => {
         if (!handlesEvent(sessionId)) return;
         const finished = detachSession(sessionId);
         const message = error instanceof Error ? error.message : String(error ?? '');

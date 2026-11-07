@@ -203,6 +203,15 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
             return;
         }
 
+        // Language is required: no implicit English fallback. The recogniser
+        // auto-detects the spoken language, but an unsupported tag must fail
+        // rather than silently transcribe as English.
+        final String language = RecognitionLanguage.normalize(call.getString("lang"));
+        if (language == null) {
+            call.reject("unsupported-language");
+            return;
+        }
+
         synchronized (stateLock) {
             if (released) {
                 call.reject("offline-unavailable");
