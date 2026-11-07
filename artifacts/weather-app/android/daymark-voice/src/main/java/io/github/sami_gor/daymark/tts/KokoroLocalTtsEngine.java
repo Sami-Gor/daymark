@@ -153,10 +153,18 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                             + " voices=" + String.join(",", voices));
 
                     long start = SystemClock.elapsedRealtime();
-                    String error = nativeInit(
-                            modelFile.getAbsolutePath(),
-                            voicesDir.getAbsolutePath(),
-                            DEFAULT_VOICE_NAME);
+                    // Serialise with release: a stale instance must not clear the
+                    // engine a successful init has just installed.
+                    String error;
+                    synchronized (EngineOwnership.NATIVE_LOCK) {
+                        error = nativeInit(
+                                modelFile.getAbsolutePath(),
+                                voicesDir.getAbsolutePath(),
+                                DEFAULT_VOICE_NAME);
+                        if (error == null) {
+                            EngineOwnership.commitInit(generation);
+                        }
+                    }
                     long elapsedMs = SystemClock.elapsedRealtime() - start;
                     if (error != null) {
                         Log.e(TAG, "initialize: failed: " + error);
@@ -243,10 +251,13 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             @Override
             public void run() {
                 try {
-                    if (EngineOwnership.claimRelease(generation)) {
-                        nativeRelease();
-                    } else {
-                        Log.i(TAG, "shutdown: skipped release for superseded generation " + generation);
+                    synchronized (EngineOwnership.NATIVE_LOCK) {
+                        if (EngineOwnership.claimRelease(generation)) {
+                            nativeRelease();
+                        } else {
+                            Log.i(TAG, "shutdown: skipped release for superseded generation "
+                                    + generation);
+                        }
                     }
                 } catch (Throwable failure) {
                     Log.w(TAG, "shutdown: release failed: " + failure.getMessage());

@@ -16,23 +16,30 @@ package io.github.sami_gor.daymark.tts;
  */
 public final class EngineOwnership {
 
+    /** Serialises every native init/release call. */
+    public static final Object NATIVE_LOCK = new Object();
+
     private static long currentGeneration;
     private static boolean initialised;
 
     private EngineOwnership() {
     }
 
-    /** Registers a new owner and returns its generation. */
+    /** Allocates an owner token; ownership is committed only after native init succeeds. */
     public static synchronized long beginInit() {
-        currentGeneration += 1;
+        return currentGeneration + 1;
+    }
+
+    /** Commits ownership after a successful native init; call under NATIVE_LOCK. */
+    public static synchronized void commitInit(long generation) {
+        currentGeneration = generation;
         initialised = true;
-        return currentGeneration;
     }
 
     /**
      * True when this generation owns the engine and should release it.
      * Marks the engine unowned so a second release from the same generation is
-     * also a no-op.
+     * also a no-op. Call under NATIVE_LOCK.
      */
     public static synchronized boolean claimRelease(long generation) {
         if (!initialised || generation != currentGeneration) {
