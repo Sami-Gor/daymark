@@ -45,13 +45,27 @@ public final class NarrationVoicePolicy {
      *         the locale.
      */
     public static String voiceForLanguage(String lang, boolean multilingualNarration) {
+        return voiceForLanguage(lang, multilingualNarration,
+                multilingualNarration ? MULTILINGUAL : ENGLISH_ONLY);
+    }
+
+    /**
+     * Voice for a narration locale, requiring the optional voice to be present.
+     *
+     * <p>French and Spanish are optional packs: enabling multilingual narration
+     * is not enough, the voice file must be installed. Missing voices return
+     * {@code null} so the caller reports a pack error instead of falling back to
+     * English.
+     */
+    public static String voiceForLanguage(
+            String lang, boolean multilingualNarration, java.util.Collection<String> installedVoices) {
         switch (languageBase(lang)) {
             case "en":
                 return ENGLISH_VOICE;
             case "fr":
-                return multilingualNarration ? FRENCH_VOICE : null;
+                return multilingualNarration && installedVoices.contains(FRENCH_VOICE) ? FRENCH_VOICE : null;
             case "es":
-                return multilingualNarration ? SPANISH_VOICE : null;
+                return multilingualNarration && installedVoices.contains(SPANISH_VOICE) ? SPANISH_VOICE : null;
             default:
                 return null;
         }

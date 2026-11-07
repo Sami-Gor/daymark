@@ -25,12 +25,14 @@ android {
             // Multilingual narration is the debug-POC capability. Debug
             // packages ff_siwis/em_alex from src/debug/assets.
             buildConfigField "boolean", "MULTILINGUAL_NARRATION", "true"
+            buildConfigField "boolean", "PACKAGED_MULTILINGUAL_VOICES", "true"
         }
         release {
-            // Production builds must never expose French/Spanish narration.
-            // NarrationVoicePolicy returns null for fr/es when this is false,
-            // and the engine materialises only the English voice.
-            buildConfigField "boolean", "MULTILINGUAL_NARRATION", "false"
+            // V2.1 ships multilingual narration, but the base APK packages only
+            // the English voice; French/Spanish voices arrive via optional packs
+            // and are gated by installed-voice checks in NarrationVoicePolicy.
+            buildConfigField "boolean", "MULTILINGUAL_NARRATION", "true"
+            buildConfigField "boolean", "PACKAGED_MULTILINGUAL_VOICES", "false"
         }
     }
 
@@ -87,4 +89,7 @@ def verifyMultilingualGate = { String variant, boolean expected ->
 }
 
 verifyMultilingualGate('debug', true)
-verifyMultilingualGate('release', false)
+// V2.1 enables multilingual narration in release; the base APK still packages
+// only English (PACKAGED_MULTILINGUAL_VOICES=false), so optional voices must be
+// installed before they can be selected.
+verifyMultilingualGate('release', true)

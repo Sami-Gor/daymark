@@ -89,4 +89,24 @@ public class NarrationVoicePolicyTest {
         assertEquals("fr", NarrationVoicePolicy.languageBase("fr_FR"));
         assertEquals("es", NarrationVoicePolicy.languageBase("es-419"));
     }
+
+    @Test
+    public void optionalVoicesRequireInstallation() {
+        java.util.Set<String> none = java.util.Collections.emptySet();
+        org.junit.Assert.assertNull(
+                NarrationVoicePolicy.voiceForLanguage("fr-FR", true, none));
+        org.junit.Assert.assertNull(
+                NarrationVoicePolicy.voiceForLanguage("es-419", true, none));
+        org.junit.Assert.assertEquals(
+                NarrationVoicePolicy.ENGLISH_VOICE,
+                NarrationVoicePolicy.voiceForLanguage("en-GB", true, none));
+
+        java.util.Set<String> fr = new java.util.HashSet<>();
+        fr.add(NarrationVoicePolicy.FRENCH_VOICE);
+        org.junit.Assert.assertEquals(
+                NarrationVoicePolicy.FRENCH_VOICE,
+                NarrationVoicePolicy.voiceForLanguage("fr-FR", true, fr));
+        org.junit.Assert.assertNull(
+                NarrationVoicePolicy.voiceForLanguage("es-419", true, fr));
+    }
 }

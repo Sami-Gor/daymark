@@ -74,6 +74,26 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private native void nativeStreamClear();
     private native void nativeRelease();
 
+    /** Optional voices currently installed in app-private storage. */
+    private java.util.Set<String> installedVoiceNames() {
+        java.util.Set<String> installed = new java.util.HashSet<>();
+        File dir = new File(appContext.getFilesDir(), "kokoro");
+        String[] names = dir.list();
+        if (names == null) {
+            return installed;
+        }
+        for (String name : names) {
+            if (!name.endsWith(".bin")) {
+                continue;
+            }
+            String voice = name.substring(0, name.length() - 4);
+            if (NarrationVoicePolicy.isMultilingualVoice(voice)) {
+                installed.add(voice);
+            }
+        }
+        return installed;
+    }
+
     private static String voiceSha256(String voiceName) {
         switch (voiceName) {
             case NarrationVoicePolicy.ENGLISH_VOICE:
@@ -111,7 +131,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     File modelFile = copyAssetIfNeeded(MODEL_ASSET, "model_quantized.onnx", MODEL_BYTES, MODEL_SHA256);
                     File voicesDir = new File(appContext.getFilesDir(), "kokoro");
                     List<String> voices = NarrationVoicePolicy.packagedVoices(
-                            BuildConfig.MULTILINGUAL_NARRATION);
+                            BuildConfig.PACKAGED_MULTILINGUAL_VOICES);
                     for (String voice : voices) {
                         copyAssetIfNeeded(
                                 VOICE_ASSET_PREFIX + voice + ".bin",
@@ -164,7 +184,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             return;
         }
         final String voice = NarrationVoicePolicy.voiceForLanguage(
-                lang, BuildConfig.MULTILINGUAL_NARRATION);
+                lang, BuildConfig.MULTILINGUAL_NARRATION, installedVoiceNames());
         if (voice == null) {
             notifyError("Unsupported narration language: " + lang);
             return;
