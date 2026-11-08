@@ -29,6 +29,8 @@ export interface DaymarkVoicePlugin {
   speak(options: { text: string; lang?: string; segments?: string[] }): Promise<void>;
   stop(): Promise<void>;
   isSpeaking(): Promise<{ speaking: boolean }>;
+  /** Per-voice lifecycle state: available/downloading/verifying/installed/activating/ready/failed. */
+  getVoiceStates(): Promise<{ states: Record<string, string> }>;
   /** Optional narration voices currently installed on disk. */
   getInstalledVoices(): Promise<{ voices: string[] }>;
   /**

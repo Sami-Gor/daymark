@@ -28,6 +28,10 @@ export class DaymarkVoiceWeb extends WebPlugin implements DaymarkVoicePlugin {
     return { speaking: false };
   }
 
+  async getVoiceStates(): Promise<{ states: Record<string, string> }> {
+    return { states: {} };
+  }
+
   async getInstalledVoices(): Promise<{ voices: string[] }> {
     return { voices: [] };
   }

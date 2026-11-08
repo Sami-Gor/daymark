@@ -39,6 +39,8 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private KokoroLocalTtsEngine engine;
+    /** Connects verified pack installs to native voice registration. */
+    private io.github.sami_gor.daymark.packs.VoiceRegistrationFlow voiceFlow;
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
     private boolean focusHeld;
@@ -76,6 +78,26 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         }
         try {
             engine = new KokoroLocalTtsEngine(context);
+            voiceFlow = new io.github.sami_gor.daymark.packs.VoiceRegistrationFlow(
+                    new io.github.sami_gor.daymark.packs.VoiceActivationCoordinator.Registrar() {
+                        @Override
+                        public void register(final String voiceId,
+                                final io.github.sami_gor.daymark.packs.VoiceActivationCoordinator
+                                        .RegistrationCallback callback) {
+                            engine.registerVoice(voiceId,
+                                    new KokoroLocalTtsEngine.VoiceOperationResult() {
+                                        @Override
+                                        public void onSuccess(java.util.Set<String> installed) {
+                                            callback.onRegistered(installed);
+                                        }
+
+                                        @Override
+                                        public void onError(String code) {
+                                            callback.onFailed(code);
+                                        }
+                                    });
+                        }
+                    });
             engine.initialize(this);
         } catch (Throwable failure) {
             // A missing or incompatible optional voice library must never take
@@ -115,6 +137,19 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         call.resolve(result);
     }
 
+    @PluginMethod
+    public void getVoiceStates(PluginCall call) {
+        JSObject result = new JSObject();
+        JSObject states = new JSObject();
+        if (voiceFlow != null) {
+            for (java.util.Map.Entry<String, String> entry : voiceFlow.states().entrySet()) {
+                states.put(entry.getKey(), entry.getValue());
+            }
+        }
+        result.put("states", states);
+        call.resolve(result);
+    }
+
     /**
      * Registers a voice file the pack manager has already verified and installed.
      * The engine reloads its native voice set and reports the resulting list.
@@ -136,21 +171,32 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             call.reject("invalid-voice");
             return;
         }
-        if (engine == null || state == LocalTtsEngine.State.ERROR) {
-            call.reject(lastFailureReason.isEmpty() ? "native-unavailable" : lastFailureReason);
+        if (engine == null || voiceFlow == null) {
+            call.reject("native-unavailable");
             return;
         }
-        engine.registerVoice(voiceId.trim(), new KokoroLocalTtsEngine.VoiceOperationResult() {
+        final String id = voiceId.trim();
+        // The pack manager installed and verified the file before calling in;
+        // record that, then ask the runtime to load it.
+        voiceFlow.installVerified(id);
+        voiceFlow.activate(id, new io.github.sami_gor.daymark.packs
+                .VoiceRegistrationFlow.Result() {
             @Override
-            public void onSuccess(java.util.Set<String> installed) {
+            public void onResult(boolean ready, String error,
+                    java.util.Map<String, String> states) {
+                if (!ready) {
+                    call.reject(error == null || error.isEmpty() ? "registration-failed" : error);
+                    return;
+                }
                 JSObject result = new JSObject();
-                result.put("voices", voiceArray(installed));
+                JSObject stateMap = new JSObject();
+                for (java.util.Map.Entry<String, String> entry : states.entrySet()) {
+                    stateMap.put(entry.getKey(), entry.getValue());
+                }
+                result.put("states", stateMap);
+                result.put("voiceId", id);
+                result.put("ready", true);
                 call.resolve(result);
-            }
-
-            @Override
-            public void onError(String code) {
-                call.reject(code);
             }
         });
     }

@@ -47,6 +47,11 @@ public final class VoiceActivationCoordinator {
         void onFailed(String reason);
     }
 
+    /** Optional completion signal for callers that must await readiness. */
+    public interface Completion {
+        void onFinished(boolean ready, String error);
+    }
+
     private final Registrar registrar;
     private final Map<String, State> states = new LinkedHashMap<>();
     private final Set<String> readyVoices = new LinkedHashSet<>();
@@ -80,14 +85,20 @@ public final class VoiceActivationCoordinator {
      * loaded voices. A stale or failed registration leaves the previous ready
      * voices untouched and records a specific error.
      */
-    public synchronized void register(final String voiceId) {
+    public synchronized void register(String voiceId) {
+        register(voiceId, null);
+    }
+
+    public synchronized void register(final String voiceId, final Completion completion) {
         if (voiceId == null || voiceId.isEmpty()) {
             fail(voiceId, "invalid-voice");
+            if (completion != null) completion.onFinished(false, "invalid-voice");
             return;
         }
         State current = states.get(voiceId);
         if (current != State.INSTALLED && current != State.FAILED && current != State.READY) {
             fail(voiceId, "not-installed");
+            if (completion != null) completion.onFinished(false, "not-installed");
             return;
         }
         put(voiceId, State.ACTIVATING);
@@ -97,19 +108,23 @@ public final class VoiceActivationCoordinator {
                 synchronized (VoiceActivationCoordinator.this) {
                     if (loadedVoices == null || !loadedVoices.contains(voiceId)) {
                         failLocked(voiceId, "voice-not-loaded");
+                        if (completion != null) completion.onFinished(false, "voice-not-loaded");
                         return;
                     }
                     readyVoices.add(voiceId);
                     states.put(voiceId, State.READY);
                     lastError = "";
+                    if (completion != null) completion.onFinished(true, "");
                 }
             }
 
             @Override
             public void onFailed(String reason) {
                 synchronized (VoiceActivationCoordinator.this) {
-                    failLocked(voiceId, reason == null || reason.isEmpty()
-                            ? "registration-failed" : reason);
+                    String error = reason == null || reason.isEmpty()
+                            ? "registration-failed" : reason;
+                    failLocked(voiceId, error);
+                    if (completion != null) completion.onFinished(false, error);
                 }
             }
         });
