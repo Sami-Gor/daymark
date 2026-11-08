@@ -938,6 +938,44 @@ function dedupeDisplayText(parts: readonly string[]): string {
  * "raining now" suffix is omitted so the rain fact is stated once by the rain
  * intent.
  */
+/**
+ * Rain answer scoped to tomorrow rather than the rest of today.
+ *
+ * <p>Used when the user asks about rain and tomorrow together: the regular
+ * rain summary deliberately only looks at the current day, so applying it to a
+ * tomorrow question reported today's rain under a "later today" phrase. This
+ * response reads the daily rain probability for tomorrow instead.
+ */
+export function getTomorrowRainSummary(
+  weather: WeatherPayload,
+  context: IntentContext = {},
+): DaymarkIntentResponse {
+  const { t } = translator(context);
+  const rain = weather.daily?.precipitation_probability_max?.[1];
+  if (rain == null || Number.isNaN(rain)) {
+    return unavailableResponse(
+      DAYMARK_INTENTS.rain,
+      t('intent.title.rainTomorrow'),
+      t('intent.rain.unavailable'),
+      t('intent.rain.dataUnavailable'),
+    );
+  }
+  const rounded = Math.round(rain);
+  const spoken = rounded >= 40
+    ? t('intent.tomorrow.rainLikely', { percent: rounded })
+    : rounded >= 20
+      ? t('intent.tomorrow.rainChance', { percent: rounded })
+      : t('intent.tomorrow.rainNone');
+  return {
+    intent: DAYMARK_INTENTS.rain,
+    title: t('intent.title.rainTomorrow'),
+    spokenText: spoken.trim(),
+    displayText: spoken.trim(),
+    priority: rounded >= 70 ? 'high' : rounded >= 20 ? 'normal' : 'low',
+    data: { available: true, tomorrow: true, maxProbability: rounded },
+  };
+}
+
 export function getCombinedIntentResponse(
   intents: readonly DaymarkIntentId[],
   weather: WeatherPayload,
@@ -952,6 +990,9 @@ export function getCombinedIntentResponse(
   }
   const { t } = translator(context);
   const responses = unique.map((intent) => {
+    if (intent === DAYMARK_INTENTS.rain && unique.includes(DAYMARK_INTENTS.tomorrow)) {
+      return getTomorrowRainSummary(weather, context);
+    }
     const response = getIntentResponse(intent, weather, context);
     if (intent !== DAYMARK_INTENTS.current || !unique.includes(DAYMARK_INTENTS.rain)) {
       return response;

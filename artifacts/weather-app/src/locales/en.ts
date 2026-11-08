@@ -396,6 +396,8 @@ const en = {
   'intent.tomorrow.withLow': ', with a low of {low} degrees',
   'intent.tomorrow.rainLikely': ' Rain is likely ({percent}% chance).',
   'intent.tomorrow.rainChance': " There's a {percent}% chance of rain.",
+  'intent.title.rainTomorrow': 'Rain tomorrow',
+  'intent.tomorrow.rainNone': ' No rain is expected tomorrow.',
 } as const;
 
 export type TranslationKey = keyof typeof en;

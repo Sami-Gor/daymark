@@ -774,3 +774,46 @@ describe('compound intent edge cases (synthetic payloads)', () => {
     expect(response.spokenText.toLowerCase()).not.toContain('undefined');
   });
 });
+
+describe('rain day scoping', () => {
+  it('answers "rain tomorrow" from tomorrow daily probability, not today hourly', () => {
+    const weather = buildWeather({
+      daily: { ...DEFAULT_DAILY, precipitation_probability_max: [5, 90, 0] },
+    });
+    const response = getCombinedIntentResponse(
+      [DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain],
+      weather,
+      { locale: 'en' },
+    );
+    expect(response.spokenText).toContain('Rain is likely');
+    expect(response.spokenText).not.toContain('later today');
+    expect(response.spokenText).toContain('90');
+  });
+
+  it('says no rain tomorrow when tomorrow probability is low', () => {
+    const weather = buildWeather({
+      daily: { ...DEFAULT_DAILY, precipitation_probability_max: [80, 5, 0] },
+    });
+    const response = getCombinedIntentResponse(
+      [DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain],
+      weather,
+      { locale: 'en' },
+    );
+    expect(response.spokenText).toContain('No rain is expected tomorrow');
+    expect(response.spokenText).not.toContain('later today');
+    expect(response.spokenText).not.toContain('Rain is likely');
+  });
+
+  it('localises the tomorrow-scoped rain answer', () => {
+    const weather = buildWeather({
+      daily: { ...DEFAULT_DAILY, precipitation_probability_max: [5, 70, 0] },
+    });
+    const french = getCombinedIntentResponse(
+      [DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain], weather, { locale: 'fr' });
+    expect(french.spokenText).toContain('Pluie probable');
+    const spanish = getCombinedIntentResponse(
+      [DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain], weather, { locale: 'es' });
+    expect(spanish.spokenText).toContain('Lluvia probable');
+    expect(french.spokenText).not.toBe(spanish.spokenText);
+  });
+});

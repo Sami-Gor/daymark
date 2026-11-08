@@ -376,6 +376,8 @@ const es: Record<TranslationKey, string> = {
   'intent.tomorrow.withLow': ', con una mínima de {low} grados',
   'intent.tomorrow.rainLikely': ' Lluvia probable ({percent} %).',
   'intent.tomorrow.rainChance': ' {percent} % de probabilidad de lluvia.',
+  'intent.title.rainTomorrow': 'Lluvia mañana',
+  'intent.tomorrow.rainNone': ' No se espera lluvia mañana.',
 };
 
 export default es;
