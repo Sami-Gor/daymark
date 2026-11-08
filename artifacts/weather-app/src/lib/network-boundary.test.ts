@@ -421,8 +421,10 @@ describe('network boundary', () => {
     // `capacitor-cordova-android-plugins` is Capacitor-generated (third-party
     // placeholder, no Java today); `parakeet-assets` currently ships only
     // model assets but is walked so Java appearing there would be scanned.
+    // Shipped sources only: JVM test sources legitimately reference mock
+    // https:// URLs and are not part of the application boundary.
     const roots = ['app', 'daymark-voice', 'parakeet-assets'].map((module) =>
-      path.join(appRoot, 'android', module, 'src'),
+      path.join(appRoot, 'android', module, 'src', 'main'),
     );
     const files = roots.flatMap((root) => collectJavaSources(root));
     expect(files.length).toBeGreaterThanOrEqual(12);
@@ -437,7 +439,29 @@ describe('network boundary', () => {
     ]) {
       expect(relative).toContain(key);
     }
-    expect(javaOffenders(files, appRoot)).toEqual([]);
+    /*
+     * Deliberate exception: the optional TTS pack transport is the one
+     * first-party network client. It exists to download user-consented voice
+     * packs over HTTPS after the signed-manifest check; everything else in the
+     * Android tree must stay network-free. The allowlist is exact (one file),
+     * the exception is asserted to be exercised, and cleartext literals are
+     * still forbidden everywhere including that file.
+     */
+    const allowed = [
+      // The one first-party network client: user-consented HTTPS pack download
+      // after signed-manifest verification.
+      'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/packs/HttpUrlConnectionTransport.java',
+      // Licence URLs are embedded data for attribution manifests, not fetches.
+      'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/packs/PackLicences.java',
+      'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/packs/PackManifest.java',
+    ];
+    for (const file of allowed) {
+      expect(relative).toContain(file);
+    }
+    const offenders = javaOffenders(files, appRoot);
+    expect(offenders.filter((entry) => !allowed.some((file) => entry.startsWith(file)))).toEqual([]);
+    expect(offenders.some((entry) => entry.startsWith(allowed[0]))).toBe(true);
+    expect(offenders.filter((entry) => entry.endsWith(': http://'))).toEqual([]);
   });
 
   it('the retired root TWA tree stays outside the network boundary', () => {

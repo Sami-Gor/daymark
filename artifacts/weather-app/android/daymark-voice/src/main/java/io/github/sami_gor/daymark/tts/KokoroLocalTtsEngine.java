@@ -67,6 +67,13 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     /** Path of the materialised model, retained so the engine can be reloaded. */
     private volatile String modelPath;
     private final ReloadGuard reloadGuard = new ReloadGuard();
+    /**
+     * Voices the current native generation actually loaded. Derived only from
+     * successful initialisation, never from files on disk: a downloaded voice
+     * is selectable only after registerVoice reloads the engine.
+     */
+    private volatile java.util.Set<String> loadedVoices =
+            java.util.Collections.singleton(DEFAULT_VOICE_NAME);
 
     private native String nativeInit(String modelPath, String voicesPath, String voiceName);
     private native float[] nativeSynth(String text, String lang, String voiceName);
@@ -170,6 +177,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         if (error == null) {
                             EngineOwnership.commitInit(generation);
                             nativeInitialised = true;
+                            loadedVoices = VoiceRegistry.installed(voicesDir);
                         }
                     }
                     long elapsedMs = SystemClock.elapsedRealtime() - start;
@@ -204,6 +212,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return VoiceRegistry.installed(new File(appContext.getFilesDir(), "kokoro"));
     }
 
+    /** Voices loaded by the current native generation. */
+    public java.util.Set<String> loadedVoices() {
+        return loadedVoices;
+    }
+
     /** True when the voice file is present and readable; does not imply loaded. */
     public boolean isVoiceInstalled(String voiceId) {
         return VoiceRegistry.isInstalled(new File(appContext.getFilesDir(), "kokoro"), voiceId);
@@ -234,7 +247,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             callback.onError("engine-not-ready");
             return;
         }
-        if (!EngineOwnership.owns(generation)) {
+        final boolean recovering = state == State.ERROR;
+        if (!EngineOwnership.owns(generation) && !recovering) {
             callback.onError("engine-superseded");
             return;
         }
@@ -259,6 +273,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         if (error == null) {
                             nativeInitialised = true;
                             EngineOwnership.commitInit(reloadGeneration);
+                            loadedVoices = VoiceRegistry.installed(voicesDir);
                         } else {
                             // Attempt to restore the previous working voice.
                             String restore = nativeInit(model, voicesDir.getAbsolutePath(),
@@ -280,6 +295,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                             nativeInitialised = restore == null;
                             if (restore == null) {
                                 EngineOwnership.commitInit(EngineOwnership.beginInit());
+                                loadedVoices = VoiceRegistry.installed(voicesDir);
                             }
                         } catch (Throwable restoreFailure) {
                             nativeInitialised = false;
@@ -331,6 +347,12 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         if (!NarrationVoicePolicy.isVoiceDistributable(
                 voice, BuildConfig.SPANISH_VOICE_DISTRIBUTION_APPROVED)) {
             notifyError("voice-rights-unresolved");
+            return;
+        }
+        if (!loadedVoices.contains(voice)) {
+            // The file may be installed but the native engine has not loaded it
+            // yet; never fall back to English or another voice.
+            notifyError("voice-not-loaded");
             return;
         }
         if (isSpeaking()) {

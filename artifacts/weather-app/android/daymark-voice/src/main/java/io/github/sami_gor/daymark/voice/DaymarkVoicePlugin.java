@@ -294,6 +294,12 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
                 || normalized.contains("unsupported-language")) {
             return "unsupported-language";
         }
+        if (normalized.contains("voice-not-loaded")) {
+            return "voice-not-loaded";
+        }
+        if (normalized.contains("voice-rights-unresolved")) {
+            return "voice-rights-unresolved";
+        }
         if (normalized.contains("integrity")
                 || (normalized.contains("asset") && (normalized.contains("invalid")
                 || normalized.contains("mismatch")))

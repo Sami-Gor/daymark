@@ -29,6 +29,16 @@ export interface DaymarkVoicePlugin {
   speak(options: { text: string; lang?: string; segments?: string[] }): Promise<void>;
   stop(): Promise<void>;
   isSpeaking(): Promise<{ speaking: boolean }>;
+  /** Optional narration voices currently installed on disk. */
+  getInstalledVoices(): Promise<{ voices: string[] }>;
+  /**
+   * Registers a voice file the pack manager has already verified and installed.
+   * The engine reloads its native voice set; the returned list is what is now
+   * loaded. Never falls back to English: failures reject with a stable code.
+   */
+  registerVoice(options: { voiceId: string }): Promise<{ voices: string[] }>;
+  /** Activating an installed voice uses the same guarded reload. */
+  activateVoice(options: { voiceId: string }): Promise<{ voices: string[] }>;
   /** Engine state transitions, used to move the UI from preparing to speaking. */
   addListener(
     eventName: 'stateChanged',

@@ -27,4 +27,16 @@ export class DaymarkVoiceWeb extends WebPlugin implements DaymarkVoicePlugin {
   async isSpeaking(): Promise<{ speaking: boolean }> {
     return { speaking: false };
   }
+
+  async getInstalledVoices(): Promise<{ voices: string[] }> {
+    return { voices: [] };
+  }
+
+  async registerVoice(): Promise<{ voices: string[] }> {
+    throw this.unavailable('Optional narration voices are Android-only');
+  }
+
+  async activateVoice(): Promise<{ voices: string[] }> {
+    throw this.unavailable('Optional narration voices are Android-only');
+  }
 }
