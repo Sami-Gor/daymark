@@ -804,17 +804,24 @@ describe('rain day scoping', () => {
     expect(response.spokenText).not.toContain('Rain is likely');
   });
 
-  it('localises the tomorrow-scoped rain answer', () => {
+  it('localises the low-probability tomorrow answer that only the scoped helper emits', () => {
+    // Tomorrow summary omits rain below 20 %, so these strings prove the new
+    // tomorrow-scoped rain response ran, not just that a locale key exists.
     const weather = buildWeather({
-      daily: { ...DEFAULT_DAILY, precipitation_probability_max: [5, 70, 0] },
+      daily: {
+        ...DEFAULT_DAILY,
+        weather_code: [3, 3, 0],
+        precipitation_probability_max: [5, 5, 0],
+      },
     });
     const french = getCombinedIntentResponse(
       [DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain], weather, { locale: 'fr' });
-    expect(french.spokenText).toContain('Pluie probable');
+    expect(french.spokenText).toContain('Aucune pluie attendue demain');
+    expect(french.title).toContain('Pluie demain');
     const spanish = getCombinedIntentResponse(
       [DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain], weather, { locale: 'es' });
-    expect(spanish.spokenText).toContain('Lluvia probable');
-    expect(french.spokenText).not.toBe(spanish.spokenText);
+    expect(spanish.spokenText).toContain('No se espera lluvia mañana');
+    expect(spanish.title).toContain('Lluvia mañana');
   });
 
   it('keeps "raining now" when rain is combined with tomorrow and current', () => {

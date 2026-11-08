@@ -39,12 +39,33 @@ public class ReloadGuardTest {
     }
 
     @Test
-    public void invalidateAllowsNewWorkAfterRelease() {
+    public void invalidateStopsTheInFlightReloadFromCompleting() {
         ReloadGuard guard = new ReloadGuard();
-        long token = guard.tryBegin();
+        long stale = guard.tryBegin();
         guard.invalidate();
-        assertFalse(guard.isCurrent(token));
-        assertTrue(guard.tryBegin() > token);
+        assertFalse(guard.isCurrent(stale));
+        // New work may start, and finishing the stale reload must not clear
+        // the newer single-flight slot.
+        long fresh = guard.tryBegin();
+        assertTrue(fresh > stale);
+        assertTrue(guard.isInFlight());
+        guard.finish(stale);
+        assertTrue(guard.isInFlight());
+        guard.finish(fresh);
+        assertFalse(guard.isInFlight());
+    }
+
+    @Test
+    public void aStaleFinishDoesNotClearANewerReload() {
+        ReloadGuard guard = new ReloadGuard();
+        long first = guard.tryBegin();
+        guard.finish(first);
+        long second = guard.tryBegin();
+        guard.finish(first); // late callback from the previous generation
+        assertTrue(guard.isInFlight());
+        assertTrue(guard.isCurrent(second));
+        guard.finish(second);
+        assertFalse(guard.isInFlight());
     }
 
     @Test
