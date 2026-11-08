@@ -256,4 +256,7 @@ Issues and pull requests are welcome.
   pnpm --filter @workspace/weather-app run test:e2e
   ```
 
-  Android changes also run through [`.github/workflows/android-ci.yml`](.github/workflows/android-ci.yml).
+  Android changes also run through [`.github/workflows/android-ci.yml`](.github/workflows/android-ci.yml), and release-variant gates
+  (release lint, release-variant JVM tests, release configuration validation) through
+  [`release-gates.yml`](.github/workflows/release-gates.yml). What those gates do and do not prove is described in
+  [`docs/release/ci-release-gates.md`](docs/release/ci-release-gates.md).

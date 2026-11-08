@@ -1,0 +1,301 @@
+name: Release gates
+
+# Release-variant coverage for the V2.1 release line.
+#
+# `CI` (ci.yml) proves the web layer plus one debug Android build. `Android CI`
+# (android-ci.yml) proves the debug Android variants and `:app:lintDebug`.
+# Neither runs lint on a *release* variant, the DaymarkVoice release unit tests,
+# or any release-configuration check, so a release-only regression (a
+# release-only BuildConfig field, an R8/resource problem, a lint check that only
+# applies to release) could merge green.
+#
+# Three jobs, one question each:
+#   * release-lint     - lint runs on debug and release variants of both the
+#                        app and the DaymarkVoice module.
+#   * native-jvm-tests - the DaymarkVoice JVM tests run against both variants.
+#   * release-config   - the release variant configures and lints on a clean
+#                        runner, without release signing material or the
+#                        Parakeet model; the debug APK still assembles.
+#
+# None of these jobs builds a release AAB/APK, signs anything, or exercises
+# Play Asset Delivery, and the job names say so. What each job proves, and what
+# stays unproven, is written up in docs/release/ci-release-gates.md.
+#
+# A genuine release build needs two things this workflow deliberately does not
+# have:
+#   * Production signing material. The upload key and
+#     artifacts/weather-app/android/keystore.properties live outside the
+#     repository (the properties file is gitignored). Never add signing
+#     credentials to this repository or to CI secrets for these gates.
+#   * The Parakeet model, delivered as the install-time `parakeet` Play asset
+#     pack. The model is Parakeet TDT 0.6B v3 (int8) from the pinned k2-fsa
+#     sherpa-onnx release archive
+#     sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2 (archive SHA-256
+#     5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf,
+#     ~640 MB uncompressed).
+#
+# Parakeet asset handling:
+#   * android/kokoro-poc/scripts/fetch-parakeet-assets.sh downloads that pinned
+#     archive and verifies its SHA-256 plus the SHA-256 of every extracted file
+#     (encoder/decoder/joiner .onnx and tokens.txt) before staging them under
+#     artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet.
+#     It is the only supported way to obtain the model.
+#   * artifacts/weather-app/android/parakeet-assets/build.gradle re-verifies
+#     the staged files (`verifyParakeetAssets`) before any release packaging
+#     task, and the app re-checks the same digests before loading the model.
+#   * These jobs never fetch the model, because none of the tasks they run
+#     package it. Do not "fix" a missing-model failure here by committing dummy
+#     or truncated model files, by pointing the checks at unverified bytes, or
+#     by disabling `verifyParakeetAssets` / the app-level integrity check: a
+#     build without the real, verified model is not a release build, and the
+#     release-config job asserts below that no model is staged.
+#
+# The DaymarkVoice module compiles against a local, hash-pinned sherpa-onnx
+# AAR that *is* committed (~10 MB) under
+# artifacts/weather-app/android/daymark-voice/libs. The jobs verify it with
+# android/kokoro-poc/scripts/fetch-sherpa-onnx.sh, which refuses to substitute
+# the upstream AAR (see
+# artifacts/weather-app/android/daymark-voice/SHERPA-ONNX-PROVENANCE.md).
+
+on:
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+    paths:
+      # The Gradle project, including daymark-voice/, parakeet-assets/ and
+      # every module and wrapper Gradle file.
+      - 'artifacts/weather-app/android/**'
+      - 'artifacts/weather-app/package.json'
+      - 'artifacts/weather-app/capacitor.config.ts'
+      - 'artifacts/weather-app/public/**'
+      - 'artifacts/weather-app/scripts/**'
+      # Fetch scripts and their pinned URLs/checksums.
+      - 'android/kokoro-poc/scripts/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/release-gates.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-lint:
+    name: release lint (app + voice, debug and release)
+    runs-on: ubuntu-latest
+    # Four lint variants plus a web build and two Capacitor syncs.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      # SHA-pinned third-party action; b906aff is the v4 tag commit.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Capacitor 8's Android modules compile with Java 21. Same setup as the
+      # `CI` and `Android CI` workflows.
+      - name: Set up Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # `cap sync` copies the built web assets (webDir = dist/public) into the
+      # Android project, so the web build has to run first.
+      - name: Build web assets
+        run: pnpm --filter @workspace/weather-app run build
+        env:
+          PORT: 5173
+          BASE_PATH: /
+
+      # Generate the Capacitor-managed Android files that are not committed
+      # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
+      - name: Sync Capacitor Android project
+        run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      # Build, copy and hash-verify the Android web assets against `dist`.
+      # This runs after `cap sync` on purpose: the verified copy is then the
+      # last write before Gradle packages anything. The repeated `vite build`
+      # is deterministic and is the cost of keeping verification last.
+      - name: Build, copy and verify Android web assets
+        run: pnpm --filter @workspace/weather-app run sync:android-web
+
+      # The voice module's compile classpath includes the committed, patched
+      # sherpa-onnx AAR. The script verifies its pinned SHA-256 and fails rather
+      # than accept the unpatched upstream artifact.
+      - name: Verify the sherpa-onnx runtime
+        run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
+
+      # Release lint is the point of this job: `:app:lintRelease` applies lint
+      # to the release variant (its merged manifest/resources and release
+      # BuildConfig), and `:daymark-voice:lintRelease` does the same for the
+      # voice library. `:app:lintDebug` also runs in `CI` and `Android CI`; it
+      # is repeated here so this gate stands on its own and can be required
+      # without depending on another workflow.
+      #
+      # No Parakeet model is fetched: lint does not read model assets.
+      - name: Android lint (debug and release)
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :daymark-voice:lintDebug :daymark-voice:lintRelease :app:lintDebug :app:lintRelease
+
+  native-jvm-tests:
+    name: native JVM unit tests (debug and release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # SHA-pinned third-party action; b906aff is the v4 tag commit.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Capacitor 8's Android modules compile with Java 21.
+      - name: Set up Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # Gradle configures the Capacitor project only after `cap sync` has
+      # generated cordova.variables.gradle, and `cap sync` needs dist/public.
+      - name: Build web assets
+        run: pnpm --filter @workspace/weather-app run build
+        env:
+          PORT: 5173
+          BASE_PATH: /
+
+      - name: Sync Capacitor Android project
+        run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      # The voice module's compile classpath includes the committed, patched
+      # sherpa-onnx AAR; verify its pinned SHA-256 before Gradle resolves it.
+      - name: Verify the sherpa-onnx runtime
+        run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
+
+      # The release unit-test variant is what this job adds: `Android CI` only
+      # runs `:daymark-voice:testDebugUnitTest`. Compiling the release variant
+      # regenerates the release BuildConfig (MULTILINGUAL_NARRATION = true,
+      # PACKAGED_MULTILINGUAL_VOICES = false), so the module's
+      # verifyReleaseMultilingualGate finalizer also runs, and every policy,
+      # integrity and endpoint test is executed against release bytecode.
+      #
+      # No Parakeet model is fetched: the tests exercise digests, policies and
+      # detectors compiled into the module, not the model files. `Android CI`
+      # runs the debug variant of these tests before its model fetch for the
+      # same reason.
+      - name: Android JVM unit tests (debug and release)
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :daymark-voice:testDebugUnitTest :daymark-voice:testReleaseUnitTest
+
+  release-config:
+    name: release configuration validation (not a release build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      # SHA-pinned third-party action; b906aff is the v4 tag commit.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Capacitor 8's Android modules compile with Java 21.
+      - name: Set up Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web assets
+        run: pnpm --filter @workspace/weather-app run build
+        env:
+          PORT: 5173
+          BASE_PATH: /
+
+      - name: Sync Capacitor Android project
+        run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      # The debug APK packages the web assets, so verify them first.
+      - name: Build, copy and verify Android web assets
+        run: pnpm --filter @workspace/weather-app run sync:android-web
+
+      # The voice module's compile classpath includes the committed, patched
+      # sherpa-onnx AAR; verify its pinned SHA-256 before Gradle resolves it.
+      - name: Verify the sherpa-onnx runtime
+        run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
+
+      # Make the "no model needed" claim falsifiable: on a clean runner the
+      # model directory does not exist. If this ever fails, the gate below has
+      # stopped proving that the release variant configures without the model.
+      - name: Assert the Parakeet model is not staged
+        run: |
+          assets=artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet
+          if [ -d "$assets" ] && [ -n "$(ls -A "$assets")" ]; then
+            echo "::error::$assets is populated; this job must prove the release variant configures without the Parakeet model." >&2
+            exit 1
+          fi
+          echo "ok: no Parakeet model staged; this job validates configuration only."
+
+      # What can be proven on a clean runner without release signing material
+      # or the ~640 MB model:
+      #   * `:app:assembleDebug` still produces a real debug APK, including the
+      #     Capacitor web assets and the archive checks that open the APK
+      #     (`verifyWebAssets`, `verifyDebugPackagedLicenses`). An APK never
+      #     contains the install-time pack, and parakeet-assets/build.gradle
+      #     wires `verifyParakeetAssets` only to bundle tasks, so APK packaging
+      #     needs no model. Bundles still verify it: this job does not weaken
+      #     that check, it only does not run a bundle.
+      #   * `:app:lintRelease` configures and analyses the release variant, so
+      #     a broken release manifest/resource/BuildConfig or a release-only
+      #     lint error fails here.
+      #
+      # What is deliberately excluded, because it cannot pass without the
+      # model and a keystore: `:app:bundleRelease` (release AAB), the packaged
+      # archive checks (`verifyReleaseBundleContents`, `verifyReleasePackagedLicenses`),
+      # R8 shrinking, asset-pack manifests, and signing. This job is named
+      # "release configuration validation" for that reason; do not rename it to
+      # a release build.
+      - name: Android debug APK and release variant lint
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:assembleDebug :app:lintRelease
+
+      # Put the boundary in the run summary as well as in the workflow, so a
+      # green check cannot be read as "release build passed".
+      - name: Record what this job validates
+        run: |
+          {
+            echo '### Release configuration validation (not a release build)'
+            echo ''
+            echo 'Ran `:app:assembleDebug` (real debug APK) and `:app:lintRelease`'
+            echo '(release variant configuration and lint).'
+            echo ''
+            echo 'Not proven here, and not claimed:'
+            echo '- a release AAB or APK (`:app:bundleRelease`), R8 shrinking, or the release packaged-archive checks;'
+            echo '- release signing (the production upload key is never in the repository);'
+            echo '- Play Asset Delivery of the install-time `parakeet` pack (needs the pinned model assets);'
+            echo '- install or launch of split APKs on a device.'
+            echo ''
+            echo 'See `docs/release/ci-release-gates.md`.'
+          } >> "$GITHUB_STEP_SUMMARY"

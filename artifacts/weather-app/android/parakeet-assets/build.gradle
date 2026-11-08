@@ -108,8 +108,17 @@ tasks.matching { candidate ->
 }
 
 // The asset pack has no release packaging task of its own: the app's bundle
-// task reads the pack. Wire those tasks explicitly so a release bundle always
-// verifies the staged model first.
+// task reads the pack. Wire those tasks explicitly so a bundle always verifies
+// the staged model first.
+//
+// Only *bundle* packaging reads the pack. `packageDebug`/`packageRelease`
+// build an APK, and an APK never contains an asset pack, so they must not
+// depend on the ~640 MB model: a plain `:app:assembleDebug` (and the
+// asset-free release-configuration CI gate) has to work from a clean checkout.
+// Depending on `package*` here made `assembleDebug` download the model, which
+// contradicts the "debug build is unaffected" contract of the guard above and
+// blocked model-free CI. Bundles (`bundleDebug`, `bundleRelease`,
+// `packageDebugBundle`, `packageReleaseBundle`) still verify the model.
 gradle.projectsEvaluated {
     def appProject = rootProject.findProject(":app")
     if (appProject == null) {
@@ -119,9 +128,7 @@ gradle.projectsEvaluated {
         def name = candidate.name
         name == "bundleDebug" ||
             name == "bundleRelease" ||
-            name == "packageDebugBundle" ||
-            name == "packageReleaseBundle" ||
-            (name.startsWith("package") && (name.endsWith("Debug") || name.endsWith("Release")))
+            (name.startsWith("package") && name.endsWith("Bundle"))
     }.configureEach {
         dependsOn verifyParakeetAssets
     }

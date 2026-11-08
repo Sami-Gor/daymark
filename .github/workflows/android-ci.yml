@@ -9,6 +9,11 @@ name: Android CI
 # protected `main` branch. Coupling the Android toolchain to `verify` would
 # let a runner-side SDK problem block every merge to the release branch. A
 # separate job reports the result without becoming a merge gate.
+#
+# Release-variant coverage (release lint, release-variant JVM tests and a
+# release configuration check that does not need the Parakeet model or signing)
+# lives in `.github/workflows/release-gates.yml`; see
+# `docs/release/ci-release-gates.md` for what those gates prove and do not.
 
 on:
   push:
