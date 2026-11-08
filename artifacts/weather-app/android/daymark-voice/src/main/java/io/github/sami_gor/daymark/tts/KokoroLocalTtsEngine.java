@@ -234,11 +234,16 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             callback.onError("engine-not-ready");
             return;
         }
+        if (!EngineOwnership.owns(generation)) {
+            callback.onError("engine-superseded");
+            return;
+        }
         final long token = reloadGuard.tryBegin();
         if (token < 0) {
             callback.onError("operation-conflict");
             return;
         }
+        final long reloadGeneration = EngineOwnership.beginInit();
         worker.post(new Runnable() {
             @Override
             public void run() {
@@ -253,6 +258,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         String error = nativeInit(model, voicesDir.getAbsolutePath(), voiceId);
                         if (error == null) {
                             nativeInitialised = true;
+                            EngineOwnership.commitInit(reloadGeneration);
                         } else {
                             // Attempt to restore the previous working voice.
                             String restore = nativeInit(model, voicesDir.getAbsolutePath(),
@@ -266,11 +272,28 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         }
                     } catch (Throwable error) {
                         Log.e(TAG, "registerVoice: failed", error);
-                        failure = "reload-failed";
+                        // Never leave the released engine without attempting to
+                        // restore a working one, even on an unexpected throwable.
+                        try {
+                            String restore = nativeInit(model, voicesDir.getAbsolutePath(),
+                                    DEFAULT_VOICE_NAME);
+                            nativeInitialised = restore == null;
+                            if (restore == null) {
+                                EngineOwnership.commitInit(EngineOwnership.beginInit());
+                            }
+                        } catch (Throwable restoreFailure) {
+                            nativeInitialised = false;
+                            Log.e(TAG, "registerVoice: restore failed", restoreFailure);
+                        }
+                        failure = nativeInitialised ? "reload-failed" : "reload-failed-unrecovered";
                     }
                 }
+                // Snapshot currency before releasing the single-flight slot: a
+                // concurrent tryBegin must not turn a successful reload into a
+                // reported conflict.
+                boolean current = reloadGuard.isCurrent(token);
                 reloadGuard.finish(token);
-                if (!reloadGuard.isCurrent(token)) {
+                if (!current) {
                     callback.onError("operation-conflict");
                     return;
                 }
@@ -350,6 +373,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     @Override
     public void shutdown() {
+        reloadGuard.invalidate();
         stop();
         worker.post(new Runnable() {
             @Override

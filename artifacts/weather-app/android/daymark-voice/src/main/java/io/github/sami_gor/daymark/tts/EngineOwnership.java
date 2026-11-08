@@ -20,20 +20,34 @@ public final class EngineOwnership {
     public static final Object NATIVE_LOCK = new Object();
 
     private static long currentGeneration;
+    private static long reservedGeneration;
     private static boolean initialised;
 
     private EngineOwnership() {
     }
 
-    /** Allocates an owner token; ownership is committed only after native init succeeds. */
+    /**
+     * Reserves the next owner token; ownership is committed only after native
+     * init succeeds. Reserving immediately supersedes every older token: two
+     * concurrent initialisations must never receive the same generation.
+     */
     public static synchronized long beginInit() {
-        return currentGeneration + 1;
+        reservedGeneration = Math.max(reservedGeneration, currentGeneration) + 1;
+        return reservedGeneration;
     }
 
-    /** Commits ownership after a successful native init; call under NATIVE_LOCK. */
-    public static synchronized void commitInit(long generation) {
+    /**
+     * Commits ownership after a successful native init; call under NATIVE_LOCK.
+     * A token older than the newest reservation is rejected and returns false,
+     * so a slow stale initialisation can never roll ownership backwards.
+     */
+    public static synchronized boolean commitInit(long generation) {
+        if (generation != reservedGeneration) {
+            return false;
+        }
         currentGeneration = generation;
         initialised = true;
+        return true;
     }
 
     /**

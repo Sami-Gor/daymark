@@ -751,8 +751,18 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
                         ParakeetModelAssets.MODEL_FILE_SHA256);
                 if (!integrity.isOk()) {
                     Log.w(TAG, "model integrity: " + integrity.reason());
+                    // getUsableSpace() reports 0 when the path does not exist, so
+                    // a fresh install must create the directory (or fall back to
+                    // the parent's free space) before the preflight decides.
+                    if (!directory.isDirectory() && !directory.mkdirs()) {
+                        Log.w(TAG, "model install: cannot create model directory");
+                    }
                     long available = directory.getUsableSpace();
-                    if (!ModelStoragePreflight.hasRoom(available, ParakeetModelAssets.MODEL_FILE_SIZES)) {
+                    if (available <= 0) {
+                        available = getContext().getFilesDir().getUsableSpace();
+                    }
+                    if (available > 0
+                            && !ModelStoragePreflight.hasRoom(available, ParakeetModelAssets.MODEL_FILE_SIZES)) {
                         Log.e(TAG, "model install: insufficient storage available=" + available
                                 + " required=" + ModelStoragePreflight.requiredBytes(
                                         ParakeetModelAssets.MODEL_FILE_SIZES));

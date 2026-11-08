@@ -816,4 +816,36 @@ describe('rain day scoping', () => {
     expect(spanish.spokenText).toContain('Lluvia probable');
     expect(french.spokenText).not.toBe(spanish.spokenText);
   });
+
+  it('keeps "raining now" when rain is combined with tomorrow and current', () => {
+    const weather = buildWeather({
+      current: { ...DEFAULT_CURRENT, precipitation: 0.6 },
+      daily: {
+        ...DEFAULT_DAILY,
+        weather_code: [3, 3, 0],
+        precipitation_probability_max: [70, 5, 0],
+      },
+    });
+    const response = getCombinedIntentResponse(
+      [DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain, DAYMARK_INTENTS.current],
+      weather,
+      { locale: 'en' },
+    );
+    expect(response.spokenText).toContain("It's raining now");
+    expect(response.spokenText).toContain('more rain likely');
+    expect(response.spokenText).toContain('Tomorrow');
+  });
+
+  it('answers both days when rain today and tomorrow are requested together', () => {
+    const weather = buildWeather({
+      daily: { ...DEFAULT_DAILY, precipitation_probability_max: [70, 35, 0] },
+    });
+    const response = getCombinedIntentResponse(
+      [DAYMARK_INTENTS.today, DAYMARK_INTENTS.tomorrow, DAYMARK_INTENTS.rain],
+      weather,
+      { locale: 'en' },
+    );
+    expect(response.spokenText).toContain('later today');
+    expect(response.spokenText).toContain('chance of rain');
+  });
 });

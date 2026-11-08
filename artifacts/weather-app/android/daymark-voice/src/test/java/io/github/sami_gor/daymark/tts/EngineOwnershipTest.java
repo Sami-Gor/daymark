@@ -51,4 +51,29 @@ public class EngineOwnershipTest {
         assertFalse(EngineOwnership.owns(a));
         assertTrue(EngineOwnership.owns(b));
     }
+
+    @Test
+    public void concurrentReservationsReceiveDistinctGenerations() {
+        EngineOwnership.resetForTest();
+        long first = EngineOwnership.beginInit();
+        long second = EngineOwnership.beginInit();
+        org.junit.Assert.assertNotEquals(first, second);
+        // The slow first initialisation must not be able to commit.
+        org.junit.Assert.assertFalse(EngineOwnership.commitInit(first));
+        org.junit.Assert.assertTrue(EngineOwnership.commitInit(second));
+        org.junit.Assert.assertTrue(EngineOwnership.owns(second));
+        org.junit.Assert.assertFalse(EngineOwnership.owns(first));
+        org.junit.Assert.assertFalse(EngineOwnership.claimRelease(first));
+        org.junit.Assert.assertTrue(EngineOwnership.claimRelease(second));
+    }
+
+    @Test
+    public void aStaleCommitCannotRollOwnershipBackwards() {
+        EngineOwnership.resetForTest();
+        long oldToken = EngineOwnership.beginInit();
+        long newToken = EngineOwnership.beginInit();
+        org.junit.Assert.assertTrue(EngineOwnership.commitInit(newToken));
+        org.junit.Assert.assertFalse(EngineOwnership.commitInit(oldToken));
+        org.junit.Assert.assertEquals(newToken, EngineOwnership.currentGeneration());
+    }
 }

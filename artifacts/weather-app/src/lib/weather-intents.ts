@@ -989,12 +989,21 @@ export function getCombinedIntentResponse(
     throw new Error('getCombinedIntentResponse requires at least one intent');
   }
   const { t } = translator(context);
+  // Rain is scoped to tomorrow only when the user did not also ask about
+  // today/now; otherwise tomorrow-scoping would suppress the "raining now"
+  // fact and contradict a current-conditions answer in the same reply.
+  const todayScopedRain = unique.includes(DAYMARK_INTENTS.current)
+    || unique.includes(DAYMARK_INTENTS.hours)
+    || unique.includes(DAYMARK_INTENTS.today);
+  const rainTomorrowOnly =
+    unique.includes(DAYMARK_INTENTS.tomorrow) && !todayScopedRain;
   const responses = unique.map((intent) => {
-    if (intent === DAYMARK_INTENTS.rain && unique.includes(DAYMARK_INTENTS.tomorrow)) {
+    if (intent === DAYMARK_INTENTS.rain && rainTomorrowOnly) {
       return getTomorrowRainSummary(weather, context);
     }
     const response = getIntentResponse(intent, weather, context);
-    if (intent !== DAYMARK_INTENTS.current || !unique.includes(DAYMARK_INTENTS.rain)) {
+    if (intent !== DAYMARK_INTENTS.current || !unique.includes(DAYMARK_INTENTS.rain)
+        || rainTomorrowOnly) {
       return response;
     }
     const rainNow = t('intent.current.raining').trim();
