@@ -105,6 +105,65 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     }
 
     @PluginMethod
+    public void getInstalledVoices(PluginCall call) {
+        if (engine == null) {
+            call.reject("native-unavailable");
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("voices", voiceArray(engine.installedOptionalVoices()));
+        call.resolve(result);
+    }
+
+    /**
+     * Registers a voice file the pack manager has already verified and installed.
+     * The engine reloads its native voice set and reports the resulting list.
+     */
+    @PluginMethod
+    public void registerVoice(PluginCall call) {
+        reloadForVoice(call);
+    }
+
+    /** Activation is the same guarded reload: the voice must already be installed. */
+    @PluginMethod
+    public void activateVoice(PluginCall call) {
+        reloadForVoice(call);
+    }
+
+    private void reloadForVoice(PluginCall call) {
+        String voiceId = call.getString("voiceId");
+        if (voiceId == null || voiceId.trim().isEmpty()) {
+            call.reject("invalid-voice");
+            return;
+        }
+        if (engine == null || state == LocalTtsEngine.State.ERROR) {
+            call.reject(lastFailureReason.isEmpty() ? "native-unavailable" : lastFailureReason);
+            return;
+        }
+        engine.registerVoice(voiceId.trim(), new KokoroLocalTtsEngine.VoiceOperationResult() {
+            @Override
+            public void onSuccess(java.util.Set<String> installed) {
+                JSObject result = new JSObject();
+                result.put("voices", voiceArray(installed));
+                call.resolve(result);
+            }
+
+            @Override
+            public void onError(String code) {
+                call.reject(code);
+            }
+        });
+    }
+
+    private static JSArray voiceArray(java.util.Set<String> voices) {
+        JSArray array = new JSArray();
+        for (String voice : voices) {
+            array.put(voice);
+        }
+        return array;
+    }
+
+    @PluginMethod
     public void speak(PluginCall call) {
         String text = call.getString("text");
         if (text == null || text.trim().isEmpty()) {

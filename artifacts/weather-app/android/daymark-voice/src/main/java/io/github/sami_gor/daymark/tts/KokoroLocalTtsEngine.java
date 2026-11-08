@@ -64,6 +64,9 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private volatile boolean nativeInitialised;
     private volatile AudioTrack audioTrack;
     private int synthesisCount;
+    /** Path of the materialised model, retained so the engine can be reloaded. */
+    private volatile String modelPath;
+    private final ReloadGuard reloadGuard = new ReloadGuard();
 
     private native String nativeInit(String modelPath, String voicesPath, String voiceName);
     private native float[] nativeSynth(String text, String lang, String voiceName);
@@ -150,6 +153,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                                 VOICE_BYTES,
                                 voiceSha256(voice));
                     }
+                    modelPath = modelFile.getAbsolutePath();
                     Log.i(TAG, "initialize: assets ready in " + (SystemClock.elapsedRealtime() - copyStart)
                             + "ms modelBytes=" + modelFile.length()
                             + " voices=" + String.join(",", voices));
@@ -184,6 +188,98 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     notifyError("Initialization failed: " + failure.getMessage());
                     setState(State.ERROR);
                 }
+            }
+        });
+    }
+
+    /** Callback for asynchronous voice registration/reload. */
+    public interface VoiceOperationResult {
+        void onSuccess(java.util.Set<String> installed);
+
+        void onError(String code);
+    }
+
+    /** Supported optional voices currently present in app-private storage. */
+    public java.util.Set<String> installedOptionalVoices() {
+        return VoiceRegistry.installed(new File(appContext.getFilesDir(), "kokoro"));
+    }
+
+    /** True when the voice file is present and readable; does not imply loaded. */
+    public boolean isVoiceInstalled(String voiceId) {
+        return VoiceRegistry.isInstalled(new File(appContext.getFilesDir(), "kokoro"), voiceId);
+    }
+
+    /**
+     * Registers a voice that the pack manager has already verified and installed.
+     *
+     * <p>The native engine snapshots its voice directory at initialisation, so a
+     * newly installed file only becomes usable after a guarded reload. The
+     * previous generation is released only after the replacement initialises;
+     * a failed reload attempts to restore the previous voice, and the caller
+     * always receives an explicit error instead of a silent English fallback.
+     */
+    public void registerVoice(final String voiceId, final VoiceOperationResult callback) {
+        final File voicesDir = new File(appContext.getFilesDir(), "kokoro");
+        final String reason = VoiceRegistry.unavailableReason(voicesDir, voiceId);
+        if (reason != null) {
+            callback.onError(reason);
+            return;
+        }
+        if (state == State.SPEAKING || state == State.LOADING) {
+            callback.onError("operation-conflict");
+            return;
+        }
+        final String model = modelPath;
+        if (model == null) {
+            callback.onError("engine-not-ready");
+            return;
+        }
+        final long token = reloadGuard.tryBegin();
+        if (token < 0) {
+            callback.onError("operation-conflict");
+            return;
+        }
+        worker.post(new Runnable() {
+            @Override
+            public void run() {
+                String failure = null;
+                java.util.Set<String> installed = VoiceRegistry.installed(voicesDir);
+                synchronized (EngineOwnership.NATIVE_LOCK) {
+                    try {
+                        if (nativeInitialised) {
+                            nativeRelease();
+                            nativeInitialised = false;
+                        }
+                        String error = nativeInit(model, voicesDir.getAbsolutePath(), voiceId);
+                        if (error == null) {
+                            nativeInitialised = true;
+                        } else {
+                            // Attempt to restore the previous working voice.
+                            String restore = nativeInit(model, voicesDir.getAbsolutePath(),
+                                    DEFAULT_VOICE_NAME);
+                            nativeInitialised = restore == null;
+                            failure = "reload-failed";
+                            if (restore != null) {
+                                failure = "reload-failed-unrecovered";
+                                setState(State.ERROR);
+                            }
+                        }
+                    } catch (Throwable error) {
+                        Log.e(TAG, "registerVoice: failed", error);
+                        failure = "reload-failed";
+                    }
+                }
+                reloadGuard.finish(token);
+                if (!reloadGuard.isCurrent(token)) {
+                    callback.onError("operation-conflict");
+                    return;
+                }
+                if (failure != null) {
+                    callback.onError(failure);
+                    return;
+                }
+                setState(State.READY);
+                callback.onSuccess(installed);
             }
         });
     }
