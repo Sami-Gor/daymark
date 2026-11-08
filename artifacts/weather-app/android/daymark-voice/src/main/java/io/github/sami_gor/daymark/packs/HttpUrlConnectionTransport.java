@@ -174,6 +174,11 @@ public final class HttpUrlConnectionTransport implements PackTransport {
                     throw new TransportException("http-" + code,
                             "metadata fetch failed with HTTP " + code);
                 }
+                String contentEncoding = connection.getHeaderField("Content-Encoding");
+                if (contentEncoding != null && !"identity".equalsIgnoreCase(contentEncoding)) {
+                    throw new TransportException("content-encoding",
+                            "server applied unsupported content encoding " + contentEncoding);
+                }
                 long declared = connection.getContentLengthLong();
                 if (declared > maxBytes) {
                     throw new TransportException("too-large",

@@ -322,6 +322,7 @@ public final class PackDownloader {
                 sync(backup);
             } catch (IOException e) {
                 temp.delete();
+                backup.delete();
                 throw new PackInstaller.PackException("io",
                         "cannot back up the previous voice: " + e.getMessage());
             }
