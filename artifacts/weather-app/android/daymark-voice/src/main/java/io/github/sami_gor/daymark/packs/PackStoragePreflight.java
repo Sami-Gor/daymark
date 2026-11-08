@@ -34,8 +34,14 @@ public final class PackStoragePreflight {
         long remaining = Math.max(0L, payloadSize - alreadyDownloaded);
         long margin = Math.max(
                 ModelStoragePreflight.MIN_MARGIN_BYTES,
-                payloadSize * ModelStoragePreflight.MARGIN_PERCENT / 100L);
-        return remaining + payloadSize + margin;
+                (payloadSize / 100L) * ModelStoragePreflight.MARGIN_PERCENT);
+        try {
+            return Math.addExact(Math.addExact(remaining, payloadSize), margin);
+        } catch (ArithmeticException e) {
+            // A manifest claiming an absurd size must fail the preflight rather
+            // than wrap around to a small "required" value.
+            return Long.MAX_VALUE;
+        }
     }
 
     public static boolean hasRoom(long availableBytes, long payloadSize, long alreadyDownloaded) {
