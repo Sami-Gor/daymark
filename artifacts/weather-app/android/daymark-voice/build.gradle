@@ -26,6 +26,8 @@ android {
             // packages ff_siwis/em_alex from src/debug/assets.
             buildConfigField "boolean", "MULTILINGUAL_NARRATION", "true"
             buildConfigField "boolean", "PACKAGED_MULTILINGUAL_VOICES", "true"
+            // Development builds may exercise em_alex locally.
+            buildConfigField "boolean", "SPANISH_VOICE_DISTRIBUTION_APPROVED", "true"
         }
         release {
             // V2.1 ships multilingual narration, but the base APK packages only
@@ -33,6 +35,9 @@ android {
             // and are gated by installed-voice checks in NarrationVoicePolicy.
             buildConfigField "boolean", "MULTILINGUAL_NARRATION", "true"
             buildConfigField "boolean", "PACKAGED_MULTILINGUAL_VOICES", "false"
+            // Release distribution of em_alex is blocked until written speaker
+            // rights evidence exists; flip only after that evidence is recorded.
+            buildConfigField "boolean", "SPANISH_VOICE_DISTRIBUTION_APPROVED", "false"
         }
     }
 

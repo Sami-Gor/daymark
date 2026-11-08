@@ -118,8 +118,11 @@ Generated material (`daymark-voice/src/main/assets/kokoro`, `jniLibs`,
 `app/src/main/assets/public`) is gitignored and reproduced by steps 1–3.
 
 **Narration and notice gate (V2.1 branch).** Release builds compile
-`MULTILINGUAL_NARRATION = false`; the engine materialises only `bm_fable` and
-rejects `fr`/`es`. `:app:verifyReleaseNarrationSources` and
+`MULTILINGUAL_NARRATION = true` with `PACKAGED_MULTILINGUAL_VOICES = false`:
+the base APK still materialises only `bm_fable`, French becomes selectable only
+after its voice is installed, and `em_alex` is refused at synthesis time because
+`SPANISH_VOICE_DISTRIBUTION_APPROVED = false` (rights evidence outstanding).
+`:app:verifyReleaseNarrationSources` and
 `:app:verifyReleaseNarrationAssets` fail a release that would package
 `ff_siwis.bin` or `em_alex.bin`. Every APK/AAB packages
 `assets/licenses/THIRD-PARTY-NOTICES.md` and

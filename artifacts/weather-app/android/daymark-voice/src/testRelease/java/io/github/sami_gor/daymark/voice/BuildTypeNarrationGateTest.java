@@ -42,4 +42,15 @@ public class BuildTypeNarrationGateTest {
         assertNull(NarrationVoicePolicy.voiceForLanguage(
                 "es-419", BuildConfig.MULTILINGUAL_NARRATION, installed));
     }
+
+    @Test
+    public void releaseBlocksSpanishDistributionUntilRightsEvidenceExists() {
+        assertFalse(BuildConfig.SPANISH_VOICE_DISTRIBUTION_APPROVED);
+        assertFalse(NarrationVoicePolicy.isVoiceDistributable(
+                NarrationVoicePolicy.SPANISH_VOICE,
+                BuildConfig.SPANISH_VOICE_DISTRIBUTION_APPROVED));
+        assertTrue(NarrationVoicePolicy.isVoiceDistributable(
+                NarrationVoicePolicy.FRENCH_VOICE,
+                BuildConfig.SPANISH_VOICE_DISTRIBUTION_APPROVED));
+    }
 }

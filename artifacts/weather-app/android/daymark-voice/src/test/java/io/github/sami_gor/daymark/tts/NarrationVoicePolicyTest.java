@@ -109,4 +109,17 @@ public class NarrationVoicePolicyTest {
         org.junit.Assert.assertNull(
                 NarrationVoicePolicy.voiceForLanguage("es-419", true, fr));
     }
+
+    @Test
+    public void spanishDistributionRequiresExplicitRightsApproval() {
+        org.junit.Assert.assertTrue(
+                NarrationVoicePolicy.isVoiceDistributable(NarrationVoicePolicy.ENGLISH_VOICE, false));
+        org.junit.Assert.assertTrue(
+                NarrationVoicePolicy.isVoiceDistributable(NarrationVoicePolicy.FRENCH_VOICE, false));
+        org.junit.Assert.assertFalse(
+                NarrationVoicePolicy.isVoiceDistributable(NarrationVoicePolicy.SPANISH_VOICE, false));
+        org.junit.Assert.assertTrue(
+                NarrationVoicePolicy.isVoiceDistributable(NarrationVoicePolicy.SPANISH_VOICE, true));
+        org.junit.Assert.assertFalse(NarrationVoicePolicy.isVoiceDistributable("bm_george", true));
+    }
 }

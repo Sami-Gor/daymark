@@ -81,6 +81,25 @@ public final class NarrationVoicePolicy {
         return multilingualNarration ? MULTILINGUAL : ENGLISH_ONLY;
     }
 
+    /**
+     * Whether a voice may be distributed in a release build.
+     *
+     * <p>English and French are cleared. Spanish ({@code em_alex}) has an
+     * Apache-2.0 file notice but no written speaker/likeness rights evidence,
+     * so it stays development-only until the owner supplies that evidence.
+     * This is a distribution gate, not a language gate: it must not be removed
+     * by a build-type flag alone.
+     */
+    public static boolean isVoiceDistributable(String voiceId, boolean spanishDistributionApproved) {
+        if (ENGLISH_VOICE.equals(voiceId) || FRENCH_VOICE.equals(voiceId)) {
+            return true;
+        }
+        if (SPANISH_VOICE.equals(voiceId)) {
+            return spanishDistributionApproved;
+        }
+        return false;
+    }
+
     /** True for the French/Spanish voices that are debug-POC only. */
     public static boolean isMultilingualVoice(String voiceName) {
         return FRENCH_VOICE.equals(voiceName) || SPANISH_VOICE.equals(voiceName);

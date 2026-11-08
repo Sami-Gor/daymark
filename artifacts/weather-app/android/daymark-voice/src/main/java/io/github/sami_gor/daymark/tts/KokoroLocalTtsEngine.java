@@ -305,6 +305,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             notifyError("Unsupported narration language: " + lang);
             return;
         }
+        if (!NarrationVoicePolicy.isVoiceDistributable(
+                voice, BuildConfig.SPANISH_VOICE_DISTRIBUTION_APPROVED)) {
+            notifyError("voice-rights-unresolved");
+            return;
+        }
         if (isSpeaking()) {
             stop();
         }

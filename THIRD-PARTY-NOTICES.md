@@ -147,13 +147,15 @@ The public model card does not identify the original speaker or per-voice source
 
 ## Release packaging and remaining third-party conditions
 
-French and Spanish narration is a debug-POC capability. It is not part of a
-production release:
+Optional narration voices are external, verified downloads rather than packaged
+release assets:
 
-- `daymark-voice` compiles `BuildConfig.MULTILINGUAL_NARRATION = false` for the
-  release variant and `true` for debug. `NarrationVoicePolicy` therefore
-  rejects `fr`/`es` in release before any synthesis, and the release engine
-  materialises only the English `bm_fable` voice.
+- `daymark-voice` compiles `BuildConfig.MULTILINGUAL_NARRATION = true` for both
+  variants and `BuildConfig.PACKAGED_MULTILINGUAL_VOICES = false` for release:
+  the base APK materialises only the English `bm_fable` voice, French is
+  selectable only after its installed voice file is registered, and Spanish is
+  refused because `SPANISH_VOICE_DISTRIBUTION_APPROVED = false` until written
+  speaker-rights evidence exists.
 - `fetch-kokoro-assets.sh` stages the English model and `bm_fable` in the main
   source set and stages `ff_siwis`/`em_alex` only in the debug source set.
 - `:app:verifyReleaseNarrationSources` and
