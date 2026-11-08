@@ -74,15 +74,8 @@ public final class PackInstaller {
     public Installed stage(String packId, long version, File source, long expectedSize, String expectedSha256)
             throws PackException {
         requirePackId(packId);
-        if (version <= 0) {
-            throw new PackException("invalid-version", "pack version must be positive");
-        }
-        if (expectedSize <= 0) {
-            throw new PackException("invalid-size", "expected size must be positive");
-        }
-        if (expectedSha256 == null || !expectedSha256.matches("[0-9a-fA-F]{64}")) {
-            throw new PackException("invalid-hash", "expected SHA-256 is not a 64-character hex digest");
-        }
+        requireVersion(version);
+        requireExpected(expectedSize, expectedSha256);
         if (source == null || !source.isFile()) {
             throw new PackException("missing-download", "downloaded pack file is missing");
         }
@@ -90,17 +83,12 @@ public final class PackInstaller {
             throw new PackException("size-mismatch",
                     "downloaded size " + source.length() + " != expected " + expectedSize);
         }
-
-        File staging = new File(root, "staging");
-        File packs = new File(root, "packs");
-        if (!staging.isDirectory() && !staging.mkdirs()) {
-            throw new PackException("io", "cannot create staging directory");
+        File part = stagingPart(packId, version);
+        if (sameFile(source, part)) {
+            // The download layer already staged directly into the canonical
+            // .part path; do not truncate it by copying onto itself.
+            return installStaged(packId, version, part, expectedSize, expectedSha256);
         }
-        if (!packs.isDirectory() && !packs.mkdirs()) {
-            throw new PackException("io", "cannot create packs directory");
-        }
-
-        File part = new File(staging, packId + "-" + version + ".part");
         String actual;
         try {
             actual = copyAndHash(source, part);
@@ -113,24 +101,61 @@ public final class PackInstaller {
             throw new PackException("hash-mismatch",
                     "pack SHA-256 " + actual + " != expected " + expectedSha256);
         }
+        return installStaged(packId, version, part, expectedSize, expectedSha256);
+    }
 
+    /**
+     * Verifies an already-staged {@code .part} file and atomically moves it into
+     * the version directory. This is the hand-off point for
+     * {@link PackDownloader}: the download layer owns staging and resume, while
+     * this class owns the final size/SHA-256 check, replacement and readiness
+     * marker. The previous active version is untouched until {@link #activate}.
+     */
+    public Installed installStaged(
+            String packId, long version, File stagedPart, long expectedSize, String expectedSha256)
+            throws PackException {
+        requirePackId(packId);
+        requireVersion(version);
+        requireExpected(expectedSize, expectedSha256);
+        if (stagedPart == null || !stagedPart.isFile()) {
+            throw new PackException("missing-download", "staged pack file is missing");
+        }
+        if (stagedPart.length() != expectedSize) {
+            throw new PackException("size-mismatch",
+                    "staged size " + stagedPart.length() + " != expected " + expectedSize);
+        }
+        String actual;
+        try {
+            actual = sha256(stagedPart);
+        } catch (IOException e) {
+            throw new PackException("io", "cannot hash staged pack: " + e.getMessage());
+        }
+        if (!expectedSha256.equalsIgnoreCase(actual)) {
+            if (isStagingPart(stagedPart)) {
+                stagedPart.delete();
+            }
+            throw new PackException("hash-mismatch",
+                    "pack SHA-256 " + actual + " != expected " + expectedSha256);
+        }
+
+        File packs = new File(root, "packs");
+        if (!packs.isDirectory() && !packs.mkdirs()) {
+            throw new PackException("io", "cannot create packs directory");
+        }
         File dir = new File(new File(packs, packId), Long.toString(version));
         File parent = dir.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            part.delete();
             throw new PackException("io", "cannot create pack directory");
         }
         if (dir.exists() && !deleteRecursively(dir)) {
-            part.delete();
             throw new PackException("io", "cannot replace existing pack version directory");
         }
         if (!dir.mkdirs()) {
-            part.delete();
             throw new PackException("io", "cannot create pack version directory");
         }
-        if (!part.renameTo(new File(dir, "payload"))) {
+        File payload = new File(dir, "payload");
+        if (!moveIntoPlace(stagedPart, payload)) {
             deleteRecursively(dir);
-            part.delete();
             throw new PackException("io", "cannot move payload into place");
         }
         if (!writeMarker(new File(dir, ".ready"))) {
@@ -138,6 +163,42 @@ public final class PackInstaller {
             throw new PackException("io", "cannot write readiness marker");
         }
         return new Installed(packId, version, dir);
+    }
+
+    /** Root under which staging and installed packs live. */
+    public File root() {
+        return root;
+    }
+
+    /**
+     * Canonical staging path for a pack version, creating the staging directory.
+     * The download layer appends to this file when resuming.
+     */
+    public File stagingPart(String packId, long version) throws PackException {
+        requirePackId(packId);
+        requireVersion(version);
+        File staging = new File(root, "staging");
+        if (!staging.isDirectory() && !staging.mkdirs()) {
+            throw new PackException("io", "cannot create staging directory");
+        }
+        return new File(staging, packId + "-" + version + ".part");
+    }
+
+    private static void requireVersion(long version) throws PackException {
+        if (version <= 0) {
+            throw new PackException("invalid-version", "pack version must be positive");
+        }
+    }
+
+    private static void requireExpected(long expectedSize, String expectedSha256)
+            throws PackException {
+        if (expectedSize <= 0) {
+            throw new PackException("invalid-size", "expected size must be positive");
+        }
+        if (expectedSha256 == null || !expectedSha256.matches("[0-9a-fA-F]{64}")) {
+            throw new PackException("invalid-hash",
+                    "expected SHA-256 is not a 64-character hex digest");
+        }
     }
 
     /** Atomically makes a staged version active; the previous version stays on disk. */
@@ -209,12 +270,66 @@ public final class PackInstaller {
         if (dir.exists() && !deleteRecursively(dir)) {
             throw new PackException("io", "cannot remove pack");
         }
+        File staging = new File(root, "staging");
+        File[] parts = staging.listFiles();
+        if (parts != null) {
+            for (File part : parts) {
+                if (part.getName().startsWith(packId + "-") && part.getName().endsWith(".part")) {
+                    part.delete();
+                }
+            }
+        }
     }
 
     private static void requirePackId(String packId) throws PackException {
         if (packId == null || !packId.matches("[a-z]{2}")) {
             throw new PackException("invalid-pack", "pack id must be a two-letter language code");
         }
+    }
+
+    private static boolean sameFile(File first, File second) {
+        try {
+            return first.getCanonicalFile().equals(second.getCanonicalFile());
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private boolean isStagingPart(File file) {
+        File staging = new File(root, "staging");
+        File parent = file.getParentFile();
+        return parent != null && sameFile(parent, staging);
+    }
+
+    static boolean moveIntoPlace(File source, File target) {
+        try {
+            try {
+                Files.move(source.toPath(), target.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /** SHA-256 of a file, lower-case hex. */
+    static String sha256(File file) throws IOException {
+        MessageDigest digest = newDigest();
+        try (InputStream in = new FileInputStream(file)) {
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+        }
+        StringBuilder hex = new StringBuilder(64);
+        for (byte b : digest.digest()) {
+            hex.append(String.format("%02x", b));
+        }
+        return hex.toString();
     }
 
     private static String copyAndHash(File source, File target) throws IOException {
