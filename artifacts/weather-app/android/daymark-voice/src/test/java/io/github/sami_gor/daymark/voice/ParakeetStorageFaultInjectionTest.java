@@ -152,14 +152,13 @@ public class ParakeetStorageFaultInjectionTest {
      * ENOSPC; a fix would preserve the storage reason through the wrapper.
      */
     @Test
-    public void midCopyEnospcIsCurrentlyReportedAsCopyFailureNotInsufficientStorage() {
+    public void midCopyEnospcIsReportedAsInsufficientStorageThroughTheCauseChain() {
         ParakeetModelInstaller.InstallException failure = installExpectingFailure(
                 verify(), sourceFailingOn(NAMES[0], SERVED_BEFORE_FAILURE, enospc()));
 
-        assertEquals("copy-failed:" + NAMES[0],
+        assertEquals(ParakeetModelAssets.REASON_INSUFFICIENT_STORAGE,
                 ParakeetModelInstaller.classify(failure));
-        assertNotEquals(ParakeetModelAssets.REASON_INSUFFICIENT_STORAGE,
-                ParakeetModelInstaller.classify(failure));
+        assertEquals("copy-failed:" + NAMES[0], failure.reason());
     }
 
     @Test

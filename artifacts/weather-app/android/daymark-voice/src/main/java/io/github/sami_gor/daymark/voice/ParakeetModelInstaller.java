@@ -42,16 +42,34 @@ public final class ParakeetModelInstaller {
     /** Maps a copy failure to a stable reason without flattening every cause. */
     public static String classify(Throwable failure) {
         if (failure instanceof InstallException) {
-            return ((InstallException) failure).reason();
+            String reason = ((InstallException) failure).reason();
+            // A disk that fills during the copy surfaces as copy-failed; the
+            // underlying IOException is still the authoritative classification.
+            if (reason != null && reason.startsWith("copy-failed:") && causedByNoSpace(failure)) {
+                return ParakeetModelAssets.REASON_INSUFFICIENT_STORAGE;
+            }
+            return reason;
         }
         if (failure instanceof InterruptedException) {
             return ParakeetModelAssets.REASON_INSTALLATION_INTERRUPTED;
         }
-        String message = failure == null ? "" : String.valueOf(failure.getMessage());
-        if (message.contains("ENOSPC") || message.toLowerCase().contains("no space left")) {
+        if (causedByNoSpace(failure)) {
             return ParakeetModelAssets.REASON_INSUFFICIENT_STORAGE;
         }
         return ParakeetModelAssets.REASON_STORAGE_WRITE_FAILED;
+    }
+
+    private static boolean causedByNoSpace(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message == null) {
+                continue;
+            }
+            if (message.contains("ENOSPC") || message.toLowerCase().contains("no space left")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ParakeetModelInstaller() {
