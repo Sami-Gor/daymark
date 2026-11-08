@@ -403,5 +403,7 @@ public class PackDownloaderTest {
                 PackStoragePreflight.requiredBytes(payload, 0), payload, 0));
         assertFalse(PackStoragePreflight.hasRoom(
                 PackStoragePreflight.requiredBytes(payload, 0) - 1, payload, 0));
+        assertEquals("absurd sizes must fail closed", Long.MAX_VALUE,
+                PackStoragePreflight.requiredBytes(Long.MAX_VALUE, 0));
     }
 }
