@@ -19,6 +19,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import io.github.sami_gor.daymark.packs.PackTestSupport.MockTransport;
+import io.github.sami_gor.daymark.tts.NarrationVoicePolicy;
 import io.github.sami_gor.daymark.tts.VoiceRegistry;
 
 public class PackDownloaderTest {
@@ -86,6 +87,8 @@ public class PackDownloaderTest {
         assertArrayEquals(payload, read(installer.activePayload("fr")));
         assertArrayEquals(payload, read(result.voiceFile));
         assertTrue(VoiceRegistry.installed(voices).contains("ff_siwis"));
+        assertEquals("ff_siwis", NarrationVoicePolicy.voiceForLanguage(
+                "fr", true, VoiceRegistry.installed(voices)));
         assertFalse(new File(root, "staging/fr-1.part").exists());
         assertFalse(new File(voices, ".ff_siwis.bin.backup").exists());
         assertEquals(1, transport.downloadCalls);
@@ -330,6 +333,11 @@ public class PackDownloaderTest {
         assertFalse(new File(voices, "ff_siwis.bin").exists());
         assertArrayEquals(english, read(new File(voices, "bm_fable.bin")));
         assertEquals("[bm_fable]", VoiceRegistry.installed(voices).toString());
+        assertNull("a removed French voice must not be selectable",
+                NarrationVoicePolicy.voiceForLanguage(
+                        "fr", true, VoiceRegistry.installed(voices)));
+        assertEquals("bm_fable", NarrationVoicePolicy.voiceForLanguage(
+                "en", true, VoiceRegistry.installed(voices)));
 
         try {
             downloader.remove("en");
