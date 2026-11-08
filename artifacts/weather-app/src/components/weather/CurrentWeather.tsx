@@ -8,6 +8,7 @@ import { TTS_LANGS } from '@/lib/i18n';
 import { isSupportedSpeechLocale } from '@/lib/speech-engine';
 import { describeNarrationError } from '@/lib/speech-errors';
 import { useDaymarkSpeech } from '@/hooks/use-daymark-speech';
+import { useVoicePackState } from '@/hooks/use-voice-pack-state';
 import { useLocale } from '@/hooks/use-locale';
 import { AskDaymark } from '@/components/weather/AskDaymark';
 import { DayCueHero } from '@/components/weather/DayCueHero';
@@ -28,7 +29,11 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
   const current = weather.current ?? {};
   const currentCode = current.weather_code ?? 0;
   const speech = useDaymarkSpeech();
-  const narrationAvailableInLocale = isSupportedSpeechLocale(locale);
+  const voicePacks = useVoicePackState();
+  // Optional fr/es voices are selectable only after native READY. English is
+  // built in; a missing/failed pack must never fall back to English audio.
+  const narrationAvailableInLocale = isSupportedSpeechLocale(locale)
+    && voicePacks.isReady(locale);
   const stopSpeech = speech.stop;
   const previousLocale = useRef(locale);
   const briefing = useMemo(
