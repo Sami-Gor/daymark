@@ -206,6 +206,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private final PlaybackGeneration playbackGeneration = new PlaybackGeneration();
     /** Ownership token for this instance; stale generations must not release. */
     private volatile long generation;
+    /** Reservation owned by this instance's failed reload, for a safe retry. */
+    private volatile long recoverableReservation;
     /** True only after nativeInit succeeded, so release never calls into an unloaded library. */
     private volatile boolean nativeInitialised;
     /**
@@ -322,10 +324,12 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 return;
             }
             if (state == State.ERROR && generation > 0
-                    && EngineOwnership.currentGeneration() != 0
-                    && EngineOwnership.currentGeneration() != generation) {
-                // Another engine instance already took over; re-initialising
-                // here would reserve and steal its native generation.
+                    && !EngineOwnership.isAuthoritative(generation)
+                    && !isRecoverableError()) {
+                // This instance was revoked (a newer reservation is
+                // authoritative); retrying here would steal its generation.
+                // A failed reload that still owns the newest reservation is
+                // allowed to retry via isRecoverableError().
                 rejectError("engine-superseded");
                 return;
             }
@@ -633,6 +637,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 return;
             }
             reloadGeneration = EngineOwnership.beginInit();
+            recoverableReservation = reloadGeneration;
             // The reload is observable through the existing state machine:
             // LOADING until the replacement voice actually committed.
             setState(State.LOADING);
@@ -901,9 +906,16 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      * the generation is no longer current and a retry would steal its engine.
      */
     private boolean isRecoverableError() {
-        return state == State.ERROR
-                && generation > 0
-                && EngineOwnership.currentGeneration() == generation;
+        if (state != State.ERROR || generation <= 0) {
+            return false;
+        }
+        if (EngineOwnership.isAuthoritative(generation)) {
+            return true;
+        }
+        // An unrecovered reload reserved a generation that never committed;
+        // this instance may retry only while that reservation is still newest.
+        return recoverableReservation > 0
+                && EngineOwnership.isLatestReservation(recoverableReservation);
     }
 
     /**
@@ -1521,8 +1533,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     notifyError(opGeneration, playbackToken,
                             EngineOwnership.REASON_RELEASE_UNCONFIRMED);
                 }
-                setState(EngineOwnership.isReleaseUnconfirmed()
-                        ? State.ERROR : State.READY);
+                // The operation was not admitted: if this generation lost
+                // authority, READY would be a false engine-usable claim.
+                if (EngineOwnership.owns(opGeneration)) {
+                    setState(EngineOwnership.isReleaseUnconfirmed()
+                            ? State.ERROR : State.READY, opGeneration);
+                } else {
+                    setState(EngineOwnership.isReleaseUnconfirmed()
+                            ? State.ERROR : State.STOPPED, opGeneration);
+                }
             }
         }
     }
@@ -1656,6 +1675,16 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      * (ERROR/UNINITIALIZED) transitions are still delivered in order.
      */
     private void setState(final State next) {
+        setState(next, generation);
+    }
+
+    /**
+     * Publishes a state transition produced by {@code producingGeneration}.
+     * READY/SPEAKING delivery requires that generation to still be both the
+     * owning and the newest-reserved generation at delivery time, so a
+     * superseded instance can never surface engine-usable state.
+     */
+    private void setState(final State next, final long producingGeneration) {
         synchronized (lifecycleLock) {
             if (shuttingDown.get() && next != State.UNINITIALIZED) {
                 return;
@@ -1663,11 +1692,10 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             state = next;
             final Listener current = listener;
             if (current != null) {
-                final long deliveryReservation = EngineOwnership.reservedGeneration();
                 scheduler.postMain(new Runnable() {
                     @Override
                     public void run() {
-                        if (mayDeliverState(next, deliveryReservation)) {
+                        if (mayDeliverState(next, producingGeneration)) {
                             current.onStateChanged(next);
                         }
                     }
@@ -1688,7 +1716,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      * ordered lifecycle the listener already observed (a superseded instance
      * must still be able to report its terminal ERROR).
      */
-    private boolean mayDeliverState(State next, long deliveryReservation) {
+    private boolean mayDeliverState(State next, long producingGeneration) {
         if (next == State.UNINITIALIZED) {
             return true;
         }
@@ -1696,8 +1724,10 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             return true;
         }
         return !shuttingDown.get()
-                && deliveryReservation > 0
-                && deliveryReservation == EngineOwnership.reservedGeneration();
+                && producingGeneration > 0
+                && producingGeneration == generation
+                && EngineOwnership.owns(producingGeneration)
+                && EngineOwnership.isLatestReservation(producingGeneration);
     }
 
     /**
