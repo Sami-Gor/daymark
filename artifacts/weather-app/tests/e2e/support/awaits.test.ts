@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -11,37 +12,57 @@ import { describe, expect, it } from 'vitest';
  * either never executes or races the next step. This check statically scans the
  * E2E specs and page objects so the same class of mistake cannot return, and is
  * run by the normal Vitest unit-test layer in CI.
+ *
+ * Why a scanner when ESLint already enforces no-floating-promises? Type-aware
+ * lint catches dropped promises, but not an un-invoked matcher reference: the
+ * expression `expect(locator).toBeVisible;` is just a property access, not a
+ * promise, so the compiler and the lint rule see nothing wrong. That shape is
+ * exactly the original defect, so it keeps a dedicated static check here.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const e2eRoot = path.resolve(here, '..');
 
-/** Playwright matchers that return a promise and therefore need `await`. */
+/**
+ * Playwright matchers that return a promise and therefore need `await`.
+ *
+ * Kept in sync with the LocatorAssertions / PageAssertions / APIResponseAssertions
+ * / FunctionAssertions surfaces of @playwright/test 1.63. Generic matchers that
+ * resolve synchronously (`toBe`, `toEqual`, `toHaveLength`, `toHaveProperty`,
+ * ...) are deliberately not listed: flagging them would create false positives.
+ */
 const ASYNC_MATCHERS = [
-  'toBeVisible',
-  'toBeHidden',
   'toBeAttached',
-  'toHaveText',
-  'toContainText',
-  'toHaveCount',
-  'toHaveAttribute',
-  'toHaveClass',
-  'toHaveValue',
   'toBeChecked',
-  'toBeEnabled',
   'toBeDisabled',
   'toBeEditable',
+  'toBeEmpty',
+  'toBeEnabled',
   'toBeFocused',
+  'toBeHidden',
   'toBeInViewport',
+  'toBeOK',
+  'toBeVisible',
+  'toContainClass',
+  'toContainText',
+  'toHaveAccessibleDescription',
+  'toHaveAccessibleErrorMessage',
+  'toHaveAccessibleName',
+  'toHaveAttribute',
+  'toHaveClass',
+  'toHaveCount',
   'toHaveCSS',
   'toHaveId',
   'toHaveJSProperty',
-  'toHaveURL',
-  'toHaveTitle',
-  'toHaveScreenshot',
-  'toHaveAccessibleName',
-  'toHaveAccessibleDescription',
   'toHaveRole',
+  'toHaveScreenshot',
+  'toHaveText',
+  'toHaveTitle',
+  'toHaveURL',
+  'toHaveValue',
+  'toHaveValues',
+  'toMatchAriaSnapshot',
+  'toPass',
 ] as const;
 
 /** Playwright page/context/browser methods that return a promise. */
@@ -66,6 +87,11 @@ const ASYNC_ACTIONS = [
   'waitForTimeout',
   'waitForSelector',
   'waitForEvent',
+  'waitForFunction',
+  'waitForRequest',
+  'waitForResponse',
+  'waitForPopup',
+  'waitForDownload',
   'screenshot',
   'click',
   'dblclick',
@@ -92,7 +118,9 @@ const ASYNC_ACTIONS = [
 
 export type Violation = { line: number; text: string; reason: string };
 
-const ASYNC_MATCHER_PATTERN = new RegExp(`\\.(${ASYNC_MATCHERS.join('|')})\\s*\\(?`);
+// Anchor to a real identifier position so `something.expect(...)` cannot match.
+const EXPECT_STATEMENT_PATTERN = /(?:^|[^.\w$])expect(?:\.(?:soft|poll))?\s*\(/;
+const ASYNC_MATCHER_PATTERN = new RegExp(`\\.(${ASYNC_MATCHERS.join('|')})(?![A-Za-z0-9_$])`);
 const ASYNC_ACTION_PATTERN = new RegExp(
   `\\b(?:page|browser|context|dashboard|sections|search|voice|alerts|privacy|promo|api|geo|speech)\\.[\\w$]+\\(`,
 );
@@ -105,46 +133,60 @@ function isAwaited(trimmed: string): boolean {
   return /(^|[\s(])await\s+/.test(trimmed) || /^(return|void)\s+/.test(trimmed);
 }
 
-/** Detect un-awaited Playwright async assertions in a source string. */
+function parenBalance(text: string): number {
+  return (text.match(/\(/g) ?? []).length - (text.match(/\)/g) ?? []).length;
+}
+
+/**
+ * Collect the full assertion statement starting at `start`.
+ *
+ * A matcher chain can continue on the next line (`.toBeVisible();`) even when
+ * the `expect(...)` call itself is balanced, so both open parentheses and a
+ * leading-dot continuation are used to decide whether the statement continues.
+ */
+function collectAssertionStatement(lines: string[], start: number): string {
+  let text = lines[start].trim();
+  let balance = parenBalance(text);
+  let index = start;
+  while (index + 1 < lines.length) {
+    const next = lines[index + 1].trim();
+    if (balance <= 0 && !next.startsWith('.')) break;
+    index += 1;
+    text += `\n${next}`;
+    balance += parenBalance(next);
+  }
+  return text;
+}
+
+/** Detect un-awaited or un-invoked Playwright async assertions in a source string. */
 export function findUnawaitedAssertions(source: string): Violation[] {
   const lines = source.split('\n');
   const violations: Violation[] = [];
-  lines.forEach((line, index) => {
-    const trimmed = line.trim();
-    if (!trimmed || isComment(trimmed)) return;
-    if (!/\bexpect(?:\.poll)?\s*\(/.test(trimmed)) return;
-    if (isAwaited(trimmed)) return;
+  for (let index = 0; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (!trimmed || isComment(trimmed)) continue;
+    if (!EXPECT_STATEMENT_PATTERN.test(trimmed)) continue;
+    if (isAwaited(trimmed)) continue;
 
-    // A same-line matcher is the common case (and the original defect).
-    const sameLineMatcher = trimmed.match(ASYNC_MATCHER_PATTERN);
-    if (sameLineMatcher) {
-      violations.push({
-        line: index + 1,
-        text: trimmed,
-        reason: `un-awaited Playwright assertion (.${sameLineMatcher[1]})`,
-      });
-      return;
-    }
+    const statement = collectAssertionStatement(lines, index);
 
-    // Any un-awaited expect.poll is a defect regardless of line shape.
-    if (/\bexpect\.poll\s*\(/.test(trimmed)) {
+    // Any un-awaited expect.poll is a defect regardless of which matcher follows.
+    if (/\bexpect\.poll\s*\(/.test(statement)) {
       violations.push({ line: index + 1, text: trimmed, reason: 'un-awaited expect.poll' });
-      return;
+      continue;
     }
 
-    // Only scan following lines when the expect call itself is still open.
-    const openParens = (trimmed.match(/\(/g) ?? []).length;
-    const closeParens = (trimmed.match(/\)/g) ?? []).length;
-    if (openParens <= closeParens) return;
-    const window = lines.slice(index + 1, index + 4).join('\n');
-    const matcher = window.match(ASYNC_MATCHER_PATTERN);
-    if (!matcher) return;
+    const matcher = statement.match(ASYNC_MATCHER_PATTERN);
+    if (!matcher) continue;
+    const invoked = new RegExp(`\\.${matcher[1]}\\s*\\(`).test(statement);
     violations.push({
       line: index + 1,
       text: trimmed,
-      reason: `un-awaited Playwright assertion (.${matcher[1]})`,
+      reason: invoked
+        ? `un-awaited Playwright assertion (.${matcher[1]})`
+        : `un-invoked Playwright assertion (.${matcher[1]} is referenced but never called)`,
     });
-  });
+  }
   return violations;
 }
 
@@ -190,7 +232,8 @@ function walkTypeScriptFiles(directory: string): string[] {
   return files;
 }
 
-function collectViolations(directories: string[]): string[] {
+/** Collect scanner findings for every TypeScript file under the given directories. */
+export function collectViolations(directories: string[]): string[] {
   const problems: string[] = [];
   for (const directory of directories) {
     for (const file of walkTypeScriptFiles(directory)) {
@@ -209,19 +252,51 @@ describe('async assertion scanner', () => {
     const violations = findUnawaitedAssertions("expect(page.getByTestId('text-current-temperature')).toBeVisible;");
     expect(violations).toHaveLength(1);
     expect(violations[0].line).toBe(1);
+    expect(violations[0].reason).toContain('un-invoked');
+    expect(violations[0].reason).toContain('toBeVisible');
   });
 
   it('flags a missing await', () => {
-    expect(findUnawaitedAssertions("expect(page.getByTestId('x')).toHaveText('y');")).toHaveLength(1);
+    const violations = findUnawaitedAssertions("expect(page.getByTestId('x')).toHaveText('y');");
+    expect(violations).toHaveLength(1);
+    expect(violations[0].reason).toContain('un-awaited');
   });
 
   it('accepts awaited assertions, including multiline ones', () => {
     expect(findUnawaitedAssertions("await expect(page.getByTestId('x')).toBeVisible();")).toEqual([]);
-    expect(findUnawaitedAssertions("await expect\n  .poll(async () => 1)\n  .toBe(1);")).toEqual([]);
+    expect(findUnawaitedAssertions('await expect\n  .poll(async () => 1)\n  .toBe(1);')).toEqual([]);
+    expect(findUnawaitedAssertions("await expect(page.getByTestId('x'))\n  .toBeVisible();")).toEqual([]);
+  });
+
+  it('flags a multiline un-awaited assertion', () => {
+    const violations = findUnawaitedAssertions(
+      "expect(page.getByTestId('text-current-temperature'))\n  .toBeVisible();",
+    );
+    expect(violations).toHaveLength(1);
+    expect(violations[0].line).toBe(1);
+    expect(violations[0].reason).toContain('toBeVisible');
+  });
+
+  it('flags an un-awaited expect.poll', () => {
+    expect(findUnawaitedAssertions('expect.poll(async () => 1).toBe(1);')).toHaveLength(1);
+    expect(findUnawaitedAssertions('expect.poll(async () => 1)\n  .toBe(1);')).toHaveLength(1);
+  });
+
+  it('flags un-awaited expect.soft assertions', () => {
+    expect(findUnawaitedAssertions("expect.soft(page.getByTestId('x')).toBeVisible();")).toHaveLength(1);
+    expect(findUnawaitedAssertions("expect.soft(page.getByTestId('x'))\n  .toHaveText('y');")).toHaveLength(1);
+  });
+
+  it('knows the newer async matchers', () => {
+    expect(findUnawaitedAssertions("expect(page.getByTestId('x')).toMatchAriaSnapshot('- heading');")).toHaveLength(1);
+    expect(findUnawaitedAssertions("expect(page.getByTestId('x')).toBeEmpty();")).toHaveLength(1);
+    expect(findUnawaitedAssertions("expect(page.getByTestId('x')).toPass();")).toHaveLength(1);
   });
 
   it('ignores synchronous assertions and comments', () => {
     expect(findUnawaitedAssertions('expect(values).toEqual([1, 2]);')).toEqual([]);
+    expect(findUnawaitedAssertions('expect(values).toHaveLength(2);')).toEqual([]);
+    expect(findUnawaitedAssertions('expect(value).toBeTruthy();')).toEqual([]);
     expect(findUnawaitedAssertions("// expect(page.getByTestId('x')).toBeVisible;")).toEqual([]);
   });
 
@@ -233,6 +308,21 @@ describe('async assertion scanner', () => {
   it('accepts awaited actions and event subscriptions', () => {
     expect(findUnawaitedActions("await page.getByTestId('x').click();")).toEqual([]);
     expect(findUnawaitedActions("page.on('request', () => {});")).toEqual([]);
+    expect(findUnawaitedActions("page.once('request', () => {});")).toEqual([]);
+  });
+
+  it('reports file:line for collected violations', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'daymark-awaits-'));
+    try {
+      const file = path.join(directory, 'offender.ts');
+      writeFileSync(file, "page.getByTestId('x').click();\n");
+      const problems = collectViolations([directory]);
+      expect(problems).toHaveLength(1);
+      expect(problems[0]).toContain('offender.ts:1');
+      expect(problems[0]).toContain('un-awaited Playwright action');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 
