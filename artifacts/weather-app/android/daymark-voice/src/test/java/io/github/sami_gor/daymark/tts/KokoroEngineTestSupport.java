@@ -10,9 +10,12 @@ import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Deterministic JVM harness for {@link KokoroLocalTtsEngine}.
@@ -103,6 +106,43 @@ final class KokoroEngineTestSupport {
         }
     }
 
+    /**
+     * One native bridge call with the process-wide resource identity it
+     * touched. The ordered log is the oracle for cross-generation tests: a
+     * stale operation is detected when its call lands before/after the call it
+     * must not overlap, not by inspecting a single counter.
+     */
+    static final class NativeCall {
+        final int sequence;
+        final String kind;
+        final int instanceId;
+        final int streamToken;
+        final String detail;
+
+        NativeCall(int sequence, String kind, int instanceId, int streamToken, String detail) {
+            this.sequence = sequence;
+            this.kind = kind;
+            this.instanceId = instanceId;
+            this.streamToken = streamToken;
+            this.detail = detail;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder text = new StringBuilder("#").append(sequence).append(' ').append(kind);
+            if (instanceId != 0) {
+                text.append(" instance=").append(instanceId);
+            }
+            if (streamToken != 0) {
+                text.append(" stream=").append(streamToken);
+            }
+            if (detail != null) {
+                text.append(" (").append(detail).append(')');
+            }
+            return text.toString();
+        }
+    }
+
     /** Instrumented native bridge with deterministic failure switches. */
     static final class FakeNative implements KokoroLocalTtsEngine.NativeApi {
         boolean loaded = true;
@@ -151,6 +191,25 @@ final class KokoroEngineTestSupport {
         /** Invoked at the start of every {@link #synth} call. */
         Runnable onSynth;
 
+        /**
+         * Ordered record of every native call, shared by every engine instance
+         * in a test (the bridge is process-wide).
+         */
+        final List<NativeCall> calls =
+                Collections.synchronizedList(new ArrayList<NativeCall>());
+        /** Instance ids actually destroyed by {@link #release}; duplicates are a double free. */
+        final List<Integer> releasedInstanceIds =
+                Collections.synchronizedList(new ArrayList<Integer>());
+        /** Releases attempted while no native instance was live (blind release). */
+        int releaseWithoutInstance;
+        /** Native instance created by the last successful init; 0 once released. */
+        private int activeInstanceId;
+        /** Identity of the single process-wide STREAM slot; 0 when no stream is open. */
+        private int activeStreamToken;
+        private int nextInstanceId = 1;
+        private int nextStreamToken = 1;
+        private int callSequence;
+
         void failVoice(String voice) {
             failingVoices.add(voice);
         }
@@ -195,6 +254,16 @@ final class KokoroEngineTestSupport {
             }
             lastInitSucceeded = true;
             successfulInitCalls += 1;
+                record("init-failed", 0, 0, voiceName);
+                return "kokoro native init failed for " + voiceName;
+            }
+            int instanceId;
+            synchronized (this) {
+                instanceId = nextInstanceId++;
+                activeInstanceId = instanceId;
+                successfulInitCalls += 1;
+            }
+            record("init", instanceId, 0, voiceName);
             return null;
         }
 
@@ -210,27 +279,46 @@ final class KokoroEngineTestSupport {
             if (callback != null) {
                 callback.run();
             }
+            record("synth", activeInstanceId(), 0, voiceName);
             return null;
         }
 
         @Override
         public String streamStart(String text, String lang, String voiceName) {
             streamStartCalls += 1;
+            int token;
+            synchronized (this) {
+                token = nextStreamToken++;
+                activeStreamToken = token;
+            }
+            record("streamStart", activeInstanceId(), token, voiceName);
             Runnable callback = onStreamStart;
             if (callback != null) {
                 callback.run();
             }
+            if (streamStartError != null) {
+                synchronized (this) {
+                    if (activeStreamToken == token) {
+                        activeStreamToken = 0;
+                    }
+                }
+                record("streamStart-failed", activeInstanceId(), token, streamStartError);
+            }
+            record("streamStart-return", activeInstanceId(),
+                    streamStartError == null ? token : 0, null);
             return streamStartError;
         }
 
         @Override
         public void streamPush(String text) {
             streamPushCalls += 1;
+            record("streamPush", activeInstanceId(), activeStreamToken(), null);
         }
 
         @Override
         public void streamFinish() {
             streamFinishCalls += 1;
+            record("streamFinish", activeInstanceId(), activeStreamToken(), null);
         }
 
         @Override
@@ -240,6 +328,7 @@ final class KokoroEngineTestSupport {
             if (callback != null) {
                 callback.run();
             }
+            record("streamNext", activeInstanceId(), activeStreamToken(), null);
             synchronized (streamChunks) {
                 if (streamChunks.isEmpty()) {
                     return null;
@@ -251,14 +340,79 @@ final class KokoroEngineTestSupport {
         @Override
         public void streamClear() {
             streamClearCount += 1;
+            int cleared;
+            synchronized (this) {
+                cleared = activeStreamToken;
+                activeStreamToken = 0;
+            }
+            // A shared native STREAM slot: clearing whatever is currently open
+            // destroys a newer stream unless the caller is prevented from
+            // touching a slot it no longer owns.
+            record("streamClear", activeInstanceId(), cleared, null);
         }
 
         @Override
         public void release() {
             releaseCount += 1;
+            int released;
+            synchronized (this) {
+                released = activeInstanceId;
+                activeInstanceId = 0;
+                if (released == 0) {
+                    releaseWithoutInstance += 1;
+                } else {
+                    releasedInstanceIds.add(released);
+                }
+            }
+            record("release", released, 0, released == 0 ? "no live instance" : null);
             if (releaseThrows) {
                 throw new IllegalStateException("native release failed");
             }
+        }
+
+        private NativeCall record(String kind, int instanceId, int streamToken, String detail) {
+            synchronized (this) {
+                NativeCall call =
+                        new NativeCall(++callSequence, kind, instanceId, streamToken, detail);
+                calls.add(call);
+                return call;
+            }
+        }
+
+        synchronized int activeInstanceId() {
+            return activeInstanceId;
+        }
+
+        synchronized int activeStreamToken() {
+            return activeStreamToken;
+        }
+
+        /** Immutable snapshot of the call log, safe to iterate off-thread. */
+        List<NativeCall> callsSnapshot() {
+            synchronized (calls) {
+                return new ArrayList<>(calls);
+            }
+        }
+
+        List<Integer> releasedSnapshot() {
+            synchronized (releasedInstanceIds) {
+                return new ArrayList<>(releasedInstanceIds);
+            }
+        }
+
+        /** Count of calls of one kind, optionally restricted to one stream token. */
+        int countCalls(String kind, int streamToken) {
+            int count = 0;
+            for (NativeCall call : callsSnapshot()) {
+                if (call.kind.equals(kind) && (streamToken == -1 || call.streamToken == streamToken)) {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+
+        int countCalls(String kind) {
+            return countCalls(kind, -1);
         }
     }
 
@@ -318,8 +472,14 @@ final class KokoroEngineTestSupport {
 
     /** AudioTrack substitute whose writes can run test callbacks re-entrantly. */
     static final class FakeAudioFactory implements KokoroLocalTtsEngine.AudioFactory {
+        /** Per-handle write hook, used when a test must hold two sessions at once. */
+        interface WriteHook {
+            void onWrite(FakeHandle handle);
+        }
+
         final List<FakeHandle> handles = new ArrayList<>();
         Runnable onWrite;
+        WriteHook writeHook;
         int openCount;
 
         @Override
@@ -356,6 +516,11 @@ final class KokoroEngineTestSupport {
         @Override
         public int write(short[] buffer, int offset, int size) {
             writtenSamples += size;
+            FakeAudioFactory.WriteHook hook = factory.writeHook;
+            if (hook != null) {
+                hook.onWrite(this);
+                return size;
+            }
             Runnable callback = factory.onWrite;
             if (callback != null) {
                 callback.run();
@@ -522,6 +687,17 @@ final class KokoroEngineTestSupport {
             return nativeApi.initCalls.size();
         }
 
+        /**
+         * Builds a second engine object that shares the process-wide native
+         * bridge, assets, audio and log but has its own worker queue and
+         * listener: the renderer-recreation replacement in lifecycle tests.
+         */
+        KokoroLocalTtsEngine newEngine(ManualScheduler secondScheduler,
+                RecordingListener secondListener) {
+            return new KokoroLocalTtsEngine(
+                    secondScheduler, assets, audio, nativeApi, log, clock);
+        }
+
         Set<String> loaded() {
             return new HashSet<>(engine.loadedVoices());
         }
@@ -533,6 +709,58 @@ final class KokoroEngineTestSupport {
 
     static <T> List<T> copyOf(Collection<T> source) {
         return new ArrayList<>(source);
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Deterministic cross-thread helpers (latches, never Thread.sleep)    *
+     * ------------------------------------------------------------------ */
+
+    static Thread startDaemon(String name, final Runnable body) {
+        Thread thread = new Thread(body, name);
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
+    }
+
+    static void joinOrFail(Thread thread) {
+        try {
+            thread.join(5000);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("interrupted while joining " + thread.getName());
+        }
+        assertTrue("worker thread did not finish: " + thread.getName(), !thread.isAlive());
+    }
+
+    /** Bounded wait used only to decide whether a forbidden event happens at all. */
+    static boolean awaitQuietly(CountDownLatch latch, long millis) {
+        try {
+            return latch.await(millis, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("interrupted while awaiting a test latch", interrupted);
+        }
+    }
+
+    static void await(CountDownLatch latch, String what) {
+        try {
+            assertTrue("timed out waiting for " + what, latch.await(5, TimeUnit.SECONDS));
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("interrupted while waiting for " + what, interrupted);
+        }
+    }
+
+    /** Used from inside a fake-native or audio hook running on a worker thread. */
+    static void awaitUnchecked(CountDownLatch latch, String what) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("timed out waiting inside a native hook for " + what);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("interrupted inside a native hook", interrupted);
+        }
     }
 
     /**
