@@ -1,5 +1,33 @@
 apply plugin: 'com.android.library'
 
+/*
+ * Optional narration pack source configuration (Agent C).
+ *
+ * These values are compiled into BuildConfig, never read from the web layer or
+ * a runtime preference. The public Ed25519 key is the only key material in the
+ * build: the matching private key belongs to release tooling and must never be
+ * committed. Debug builds point at the development pack host; release builds
+ * are intentionally EMPTY by default so PackSourceConfig fails closed
+ * (packs-unconfigured) until release engineering supplies the production host
+ * and public key with -PdaymarkReleasePackBaseUrl / -PdaymarkReleasePackTrustAnchor.
+ */
+def packConfigString = { String value ->
+    '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
+}
+def packProperty = { String name, String fallback ->
+    (project.findProperty(name) ?: fallback).toString()
+}
+def debugPackBaseUrl = packProperty(
+        'daymarkPackBaseUrl', 'https://packs.dev.daymark.app/v21')
+def debugPackTrustAnchor = packProperty(
+        'daymarkPackTrustAnchor',
+        '2913931e905640452ad0498185e5bd928c1ca6444908094e872a2f9d24605102')
+def debugPackAllowedVoices = packProperty(
+        'daymarkPackAllowedVoices', 'ff_siwis')
+def releasePackBaseUrl = packProperty('daymarkReleasePackBaseUrl', '')
+def releasePackTrustAnchor = packProperty('daymarkReleasePackTrustAnchor', '')
+def releasePackAllowedVoices = packProperty('daymarkReleasePackAllowedVoices', '')
+
 android {
     namespace = "io.github.sami_gor.daymark.voice"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -28,6 +56,12 @@ android {
             buildConfigField "boolean", "PACKAGED_MULTILINGUAL_VOICES", "true"
             // Development builds may exercise em_alex locally.
             buildConfigField "boolean", "SPANISH_VOICE_DISTRIBUTION_APPROVED", "true"
+            // Development pack source. The public anchor is safe to ship in a
+            // debug variant; its private half is provisioned out-of-band and is
+            // not in this repository.
+            buildConfigField "String", "PACK_BASE_URL", packConfigString(debugPackBaseUrl)
+            buildConfigField "String", "PACK_TRUST_ANCHOR", packConfigString(debugPackTrustAnchor)
+            buildConfigField "String", "PACK_ALLOWED_VOICE_IDS", packConfigString(debugPackAllowedVoices)
         }
         release {
             // V2.1 ships multilingual narration, but the base APK packages only
@@ -38,6 +72,12 @@ android {
             // Release distribution of em_alex is blocked until written speaker
             // rights evidence exists; flip only after that evidence is recorded.
             buildConfigField "boolean", "SPANISH_VOICE_DISTRIBUTION_APPROVED", "false"
+            // Fail closed: release builds ship no pack source until release
+            // engineering injects the production host and public key. An empty
+            // configuration makes PackSourceConfig throw packs-unconfigured.
+            buildConfigField "String", "PACK_BASE_URL", packConfigString(releasePackBaseUrl)
+            buildConfigField "String", "PACK_TRUST_ANCHOR", packConfigString(releasePackTrustAnchor)
+            buildConfigField "String", "PACK_ALLOWED_VOICE_IDS", packConfigString(releasePackAllowedVoices)
         }
     }
 
