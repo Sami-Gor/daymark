@@ -54,6 +54,18 @@ beforeAll(() => {
   fixtureEslint = new ESLint({ cwd: appRoot, ignore: false });
 });
 
+/**
+ * Lint one deliberately-invalid fixture with the configured ESLint instance.
+ *
+ * Uses the `ignore: false` instance so the fixture directory's normal ignore
+ * rules do not apply here, and runs the real `eslint.config.mjs` so the guard
+ * proves the async rules fire rather than trusting the configuration.
+ *
+ * @param name Fixture basename without the `.fixture.ts` suffix.
+ * @returns ESLint's result for that fixture, including its rule violations.
+ * @throws Error when ESLint returns no result (for example the fixture was
+ * renamed or moved), so fixture drift fails the guard instead of passing.
+ */
 async function lintFixture(name: string): Promise<ESLint.LintResult> {
   const [result] = await fixtureEslint.lintFiles([relativeFixture(name)]);
   if (!result) throw new Error(`ESLint returned no result for fixture "${name}"`);

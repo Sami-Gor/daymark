@@ -46,6 +46,19 @@ export class LocalityWorkerProbe {
       probeWindow.__daymarkLocalityWorkerMessages = messages;
       const OriginalWorker = window.Worker;
       if (typeof OriginalWorker !== 'function') return;
+      /**
+       * Replacement Worker constructor installed in the page by the probe.
+       *
+       * Forwards construction to the real `Worker` and returns it unchanged.
+       * For the locality worker asset only, it also attaches a `message`
+       * listener that appends each event to the probe's `messages` array; the
+       * app's own `onmessage` handler still runs, and events are recorded
+       * without being altered. Non-locality workers get no listener.
+       *
+       * @param scriptURL Worker script URL exactly as the app passed it.
+       * @param options Standard Worker construction options.
+       * @returns The real Worker instance.
+       */
       function ProbeWorker(this: unknown, scriptURL: string | URL, options?: WorkerOptions): Worker {
         const worker = new OriginalWorker(scriptURL, options);
         if (String(scriptURL).includes('locality.worker')) {
