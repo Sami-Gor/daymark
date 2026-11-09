@@ -361,7 +361,7 @@ public class N1StreamShutdownRaceTest {
         assertEquals("exactly one release attempt", 1, harness.nativeApi.releaseCount);
         assertEquals(1, harness.nativeApi.successfulInitCalls);
         assertTrue("a failed release must be reported, not swallowed silently",
-                hasWarning("release failed"));
+                hasFailureLog("release failed"));
         assertEquals(LocalTtsEngine.State.UNINITIALIZED, harness.listener.lastState());
         assertFalse(harness.listener.states.contains(LocalTtsEngine.State.READY));
         // The helper clears the flag before entering the bridge, so a throwing
@@ -426,6 +426,21 @@ public class N1StreamShutdownRaceTest {
             Thread.currentThread().interrupt();
             throw new AssertionError("interrupted inside a native hook", interrupted);
         }
+    }
+
+    /** Release failures surface as warnings (baseline) or errors (v2 helper). */
+    private boolean hasFailureLog(String fragment) {
+        for (String line : harness.log.warnings) {
+            if (line != null && line.contains(fragment)) {
+                return true;
+            }
+        }
+        for (String line : harness.log.errors) {
+            if (line != null && line.contains(fragment)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hasWarning(String fragment) {
