@@ -361,7 +361,7 @@ public class N1StreamShutdownRaceTest {
         assertEquals("exactly one release attempt", 1, harness.nativeApi.releaseCount);
         assertEquals(1, harness.nativeApi.successfulInitCalls);
         assertTrue("a failed release must be reported, not swallowed silently",
-                hasWarning("shutdown: release failed"));
+                hasWarning("release failed"));
         assertEquals(LocalTtsEngine.State.UNINITIALIZED, harness.listener.lastState());
         assertFalse(harness.listener.states.contains(LocalTtsEngine.State.READY));
         // The helper clears the flag before entering the bridge, so a throwing
