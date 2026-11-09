@@ -16,10 +16,21 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+import io.github.sami_gor.daymark.packs.HttpUrlConnectionTransport;
+import io.github.sami_gor.daymark.packs.PackDownloader;
+import io.github.sami_gor.daymark.packs.PackInstaller;
+import io.github.sami_gor.daymark.packs.PackSignatureVerifier;
+import io.github.sami_gor.daymark.packs.PackSourceConfig;
+import io.github.sami_gor.daymark.packs.VoicePackManager;
+import io.github.sami_gor.daymark.packs.VoiceRegistrationFlow;
 import io.github.sami_gor.daymark.tts.KokoroLocalTtsEngine;
 import io.github.sami_gor.daymark.tts.LocalTtsEngine;
 
@@ -40,7 +51,14 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
 
     private KokoroLocalTtsEngine engine;
     /** Connects verified pack installs to native voice registration. */
-    private io.github.sami_gor.daymark.packs.VoiceRegistrationFlow voiceFlow;
+    private VoiceRegistrationFlow voiceFlow;
+    /** Orchestrates download → verify → install → activate → register. */
+    private VoicePackManager packManager;
+    private PackSourceConfig packSource;
+    private ExecutorService packExecutor;
+    private String packConfigError = "";
+    private final Object packLock = new Object();
+    private String activePackOperationId;
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
     private boolean focusHeld;
@@ -67,6 +85,15 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     public void load() {
         Context context = getContext();
         audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        // Pack source configuration is compiled into the variant. An empty
+        // production configuration fails closed here and never offers a download.
+        loadPackSource();
+        voiceFlow = createVoiceFlow();
+        packExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "daymark-pack-install");
+            thread.setDaemon(true);
+            return thread;
+        });
         // Resolve the optional native library synchronously so isAvailable()
         // cannot report voice as ready while the load is still failing.
         if (!io.github.sami_gor.daymark.tts.NativeLibraryState.ensureLoaded()) {
@@ -74,30 +101,11 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             state = LocalTtsEngine.State.ERROR;
             lastFailureReason = reason == null ? "native-unavailable" : reason;
             Log.e(TAG, "load: native library unavailable: " + lastFailureReason);
+            buildPackManager();
             return;
         }
         try {
             engine = new KokoroLocalTtsEngine(context);
-            voiceFlow = new io.github.sami_gor.daymark.packs.VoiceRegistrationFlow(
-                    new io.github.sami_gor.daymark.packs.VoiceActivationCoordinator.Registrar() {
-                        @Override
-                        public void register(final String voiceId,
-                                final io.github.sami_gor.daymark.packs.VoiceActivationCoordinator
-                                        .RegistrationCallback callback) {
-                            engine.registerVoice(voiceId,
-                                    new KokoroLocalTtsEngine.VoiceOperationResult() {
-                                        @Override
-                                        public void onSuccess(java.util.Set<String> installed) {
-                                            callback.onRegistered(installed);
-                                        }
-
-                                        @Override
-                                        public void onError(String code) {
-                                            callback.onFailed(code);
-                                        }
-                                    });
-                        }
-                    });
             engine.initialize(this);
         } catch (Throwable failure) {
             // A missing or incompatible optional voice library must never take
@@ -107,6 +115,84 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
             state = LocalTtsEngine.State.ERROR;
             lastFailureReason = "native-unavailable";
             Log.e(TAG, "load: voice engine unavailable: " + failure.getMessage(), failure);
+        }
+        buildPackManager();
+    }
+
+    private void loadPackSource() {
+        try {
+            packSource = PackSourceConfig.fromBuildConfig(
+                    BuildConfig.PACK_BASE_URL,
+                    BuildConfig.PACK_TRUST_ANCHOR,
+                    BuildConfig.PACK_ALLOWED_VOICE_IDS);
+            packConfigError = "";
+        } catch (PackSourceConfig.ConfigurationException failure) {
+            packSource = null;
+            packConfigError = failure.reason;
+            Log.w(TAG, "load: narration pack source unavailable: " + failure.reason);
+        }
+    }
+
+    private VoiceRegistrationFlow createVoiceFlow() {
+        return new VoiceRegistrationFlow((voiceId, callback) -> {
+            KokoroLocalTtsEngine current = engine;
+            if (current == null) {
+                callback.onFailed("native-unavailable");
+                return;
+            }
+            current.registerVoice(voiceId, new KokoroLocalTtsEngine.VoiceOperationResult() {
+                @Override
+                public void onSuccess(java.util.Set<String> installed) {
+                    callback.onRegistered(installed);
+                }
+
+                @Override
+                public void onError(String code) {
+                    callback.onFailed(code);
+                }
+            });
+        });
+    }
+
+    private void buildPackManager() {
+        if (packSource == null || voiceFlow == null || packExecutor == null) {
+            return;
+        }
+        try {
+            File filesDir = getContext().getFilesDir();
+            File voicesDir = new File(filesDir, "kokoro");
+            PackInstaller installer = new PackInstaller(filesDir);
+            PackDownloader downloader = new PackDownloader(
+                    installer,
+                    voicesDir,
+                    new HttpUrlConnectionTransport(),
+                    new PackSignatureVerifier(packSource.trustAnchor()),
+                    appVersionCode(),
+                    false,
+                    PackDownloader.FreeSpace.fileSystem());
+            packManager = new VoicePackManager(
+                    packSource,
+                    installer,
+                    voicesDir,
+                    downloader,
+                    voiceFlow,
+                    packExecutor::execute,
+                    null);
+        } catch (RuntimeException failure) {
+            packManager = null;
+            packConfigError = "pack-source-invalid";
+            Log.e(TAG, "load: cannot build pack manager: " + failure.getMessage(), failure);
+        }
+    }
+
+    private long appVersionCode() {
+        try {
+            return getContext().getPackageManager()
+                    .getPackageInfo(getContext().getPackageName(), 0).getLongVersionCode();
+        } catch (Exception failure) {
+            // A missing package record must not make packs look newer than the
+            // app; the smallest positive version keeps minAppVersion checks on.
+            return 1L;
         }
     }
 
@@ -151,6 +237,146 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     }
 
     /**
+     * Local metadata for optional narration packs: known download size, licence
+     * text, install/readiness state and whether this build has a usable pack
+     * source. Never downloads a payload and never touches the network.
+     */
+    @PluginMethod
+    public void getVoicePackInfo(PluginCall call) {
+        JSObject result = new JSObject();
+        boolean configured = packSource != null && packManager != null;
+        result.put("sourceConfigured", configured);
+        result.put("nativeAvailable", engine != null);
+        if (!configured) {
+            result.put("errorCode",
+                    packConfigError.isEmpty() ? PackSourceConfig.UNCONFIGURED : packConfigError);
+        }
+        JSArray voices = new JSArray();
+        if (configured) {
+            for (VoicePackManager.Info info : packManager.infos()) {
+                voices.put(packInfoObject(info));
+            }
+        }
+        result.put("voices", voices);
+        call.resolve(result);
+    }
+
+    private static JSObject packInfoObject(VoicePackManager.Info info) {
+        JSObject voice = new JSObject();
+        voice.put("voiceId", info.voiceId);
+        voice.put("packId", info.packId);
+        voice.put("language", info.language);
+        voice.put("sizeBytes", info.sizeBytes);
+        voice.put("installedVersion", info.installedVersion);
+        voice.put("installed", info.installed);
+        voice.put("ready", info.ready);
+        voice.put("state", info.state);
+        JSObject licence = new JSObject();
+        licence.put("spdx", info.licenceSpdx);
+        licence.put("name", info.licenceName);
+        licence.put("url", info.licenceUrl);
+        licence.put("attribution", info.licenceAttribution);
+        licence.put("notice", info.licenceNotice);
+        voice.put("licence", licence);
+        return voice;
+    }
+
+    /**
+     * Starts a user-initiated pack install. The web layer supplies the voice id
+     * (validated against the compiled allow-list) and an optional operation id
+     * used to correlate progress events. No URL or file path is accepted.
+     */
+    @PluginMethod
+    public void installVoicePack(PluginCall call) {
+        String voiceId = trimmed(call.getString("voiceId"));
+        if (voiceId == null) {
+            call.reject("invalid-voice");
+            return;
+        }
+        if (engine == null) {
+            call.reject("native-unavailable");
+            return;
+        }
+        if (packSource == null || packManager == null) {
+            call.reject(packConfigError.isEmpty() ? PackSourceConfig.UNCONFIGURED : packConfigError);
+            return;
+        }
+        if (!packSource.allows(voiceId)) {
+            call.reject("unsupported-voice");
+            return;
+        }
+        String requestedOperation = trimmed(call.getString("operationId"));
+        String operationId = requestedOperation == null
+                ? UUID.randomUUID().toString() : requestedOperation;
+        if (!operationId.matches("[A-Za-z0-9._:-]{1,120}")) {
+            call.reject("invalid-operation");
+            return;
+        }
+        synchronized (packLock) {
+            if (activePackOperationId != null) {
+                call.reject("install-in-progress");
+                return;
+            }
+            activePackOperationId = operationId;
+        }
+        String startError = packManager.start(voiceId, operationId, outcome -> {
+            mainHandler.post(() -> {
+                synchronized (packLock) {
+                    if (operationId.equals(activePackOperationId)) {
+                        activePackOperationId = null;
+                    }
+                }
+                if (outcome.ready) {
+                    JSObject resolved = new JSObject();
+                    resolved.put("voiceId", voiceId);
+                    resolved.put("operationId", operationId);
+                    resolved.put("ready", true);
+                    JSObject stateMap = new JSObject();
+                    for (java.util.Map.Entry<String, String> entry : outcome.states.entrySet()) {
+                        stateMap.put(entry.getKey(), entry.getValue());
+                    }
+                    resolved.put("states", stateMap);
+                    call.resolve(resolved);
+                } else {
+                    String code = outcome.errorCode.isEmpty()
+                            ? "pack-install-failed" : outcome.errorCode;
+                    call.reject(code, code);
+                }
+            });
+        });
+        if (startError != null) {
+            synchronized (packLock) {
+                if (operationId.equals(activePackOperationId)) {
+                    activePackOperationId = null;
+                }
+            }
+            call.reject(startError);
+        }
+    }
+
+    /** Cooperative cancellation for the active install, if it is still current. */
+    @PluginMethod
+    public void cancelVoicePackInstall(PluginCall call) {
+        String operationId = trimmed(call.getString("operationId"));
+        if (operationId == null || !operationId.matches("[A-Za-z0-9._:-]{1,120}")) {
+            call.reject("invalid-operation");
+            return;
+        }
+        boolean cancelled = packManager != null && packManager.cancel(operationId);
+        JSObject result = new JSObject();
+        result.put("cancelled", cancelled);
+        call.resolve(result);
+    }
+
+    private static String trimmed(String value) {
+        if (value == null) {
+            return null;
+        }
+        String text = value.trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    /**
      * Registers a voice file the pack manager has already verified and installed.
      * The engine reloads its native voice set and reports the resulting list.
      */
@@ -179,8 +405,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         // The pack manager installed and verified the file before calling in;
         // record that, then ask the runtime to load it.
         voiceFlow.installVerified(id);
-        voiceFlow.activate(id, new io.github.sami_gor.daymark.packs
-                .VoiceRegistrationFlow.Result() {
+        voiceFlow.activate(id, new VoiceRegistrationFlow.Result() {
             @Override
             public void onResult(boolean ready, String error,
                     java.util.Map<String, String> states) {
@@ -386,6 +611,17 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         cancelReadyTimeout();
         resolvePendingSpeak();
         abandonAudioFocus();
+        synchronized (packLock) {
+            if (activePackOperationId != null && packManager != null) {
+                packManager.cancel(activePackOperationId);
+            }
+            activePackOperationId = null;
+        }
+        if (packExecutor != null) {
+            packExecutor.shutdownNow();
+            packExecutor = null;
+        }
+        packManager = null;
         if (engine != null) {
             engine.shutdown();
             engine = null;

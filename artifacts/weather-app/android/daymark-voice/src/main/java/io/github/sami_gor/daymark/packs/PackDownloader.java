@@ -48,6 +48,39 @@ public final class PackDownloader {
         }
     }
 
+    /** Coarse install stage, reported before the work for that stage starts. */
+    public enum Stage {
+        VERIFYING,
+        DOWNLOADING,
+        INSTALLING,
+        ACTIVATING
+    }
+
+    /**
+     * Optional observer for callers that surface install phases to a UI. The
+     * callbacks run on the caller's thread and never replace the authoritative
+     * size/hash checks in {@link PackInstaller}.
+     */
+    public interface StageObserver {
+        void onStage(Stage stage);
+    }
+
+    /** A verified manifest together with the detached signature that proved it. */
+    public static final class FetchedManifest {
+        public final PackManifest manifest;
+        private final byte[] signature;
+
+        FetchedManifest(PackManifest manifest, byte[] signature) {
+            this.manifest = manifest;
+            this.signature = signature == null ? null : signature.clone();
+        }
+
+        /** Detached 64-byte Ed25519 signature over {@link PackManifest#canonicalBytes()}. */
+        public byte[] signature() {
+            return signature == null ? null : signature.clone();
+        }
+    }
+
     /** Result of a successful install or update. */
     public static final class Result {
         public final String packId;
@@ -124,6 +157,16 @@ public final class PackDownloader {
     /** Fetches, parses and authenticates a manifest and its detached signature. */
     public PackManifest fetchManifest(String manifestUrl, String signatureUrl)
             throws PackInstaller.PackException {
+        return fetchVerifiedManifest(manifestUrl, signatureUrl).manifest;
+    }
+
+    /**
+     * Fetches, parses and authenticates a manifest, returning the detached
+     * signature as well so the caller can pass it to {@link #install} without a
+     * second network fetch.
+     */
+    public FetchedManifest fetchVerifiedManifest(String manifestUrl, String signatureUrl)
+            throws PackInstaller.PackException {
         byte[] manifestBytes;
         byte[] signature;
         try {
@@ -152,9 +195,25 @@ public final class PackDownloader {
             byte[] signature,
             PackTransport.Progress progress,
             PackTransport.CancelSignal cancel) throws PackInstaller.PackException {
+        return install(manifest, payloadUrl, signature, progress, cancel, null);
+    }
+
+    /**
+     * Installs (or updates to) a signed manifest, reporting coarse stages to
+     * {@code observer}. The observer is advisory: it cannot skip verification
+     * or change the expected size/digest.
+     */
+    public Result install(
+            PackManifest manifest,
+            String payloadUrl,
+            byte[] signature,
+            PackTransport.Progress progress,
+            PackTransport.CancelSignal cancel,
+            StageObserver observer) throws PackInstaller.PackException {
         if (manifest == null) {
             throw new PackInstaller.PackException("invalid-manifest", "manifest is missing");
         }
+        notifyStage(observer, Stage.VERIFYING);
         try {
             verifier.verify(manifest, signature);
         } catch (PackSignatureVerifier.SignatureException e) {
@@ -197,6 +256,7 @@ public final class PackDownloader {
         }
 
         if (alreadyDownloaded < expectedSize) {
+            notifyStage(observer, Stage.DOWNLOADING);
             try {
                 transport.download(payloadUrl, part, true, expectedSize, progress, cancel);
             } catch (PackTransport.TransportException e) {
@@ -215,12 +275,14 @@ public final class PackDownloader {
                     "downloaded " + downloaded + " bytes, expected " + expectedSize);
         }
 
+        notifyStage(observer, Stage.INSTALLING);
         PackInstaller.Installed installed =
                 installer.installStaged(packId, version, part, expectedSize, expectedSha256);
         long previousVersion = installer.activeVersion(packId);
         File voiceFile = new File(voicesDir, manifest.voiceId() + ".bin");
         File backup = new File(voicesDir, "." + manifest.voiceId() + ".bin.backup");
         boolean replacedVoice = publishVoice(installed.directory, voiceFile, backup, expectedSha256);
+        notifyStage(observer, Stage.ACTIVATING);
         try {
             installer.activate(installed);
         } catch (PackInstaller.PackException activationFailure) {
@@ -269,7 +331,7 @@ public final class PackDownloader {
         return new Removed(packId, voiceId, deleted);
     }
 
-    private PackManifest parseAndVerify(byte[] manifestBytes, byte[] signature)
+    private FetchedManifest parseAndVerify(byte[] manifestBytes, byte[] signature)
             throws PackInstaller.PackException {
         PackManifest manifest;
         try {
@@ -283,7 +345,13 @@ public final class PackDownloader {
         } catch (PackSignatureVerifier.SignatureException e) {
             throw new PackInstaller.PackException(e.reason, e.getMessage());
         }
-        return manifest;
+        return new FetchedManifest(manifest, signature);
+    }
+
+    private static void notifyStage(StageObserver observer, Stage stage) {
+        if (observer != null) {
+            observer.onStage(stage);
+        }
     }
 
     /**
