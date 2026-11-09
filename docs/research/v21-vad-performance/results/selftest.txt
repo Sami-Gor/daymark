@@ -1,0 +1,2 @@
+selftest wav: capture=3500 ms expected=3500 ms
+selftest PASS: detector port, capture timing, WAV round-trip, truncation
