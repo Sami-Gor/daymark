@@ -44,6 +44,13 @@ import io.github.sami_gor.daymark.voice.BuildConfig;
  * {@link #loadedVoices()} only ever contains voices a committed native
  * initialisation actually loaded, never merely installed files.
  *
+ * <p>Listener callbacks are generation-fenced: every deferred completion
+ * captures the ownership generation (and playback token) that produced it and
+ * re-validates that identity on the main thread immediately before delivery.
+ * A callback from a superseded or shut-down generation is dropped, so it can
+ * neither publish {@code READY}/{@code SPEAKING}, nor report a stale error,
+ * nor inject an audio measurement into the current generation.
+ *
  * <p>For JVM tests every platform dependency is injectable through the
  * package-private constructor: scheduling, native bridge, packaged assets,
  * audio output, logging and the clock.
@@ -298,20 +305,20 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             if (shuttingDown.get()) {
                 // The worker/handlers are gone; reporting an error is the only
                 // honest outcome. A replacement engine instance is required.
-                notifyError("engine-shutdown");
+                rejectError("engine-shutdown");
                 return;
             }
             if (EngineOwnership.isReleaseUnconfirmed()) {
                 // A previous native release threw; the native slots may still
                 // hold a half-released engine. No init may run on that state.
-                notifyError("Initialization failed: "
+                rejectError("Initialization failed: "
                         + EngineOwnership.REASON_RELEASE_UNCONFIRMED);
                 setState(State.ERROR);
                 return;
             }
             if (state == State.LOADING || state == State.READY
                     || state == State.SPEAKING || state == State.STOPPED) {
-                notifyError("operation-conflict");
+                rejectError("operation-conflict");
                 return;
             }
             if (state == State.ERROR && generation > 0
@@ -319,11 +326,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     && EngineOwnership.currentGeneration() != generation) {
                 // Another engine instance already took over; re-initialising
                 // here would reserve and steal its native generation.
-                notifyError("engine-superseded");
+                rejectError("engine-superseded");
                 return;
             }
             if (!initializationInFlight.compareAndSet(false, true)) {
-                notifyError("operation-conflict");
+                rejectError("operation-conflict");
                 return;
             }
             initGeneration = EngineOwnership.beginInit();
@@ -361,7 +368,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 log.e("initialize: native library unavailable: " + reason, null);
                 // Voice is optional: report a classified failure and leave
                 // the rest of the app fully usable.
-                notifyError("Initialization failed: "
+                notifyError(initGeneration, "Initialization failed: "
                         + (reason == null ? NativeLibraryState.REASON_NATIVE_UNAVAILABLE : reason));
                 setState(State.ERROR);
                 return;
@@ -384,7 +391,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             } catch (Throwable failure) {
                 log.e("initialize: failed: " + failure.getMessage(), failure);
                 if (!shuttingDown.get()) {
-                    notifyError("Initialization failed: " + failure.getMessage());
+                    notifyError(initGeneration,
+                            "Initialization failed: " + failure.getMessage());
                     setState(State.ERROR);
                 }
             }
@@ -488,14 +496,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             return;
         }
         if (blocked) {
-            failClosedReleaseUnconfirmed("initialize");
+            failClosedReleaseUnconfirmed("initialize", initGeneration);
             return;
         }
         if (error != null) {
             log.e("initialize: failed: " + error, null);
             // Notify before the terminal state so the bridge can preserve the
             // specific asset/model reason for the UI.
-            notifyError("Initialization failed: " + error);
+            notifyError(initGeneration, "Initialization failed: " + error);
             setState(State.ERROR);
             return;
         }
@@ -516,11 +524,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      * unknown state. There is deliberately no retry: the bridge has no way to
      * prove the engine is gone.
      */
-    private void failClosedReleaseUnconfirmed(String operation) {
+    private void failClosedReleaseUnconfirmed(String operation, long initGeneration) {
         String reason = EngineOwnership.REASON_RELEASE_UNCONFIRMED;
         log.e(operation + ": blocked, native release unconfirmed", null);
         if (!shuttingDown.get()) {
-            notifyError(reason);
+            notifyError(initGeneration, reason);
             setState(State.ERROR);
         }
     }
@@ -940,39 +948,39 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         final long opGeneration;
         synchronized (lifecycleLock) {
             if (shuttingDown.get()) {
-                notifyError("engine-shutdown");
+                rejectError("engine-shutdown");
                 return;
             }
             if (EngineOwnership.isReleaseUnconfirmed()) {
-                notifyError(EngineOwnership.REASON_RELEASE_UNCONFIRMED);
+                rejectError(EngineOwnership.REASON_RELEASE_UNCONFIRMED);
                 return;
             }
             if (state != State.READY && state != State.STOPPED) {
-                notifyError("engine not ready");
+                rejectError("engine not ready");
                 return;
             }
             if (!EngineOwnership.owns(generation)) {
                 // Another engine instance owns the process-wide native engine;
                 // speaking here would use (or release) its generation.
-                notifyError("engine-superseded");
+                rejectError("engine-superseded");
                 return;
             }
             opGeneration = generation;
             voice = NarrationVoicePolicy.voiceForLanguage(
                     lang, BuildConfig.MULTILINGUAL_NARRATION, installedVoiceNames());
             if (voice == null) {
-                notifyError("Unsupported narration language: " + lang);
+                rejectError("Unsupported narration language: " + lang);
                 return;
             }
             if (!NarrationVoicePolicy.isVoiceDistributable(
                     voice, BuildConfig.SPANISH_VOICE_DISTRIBUTION_APPROVED)) {
-                notifyError("voice-rights-unresolved");
+                rejectError("voice-rights-unresolved");
                 return;
             }
             if (!loadedVoices.contains(voice)) {
                 // The file may be installed but the native engine has not loaded it
                 // yet; never fall back to English or another voice.
-                notifyError("voice-not-loaded");
+                rejectError("voice-not-loaded");
                 return;
             }
             playbackToken = playbackGeneration.begin();
@@ -1147,7 +1155,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             // The engine was reloaded or shut down between speak() and this
             // worker task, or a native release is unconfirmed. No native call
             // may run for this generation.
-            failUnadmittedPlayback(playbackToken);
+            failUnadmittedPlayback(playbackToken, opGeneration);
             return;
         }
         try {
@@ -1190,29 +1198,22 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             }
             if (samples == null || samples.length == 0) {
                 if (isPlaybackCurrent(playbackToken, opGeneration)) {
-                    notifyError("Synthesis returned no audio");
+                    notifyError(opGeneration, playbackToken,
+                            "Synthesis returned no audio");
                     setState(State.READY);
                 }
                 return;
             }
             long audioDurationMs = Math.round(samples.length * 1000.0 / SAMPLE_RATE);
 
-            final Listener current = listener;
-            if (current != null) {
-                final long duration = audioDurationMs;
-                scheduler.postMain(new Runnable() {
-                    @Override
-                    public void run() {
-                        current.onAudioMeasured(0, duration);
-                    }
-                });
-            }
+            notifyAudioMeasured(opGeneration, playbackToken, audioDurationMs);
 
             playSamples(samples, callTimeMs, playbackToken, opGeneration);
         } catch (Throwable failure) {
             log.e("synthesis/playback failed: " + failure.getMessage(), failure);
             if (isPlaybackCurrent(playbackToken, opGeneration)) {
-                notifyError("Synthesis failed: " + failure.getMessage());
+                notifyError(opGeneration, playbackToken,
+                        "Synthesis failed: " + failure.getMessage());
                 setState(State.READY);
             }
         } finally {
@@ -1383,23 +1384,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             stopped = !isPlaybackCurrent(playbackToken, opGeneration) || revoked;
             if (chunks == 0) {
                 if (isPlaybackCurrent(playbackToken, opGeneration) && !revoked) {
-                    notifyError("Synthesis returned no audio");
+                    notifyError(opGeneration, playbackToken,
+                            "Synthesis returned no audio");
                     setState(State.READY);
                 }
                 return;
             }
             long audioDurationMs = Math.round(totalSamples * 1000.0 / SAMPLE_RATE);
 
-            final Listener current = listener;
-            if (current != null) {
-                final long duration = audioDurationMs;
-                scheduler.postMain(new Runnable() {
-                    @Override
-                    public void run() {
-                        current.onAudioMeasured(0, duration);
-                    }
-                });
-            }
+            notifyAudioMeasured(opGeneration, playbackToken, audioDurationMs);
 
             if (!stopped) {
                 waitForPlaybackEnd(track, totalSamples, playbackToken, opGeneration);
@@ -1408,7 +1401,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         } catch (Throwable failure) {
             log.e("stream playback failed: " + failure.getMessage(), failure);
             if (isPlaybackCurrent(playbackToken, opGeneration)) {
-                notifyError("Synthesis failed: " + failure.getMessage());
+                notifyError(opGeneration, playbackToken,
+                        "Synthesis failed: " + failure.getMessage());
                 setState(State.READY);
             }
             return;
@@ -1517,14 +1511,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      * A playback that could not take the lease was overtaken by a reload or
      * shutdown. Publish the honest terminal state without touching native.
      */
-    private void failUnadmittedPlayback(int playbackToken) {
+    private void failUnadmittedPlayback(int playbackToken, long opGeneration) {
         if (!isCurrent(playbackToken) || shuttingDown.get()) {
             return;
         }
         synchronized (lifecycleLock) {
             if (state == State.SPEAKING) {
                 if (EngineOwnership.isReleaseUnconfirmed()) {
-                    notifyError(EngineOwnership.REASON_RELEASE_UNCONFIRMED);
+                    notifyError(opGeneration, playbackToken,
+                            EngineOwnership.REASON_RELEASE_UNCONFIRMED);
                 }
                 setState(EngineOwnership.isReleaseUnconfirmed()
                         ? State.ERROR : State.READY);
@@ -1606,7 +1601,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         } catch (Throwable failure) {
             log.e("playback failed: " + failure.getMessage(), failure);
             if (isPlaybackCurrent(playbackToken, opGeneration)) {
-                notifyError("Playback failed: " + failure.getMessage());
+                notifyError(opGeneration, playbackToken,
+                        "Playback failed: " + failure.getMessage());
                 setState(State.READY);
             }
             return;
@@ -1649,6 +1645,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      * Publishes a state transition. Shutdown is terminal: once the shutdown
      * flag is set, only UNINITIALIZED may still be published, so a stale worker
      * can never post READY/ERROR/SPEAKING after the engine was torn down.
+     *
+     * <p>H3: the callback also carries the reservation epoch it was produced
+     * under. The state field is still updated on the producing thread (the
+     * lifecycle machine must be observable immediately), but the main-thread
+     * delivery re-validates that epoch for the states that claim the engine is
+     * usable and drops them when a newer generation has been reserved or the
+     * engine shut down. A stale READY can therefore never reach the listener of
+     * a superseded or torn-down engine; historical (LOADING) and terminal
+     * (ERROR/UNINITIALIZED) transitions are still delivered in order.
      */
     private void setState(final State next) {
         synchronized (lifecycleLock) {
@@ -1658,17 +1663,49 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             state = next;
             final Listener current = listener;
             if (current != null) {
+                final long deliveryReservation = EngineOwnership.reservedGeneration();
                 scheduler.postMain(new Runnable() {
                     @Override
                     public void run() {
-                        current.onStateChanged(next);
+                        if (mayDeliverState(next, deliveryReservation)) {
+                            current.onStateChanged(next);
+                        }
                     }
                 });
             }
         }
     }
 
-    private void notifyError(final String message) {
+    /**
+     * True when a state transition captured under {@code deliveryReservation}
+     * may still reach the listener.
+     *
+     * <p>Only the states that assert the engine is usable ({@code READY} and
+     * {@code SPEAKING}) are fenced: a queued READY must not arrive after the
+     * engine shut down or a newer generation was reserved. {@code LOADING},
+     * {@code ERROR}, {@code STOPPED} and {@code UNINITIALIZED} are historical
+     * or terminal transitions for this instance; dropping them would lose the
+     * ordered lifecycle the listener already observed (a superseded instance
+     * must still be able to report its terminal ERROR).
+     */
+    private boolean mayDeliverState(State next, long deliveryReservation) {
+        if (next == State.UNINITIALIZED) {
+            return true;
+        }
+        if (next != State.READY && next != State.SPEAKING) {
+            return true;
+        }
+        return !shuttingDown.get()
+                && deliveryReservation > 0
+                && deliveryReservation == EngineOwnership.reservedGeneration();
+    }
+
+    /**
+     * Direct rejection of a caller request (initialize/speak admission or a
+     * process-global refusal). It is not a deferred completion, so it is
+     * delivered as-is: the caller that just asked for work needs the reason.
+     */
+    private void rejectError(final String message) {
         final Listener current = listener;
         if (current != null) {
             scheduler.postMain(new Runnable() {
@@ -1678,6 +1715,81 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 }
             });
         }
+    }
+
+    /**
+     * Deferred initialisation completion error. H3: the generation that
+     * produced the callback is captured at origin and re-validated on the main
+     * thread. A callback from a shut-down or superseded initialisation is
+     * dropped instead of being reported as the current generation's failure.
+     */
+    private void notifyError(final long deliveryGeneration, final String message) {
+        final Listener current = listener;
+        if (current != null) {
+            scheduler.postMain(new Runnable() {
+                @Override
+                public void run() {
+                    if (mayDeliverInitCallback(deliveryGeneration)) {
+                        current.onError(message);
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Deferred playback completion error. H3: fenced by the playback
+     * generation and playback token so a superseded utterance can neither
+     * report an error into a newer generation nor reject a newer pending speak.
+     */
+    private void notifyError(final long opGeneration, final int playbackToken,
+            final String message) {
+        final Listener current = listener;
+        if (current != null) {
+            scheduler.postMain(new Runnable() {
+                @Override
+                public void run() {
+                    if (mayDeliverPlaybackCallback(opGeneration, playbackToken)) {
+                        current.onError(message);
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Development audio measurement, fenced by the same playback identity as
+     * {@link #notifyError(long, int, String)}. A stale generation can never
+     * inject a measurement into the current listener.
+     */
+    private void notifyAudioMeasured(final long opGeneration, final int playbackToken,
+            final long durationMs) {
+        final Listener current = listener;
+        if (current != null) {
+            scheduler.postMain(new Runnable() {
+                @Override
+                public void run() {
+                    if (mayDeliverPlaybackCallback(opGeneration, playbackToken)) {
+                        current.onAudioMeasured(0, durationMs);
+                    }
+                }
+            });
+        }
+    }
+
+    /** Deferred initialisation callback still belongs to the newest reservation. */
+    private boolean mayDeliverInitCallback(long deliveryGeneration) {
+        return !shuttingDown.get()
+                && deliveryGeneration > 0
+                && deliveryGeneration == generation
+                && EngineOwnership.isLatestReservation(deliveryGeneration);
+    }
+
+    /** Deferred playback callback still owns the committed generation and token. */
+    private boolean mayDeliverPlaybackCallback(long opGeneration, int playbackToken) {
+        return !shuttingDown.get()
+                && EngineOwnership.owns(opGeneration)
+                && playbackGeneration.isCurrent(playbackToken);
     }
 
     /* ------------------------------------------------------------------ *
