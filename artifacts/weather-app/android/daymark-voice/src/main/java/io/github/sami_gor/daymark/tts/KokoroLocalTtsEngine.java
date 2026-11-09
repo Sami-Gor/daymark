@@ -181,6 +181,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      * must never write this flag.
      */
     private boolean nativeInstanceLive;
+    /**
+     * True while this instance holds the process-wide native operation lease.
+     * Guarded by {@link EngineOwnership#NATIVE_LOCK}. The lease is taken before
+     * the first synth/stream call of a playback operation and released only
+     * after the last native call, so reload/shutdown can drain it before
+     * touching the process-global engine.
+     */
+    private boolean operationActive;
     private volatile AudioHandle audioHandle;
     private int synthesisCount;
     /** Path of the materialised model, retained so the engine can be reloaded. */
@@ -262,6 +270,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 notifyError("engine-shutdown");
                 return;
             }
+            if (EngineOwnership.isReleaseUnconfirmed()) {
+                // A previous native release threw; the native slots may still
+                // hold a half-released engine. No init may run on that state.
+                notifyError("Initialization failed: "
+                        + EngineOwnership.REASON_RELEASE_UNCONFIRMED);
+                setState(State.ERROR);
+                return;
+            }
             if (state == State.LOADING || state == State.READY
                     || state == State.SPEAKING || state == State.STOPPED) {
                 notifyError("operation-conflict");
@@ -333,66 +349,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         + "ms modelBytes=" + modelFile.length()
                         + " voices=" + String.join(",", voices));
 
-                long start = clock.elapsedRealtime();
-                String error = null;
-                boolean committed = false;
-                synchronized (EngineOwnership.NATIVE_LOCK) {
-                    // Re-check under the native lock: a newer reservation must
-                    // never be overwritten by this slow initialisation.
-                    if (!isStillWanted(initGeneration)) {
-                        abandonStaleInitialisation(initGeneration);
-                        return;
-                    }
-                    error = nativeApi.init(
-                            modelFile.getAbsolutePath(),
-                            voicesDir.getAbsolutePath(),
-                            DEFAULT_VOICE_NAME);
-                    if (error == null) {
-                        // The bridge created a native instance: claim it before
-                        // any re-check can release it. This is the only kind of
-                        // site allowed to set the ownership flag.
-                        nativeInstanceLive = true;
-                        // Re-check after the (slow) native call: shutdown may
-                        // have started, or a newer generation may have been
-                        // reserved while we were inside the bridge.
-                        if (shuttingDown.get()
-                                || !EngineOwnership.isLatestReservation(initGeneration)) {
-                            releaseNativeInstanceLocked();
-                        } else {
-                            // Ownership is committed only after the native engine
-                            // accepted the model/voice, and only if no newer
-                            // initialisation reserved the engine meanwhile.
-                            committed = EngineOwnership.commitInit(initGeneration);
-                            if (committed) {
-                                nativeInitialised = true;
-                                loadedVoices = Collections.singleton(DEFAULT_VOICE_NAME);
-                            } else {
-                                // Superseded during commit: release the engine
-                                // we created; the newer generation will initialise.
-                                releaseNativeInstanceLocked();
-                            }
-                        }
-                    }
-                }
-                long elapsedMs = clock.elapsedRealtime() - start;
-                if (error != null) {
-                    log.e("initialize: failed: " + error, null);
-                    // Notify before the terminal state so the bridge can
-                    // preserve the specific asset/model reason for the UI.
-                    notifyError("Initialization failed: " + error);
-                    setState(State.ERROR);
-                    return;
-                }
-                if (!committed) {
-                    if (!shuttingDown.get()) {
-                        log.w("initialize: superseded generation " + initGeneration, null);
-                        setState(State.ERROR);
-                    }
-                    return;
-                }
-                log.i("initialize: model loaded in " + elapsedMs
-                        + "ms defaultVoice=" + DEFAULT_VOICE_NAME);
-                setState(State.READY);
+                initializeNative(initGeneration, modelFile, voicesDir);
             } catch (Throwable failure) {
                 log.e("initialize: failed: " + failure.getMessage(), failure);
                 if (!shuttingDown.get()) {
@@ -402,6 +359,130 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             }
         } finally {
             initializationInFlight.set(false);
+        }
+    }
+
+    /**
+     * Performs (or resumes) the native half of {@link #initialize}.
+     *
+     * <p>Called under {@link EngineOwnership#NATIVE_LOCK}. The operation lease
+     * is drained before the engine is created: a replacement must never call
+     * {@code nativeInit} while an older instance's synth/stream is still on the
+     * native stack, because the bridge would replace the process-global engine
+     * underneath it. When an operation is still active the same method is
+     * queued as a continuation and re-entered by the last operation to finish.
+     */
+    private void initializeNative(
+            final long initGeneration,
+            final File modelFile,
+            final File voicesDir) {
+        final Runnable continuation = new Runnable() {
+            @Override
+            public void run() {
+                initializeNative(initGeneration, modelFile, voicesDir);
+            }
+        };
+        String error = null;
+        boolean committed = false;
+        boolean stale = false;
+        boolean blocked = false;
+        long elapsedMs = 0;
+        synchronized (EngineOwnership.NATIVE_LOCK) {
+            // Re-check under the native lock: a newer reservation must never be
+            // overwritten by this slow initialisation.
+            if (!isStillWanted(initGeneration)) {
+                stale = true;
+            } else if (EngineOwnership.isReleaseUnconfirmed()) {
+                blocked = true;
+            } else if (EngineOwnership.awaitDrain(continuation)) {
+                // No native operation is active; the lease stops new ones for
+                // this generation because authority already moved on.
+                long start = clock.elapsedRealtime();
+                error = nativeApi.init(
+                        modelFile.getAbsolutePath(),
+                        voicesDir.getAbsolutePath(),
+                        DEFAULT_VOICE_NAME);
+                elapsedMs = clock.elapsedRealtime() - start;
+                if (error == null) {
+                    // The bridge created a native instance: claim it before any
+                    // re-check can release it. This is the only kind of site
+                    // allowed to set the ownership flag.
+                    nativeInstanceLive = true;
+                    // Re-check after the (slow) native call: shutdown may have
+                    // started, or a newer generation may have been reserved
+                    // while we were inside the bridge.
+                    if (shuttingDown.get()
+                            || !EngineOwnership.isLatestReservation(initGeneration)) {
+                        releaseNativeInstanceLocked();
+                        stale = true;
+                    } else if (EngineOwnership.commitInit(initGeneration)) {
+                        // Ownership is committed only after the native engine
+                        // accepted the model/voice, and only if no newer
+                        // initialisation reserved the engine meanwhile.
+                        nativeInitialised = true;
+                        // L1: publish only while shutdown cannot interleave;
+                        // shutdown clears loadedVoices under the same lock.
+                        if (publishLoadedVoices(
+                                Collections.singleton(DEFAULT_VOICE_NAME))) {
+                            committed = true;
+                        } else {
+                            // Shutdown won the commit window: ownership stays
+                            // with the shutdown release, but this instance must
+                            // never log/publish READY.
+                            stale = true;
+                        }
+                    } else {
+                        // Superseded during commit: release the engine we
+                        // created; the newer generation will initialise.
+                        releaseNativeInstanceLocked();
+                        stale = true;
+                    }
+                }
+            } else {
+                // Drain pending: the continuation runs from the last operation
+                // and must not publish anything until then.
+                return;
+            }
+        }
+        if (stale) {
+            abandonStaleInitialisation(initGeneration);
+            return;
+        }
+        if (blocked) {
+            failClosedReleaseUnconfirmed("initialize");
+            return;
+        }
+        if (error != null) {
+            log.e("initialize: failed: " + error, null);
+            // Notify before the terminal state so the bridge can preserve the
+            // specific asset/model reason for the UI.
+            notifyError("Initialization failed: " + error);
+            setState(State.ERROR);
+            return;
+        }
+        if (!committed) {
+            if (!shuttingDown.get()) {
+                log.w("initialize: superseded generation " + initGeneration, null);
+                setState(State.ERROR);
+            }
+            return;
+        }
+        log.i("initialize: model loaded in " + elapsedMs
+                + "ms defaultVoice=" + DEFAULT_VOICE_NAME);
+        setState(State.READY);
+    }
+
+    /**
+     * Refuses work after a native release left the process-global slots in an
+     * unknown state. There is deliberately no retry: the bridge has no way to
+     * prove the engine is gone.
+     */
+    private void failClosedReleaseUnconfirmed(String operation) {
+        String reason = EngineOwnership.REASON_RELEASE_UNCONFIRMED;
+        log.e(operation + ": blocked, native release unconfirmed", null);
+        if (!shuttingDown.get()) {
+            notifyError(reason);
+            setState(State.ERROR);
         }
     }
 
@@ -476,6 +557,12 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 result.onError("engine-shutdown");
                 return;
             }
+            if (EngineOwnership.isReleaseUnconfirmed()) {
+                // The native slots may contain a half-released engine; a reload
+                // must not release or initialise on top of that.
+                result.onError(EngineOwnership.REASON_RELEASE_UNCONFIRMED);
+                return;
+            }
             if (state == State.LOADING || state == State.SPEAKING) {
                 result.onError("operation-conflict");
                 return;
@@ -528,111 +615,28 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             final long token,
             final long reloadGeneration,
             final VoiceOperationResult callback) {
-        String failure = null;
-        Set<String> loaded = null;
-        boolean stale = false;
-        boolean recovered = false;
+        ReloadOutcome outcome = new ReloadOutcome();
         synchronized (EngineOwnership.NATIVE_LOCK) {
             if (!mayRunReload(token, reloadGeneration)) {
                 // A stale reload must not release, initialise or otherwise
                 // touch the native engine a newer generation may own.
-                stale = true;
-            } else {
-                try {
-                    if (nativeInitialised) {
-                        releaseNativeInstanceLocked();
-                    }
-                    String error = nativeApi.init(model, voicesDir.getAbsolutePath(), voiceId);
-                    if (error == null) {
-                        // A native instance exists again: claim it before the
-                        // post-init re-check can release it.
-                        nativeInstanceLive = true;
-                        // Re-check after the native call: shutdown or a newer
-                        // reservation may have arrived while we were inside it.
-                        if (!mayRunReload(token, reloadGeneration)) {
-                            releaseNativeInstanceLocked();
-                            stale = true;
-                        } else if (EngineOwnership.commitInit(reloadGeneration)) {
-                            nativeInitialised = true;
-                            generation = reloadGeneration;
-                            loaded = Collections.singleton(voiceId);
-                            loadedVoices = loaded;
-                        } else {
-                            releaseNativeInstanceLocked();
-                            stale = true;
-                        }
-                    } else {
-                        log.e("registerVoice: failed: " + error, null);
-                        if (!mayRunReload(token, reloadGeneration)) {
-                            stale = true;
-                        } else {
-                            // Attempt to restore the previous working voice.
-                            String restore = nativeApi.init(
-                                    model, voicesDir.getAbsolutePath(), previousVoice);
-                            if (restore == null) {
-                                // The restore created another instance; claim
-                                // it before the re-check can release it.
-                                nativeInstanceLive = true;
-                                if (!mayRunReload(token, reloadGeneration)) {
-                                    releaseNativeInstanceLocked();
-                                    stale = true;
-                                } else if (EngineOwnership.commitInit(reloadGeneration)) {
-                                    nativeInitialised = true;
-                                    generation = reloadGeneration;
-                                    loaded = Collections.singleton(previousVoice);
-                                    loadedVoices = loaded;
-                                    recovered = true;
-                                    failure = "reload-failed";
-                                } else {
-                                    releaseNativeInstanceLocked();
-                                    stale = true;
-                                }
-                            } else {
-                                failure = "reload-failed-unrecovered";
-                            }
-                        }
-                    }
-                } catch (Throwable error) {
-                    log.e("registerVoice: failed: " + error.getMessage(), error);
-                    // Never leave a released engine without attempting to
-                    // restore the previously working voice.
-                    if (!mayRunReload(token, reloadGeneration)) {
-                        stale = true;
-                    } else {
-                        try {
-                            if (nativeInitialised) {
-                                releaseNativeInstanceLocked();
-                            }
-                            String restore = nativeApi.init(
-                                    model, voicesDir.getAbsolutePath(), previousVoice);
-                            if (restore != null) {
-                                failure = "reload-failed-unrecovered";
-                            } else {
-                                // The restore created a native instance: claim it
-                                // before the re-check can release it.
-                                nativeInstanceLive = true;
-                                if (!mayRunReload(token, reloadGeneration)
-                                        || !EngineOwnership.commitInit(reloadGeneration)) {
-                                    releaseNativeInstanceLocked();
-                                    stale = true;
-                                } else {
-                                    nativeInitialised = true;
-                                    generation = reloadGeneration;
-                                    loaded = Collections.singleton(previousVoice);
-                                    loadedVoices = loaded;
-                                    recovered = true;
-                                    failure = "reload-failed";
-                                }
-                            }
-                        } catch (Throwable restoreFailure) {
-                            log.e("registerVoice: restore failed",
-                                    restoreFailure);
-                            nativeInitialised = false;
-                            failure = "reload-failed-unrecovered";
-                        }
-                    }
+                outcome.stale = true;
+            } else if (!EngineOwnership.awaitDrain(new Runnable() {
+                @Override
+                public void run() {
+                    runReload(model, voicesDir, voiceId, previousVoice,
+                            token, reloadGeneration, callback);
                 }
-                if (failure != null && !recovered) {
+            })) {
+                // A native operation from the revoked generation is still on
+                // the stack. Defer the whole release/init: re-entered by the
+                // last operation to finish, so the global engine is never
+                // released or replaced underneath it.
+                return;
+            } else {
+                reloadNativeLocked(model, voicesDir, voiceId, previousVoice,
+                        token, reloadGeneration, outcome);
+                if (outcome.failure != null && !outcome.recovered) {
                     // No usable engine is loaded; make that ownership state
                     // explicit so a retry can reserve the next generation.
                     if (nativeInitialised || nativeInstanceLive) {
@@ -643,14 +647,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         }
                     }
                     nativeInitialised = false;
-                    loadedVoices = Collections.emptySet();
+                    clearLoadedVoices();
                     EngineOwnership.claimRelease(generation);
                 }
             }
         }
         boolean current = reloadGuard.isCurrent(token);
         reloadGuard.finish(token);
-        if (stale || !current) {
+        if (outcome.stale || !current) {
             // Stale completions never publish READY or clear a newer slot.
             callback.onError(shuttingDown.get() ? "engine-shutdown" : "operation-conflict");
             if (!shuttingDown.get()) {
@@ -664,19 +668,169 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             callback.onError("engine-shutdown");
             return;
         }
-        if (failure != null) {
-            setState(recovered ? State.READY : State.ERROR);
-            callback.onError(failure);
+        if (outcome.failure != null) {
+            setState(outcome.recovered ? State.READY : State.ERROR);
+            callback.onError(outcome.failure);
             return;
         }
-        if (loaded == null) {
+        if (outcome.loaded == null) {
             // Defensive: a current operation with no committed voice.
             setState(State.ERROR);
             callback.onError("reload-failed-unrecovered");
             return;
         }
         setState(State.READY);
-        callback.onSuccess(loaded);
+        callback.onSuccess(outcome.loaded);
+    }
+
+    /**
+     * Runs the release/replace/init sequence for one reload. Caller holds
+     * {@link EngineOwnership#NATIVE_LOCK} and has drained the operation lease.
+     */
+    private void reloadNativeLocked(
+            String model,
+            File voicesDir,
+            String voiceId,
+            String previousVoice,
+            long token,
+            long reloadGeneration,
+            ReloadOutcome outcome) {
+        if (!mayRunReload(token, reloadGeneration)) {
+            outcome.stale = true;
+            return;
+        }
+        if (EngineOwnership.isReleaseUnconfirmed()) {
+            outcome.failure = EngineOwnership.REASON_RELEASE_UNCONFIRMED;
+            return;
+        }
+        if (nativeInitialised) {
+            releaseNativeInstanceLocked();
+            // The release can take a long time and shutdown/a newer instance
+            // may have arrived while it was inside the bridge.
+            if (!mayRunReload(token, reloadGeneration)) {
+                outcome.stale = true;
+                return;
+            }
+            if (EngineOwnership.isReleaseUnconfirmed()) {
+                // The old release threw: native state is unknown, so do not
+                // init the replacement on top of it (no auto-retry).
+                outcome.failure = EngineOwnership.REASON_RELEASE_UNCONFIRMED;
+                nativeInitialised = false;
+                return;
+            }
+        }
+        try {
+            if (installVoiceLocked(model, voicesDir, voiceId, token, reloadGeneration, outcome)) {
+                return;
+            }
+        } catch (Throwable error) {
+            log.e("registerVoice: failed: " + error.getMessage(), error);
+        }
+        if (!mayRunReload(token, reloadGeneration)) {
+            outcome.stale = true;
+            return;
+        }
+        if (EngineOwnership.isReleaseUnconfirmed()) {
+            outcome.failure = EngineOwnership.REASON_RELEASE_UNCONFIRMED;
+            return;
+        }
+        try {
+            // Never leave a released engine without attempting to restore the
+            // previously working voice.
+            if (installVoiceLocked(model, voicesDir, previousVoice,
+                    token, reloadGeneration, outcome)) {
+                if (outcome.committed) {
+                    outcome.recovered = true;
+                    outcome.failure = "reload-failed";
+                }
+                return;
+            }
+        } catch (Throwable restoreFailure) {
+            log.e("registerVoice: restore failed", restoreFailure);
+            nativeInitialised = false;
+        }
+        outcome.failure = "reload-failed-unrecovered";
+        outcome.loaded = null;
+    }
+
+    /**
+     * Attempts one native init followed by an ownership commit. Caller holds
+     * {@link EngineOwnership#NATIVE_LOCK} and has drained the lease.
+     *
+     * @return true when the outcome is final (committed or superseded); false
+     *         when the bridge refused the model/voice, so the caller may try a
+     *         recovery init.
+     */
+    private boolean installVoiceLocked(
+            String model,
+            File voicesDir,
+            String voiceName,
+            long token,
+            long reloadGeneration,
+            ReloadOutcome outcome) {
+        String error = nativeApi.init(model, voicesDir.getAbsolutePath(), voiceName);
+        if (error != null) {
+            log.e("registerVoice: failed: " + error, null);
+            return false;
+        }
+        // A native instance exists again: claim it before any re-check can
+        // release it, and commit only while this generation is authoritative.
+        nativeInstanceLive = true;
+        if (!mayRunReload(token, reloadGeneration)) {
+            releaseNativeInstanceLocked();
+            outcome.stale = true;
+            return true;
+        }
+        if (!EngineOwnership.commitInit(reloadGeneration)) {
+            releaseNativeInstanceLocked();
+            outcome.stale = true;
+            return true;
+        }
+        nativeInitialised = true;
+        generation = reloadGeneration;
+        outcome.committed = true;
+        outcome.loaded = Collections.singleton(voiceName);
+        // L1: commit and publish under the lifecycle lock so shutdown clears
+        // loadedVoices atomically and a stale commit can never repopulate it.
+        publishLoadedVoices(outcome.loaded);
+        return true;
+    }
+
+    /** Outcome of one reload transition; call under NATIVE_LOCK. */
+    private static final class ReloadOutcome {
+        String failure;
+        Set<String> loaded;
+        boolean committed;
+        boolean recovered;
+        boolean stale;
+    }
+
+    /**
+     * Publishes the voices a committed native generation loaded.
+     *
+     * <p>L1: the check and the assignment happen under {@code lifecycleLock},
+     * which shutdown also holds while it publishes its terminal transition and
+     * clears {@code loadedVoices}. A commit that loses that race therefore
+     * cannot repopulate the set after shutdown.
+     *
+     * @return false when shutdown already owns the lifecycle; the caller must
+     *         not report success.
+     */
+    boolean publishLoadedVoices(Set<String> voices) {
+        synchronized (lifecycleLock) {
+            if (shuttingDown.get()) {
+                return false;
+            }
+            loadedVoices = voices;
+            return true;
+        }
+    }
+
+    /** Clears the loaded set under the same lock shutdown uses. */
+    private void clearLoadedVoices() {
+        synchronized (lifecycleLock) {
+            loadedVoices = Collections.emptySet();
+        }
     }
 
     private String singleLoadedVoice() {
@@ -738,9 +892,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         final String voice;
         final int playbackToken;
         final long callTimeMs;
+        final long opGeneration;
         synchronized (lifecycleLock) {
             if (shuttingDown.get()) {
                 notifyError("engine-shutdown");
+                return;
+            }
+            if (EngineOwnership.isReleaseUnconfirmed()) {
+                notifyError(EngineOwnership.REASON_RELEASE_UNCONFIRMED);
                 return;
             }
             if (state != State.READY && state != State.STOPPED) {
@@ -753,6 +912,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 notifyError("engine-superseded");
                 return;
             }
+            opGeneration = generation;
             voice = NarrationVoicePolicy.voiceForLanguage(
                     lang, BuildConfig.MULTILINGUAL_NARRATION, installedVoiceNames());
             if (voice == null) {
@@ -777,7 +937,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         if (!scheduler.postWorker(new Runnable() {
             @Override
             public void run() {
-                synthesizeAndPlay(text, lang, voice, segments, callTimeMs, playbackToken);
+                synthesizeAndPlay(text, lang, voice, segments, callTimeMs,
+                        playbackToken, opGeneration);
             }
         })) {
             if (playbackGeneration.isCurrent(playbackToken)) {
@@ -822,7 +983,10 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      *
      * <p>The ownership claim is spent before the bridge call: if the native
      * release throws, both flags stay cleared, the failure is recorded with
-     * {@link LogSink#e} and the release is deliberately not retried. Logging
+     * {@link LogSink#e} and the release is deliberately not retried. A throw
+     * also marks the process-wide release-unconfirmed state, because the
+     * process-global native slots may still hold a half-released engine; every
+     * later init/synth/stream/registration fails closed from then on. Logging
      * only keeps listener callbacks out of the native lock.
      */
     private void releaseNativeInstanceLocked() {
@@ -837,8 +1001,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         try {
             nativeApi.release();
         } catch (Throwable failure) {
+            // Sticky for the process: the global engine/stream slots are now
+            // in an unknown state and the bridge cannot prove otherwise.
+            EngineOwnership.markReleaseUnconfirmed();
             log.e("releaseNativeInstanceLocked: native release failed; "
-                    + "ownership cleared, no retry", failure);
+                    + "native state unconfirmed, all later native work blocked", failure);
         }
     }
 
@@ -856,38 +1023,68 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             if (!shuttingDown.compareAndSet(false, true)) {
                 return;
             }
+            // L1: clear the loaded set with the terminal transition. A commit
+            // that races this either published before (and is cleared here) or
+            // observes shuttingDown and refuses to publish.
+            loadedVoices = Collections.emptySet();
         }
         reloadGuard.invalidate();
         stopPlayback();
-        loadedVoices = Collections.emptySet();
         scheduler.postWorker(new Runnable() {
             @Override
             public void run() {
-                try {
-                    synchronized (EngineOwnership.NATIVE_LOCK) {
-                        // Read the generation when the task runs: an in-flight
-                        // reload that committed a newer generation just before
-                        // shutdown must be the one released.
-                        boolean owned = EngineOwnership.claimRelease(generation);
-                        if (owned && nativeInitialised) {
-                            releaseNativeInstanceLocked();
-                        } else if (owned) {
-                            // A reload already released the native engine
-                            // before it was interrupted: only clear ownership.
-                            nativeInitialised = false;
-                            log.i("shutdown: ownership cleared without a live release");
-                        } else {
-                            log.i("shutdown: skipped release for superseded generation "
-                                    + generation);
-                        }
-                    }
-                } catch (Throwable failure) {
-                    log.w("shutdown: release failed: " + failure.getMessage(), failure);
-                }
+                runShutdownRelease();
             }
         });
         scheduler.quitWorker();
         setState(State.UNINITIALIZED);
+    }
+
+    /**
+     * Performs (or resumes) the deferred native release for shutdown.
+     *
+     * <p>The release waits for every leased native operation to finish: freeing
+     * the process-global engine while an old synth/stream call is still on the
+     * stack would let that call touch a replacement's slots. There is no
+     * timeout that releases anyway; if a native call never returns, the engine
+     * simply remains unreleased in a fail-closed state.
+     */
+    private void runShutdownRelease() {
+        try {
+            synchronized (EngineOwnership.NATIVE_LOCK) {
+                if (!EngineOwnership.awaitDrain(new Runnable() {
+                    @Override
+                    public void run() {
+                        runShutdownRelease();
+                    }
+                })) {
+                    return;
+                }
+                if (EngineOwnership.isReleaseUnconfirmed()) {
+                    // Never retry a release whose outcome is unknown; a later
+                    // init/synth/stream is blocked by the same sticky flag.
+                    log.w("shutdown: release not retried, native state unconfirmed", null);
+                    return;
+                }
+                // Read the generation when the task runs: an in-flight reload
+                // that committed a newer generation just before shutdown must
+                // be the one released.
+                boolean owned = EngineOwnership.claimRelease(generation);
+                if (owned && nativeInitialised) {
+                    releaseNativeInstanceLocked();
+                } else if (owned) {
+                    // A reload already released the native engine before it
+                    // was interrupted: only clear ownership.
+                    nativeInitialised = false;
+                    log.i("shutdown: ownership cleared without a live release");
+                } else {
+                    log.i("shutdown: skipped release for superseded generation "
+                            + generation);
+                }
+            }
+        } catch (Throwable failure) {
+            log.w("shutdown: release failed: " + failure.getMessage(), failure);
+        }
     }
 
     private void synthesizeAndPlay(
@@ -896,39 +1093,61 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             String voice,
             List<String> segments,
             long callTimeMs,
-            int playbackToken) {
+            int playbackToken,
+            long opGeneration) {
         if (!isCurrent(playbackToken)) {
             return;
         }
-        final long synthesisNumber = ++synthesisCount;
-        boolean useSegments = segments != null && segments.size() > 1 && segmentsMatch(text, segments);
-        if (segments != null && !useSegments) {
-            log.w("synthesis #" + synthesisNumber + ": segment plan mismatch; using whole-text synthesis", null);
-        }
-        String streamError = null;
-        try {
-            streamError = useSegments
-                    ? startSegmentedStream(segments, lang, voice)
-                    : startWholeStream(text, lang, voice);
-        } catch (Throwable failure) {
-            streamError = failure.getMessage();
-        }
-        if (streamError == null) {
-            streamAndPlay(synthesisNumber, callTimeMs, playbackToken);
+        if (!admitOperation(opGeneration)) {
+            // The engine was reloaded or shut down between speak() and this
+            // worker task, or a native release is unconfirmed. No native call
+            // may run for this generation.
+            failUnadmittedPlayback(playbackToken);
             return;
         }
-        if (!isCurrent(playbackToken)) {
-            return;
-        }
-        log.w("stream: unavailable (" + streamError + "); falling back to monolithic synth", null);
         try {
+            final long synthesisNumber = ++synthesisCount;
+            boolean useSegments = segments != null && segments.size() > 1
+                    && segmentsMatch(text, segments);
+            if (segments != null && !useSegments) {
+                log.w("synthesis #" + synthesisNumber
+                        + ": segment plan mismatch; using whole-text synthesis", null);
+            }
+            StreamHandle stream;
+            try {
+                stream = useSegments
+                        ? startStream(opGeneration, null, segments, lang, voice)
+                        : startStream(opGeneration, text, null, lang, voice);
+            } catch (Throwable failure) {
+                stream = StreamHandle.failed(failure.getMessage());
+            }
+            if (stream.superseded) {
+                // A newer generation owns the engine; never fall back or touch
+                // the native surface from this stale operation.
+                return;
+            }
+            if (stream.error == null) {
+                streamAndPlay(synthesisNumber, callTimeMs, playbackToken,
+                        opGeneration, stream.token);
+                return;
+            }
+            if (!isPlaybackCurrent(playbackToken, opGeneration) || !mayUseNative(opGeneration)) {
+                return;
+            }
+            log.w("stream: unavailable (" + stream.error
+                    + "); falling back to monolithic synth", null);
+            if (!mayUseNative(opGeneration)) {
+                return;
+            }
             float[] samples = nativeApi.synth(text, lang, voice);
-            if (!isCurrent(playbackToken)) {
+            if (!isPlaybackCurrent(playbackToken, opGeneration) || !mayUseNative(opGeneration)) {
                 return;
             }
             if (samples == null || samples.length == 0) {
-                notifyError("Synthesis returned no audio");
-                setState(State.READY);
+                if (isPlaybackCurrent(playbackToken, opGeneration)) {
+                    notifyError("Synthesis returned no audio");
+                    setState(State.READY);
+                }
                 return;
             }
             long audioDurationMs = Math.round(samples.length * 1000.0 / SAMPLE_RATE);
@@ -944,13 +1163,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 });
             }
 
-            playSamples(samples, callTimeMs, playbackToken);
+            playSamples(samples, callTimeMs, playbackToken, opGeneration);
         } catch (Throwable failure) {
             log.e("synthesis/playback failed: " + failure.getMessage(), failure);
-            if (isCurrent(playbackToken)) {
+            if (isPlaybackCurrent(playbackToken, opGeneration)) {
                 notifyError("Synthesis failed: " + failure.getMessage());
                 setState(State.READY);
             }
+        } finally {
+            finishOperation();
         }
     }
 
@@ -962,30 +1183,110 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return text.equals(joined.toString());
     }
 
-    private String startWholeStream(String text, String lang, String voice) {
-        String error = nativeApi.streamStart(text, lang, voice);
-        if (error == null) {
-            // A stream is not a native engine instance: it must never create
-            // release ownership. Ownership belongs to the last successful init.
-            nativeApi.streamFinish();
+    /** One native stream attempt; {@code token} is 0 unless a stream is live. */
+    private static final class StreamHandle {
+        final String error;
+        final long token;
+        final boolean superseded;
+
+        private StreamHandle(String error, long token, boolean superseded) {
+            this.error = error;
+            this.token = token;
+            this.superseded = superseded;
         }
-        return error;
+
+        static StreamHandle ok(long token) {
+            return new StreamHandle(null, token, false);
+        }
+
+        static StreamHandle failed(String error) {
+            return new StreamHandle(
+                    error == null ? "stream start failed" : error, 0, false);
+        }
+
+        static StreamHandle superseded() {
+            return new StreamHandle(null, 0, true);
+        }
     }
 
-    private String startSegmentedStream(List<String> segments, String lang, String voice) {
-        String error = nativeApi.streamStart(segments.get(0), lang, voice);
-        if (error != null) {
-            return error;
+    /**
+     * Opens the global native stream for this operation and drives the
+     * start/push/finish handshake.
+     *
+     * <p>Every call is preceded by a re-check under
+     * {@link EngineOwnership#NATIVE_LOCK}: the generation must still be
+     * authoritative and the stream token must still be the current one. A
+     * reload revokes both, so a stale operation stops at the next call instead
+     * of pushing into a replacement's stream.
+     */
+    private StreamHandle startStream(
+            long opGeneration,
+            String wholeText,
+            List<String> segments,
+            String lang,
+            String voice) {
+        final long streamToken;
+        synchronized (EngineOwnership.NATIVE_LOCK) {
+            if (!mayUseNativeLocked(opGeneration)) {
+                return StreamHandle.superseded();
+            }
+            streamToken = EngineOwnership.openStream(opGeneration);
         }
-        for (int i = 1; i < segments.size(); i++) {
-            nativeApi.streamPush(segments.get(i));
+        if (streamToken == 0) {
+            return StreamHandle.superseded();
         }
-        nativeApi.streamFinish();
-        return null;
+        try {
+            if (segments == null) {
+                if (!streamCallAllowed(opGeneration, streamToken)) {
+                    return StreamHandle.superseded();
+                }
+                String error = nativeApi.streamStart(wholeText, lang, voice);
+                if (error != null) {
+                    closeStream(opGeneration, streamToken);
+                    return StreamHandle.failed(error);
+                }
+                if (!streamCallAllowed(opGeneration, streamToken)) {
+                    return StreamHandle.superseded();
+                }
+                // A stream is not a native engine instance: it must never
+                // create release ownership.
+                nativeApi.streamFinish();
+            } else {
+                if (!streamCallAllowed(opGeneration, streamToken)) {
+                    return StreamHandle.superseded();
+                }
+                String error = nativeApi.streamStart(segments.get(0), lang, voice);
+                if (error != null) {
+                    closeStream(opGeneration, streamToken);
+                    return StreamHandle.failed(error);
+                }
+                for (int i = 1; i < segments.size(); i++) {
+                    if (!streamCallAllowed(opGeneration, streamToken)) {
+                        return StreamHandle.superseded();
+                    }
+                    nativeApi.streamPush(segments.get(i));
+                }
+                if (!streamCallAllowed(opGeneration, streamToken)) {
+                    return StreamHandle.superseded();
+                }
+                nativeApi.streamFinish();
+            }
+            return StreamHandle.ok(streamToken);
+        } catch (Throwable failure) {
+            // A partially started stream is ours until a newer token exists.
+            closeStream(opGeneration, streamToken);
+            return StreamHandle.failed(failure.getMessage());
+        }
     }
 
-    private void streamAndPlay(long synthesisNumber, long callTimeMs, int playbackToken) {
-        if (!isCurrent(playbackToken)) {
+    private void streamAndPlay(
+            long synthesisNumber,
+            long callTimeMs,
+            int playbackToken,
+            long opGeneration,
+            long streamToken) {
+        if (!isPlaybackCurrent(playbackToken, opGeneration)) {
+            closeStream(opGeneration, streamToken);
             return;
         }
         AudioHandle track = null;
@@ -999,7 +1300,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             track.play();
 
             boolean firstWrite = true;
-            while (isCurrent(playbackToken)) {
+            while (isPlaybackCurrent(playbackToken, opGeneration)
+                    && streamCallAllowed(opGeneration, streamToken)) {
                 float[] samples = nativeApi.streamNext();
                 if (samples == null) {
                     break;
@@ -1011,7 +1313,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 int leadSilence = leadingSilenceSamples(samples);
                 int skipSamples = trimLeadingSilence(leadSilence, chunks == 1);
                 totalSamples += samples.length - skipSamples;
-                for (int offset = skipSamples; offset < samples.length && isCurrent(playbackToken); offset += chunk.length) {
+                for (int offset = skipSamples; offset < samples.length
+                        && isPlaybackCurrent(playbackToken, opGeneration); offset += chunk.length) {
                     int count = Math.min(chunk.length, samples.length - offset);
                     for (int i = 0; i < count; i++) {
                         float value = Math.max(-1f, Math.min(1f, samples[offset + i]));
@@ -1029,9 +1332,12 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 }
             }
 
-            stopped = !isCurrent(playbackToken);
+            // Losing the stream token is a cancellation (reload/shutdown), not
+            // a natural end: never wait for the retired track's tail.
+            boolean revoked = !streamCallAllowed(opGeneration, streamToken);
+            stopped = !isPlaybackCurrent(playbackToken, opGeneration) || revoked;
             if (chunks == 0) {
-                if (isCurrent(playbackToken)) {
+                if (isPlaybackCurrent(playbackToken, opGeneration) && !revoked) {
                     notifyError("Synthesis returned no audio");
                     setState(State.READY);
                 }
@@ -1051,22 +1357,19 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             }
 
             if (!stopped) {
-                waitForPlaybackEnd(track, totalSamples, playbackToken);
-                stopped = !isCurrent(playbackToken);
+                waitForPlaybackEnd(track, totalSamples, playbackToken, opGeneration);
+                stopped = !isPlaybackCurrent(playbackToken, opGeneration);
             }
         } catch (Throwable failure) {
             log.e("stream playback failed: " + failure.getMessage(), failure);
-            if (isCurrent(playbackToken)) {
+            if (isPlaybackCurrent(playbackToken, opGeneration)) {
                 notifyError("Synthesis failed: " + failure.getMessage());
                 setState(State.READY);
             }
             return;
         } finally {
-            try {
-                nativeApi.streamClear();
-            } catch (Throwable ignored) {
-                // Instrumentation only.
-            }
+            // Token-checked: a stale operation can never clear a newer stream.
+            closeStream(opGeneration, streamToken);
             if (audioHandle == track) {
                 audioHandle = null;
             }
@@ -1078,10 +1381,109 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 }
                 track.release();
             }
-            if (isCurrent(playbackToken)) {
+            if (isPlaybackCurrent(playbackToken, opGeneration)) {
                 setState(State.READY);
             }
             log.i("playback: finished stopped=" + stopped + " streamChunks=" + chunks);
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Native operation lease                                              *
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Takes the process-wide operation lease for one playback operation. Call
+     * under {@link EngineOwnership#NATIVE_LOCK}; the admission predicate is the
+     * instance generation, the committed native engine and the unconfirmed
+     * release flag.
+     */
+    private boolean admitOperation(long opGeneration) {
+        synchronized (EngineOwnership.NATIVE_LOCK) {
+            if (operationActive || shuttingDown.get() || !nativeInitialised) {
+                return false;
+            }
+            if (!EngineOwnership.beginOperation(opGeneration)) {
+                return false;
+            }
+            operationActive = true;
+            return true;
+        }
+    }
+
+    /** Releases the operation lease; runs a deferred reload/shutdown if any. */
+    private void finishOperation() {
+        Runnable deferred;
+        synchronized (EngineOwnership.NATIVE_LOCK) {
+            if (!operationActive) {
+                return;
+            }
+            operationActive = false;
+            deferred = EngineOwnership.endOperation();
+        }
+        // Run the drained transition without holding NATIVE_LOCK: it performs
+        // its own native init/release under that lock.
+        if (deferred != null) {
+            deferred.run();
+        }
+    }
+
+    private boolean mayUseNative(long opGeneration) {
+        synchronized (EngineOwnership.NATIVE_LOCK) {
+            return mayUseNativeLocked(opGeneration);
+        }
+    }
+
+    private boolean mayUseNativeLocked(long opGeneration) {
+        return operationActive
+                && !shuttingDown.get()
+                && nativeInitialised
+                && !EngineOwnership.isReleaseUnconfirmed()
+                && EngineOwnership.owns(opGeneration);
+    }
+
+    private boolean streamCallAllowed(long opGeneration, long streamToken) {
+        synchronized (EngineOwnership.NATIVE_LOCK) {
+            return mayUseNativeLocked(opGeneration)
+                    && EngineOwnership.isStreamCurrent(opGeneration, streamToken);
+        }
+    }
+
+    /**
+     * Retires the stream token and clears the native slot only while this
+     * operation still owns the current token. Holding {@link
+     * EngineOwnership#NATIVE_LOCK} across the (short) clear prevents a racing
+     * new stream from being wiped by a stale clear.
+     */
+    private void closeStream(long opGeneration, long streamToken) {
+        synchronized (EngineOwnership.NATIVE_LOCK) {
+            if (!EngineOwnership.closeStream(opGeneration, streamToken)) {
+                return;
+            }
+            try {
+                nativeApi.streamClear();
+            } catch (Throwable ignored) {
+                // Instrumentation only.
+            }
+        }
+    }
+
+    /**
+     * A playback that could not take the lease was overtaken by a reload or
+     * shutdown. Publish the honest terminal state without touching native.
+     */
+    private void failUnadmittedPlayback(int playbackToken) {
+        if (!isCurrent(playbackToken) || shuttingDown.get()) {
+            return;
+        }
+        synchronized (lifecycleLock) {
+            if (state == State.SPEAKING) {
+                if (EngineOwnership.isReleaseUnconfirmed()) {
+                    notifyError(EngineOwnership.REASON_RELEASE_UNCONFIRMED);
+                }
+                setState(EngineOwnership.isReleaseUnconfirmed()
+                        ? State.ERROR : State.READY);
+            }
         }
     }
 
@@ -1110,17 +1512,19 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return Math.min(excess, msToSamples(SEGMENT_TRIM_CAP_MS));
     }
 
-    private void waitForPlaybackEnd(AudioHandle track, long totalFrames, int playbackToken) {
+    private void waitForPlaybackEnd(AudioHandle track, long totalFrames,
+            int playbackToken, long opGeneration) {
         long deadlineMs = clock.elapsedRealtime() + 5000;
-        while (isCurrent(playbackToken)
+        while (isPlaybackCurrent(playbackToken, opGeneration)
                 && track.playbackHeadPosition() < totalFrames
                 && clock.elapsedRealtime() < deadlineMs) {
             clock.sleep(20);
         }
     }
 
-    private void playSamples(float[] samples, long callTimeMs, int playbackToken) {
-        if (!isCurrent(playbackToken)) {
+    private void playSamples(float[] samples, long callTimeMs, int playbackToken,
+            long opGeneration) {
+        if (!isPlaybackCurrent(playbackToken, opGeneration)) {
             return;
         }
         AudioHandle track = null;
@@ -1132,7 +1536,8 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
             short[] chunk = new short[2048];
             boolean firstWrite = true;
-            for (int offset = 0; offset < samples.length && isCurrent(playbackToken); offset += chunk.length) {
+            for (int offset = 0; offset < samples.length
+                    && isPlaybackCurrent(playbackToken, opGeneration); offset += chunk.length) {
                 int count = Math.min(chunk.length, samples.length - offset);
                 for (int i = 0; i < count; i++) {
                     float value = Math.max(-1f, Math.min(1f, samples[offset + i]));
@@ -1148,14 +1553,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                             + (clock.elapsedRealtime() - callTimeMs) + "ms after speak()");
                 }
             }
-            stopped = !isCurrent(playbackToken);
+            stopped = !isPlaybackCurrent(playbackToken, opGeneration);
             if (!stopped) {
-                waitForPlaybackEnd(track, samples.length, playbackToken);
-                stopped = !isCurrent(playbackToken);
+                waitForPlaybackEnd(track, samples.length, playbackToken, opGeneration);
+                stopped = !isPlaybackCurrent(playbackToken, opGeneration);
             }
         } catch (Throwable failure) {
             log.e("playback failed: " + failure.getMessage(), failure);
-            if (isCurrent(playbackToken)) {
+            if (isPlaybackCurrent(playbackToken, opGeneration)) {
                 notifyError("Playback failed: " + failure.getMessage());
                 setState(State.READY);
             }
@@ -1172,7 +1577,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 }
                 track.release();
             }
-            if (isCurrent(playbackToken)) {
+            if (isPlaybackCurrent(playbackToken, opGeneration)) {
                 setState(State.READY);
             }
             log.i("playback: finished stopped=" + stopped);
@@ -1181,6 +1586,18 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     private boolean isCurrent(int playbackToken) {
         return playbackGeneration.isCurrent(playbackToken);
+    }
+
+    /**
+     * True when this playback token is current <em>and</em> the generation
+     * still owns the engine. State publication uses this predicate: a reload
+     * that revoked the generation must not let the old worker overwrite
+     * LOADING with READY.
+     */
+    private boolean isPlaybackCurrent(int playbackToken, long opGeneration) {
+        return playbackGeneration.isCurrent(playbackToken)
+                && !shuttingDown.get()
+                && EngineOwnership.owns(opGeneration);
     }
 
     /**

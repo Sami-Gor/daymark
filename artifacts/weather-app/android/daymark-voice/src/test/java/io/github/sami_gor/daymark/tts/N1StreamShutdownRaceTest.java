@@ -88,20 +88,27 @@ public class N1StreamShutdownRaceTest {
 
         // Another thread tears the engine down while streamStart is on the stack.
         harness.engine.shutdown();
-        // Run shutdown's queued release task: the single live instance is freed.
+        // F3: shutdown's release task must drain the leased native call first.
+        // Freeing the process-global engine while nativeStreamStart is still on
+        // the stack is exactly the overlap that let a stale generation touch a
+        // replacement's slots.
         harness.scheduler.runWorker();
-        assertEquals("shutdown releases the one live instance", 1,
-                harness.nativeApi.releaseCount);
+        assertEquals("release is deferred while the native call is active",
+                0, harness.nativeApi.releaseCount);
 
         // The native stream start now returns successfully. The stale
-        // completion must not recreate release eligibility.
+        // completion must not finish/clear the stream or recreate eligibility.
         allowStreamResume.countDown();
         joinWorker(stream, streamFailure);
         harness.scheduler.runAllMain();
 
         assertEquals(1, harness.nativeApi.successfulInitCalls);
-        assertEquals("exactly one actual release for the one instance",
+        assertEquals("the deferred release runs when the native call returns",
                 1, harness.nativeApi.releaseCount);
+        assertEquals("a revoked generation must not finish the stream",
+                0, harness.nativeApi.streamFinishCalls);
+        assertEquals("a revoked generation must not clear the stream",
+                0, harness.nativeApi.streamClearCount);
         assertFalse("stale stream completion resurrected ownership",
                 KokoroEngineTestSupport.nativeInstanceLive(harness.engine));
         assertEquals(LocalTtsEngine.State.UNINITIALIZED, harness.listener.lastState());
@@ -140,15 +147,18 @@ public class N1StreamShutdownRaceTest {
 
         harness.engine.shutdown();
         harness.scheduler.runWorker();
-        assertEquals(1, harness.nativeApi.releaseCount);
+        assertEquals("release is deferred while the native call is active",
+                0, harness.nativeApi.releaseCount);
 
         allowStreamResume.countDown();
         joinWorker(stream, streamFailure);
         harness.scheduler.runAllMain();
 
         assertEquals(1, harness.nativeApi.successfulInitCalls);
-        assertEquals("exactly one actual release for the one instance",
+        assertEquals("the deferred release runs when the native call returns",
                 1, harness.nativeApi.releaseCount);
+        assertEquals("a revoked segmented stream must not push",
+                0, harness.nativeApi.streamPushCalls);
         // On de7c9b5 the segmented path never writes nativeInstanceLive, so
         // this assertion pins the asymmetry with startWholeStream: a future
         // fix must not "restore symmetry" by adding the same late write here.
@@ -198,7 +208,7 @@ public class N1StreamShutdownRaceTest {
      * ------------------------------------------------------------------ */
 
     @Test
-    public void staleWholeStreamCompletionAfterShutdownCannotTriggerASecondRelease()
+    public void deferredReloadAndShutdownReleaseExactlyOnceWhenTheStreamCompletes()
             throws Exception {
         harness.initializeReady();
         harness.assets.install(FR);
@@ -206,28 +216,11 @@ public class N1StreamShutdownRaceTest {
 
         final CountDownLatch streamEntered = new CountDownLatch(1);
         final CountDownLatch allowStreamResume = new CountDownLatch(1);
-        final CountDownLatch restoreInitEntered = new CountDownLatch(1);
-        final CountDownLatch allowRestoreInit = new CountDownLatch(1);
-        final AtomicInteger reloadInitCalls = new AtomicInteger();
-
         harness.nativeApi.onStreamStart = new Runnable() {
             @Override
             public void run() {
                 streamEntered.countDown();
                 awaitUnchecked(allowStreamResume);
-            }
-        };
-        // Both replacement inits fail. The first (French) fails immediately so
-        // the engine attempts the recovery init; the recovery init (English)
-        // is held so shutdown can land while the reload owns NATIVE_LOCK.
-        harness.nativeApi.failAll = true;
-        harness.nativeApi.onInit = new Runnable() {
-            @Override
-            public void run() {
-                if (reloadInitCalls.incrementAndGet() == 2) {
-                    restoreInitEntered.countDown();
-                    awaitUnchecked(allowRestoreInit);
-                }
             }
         };
 
@@ -236,32 +229,35 @@ public class N1StreamShutdownRaceTest {
         AtomicReference<Throwable> streamFailure = new AtomicReference<>();
         Thread stream = startWorker("n1-stale-stream", streamFailure);
         await(streamEntered);
+        assertEquals(1, harness.nativeApi.streamStartCalls);
 
-        // Cancellation makes the engine admissible for a replacement voice
-        // while the old stream is still inside nativeApi.streamStart().
+        // Cancellation admits a replacement voice while the stream is still on
+        // the native stack. F3: the reload must not release or re-init until
+        // that call drains.
         harness.engine.stop();
         KokoroEngineTestSupport.Capture capture = new KokoroEngineTestSupport.Capture();
         harness.engine.registerVoice(FR, capture);
         AtomicReference<Throwable> reloadFailure = new AtomicReference<>();
         Thread reload = startWorker("n1-reload", reloadFailure);
-        await(restoreInitEntered);
-        assertEquals("the reload released the original instance before init",
-                1, harness.nativeApi.releaseCount);
+        joinWorker(reload, reloadFailure);
 
-        // Shutdown while both the stream and the reload are suspended.
+        assertEquals("the reload is deferred while the native stream is active",
+                0, harness.nativeApi.releaseCount);
+        assertEquals("no replacement init on an un-drained engine",
+                Arrays.asList(EN), harness.nativeApi.initCalls);
+
+        // Shutdown while the stream and its deferred reload are suspended.
         harness.engine.shutdown();
 
-        // The stale whole-stream completion resurrects ownership after the
-        // instance was released.
         allowStreamResume.countDown();
         joinWorker(stream, streamFailure);
-
-        // The reload's failed-recovery cleanup now observes the resurrected
-        // flag and would issue a second native release for the same instance.
-        allowRestoreInit.countDown();
-        joinWorker(reload, reloadFailure);
         harness.scheduler.drain();
 
+        // The stale completion must not have pushed, finished, cleared or
+        // release-claimed anything.
+        assertEquals(0, harness.nativeApi.streamPushCalls);
+        assertEquals(0, harness.nativeApi.streamFinishCalls);
+        assertEquals(0, harness.nativeApi.streamClearCount);
         assertFalse(capture.succeeded());
         assertEquals("engine-shutdown", capture.lastError());
         assertEquals(1, harness.nativeApi.successfulInitCalls);
@@ -303,8 +299,9 @@ public class N1StreamShutdownRaceTest {
         // The old instance shuts down but its release task stays queued.
         harness.engine.shutdown();
 
-        // Renderer recreation: a replacement engine commits a newer generation
-        // before the old release task runs.
+        // Renderer recreation: the replacement reserves a newer generation
+        // immediately (revoking the old one), but its native init must wait for
+        // the old native call to drain.
         KokoroEngineTestSupport.ManualScheduler secondScheduler =
                 new KokoroEngineTestSupport.ManualScheduler();
         KokoroEngineTestSupport.RecordingListener secondListener =
@@ -314,12 +311,17 @@ public class N1StreamShutdownRaceTest {
                 harness.nativeApi, harness.log, harness.clock);
         second.initialize(secondListener);
         secondScheduler.drain();
-        assertEquals(LocalTtsEngine.State.READY, secondListener.lastState());
-        long secondGeneration = EngineOwnership.currentGeneration();
+        assertEquals("F2: the reservation already revoked the old owner",
+                LocalTtsEngine.State.LOADING, secondListener.lastState());
+        assertEquals("F3: nativeInit waits for the old stream to drain",
+                1, harness.nativeApi.initCalls.size());
 
         // The old stream completes only after the newer generation exists.
         allowStreamResume.countDown();
         joinWorker(stream, streamFailure);
+        secondScheduler.drain();
+        assertEquals(LocalTtsEngine.State.READY, secondListener.lastState());
+        long secondGeneration = EngineOwnership.currentGeneration();
         // Now drain the old instance's queued shutdown release.
         harness.scheduler.drain();
 

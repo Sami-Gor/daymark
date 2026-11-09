@@ -3,7 +3,7 @@ package io.github.sami_gor.daymark.tts;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -620,22 +620,25 @@ public class KokoroLocalTtsEngineRaceTest {
     }
 
     @Test
-    public void streamCompletionAfterReleaseCannotResurrectOwnership() throws Exception {
+    public void noStreamCallIsPossibleWithoutAnAdmittedOperationLease() throws Exception {
         harness.initializeReady();
         harness.engine.shutdown();
         harness.scheduler.drain();
         assertEquals(1, harness.nativeApi.releaseCount);
         assertFalse(nativeInstanceLive(harness.engine));
 
-        // Simulate a stream that was already inside the native bridge when
-        // shutdown released the engine: its success completion must not make
-        // this instance look like an owner again.
-        Method startWholeStream = KokoroLocalTtsEngine.class.getDeclaredMethod(
-                "startWholeStream", String.class, String.class, String.class);
-        startWholeStream.setAccessible(true);
-        assertNull(startWholeStream.invoke(harness.engine, "hello", "en-GB", EN));
-        assertFalse("a stream does not own a native engine instance",
-                nativeInstanceLive(harness.engine));
+        // F3: the stream entry point itself re-checks ownership under
+        // NATIVE_LOCK. A stale caller that reaches it after release must not
+        // reach the native bridge and must not resurrect release ownership.
+        Method startStream = KokoroLocalTtsEngine.class.getDeclaredMethod(
+                "startStream", long.class, String.class, java.util.List.class,
+                String.class, String.class);
+        startStream.setAccessible(true);
+        assertNotNull(startStream.invoke(harness.engine,
+                EngineOwnership.currentGeneration(), "hello", null, "en-GB", EN));
+        assertEquals("a stream does not own a native engine instance",
+                0, harness.nativeApi.streamStartCalls);
+        assertFalse(nativeInstanceLive(harness.engine));
 
         // The next cleanup therefore stays a no-op instead of releasing the
         // replacement/torn-down engine a second time.
@@ -649,7 +652,7 @@ public class KokoroLocalTtsEngineRaceTest {
     }
 
     @Test
-    public void nativeReleaseFailureIsLoggedAndDoesNotAbortTheReload() {
+    public void aThrowingReleaseFailsTheReloadClosedInsteadOfInitialisingOnUnknownState() {
         harness.initializeReady();
         harness.assets.install(FR);
         harness.nativeApi.releaseThrows = true;
@@ -659,21 +662,47 @@ public class KokoroLocalTtsEngineRaceTest {
         harness.engine.registerVoice(FR, capture);
         harness.scheduler.drain();
 
-        // The old instance's release claim was spent, so the failed bridge call
-        // is recorded but the reload still adopts the requested voice.
-        assertTrue(capture.succeeded());
-        assertEquals(new HashSet<>(Arrays.asList(FR)), harness.loaded());
-        assertEquals(LocalTtsEngine.State.READY, harness.listener.lastState());
-        assertEquals(1, harness.nativeApi.releaseCount);
+        assertEquals("a throwing release is not reported as a clean reload",
+                EngineOwnership.REASON_RELEASE_UNCONFIRMED, capture.lastError());
+        assertFalse(capture.succeeded());
+        assertEquals("no replacement init may run on unknown native state",
+                Arrays.asList(EN), harness.nativeApi.initCalls);
+        assertEquals("the failed release is not retried", 1, harness.nativeApi.releaseCount);
+        assertTrue(harness.engine.loadedVoices().isEmpty());
+        assertEquals(LocalTtsEngine.State.ERROR, harness.listener.lastState());
         assertTrue("release failure must be logged distinctly",
                 harness.log.errors.stream().anyMatch(message -> message.contains("release")));
 
-        // No automatic retry: the next release is the legitimate one for the
-        // instance the reload just created.
-        harness.nativeApi.releaseThrows = false;
-        harness.engine.shutdown();
+        // Every later native path is fail-closed with the stable error code.
+        harness.listener.clear();
+        harness.engine.speak("hello", "en-GB", null);
         harness.scheduler.drain();
-        assertEquals(2, harness.nativeApi.releaseCount);
+        assertEquals(Arrays.asList(EngineOwnership.REASON_RELEASE_UNCONFIRMED),
+                harness.listener.errors);
+        assertEquals("no synth/stream call may reach the bridge",
+                0, harness.nativeApi.streamStartCalls);
+        assertEquals(0, harness.nativeApi.synthCalls);
+
+        KokoroEngineTestSupport.Capture retry = new KokoroEngineTestSupport.Capture();
+        harness.engine.registerVoice(EN, retry);
+        assertEquals(EngineOwnership.REASON_RELEASE_UNCONFIRMED, retry.lastError());
+
+        // Even a brand-new engine instance in the same process is blocked; the
+        // flag is process-wide and deliberately never reset in production.
+        KokoroEngineTestSupport.ManualScheduler freshScheduler =
+                new KokoroEngineTestSupport.ManualScheduler();
+        KokoroEngineTestSupport.RecordingListener freshListener =
+                new KokoroEngineTestSupport.RecordingListener();
+        KokoroLocalTtsEngine fresh = new KokoroLocalTtsEngine(
+                freshScheduler, harness.assets, harness.audio,
+                harness.nativeApi, harness.log, harness.clock);
+        fresh.initialize(freshListener);
+        freshScheduler.drain();
+        assertEquals(Arrays.asList("Initialization failed: "
+                        + EngineOwnership.REASON_RELEASE_UNCONFIRMED),
+                freshListener.errors);
+        assertEquals(LocalTtsEngine.State.ERROR, freshListener.lastState());
+        assertEquals(Arrays.asList(EN), harness.nativeApi.initCalls);
     }
 
     @Test

@@ -124,6 +124,9 @@ final class KokoroEngineTestSupport {
         int streamClearCount;
         int synthCalls;
         int streamStartCalls;
+        int streamPushCalls;
+        int streamFinishCalls;
+        int streamNextCalls;
         /** Invoked at the start of every init call, before failing. */
         Runnable onInit;
         /**
@@ -133,6 +136,10 @@ final class KokoroEngineTestSupport {
          * shutdown/cleanup, which the fake previously could not express.
          */
         Runnable onStreamStart;
+        /** Invoked at the start of every {@link #streamNext} call. */
+        Runnable onStreamNext;
+        /** Invoked at the start of every {@link #synth} call. */
+        Runnable onSynth;
 
         void failVoice(String voice) {
             failingVoices.add(voice);
@@ -177,6 +184,10 @@ final class KokoroEngineTestSupport {
         @Override
         public float[] synth(String text, String lang, String voiceName) {
             synthCalls += 1;
+            Runnable callback = onSynth;
+            if (callback != null) {
+                callback.run();
+            }
             return null;
         }
 
@@ -192,14 +203,21 @@ final class KokoroEngineTestSupport {
 
         @Override
         public void streamPush(String text) {
+            streamPushCalls += 1;
         }
 
         @Override
         public void streamFinish() {
+            streamFinishCalls += 1;
         }
 
         @Override
         public float[] streamNext() {
+            streamNextCalls += 1;
+            Runnable callback = onStreamNext;
+            if (callback != null) {
+                callback.run();
+            }
             synchronized (streamChunks) {
                 if (streamChunks.isEmpty()) {
                     return null;
