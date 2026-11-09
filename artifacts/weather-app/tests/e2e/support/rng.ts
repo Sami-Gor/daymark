@@ -44,7 +44,13 @@ export function createSeededRandom(seed: number): RandomSource {
  * - The effective seed is always derived per test, so tests never share a
  *   stream and test order cannot change the data a test sees.
  */
-export function resolveSeed(titlePath: readonly string[], envSeed: string | undefined = process.env.DAYMARK_E2E_SEED): number {
+export function resolveSeed(
+  titlePath: readonly string[],
+  // `null` explicitly means "no ambient override"; a missing argument falls back
+  // to DAYMARK_E2E_SEED. The null sentinel keeps unit tests independent of the
+  // developer's/CI environment.
+  envSeed: string | null | undefined = process.env.DAYMARK_E2E_SEED,
+): number {
   const title = titlePath.join(' › ');
   const override = envSeed?.trim();
   return override ? hashString(`${override}::${title}`) : hashString(title);
