@@ -9,6 +9,7 @@ import Privacy from '@/pages/privacy';
 import PrivacyFr from '@/pages/privacy-fr';
 import PrivacyEs from '@/pages/privacy-es';
 import StorePreview from '@/pages/store-preview';
+import SettingsPage from '@/pages/settings';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
   fetchWeather,
@@ -263,7 +264,7 @@ function Home() {
             {t('demo.webLimited')}
           </p>
         )}
-        <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> {t('footer.by')}</span><span className="footer-links"><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a><Link href={privacyHref} data-testid="link-privacy">{t('footer.privacy')}</Link></span></footer>
+        <footer className="footer-note"><span><CalendarDays size={11} style={{ verticalAlign: 'middle', marginRight: 5 }} /> {t('footer.by')}</span><span className="footer-links"><Link href="/settings" data-testid="link-settings">{t('footer.settings')}</Link><a href="https://open-meteo.com/" target="_blank" rel="noreferrer" data-testid="link-open-meteo">open-meteo.com</a><Link href={privacyHref} data-testid="link-privacy">{t('footer.privacy')}</Link></span></footer>
       </div>
     </div>
   );
@@ -278,6 +279,7 @@ function Router() {
         <Route path="/fr/privacy" component={PrivacyFr} />
         <Route path="/es/privacy" component={PrivacyEs} />
         <Route path="/store-preview" component={StorePreview} />
+        <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

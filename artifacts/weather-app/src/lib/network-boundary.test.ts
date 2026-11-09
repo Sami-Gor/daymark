@@ -58,6 +58,10 @@ const NAVIGATION_HOSTS = [
   'www.cloudflare.com',
   'www.geonames.org',
   'huggingface.co',
+  // Narration licence/attribution links in the settings row and consent
+  // dialog. User-clicked navigation only; never fetched by the app.
+  'creativecommons.org',
+  'doi.org',
 ] as const;
 
 const headersFile = path.join(appRoot, 'public', '_headers');
@@ -454,6 +458,10 @@ describe('network boundary', () => {
       // Licence URLs are embedded data for attribution manifests, not fetches.
       'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/packs/PackLicences.java',
       'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/packs/PackManifest.java',
+      // Validates the compiled-in HTTPS base URL and derives pack URLs from
+      // it. It parses URIs only and never opens a socket; the allow-listed
+      // transport above remains the sole network client.
+      'android/daymark-voice/src/main/java/io/github/sami_gor/daymark/packs/PackSourceConfig.java',
     ];
     for (const file of allowed) {
       expect(relative).toContain(file);
