@@ -338,8 +338,15 @@ public final class VoicePackManager {
                                 // the payload download; do not rewind the phase.
                                 return;
                             }
-                            emit(operation, stageFor(stage),
-                                    operation.totalBytes, operation.totalBytes, "");
+                            if (stage == PackDownloader.Stage.DOWNLOADING) {
+                                // The transport reports real bytes; this stage
+                                // callback only announces that download began.
+                                emit(operation, Phase.DOWNLOADING, 0L,
+                                        operation.totalBytes, "");
+                            } else {
+                                emit(operation, stageFor(stage),
+                                        operation.totalBytes, operation.totalBytes, "");
+                            }
                         }
                     });
             checkCancelled(operation);

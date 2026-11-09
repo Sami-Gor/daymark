@@ -59,6 +59,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
     private String packConfigError = "";
     private final Object packLock = new Object();
     private String activePackOperationId;
+    private String lastPackProgressKey = "";
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
     private boolean focusHeld;
@@ -177,7 +178,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
                     downloader,
                     voiceFlow,
                     packExecutor::execute,
-                    null);
+                    this::postPackProgress);
         } catch (RuntimeException failure) {
             packManager = null;
             packConfigError = "pack-source-invalid";
@@ -318,6 +319,7 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
                 return;
             }
             activePackOperationId = operationId;
+            lastPackProgressKey = "";
         }
         String startError = packManager.start(voiceId, operationId, outcome -> {
             mainHandler.post(() -> {
@@ -366,6 +368,40 @@ public class DaymarkVoicePlugin extends Plugin implements LocalTtsEngine.Listene
         JSObject result = new JSObject();
         result.put("cancelled", cancelled);
         call.resolve(result);
+    }
+
+    /**
+     * Forwards one progress snapshot. Events are posted to the main thread,
+     * scoped to the current operation id, and de-duplicated so a transport that
+     * reports the same byte count twice cannot animate the row twice.
+     */
+    private void postPackProgress(VoicePackManager.Progress progress) {
+        mainHandler.post(() -> {
+            String key = progress.operationId + "|" + progress.phase.wireName() + "|"
+                    + progress.bytesReceived + "|" + progress.totalBytes + "|"
+                    + progress.errorCode;
+            synchronized (packLock) {
+                if (activePackOperationId == null
+                        || !activePackOperationId.equals(progress.operationId)) {
+                    return;
+                }
+                if (key.equals(lastPackProgressKey)) {
+                    return;
+                }
+                lastPackProgressKey = key;
+            }
+            JSObject event = new JSObject();
+            event.put("voiceId", progress.voiceId);
+            event.put("operationId", progress.operationId);
+            event.put("phase", progress.phase.wireName());
+            event.put("bytesReceived", progress.bytesReceived);
+            event.put("totalBytes", progress.totalBytes);
+            if (progress.totalBytes > 0 && progress.percentage >= 0) {
+                event.put("percentage", (int) Math.round(progress.percentage));
+            }
+            event.put("errorCode", progress.errorCode);
+            notifyListeners("voicePackProgress", event);
+        });
     }
 
     private static String trimmed(String value) {

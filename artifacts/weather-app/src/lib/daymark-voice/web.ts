@@ -1,6 +1,11 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { DaymarkVoicePlugin, DaymarkVoiceState } from './index';
+import type {
+  DaymarkVoicePlugin,
+  DaymarkVoiceState,
+  VoicePackInfoResult,
+  VoicePackInstallResult,
+} from './index';
 
 /*
  * Browser placeholder: DaymarkVoice is a native-only capability. On the web
@@ -34,6 +39,25 @@ export class DaymarkVoiceWeb extends WebPlugin implements DaymarkVoicePlugin {
 
   async getInstalledVoices(): Promise<{ voices: string[] }> {
     return { voices: [] };
+  }
+
+  async getVoicePackInfo(): Promise<VoicePackInfoResult> {
+    // The web demo has no on-device narration, so no pack can be offered. This
+    // is a fail-closed response, not an invitation to download.
+    return {
+      sourceConfigured: false,
+      nativeAvailable: false,
+      errorCode: 'native-unavailable',
+      voices: [],
+    };
+  }
+
+  async installVoicePack(): Promise<VoicePackInstallResult> {
+    throw this.unavailable('Optional narration voices are Android-only');
+  }
+
+  async cancelVoicePackInstall(): Promise<{ cancelled: boolean }> {
+    return { cancelled: false };
   }
 
   async registerVoice(): Promise<{ voices: string[] }> {
