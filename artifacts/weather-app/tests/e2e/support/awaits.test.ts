@@ -133,6 +133,13 @@ function isAwaited(trimmed: string): boolean {
   return /(^|[\s(])await\s+/.test(trimmed) || /^(return|void)\s+/.test(trimmed);
 }
 
+/**
+ * Net number of unclosed parentheses in a source fragment.
+ *
+ * A positive result means the expression continues on following lines; zero or
+ * negative means it is balanced or over-closed. Used only to decide how far a
+ * multiline assertion statement extends, so missing parentheses count as zero.
+ */
 function parenBalance(text: string): number {
   return (text.match(/\(/g) ?? []).length - (text.match(/\)/g) ?? []).length;
 }

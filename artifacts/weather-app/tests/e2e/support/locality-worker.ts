@@ -46,6 +46,14 @@ export class LocalityWorkerProbe {
       probeWindow.__daymarkLocalityWorkerMessages = messages;
       const OriginalWorker = window.Worker;
       if (typeof OriginalWorker !== 'function') return;
+      /**
+       * Replacement Worker constructor installed inside the page.
+       *
+       * Forwards to the real Worker; locality-worker instances also get a
+       * message listener that records events into `messages`. Every other
+       * worker is passed through untouched and no message is altered, so the
+       * app's dataset lookup behaves exactly as it does in production.
+       */
       function ProbeWorker(this: unknown, scriptURL: string | URL, options?: WorkerOptions): Worker {
         const worker = new OriginalWorker(scriptURL, options);
         if (String(scriptURL).includes('locality.worker')) {

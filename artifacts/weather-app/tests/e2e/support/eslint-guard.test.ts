@@ -54,6 +54,13 @@ beforeAll(() => {
   fixtureEslint = new ESLint({ cwd: appRoot, ignore: false });
 });
 
+/**
+ * Lint one deliberately-invalid fixture through the configured ESLint instance.
+ *
+ * Uses the `ignore: false` instance so the fixture directory's flat-config
+ * ignores do not apply here. Throws if ESLint returns no result, so a missing
+ * or renamed fixture fails the guard test instead of passing with no findings.
+ */
 async function lintFixture(name: string): Promise<ESLint.LintResult> {
   const [result] = await fixtureEslint.lintFiles([relativeFixture(name)]);
   if (!result) throw new Error(`ESLint returned no result for fixture "${name}"`);
