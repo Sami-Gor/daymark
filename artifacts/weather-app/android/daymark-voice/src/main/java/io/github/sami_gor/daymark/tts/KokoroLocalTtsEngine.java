@@ -171,6 +171,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private volatile long generation;
     /** True only after nativeInit succeeded, so release never calls into an unloaded library. */
     private volatile boolean nativeInitialised;
+    /**
+     * Exactly-once release ownership for the current native instance.
+     * Guarded by {@link EngineOwnership#NATIVE_LOCK}: every native init and
+     * release call is made while holding that lock, so the flag and the
+     * release decision are always observed consistently. Set only after a
+     * successful nativeApi.init(); cleared by the single release helper.
+     */
+    private boolean nativeInstanceLive;
     private volatile AudioHandle audioHandle;
     private int synthesisCount;
     /** Path of the materialised model, retained so the engine can be reloaded. */
@@ -338,13 +346,13 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                             voicesDir.getAbsolutePath(),
                             DEFAULT_VOICE_NAME);
                     if (error == null) {
+                        nativeInstanceLive = true;
                         // Re-check after the (slow) native call: shutdown may
                         // have started, or a newer generation may have been
                         // reserved while we were inside the bridge.
                         if (shuttingDown.get()
                                 || !EngineOwnership.isLatestReservation(initGeneration)) {
-                            nativeApi.release();
-                            nativeInitialised = false;
+                            releaseNativeInstanceLocked();
                         } else {
                             // Ownership is committed only after the native engine
                             // accepted the model/voice, and only if no newer
@@ -352,12 +360,12 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                             committed = EngineOwnership.commitInit(initGeneration);
                             if (committed) {
                                 nativeInitialised = true;
+                                nativeInstanceLive = true;
                                 loadedVoices = Collections.singleton(DEFAULT_VOICE_NAME);
                             } else {
                                 // Superseded during commit: release the engine
                                 // we created; the newer generation will initialise.
-                                nativeApi.release();
-                                nativeInitialised = false;
+                                releaseNativeInstanceLocked();
                             }
                         }
                     }
@@ -528,25 +536,24 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             } else {
                 try {
                     if (nativeInitialised) {
-                        nativeApi.release();
-                        nativeInitialised = false;
+                        releaseNativeInstanceLocked();
                     }
                     String error = nativeApi.init(model, voicesDir.getAbsolutePath(), voiceId);
                     if (error == null) {
+                        nativeInstanceLive = true;
                         // Re-check after the native call: shutdown or a newer
                         // reservation may have arrived while we were inside it.
                         if (!mayRunReload(token, reloadGeneration)) {
-                            nativeApi.release();
-                            nativeInitialised = false;
+                            releaseNativeInstanceLocked();
                             stale = true;
                         } else if (EngineOwnership.commitInit(reloadGeneration)) {
                             nativeInitialised = true;
+                            nativeInstanceLive = true;
                             generation = reloadGeneration;
                             loaded = Collections.singleton(voiceId);
                             loadedVoices = loaded;
                         } else {
-                            nativeApi.release();
-                            nativeInitialised = false;
+                            releaseNativeInstanceLocked();
                             stale = true;
                         }
                     } else {
@@ -558,20 +565,20 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                             String restore = nativeApi.init(
                                     model, voicesDir.getAbsolutePath(), previousVoice);
                             if (restore == null) {
+                                nativeInstanceLive = true;
                                 if (!mayRunReload(token, reloadGeneration)) {
-                                    nativeApi.release();
-                                    nativeInitialised = false;
+                                    releaseNativeInstanceLocked();
                                     stale = true;
                                 } else if (EngineOwnership.commitInit(reloadGeneration)) {
                                     nativeInitialised = true;
+                                    nativeInstanceLive = true;
                                     generation = reloadGeneration;
                                     loaded = Collections.singleton(previousVoice);
                                     loadedVoices = loaded;
                                     recovered = true;
                                     failure = "reload-failed";
                                 } else {
-                                    nativeApi.release();
-                                    nativeInitialised = false;
+                                    releaseNativeInstanceLocked();
                                     stale = true;
                                 }
                             } else {
@@ -588,8 +595,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     } else {
                         try {
                             if (nativeInitialised) {
-                                nativeApi.release();
-                                nativeInitialised = false;
+                                releaseNativeInstanceLocked();
                             }
                             String restore = nativeApi.init(
                                     model, voicesDir.getAbsolutePath(), previousVoice);
@@ -597,11 +603,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                                 failure = "reload-failed-unrecovered";
                             } else if (!mayRunReload(token, reloadGeneration)
                                     || !EngineOwnership.commitInit(reloadGeneration)) {
-                                nativeApi.release();
-                                nativeInitialised = false;
+                                releaseNativeInstanceLocked();
                                 stale = true;
                             } else {
                                 nativeInitialised = true;
+                                nativeInstanceLive = true;
                                 generation = reloadGeneration;
                                 loaded = Collections.singleton(previousVoice);
                                 loadedVoices = loaded;
@@ -619,9 +625,9 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 if (failure != null && !recovered) {
                     // No usable engine is loaded; make that ownership state
                     // explicit so a retry can reserve the next generation.
-                    if (nativeInitialised) {
+                    if (nativeInitialised || nativeInstanceLive) {
                         try {
-                            nativeApi.release();
+                            releaseNativeInstanceLocked();
                         } catch (Throwable ignored) {
                             // Best effort: the bridge already failed.
                         }
@@ -798,6 +804,21 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         }
     }
 
+    /**
+     * Releases the current native instance at most once. Caller must hold
+     * {@link EngineOwnership#NATIVE_LOCK}. A stale cleanup path and shutdown
+     * can both reach this method; the second call is a no-op, so the native
+     * engine is never released twice regardless of JNI idempotency.
+     */
+    private void releaseNativeInstanceLocked() {
+        nativeInitialised = false;
+        if (!nativeInstanceLive) {
+            return;
+        }
+        nativeInstanceLive = false;
+        nativeApi.release();
+    }
+
     @Override
     public boolean isSpeaking() {
         return state == State.SPEAKING;
@@ -826,8 +847,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         // shutdown must be the one released.
                         boolean owned = EngineOwnership.claimRelease(generation);
                         if (owned && nativeInitialised) {
-                            nativeApi.release();
-                            nativeInitialised = false;
+                            releaseNativeInstanceLocked();
                         } else if (owned) {
                             // A reload already released the native engine
                             // before it was interrupted: only clear ownership.
@@ -922,6 +942,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private String startWholeStream(String text, String lang, String voice) {
         String error = nativeApi.streamStart(text, lang, voice);
         if (error == null) {
+            nativeInstanceLive = true;
             nativeApi.streamFinish();
         }
         return error;

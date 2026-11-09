@@ -557,4 +557,62 @@ public class KokoroLocalTtsEngineRaceTest {
         fresh.shutdown();
         freshScheduler.drain();
     }
+
+    /* ------------------------------------------------------------------ *
+     * N-1: exactly-once native release ownership                          *
+     * ------------------------------------------------------------------ */
+
+    @Test
+    public void staleReloadCleanupAndShutdownReleaseTheInstanceExactlyOnce() {
+        harness.initializeReady();
+        harness.assets.install(FR);
+        KokoroEngineTestSupport.Capture capture = new KokoroEngineTestSupport.Capture();
+        // Shutdown begins while the reload is inside nativeApi.init().
+        harness.nativeApi.onInit = () -> harness.engine.shutdown();
+
+        harness.engine.registerVoice(FR, capture);
+        harness.scheduler.runAllWorker();
+        harness.scheduler.runAllMain();
+
+        assertFalse(capture.succeeded());
+        // Each successful nativeApi.init creates exactly one instance; the
+        // instance count must equal releases, proving no duplicates and no leak.
+        assertEquals("one release per created native instance",
+                harness.nativeApi.initCalls.size(), harness.nativeApi.releaseCount);
+    }
+
+    @Test
+    public void repeatedShutdownReleasesTheNativeInstanceOnce() {
+        harness.initializeReady();
+        harness.engine.shutdown();
+        harness.engine.shutdown();
+        harness.scheduler.runAllWorker();
+        harness.scheduler.runAllMain();
+
+        assertEquals(1, harness.nativeApi.releaseCount);
+        assertEquals(LocalTtsEngine.State.UNINITIALIZED,
+                harness.listener.states.get(harness.listener.states.size() - 1));
+    }
+
+    @Test
+    public void staleReloadCleanupAfterShutdownCannotReleaseANewerInstance() {
+        harness.initializeReady();
+        harness.assets.install(FR);
+        KokoroEngineTestSupport.Capture reload = new KokoroEngineTestSupport.Capture();
+        harness.nativeApi.onInit = () -> harness.engine.shutdown();
+
+        harness.engine.registerVoice(FR, reload);
+        harness.scheduler.runAllWorker();
+        harness.scheduler.runAllMain();
+        assertEquals(harness.nativeApi.initCalls.size(), harness.nativeApi.releaseCount);
+
+        // A later start on the same terminated engine cannot create or release
+        // another native instance.
+        int releasesAfterShutdown = harness.nativeApi.releaseCount;
+        harness.engine.speak("Bonjour", "fr-FR", null);
+        harness.scheduler.runAllWorker();
+        harness.scheduler.runAllMain();
+        assertEquals(releasesAfterShutdown, harness.nativeApi.releaseCount);
+        assertEquals(harness.nativeApi.initCalls.size(), harness.nativeApi.releaseCount);
+    }
 }
