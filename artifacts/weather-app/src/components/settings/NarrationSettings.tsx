@@ -312,7 +312,7 @@ export function NarrationSettingsView({
  * is downloaded until the user opens and confirms the consent dialog.
  */
 export function NarrationSettings() {
-  const { t, locale } = useLocale();
+  const { t, locale, setLocale } = useLocale();
   const controllerRef = useRef<NarrationSettingsController | null>(null);
   if (!controllerRef.current) {
     controllerRef.current = new NarrationSettingsController(DaymarkVoice);
@@ -329,14 +329,34 @@ export function NarrationSettings() {
     return () => controller.dispose();
   }, [controller]);
 
+  // Keep the radio in step with the app locale: French is only applied when
+  // the controller (backed by getVoiceStates) considers it ready.
+  useEffect(() => {
+    if (locale === 'fr') {
+      controller.selectVoice(FRENCH_VOICE);
+    } else {
+      controller.selectVoice(ENGLISH_VOICE);
+    }
+  }, [controller, locale, state.states]);
+
   const actions = useMemo<NarrationSettingsActions>(() => ({
     requestDownload: () => controller.requestDownload(),
     cancelConsent: () => controller.cancelConsent(),
     confirmDownload: () => controller.confirmDownload(),
     cancelInstall: () => controller.cancelInstall(),
     retry: () => controller.retry(),
-    selectVoice: (voiceId: string) => controller.selectVoice(voiceId),
-  }), [controller]);
+    selectVoice: (voiceId: string) => {
+      if (voiceId === FRENCH_VOICE) {
+        controller.selectVoice(FRENCH_VOICE);
+        if (controller.getSnapshot().selectedVoice === FRENCH_VOICE) {
+          setLocale('fr');
+        }
+      } else {
+        controller.selectVoice(ENGLISH_VOICE);
+        setLocale('en');
+      }
+    },
+  }), [controller, setLocale]);
 
   const isAndroidNative = Capacitor.isNativePlatform()
     && Capacitor.getPlatform() === 'android';
