@@ -43,6 +43,16 @@ export async function activeAnimations(page: Page): Promise<string[]> {
  * Retrying assertion used only immediately before an axe scan: resolves once no
  * animation is running or pending. Not a general-purpose sleep — callers must
  * have a real reason to want the colour scan delayed.
+ *
+ * Precondition: reduced motion must already be emulated on the page. Callers
+ * must `await page.emulateMedia({ reducedMotion: 'reduce' })` before invoking
+ * this helper (the existing callers do so before navigating, so first-paint
+ * animations are already covered). Daymark's stylesheet uses
+ * `@media (prefers-reduced-motion: reduce)` in src/index.css to collapse its
+ * persistent ticker/chart animations to a single 0.01 ms iteration; without
+ * that emulation an infinite animation can stay running and this poll will time
+ * out instead of settling. The helper deliberately does not configure media
+ * emulation itself, leaving the scan environment explicit at the call site.
  */
 export async function expectAnimationsSettled(page: Page, options: { timeout?: number } = {}): Promise<void> {
   await expect
