@@ -205,6 +205,12 @@ test.describe('randomised and boundary weather data', () => {
 
     await search.search('a');
     await search.input.press(' ');
+    // Bounded negative observation window: the expected behaviour is the
+    // absence of both a geocoding request and a results panel, and "nothing
+    // happened" has no positive completion signal to wait on. 500 ms is twice
+    // the source's 250 ms search debounce, so if the minimum-query-length guard
+    // regressed the debounced request would have fired (and rendered results)
+    // inside this window; the assertions below would then fail.
     await dashboard.page.waitForTimeout(500);
 
     expect(requests.geocoding()).toEqual([]);

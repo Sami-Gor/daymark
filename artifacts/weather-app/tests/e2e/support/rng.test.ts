@@ -78,16 +78,18 @@ describe('seeded random numbers', () => {
 describe('seed resolution', () => {
   it('is a pure function of the test title path', () => {
     const title = ['weather', 'randomised', 'renders values'];
-    expect(resolveSeed(title)).toBe(resolveSeed([...title]));
-    expect(resolveSeed(title)).toBe(hashString(title.join(' › ')));
+    // Pass an explicit null so an ambient DAYMARK_E2E_SEED cannot change
+    // what this default-seed property means (the suite must stay env-independent).
+    expect(resolveSeed(title, null)).toBe(resolveSeed([...title], null));
+    expect(resolveSeed(title, null)).toBe(hashString(title.join(' › ')));
   });
 
   it('gives different tests different seeds', () => {
-    expect(resolveSeed(['a', 'test one'])).not.toBe(resolveSeed(['a', 'test two']));
+    expect(resolveSeed(['a', 'test one'], null)).not.toBe(resolveSeed(['a', 'test two'], null));
   });
 
   it('lets DAYMARK_E2E_SEED redefine the data while keeping tests distinct', () => {
-    const defaultSeed = resolveSeed(['suite', 'test']);
+    const defaultSeed = resolveSeed(['suite', 'test'], null);
     const overridden = resolveSeed(['suite', 'test'], '2026');
     expect(overridden).not.toBe(defaultSeed);
     expect(overridden).toBe(resolveSeed(['suite', 'test'], '2026'));
@@ -95,7 +97,7 @@ describe('seed resolution', () => {
   });
 
   it('ignores blank overrides', () => {
-    expect(resolveSeed(['suite', 'test'], '   ')).toBe(resolveSeed(['suite', 'test']));
+    expect(resolveSeed(['suite', 'test'], '   ')).toBe(resolveSeed(['suite', 'test'], null));
   });
 });
 
