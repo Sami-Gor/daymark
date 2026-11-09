@@ -140,4 +140,35 @@ public class V31AuthorityFencingTest {
         assertTrue("B keeps the newest reservation",
                 EngineOwnership.isLatestReservation(reservation));
     }
+
+    // C (explicit READY race): A's READY is posted and held; B reserves; the
+    // held READY must never reach A's listener once B is authoritative.
+    @Test
+    public void readyPostedBeforeAReplacementReservationIsNotDelivered() {
+        ManualScheduler aScheduler = new ManualScheduler();
+        RecordingListener aListener = new RecordingListener();
+        KokoroLocalTtsEngine a = replacement(aScheduler, aListener);
+        a.initialize(aListener);
+        aScheduler.runAllWorker();
+        assertTrue("A must have posted its READY callback", aScheduler.pendingMain() > 0);
+        assertFalse("READY is held, not yet delivered",
+                aListener.states.contains(LocalTtsEngine.State.READY));
+
+        ManualScheduler bScheduler = new ManualScheduler();
+        RecordingListener bListener = new RecordingListener();
+        KokoroLocalTtsEngine b = replacement(bScheduler, bListener);
+        b.initialize(bListener);
+        long reservation = EngineOwnership.reservedGeneration();
+        assertTrue(EngineOwnership.isLatestReservation(reservation));
+
+        // Execute A's previously queued delivery while B is authoritative.
+        aScheduler.runAllMain();
+
+        assertFalse("stale READY must be dropped after the reservation",
+                aListener.states.contains(LocalTtsEngine.State.READY));
+        assertTrue("B must retain the newest reservation",
+                EngineOwnership.isLatestReservation(reservation));
+        assertFalse("the pre-reservation owner is revoked",
+                EngineOwnership.owns(EngineOwnership.currentGeneration()));
+    }
 }
