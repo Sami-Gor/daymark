@@ -3,6 +3,7 @@
  *
  * Exposes native calls used by KokoroLocalTtsEngine:
  *   nativeInit(modelPath, voicesDir, defaultVoice) -> error string or null
+ *   nativeInitSucceeded() -> boolean, result of the most recent nativeInit
  *   nativeSynth(text, lang, voiceName) -> FloatArray of 24 kHz mono PCM, or null
  *   nativeStreamStart(text, lang, voiceName) -> error string or null
  *   nativeStreamNext() -> next sentence FloatArray, or null when finished
@@ -17,9 +18,10 @@
  */
 use futures::StreamExt;
 use jni::objects::{JClass, JString};
-use jni::sys::{jfloatArray, jstring};
+use jni::sys::{jboolean, jfloatArray, jstring};
 use jni::JNIEnv;
 use kokoro_en::{KokoroTts, SynthSink, SynthStream, Voice};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use tokio::runtime::Runtime;
@@ -69,6 +71,19 @@ struct StreamSession {
 static ENGINE: OnceLock<Mutex<Option<Engine>>> = OnceLock::new();
 static STREAM: OnceLock<Mutex<Option<StreamSession>>> = OnceLock::new();
 
+/// Authoritative, allocation-free result of the most recent `nativeInit`.
+///
+/// `nativeInit` returns null on success and an error message on failure, but
+/// the error message is a JNI string allocation: [`to_jstring`] returns null
+/// when that allocation fails. A JNI implementation is allowed to report such
+/// a failure by returning NULL without throwing (see the Java SE JNI
+/// specification, chapter 4: functions that can return NULL and throw on
+/// error "may choose only to return NULL ... but not throw any exception"),
+/// which makes a failed init indistinguishable from the null success
+/// sentinel. The Java side therefore treats this flag, not the returned
+/// string, as the success signal.
+static LAST_INIT_SUCCEEDED: AtomicBool = AtomicBool::new(false);
+
 fn engine_slot() -> &'static Mutex<Option<Engine>> {
     ENGINE.get_or_init(|| Mutex::new(None))
 }
@@ -83,6 +98,12 @@ fn engine_handles() -> Option<(Arc<Runtime>, Arc<KokoroTts>, String)> {
         .map(|engine| (engine.runtime.clone(), engine.tts.clone(), engine.voice.clone()))
 }
 
+/// Allocates a Java string for an error message.
+///
+/// Returns null when the string cannot be allocated. Callers must not treat
+/// a null return as proof of success: the JNI specification permits an
+/// allocation failure to be reported as NULL without a pending exception.
+/// `nativeInit` publishes its real result through [`LAST_INIT_SUCCEEDED`].
 fn to_jstring(env: &mut JNIEnv, value: &str) -> jstring {
     match env.new_string(value) {
         Ok(s) => s.into_raw(),
@@ -98,6 +119,10 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     voices_path: JString,
     voice_name: JString,
 ) -> jstring {
+    // Cleared before anything else: every early-error path below returns a
+    // string (or null when that string cannot be allocated), and the Java
+    // side must never observe a stale success from a previous init.
+    LAST_INIT_SUCCEEDED.store(false, Ordering::SeqCst);
     android_logger::init_once(
         android_logger::Config::default()
             .with_max_level(log::LevelFilter::Info)
@@ -148,7 +173,22 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
         tts: Arc::new(tts),
         voice,
     });
+    // Published only after the engine is visible: the Java side uses this
+    // flag (not the null return) to decide that this init really succeeded.
+    LAST_INIT_SUCCEEDED.store(true, Ordering::SeqCst);
     std::ptr::null_mut()
+}
+
+/// Allocation-free result of the most recent `nativeInit` call.
+///
+/// Called by `KokoroLocalTtsEngine` immediately after `nativeInit`, while it
+/// still holds the process-wide native lock, so no other init can interleave.
+#[no_mangle]
+pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine_nativeInitSucceeded(
+    _env: JNIEnv,
+    _class: JClass,
+) -> jboolean {
+    LAST_INIT_SUCCEEDED.load(Ordering::SeqCst) as jboolean
 }
 
 #[no_mangle]
@@ -368,6 +408,7 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     _env: JNIEnv,
     _class: JClass,
 ) {
+    LAST_INIT_SUCCEEDED.store(false, Ordering::SeqCst);
     *stream_slot().lock().unwrap() = None;
     let mut slot = engine_slot().lock().unwrap();
     *slot = None;

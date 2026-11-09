@@ -112,11 +112,21 @@ final class KokoroEngineTestSupport {
         final List<String> initCalls = new ArrayList<>();
         /**
          * Number of init calls that actually created a native instance, i.e.
-         * returned {@code null}. The exactly-once invariant is per successful
+         * reported success. The exactly-once invariant is per successful
          * init, so tests compare {@link #releaseCount} against this, not
          * against {@link #initCalls} (which also counts failed attempts).
          */
         int successfulInitCalls;
+        /**
+         * Simulates a JNI implementation that reports the failed error-string
+         * allocation by returning the null success sentinel without an
+         * exception: the init failed, no engine was created, yet the native
+         * call returned {@code null}. {@link #successfulInitCalls} is not
+         * incremented for such a call.
+         */
+        boolean loseInitErrorString;
+        /** Result of the most recent init call; see {@link #initSucceeded()}. */
+        private boolean lastInitSucceeded;
         int releaseCount;
         boolean releaseThrows;
         String streamStartError;
@@ -175,10 +185,22 @@ final class KokoroEngineTestSupport {
                 callback.run();
             }
             if (failAll || failingVoices.contains(voiceName)) {
+                lastInitSucceeded = false;
+                if (loseInitErrorString) {
+                    // The bridge failed but lost its error text: the Java side
+                    // observes exactly the same null as a successful init.
+                    return null;
+                }
                 return "kokoro native init failed for " + voiceName;
             }
+            lastInitSucceeded = true;
             successfulInitCalls += 1;
             return null;
+        }
+
+        @Override
+        public boolean initSucceeded() {
+            return lastInitSucceeded;
         }
 
         @Override

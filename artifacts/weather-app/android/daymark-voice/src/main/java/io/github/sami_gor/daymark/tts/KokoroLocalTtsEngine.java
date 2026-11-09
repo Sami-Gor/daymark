@@ -51,6 +51,13 @@ import io.github.sami_gor.daymark.voice.BuildConfig;
 public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     private static final String TAG = "DaymarkKokoroTts";
+    /**
+     * Stable reason used when the bridge returned the null success sentinel
+     * but did not report a created engine. Kept in Java so the failure never
+     * depends on a native string allocation.
+     */
+    private static final String REASON_INIT_WITHOUT_ENGINE =
+            "native engine missing after init";
     private static final String DEFAULT_VOICE_NAME = NarrationVoicePolicy.ENGLISH_VOICE;
     private static final String LEGACY_VOICE_FILE = "bm_george.bin";
     private static final String MODEL_ASSET = "kokoro/model_quantized.onnx";
@@ -87,7 +94,30 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
         String failureReason();
 
+        /**
+         * Creates the process-wide native engine.
+         *
+         * @return {@code null} when the engine was created, otherwise a
+         *         non-null error message. A {@code null} return is ambiguous
+         *         on its own: the native error text is a JNI string
+         *         allocation, and a JNI implementation may report an
+         *         allocation failure by returning {@code null} without an
+         *         exception (the Java SE JNI specification explicitly allows
+         *         that). Callers must confirm success with
+         *         {@link #initSucceeded()}.
+         */
         String init(String modelPath, String voicesPath, String voiceName);
+
+        /**
+         * Allocation-free result of the most recent {@link #init} call.
+         *
+         * <p>A null {@code init} return is not proof that an engine exists.
+         * This flag is set by the bridge only after the engine is published,
+         * so it is the authoritative success signal. It is queried
+         * immediately after {@code init} while the caller still holds the
+         * process-wide native lock, so no other initialisation can interleave.
+         */
+        boolean initSucceeded();
 
         float[] synth(String text, String lang, String voiceName);
 
@@ -207,6 +237,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private final Object lifecycleLock = new Object();
 
     private native String nativeInit(String modelPath, String voicesPath, String voiceName);
+    private native boolean nativeInitSucceeded();
     private native float[] nativeSynth(String text, String lang, String voiceName);
     private native String nativeStreamStart(String text, String lang, String voiceName);
     private native void nativeStreamPush(String text);
@@ -403,6 +434,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         voicesDir.getAbsolutePath(),
                         DEFAULT_VOICE_NAME);
                 elapsedMs = clock.elapsedRealtime() - start;
+                if (error == null && !nativeApi.initSucceeded()) {
+                    // Ambiguous null: the bridge produced no error text, but it
+                    // did not publish an engine either. A failed error-string
+                    // allocation is reported by some JNI implementations as a
+                    // bare null, so a null return must never be trusted on its
+                    // own. No ownership is claimed and READY is never published.
+                    error = REASON_INIT_WITHOUT_ENGINE;
+                }
                 if (error == null) {
                     // The bridge created a native instance: claim it before any
                     // re-check can release it. This is the only kind of site
@@ -769,6 +808,12 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             long reloadGeneration,
             ReloadOutcome outcome) {
         String error = nativeApi.init(model, voicesDir.getAbsolutePath(), voiceName);
+        if (error == null && !nativeApi.initSucceeded()) {
+            // Same ambiguous null as initializeNative(): no engine was
+            // published by this call, so never claim or commit one. Returning
+            // false lets the caller restore the previously loaded voice.
+            error = REASON_INIT_WITHOUT_ENGINE;
+        }
         if (error != null) {
             log.e("registerVoice: failed: " + error, null);
             return false;
@@ -1687,6 +1732,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         @Override
         public String init(String modelPath, String voicesPath, String voiceName) {
             return engine.nativeInit(modelPath, voicesPath, voiceName);
+        }
+
+        @Override
+        public boolean initSucceeded() {
+            return engine.nativeInitSucceeded();
         }
 
         @Override
