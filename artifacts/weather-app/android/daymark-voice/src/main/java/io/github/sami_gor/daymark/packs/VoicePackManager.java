@@ -387,8 +387,17 @@ public final class VoicePackManager {
                 finished.countDown();
             }
         });
-        if (!finished.await(REGISTRATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            return "registration-timeout";
+        final long deadlineNanos = System.nanoTime()
+                + TimeUnit.SECONDS.toNanos(REGISTRATION_TIMEOUT_SECONDS);
+        while (!finished.await(100L, TimeUnit.MILLISECONDS)) {
+            // A cancel must release the single install slot promptly even if
+            // the native engine never calls back.
+            if (operation.cancelled) {
+                return "cancelled";
+            }
+            if (System.nanoTime() >= deadlineNanos) {
+                return "registration-timeout";
+            }
         }
         if (ready[0]) {
             return null;
