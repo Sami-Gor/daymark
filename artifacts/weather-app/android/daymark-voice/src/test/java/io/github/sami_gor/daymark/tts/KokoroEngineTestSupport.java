@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -109,6 +110,13 @@ final class KokoroEngineTestSupport {
         boolean failAll;
         final Set<String> failingVoices = new HashSet<>();
         final List<String> initCalls = new ArrayList<>();
+        /**
+         * Number of init calls that actually created a native instance, i.e.
+         * returned {@code null}. The exactly-once invariant is per successful
+         * init, so tests compare {@link #releaseCount} against this, not
+         * against {@link #initCalls} (which also counts failed attempts).
+         */
+        int successfulInitCalls;
         int releaseCount;
         boolean releaseThrows;
         String streamStartError;
@@ -118,6 +126,13 @@ final class KokoroEngineTestSupport {
         int streamStartCalls;
         /** Invoked at the start of every init call, before failing. */
         Runnable onInit;
+        /**
+         * Invoked at the start of every {@link #streamStart} call (the call is
+         * already counted and blocked on the hook). Tests use it to hold the
+         * engine inside the native stream handshake while another thread runs
+         * shutdown/cleanup, which the fake previously could not express.
+         */
+        Runnable onStreamStart;
 
         void failVoice(String voice) {
             failingVoices.add(voice);
@@ -155,6 +170,7 @@ final class KokoroEngineTestSupport {
             if (failAll || failingVoices.contains(voiceName)) {
                 return "kokoro native init failed for " + voiceName;
             }
+            successfulInitCalls += 1;
             return null;
         }
 
@@ -167,6 +183,10 @@ final class KokoroEngineTestSupport {
         @Override
         public String streamStart(String text, String lang, String voiceName) {
             streamStartCalls += 1;
+            Runnable callback = onStreamStart;
+            if (callback != null) {
+                callback.run();
+            }
             return streamStartError;
         }
 
@@ -337,6 +357,7 @@ final class KokoroEngineTestSupport {
 
     static final class FakeLog implements KokoroLocalTtsEngine.LogSink {
         final List<String> errors = new ArrayList<>();
+        final List<String> warnings = new ArrayList<>();
 
         @Override
         public void i(String message) {
@@ -344,6 +365,7 @@ final class KokoroEngineTestSupport {
 
         @Override
         public void w(String message, Throwable error) {
+            warnings.add(message);
         }
 
         @Override
@@ -471,5 +493,25 @@ final class KokoroEngineTestSupport {
 
     static <T> List<T> copyOf(Collection<T> source) {
         return new ArrayList<>(source);
+    }
+
+    /**
+     * Reads the engine's exactly-once ownership flag.
+     *
+     * <p>Test-seam gap: the production engine exposes no way to observe
+     * whether {@code nativeInstanceLive} is set, and after {@code shutdown()}
+     * no public call reaches the release helper again. N-1 asserts that a
+     * stale stream completion must not resurrect ownership, so the guarded
+     * field is read directly. If production later exposes the lifecycle
+     * snapshot, this helper should switch to it.
+     */
+    static boolean nativeInstanceLive(KokoroLocalTtsEngine engine) {
+        try {
+            Field field = KokoroLocalTtsEngine.class.getDeclaredField("nativeInstanceLive");
+            field.setAccessible(true);
+            return field.getBoolean(engine);
+        } catch (ReflectiveOperationException failure) {
+            throw new AssertionError("cannot read nativeInstanceLive", failure);
+        }
     }
 }
