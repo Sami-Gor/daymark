@@ -1,4 +1,5 @@
 import { expect, test } from '../support/fixtures';
+import { LocalityWorkerProbe } from '../support/locality-worker';
 import {
   LOCALITY_LOW_CONFIDENCE_FIXTURE,
   LOCALITY_UXBRIDGE_FIXTURE,
@@ -60,6 +61,12 @@ test.describe('offline locality naming', () => {
   });
 
   test('suppresses LOW-confidence labels', async ({ api, dashboard, geo, page }) => {
+    // Observe the worker's own completion signal instead of sleeping: the
+    // test-only probe records the locality worker's `{type:'result'}` message,
+    // so the "label stayed generic" assertion runs strictly after the lookup
+    // really answered (and we can assert it was the low-confidence match).
+    const localityWorker = new LocalityWorkerProbe(page);
+    await localityWorker.install();
     await api.locality(LOCALITY_LOW_CONFIDENCE_FIXTURE);
     await geo.defer();
     await dashboard.goto('/');
@@ -68,11 +75,22 @@ test.describe('offline locality naming', () => {
     await dashboard.requestDeviceLocation();
     await geo.resolve(UXBRIDGE.latitude, UXBRIDGE.longitude);
     await dashboard.expectCity('Your location');
-    await page.waitForTimeout(800);
+
+    const result = await localityWorker.waitForResult();
+    // The worker produced the low-confidence record rather than "no match":
+    expect(result.match).toMatchObject({ name: 'Far Village', confidence: 'low' });
+    // ...and the app still shows the generic label after that result was
+    // delivered, so the suppression is real rather than "the lookup was slow".
     await dashboard.expectCity('Your location');
   });
 
   test('a search selection supersedes a pending locality lookup', async ({ api, dashboard, geo, page, search }) => {
+    // The delay below is on the dataset response, so it determines when the
+    // worker's lookup can answer - not the label. The probe lets us wait for
+    // that stale result and assert the selection guard ignored it, instead of
+    // sleeping through a guessed window.
+    const localityWorker = new LocalityWorkerProbe(page);
+    await localityWorker.install();
     await api.locality(LOCALITY_UXBRIDGE_FIXTURE, { delay: 1200 });
     await api.geocoding(PARIS_SEARCH);
     await geo.defer();
@@ -84,7 +102,14 @@ test.describe('offline locality naming', () => {
     await search.search('paris');
     await search.selectOption(0);
     await dashboard.expectCity('Paris');
-    await page.waitForTimeout(1500);
+
+    // Ordering is deterministic: the device lookup can only answer after the
+    // 1200 ms dataset response, while the Paris search resolves in roughly a
+    // debounce-plus-round-trip (<400 ms), so this stale result arrives after
+    // Paris is selected. A missing/no-op intent guard would relabel the city to
+    // Uxbridge here; with the guard it is ignored and Paris still wins.
+    const staleResult = await localityWorker.waitForResult();
+    expect(staleResult.match?.name).toBe('Uxbridge');
     await dashboard.expectCity('Paris');
   });
 

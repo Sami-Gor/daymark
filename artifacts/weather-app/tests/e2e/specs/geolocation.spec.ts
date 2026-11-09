@@ -29,6 +29,11 @@ test.describe('geolocation flow', () => {
 
     // The older location request resolves after the newer search selection.
     await geo.resolve(51.5074567, -0.12789012);
+    // Bounded negative observation window: the stale fix takes the deliberate
+    // "silently ignored" path, which emits no positive completion signal to
+    // wait on. 500 ms is a generous multiple of the mocked forecast round-trip,
+    // so a guard regression would have rendered "Your location" (and re-shown
+    // locating state) in this window; the assertions below would then fail.
     await page.waitForTimeout(500);
     await dashboard.expectCity('Paris');
     await expect(dashboard.heroLocationButton).toHaveText('Use my location');

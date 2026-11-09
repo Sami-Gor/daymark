@@ -62,14 +62,27 @@ test.describe('location search', () => {
     await expect(search.status).toHaveText('No places found');
   });
 
-  test('the latest query wins when an older search is still in flight', async ({ api, dashboard, page, search }) => {
+  test('the latest query wins when an older search is still in flight', async ({ api, dashboard, page, requests, search }) => {
     await api.locations();
     await dashboard.goto('/');
     await search.search('paris');
-    await page.waitForTimeout(300); // paris request is now in flight (delayed 500ms)
+    // Positive signal that the delayed Paris search really is in flight: the
+    // debounced geocoding request appears in the request log. This replaces a
+    // fixed sleep that merely guessed the request had started.
+    await expect
+      .poll(
+        () => requests.geocoding().some((url) => new URL(url).searchParams.get('name') === 'paris'),
+        { message: 'expected the debounced Paris geocoding request to start before typing Tokyo' },
+      )
+      .toBe(true);
     await search.search('tokyo');
     await expect(search.option(0)).toContainText('Tokyo');
-    await page.waitForTimeout(600); // paris would have resolved by now
+    // Bounded negative observation window (600 ms > the 500 ms Paris stub
+    // delay): this reaches past the moment the older Paris response would have
+    // rendered. There is no positive signal for an aborted response, so if the
+    // abort/stale-response guard regressed the late Paris payload would overwrite
+    // Tokyo during this window and the assertions below would fail.
+    await page.waitForTimeout(600);
     await expect(search.option(0)).toContainText('Tokyo');
     await expect(search.results).not.toContainText('Paris');
   });
