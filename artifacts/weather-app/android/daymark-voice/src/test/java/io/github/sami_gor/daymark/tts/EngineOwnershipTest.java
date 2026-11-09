@@ -76,4 +76,31 @@ public class EngineOwnershipTest {
         org.junit.Assert.assertFalse(EngineOwnership.commitInit(oldToken));
         org.junit.Assert.assertEquals(newToken, EngineOwnership.currentGeneration());
     }
+
+    @Test
+    public void onlyTheNewestReservationMayTouchTheNativeEngine() {
+        EngineOwnership.resetForTest();
+        long first = EngineOwnership.beginInit();
+        org.junit.Assert.assertTrue(EngineOwnership.isLatestReservation(first));
+        long second = EngineOwnership.beginInit();
+        org.junit.Assert.assertFalse("a slow older initialisation must abort before native init",
+                EngineOwnership.isLatestReservation(first));
+        org.junit.Assert.assertTrue(EngineOwnership.isLatestReservation(second));
+        org.junit.Assert.assertFalse(EngineOwnership.isLatestReservation(0));
+        org.junit.Assert.assertFalse(EngineOwnership.isLatestReservation(-1));
+    }
+
+    @Test
+    public void resetClearsReservationsAsWellAsOwnership() {
+        long committed = EngineOwnership.beginInit();
+        org.junit.Assert.assertTrue(EngineOwnership.commitInit(committed));
+        EngineOwnership.beginInit();
+
+        EngineOwnership.resetForTest();
+
+        org.junit.Assert.assertEquals(0L, EngineOwnership.currentGeneration());
+        org.junit.Assert.assertEquals(0L, EngineOwnership.reservedGeneration());
+        long next = EngineOwnership.beginInit();
+        org.junit.Assert.assertEquals(1L, next);
+    }
 }

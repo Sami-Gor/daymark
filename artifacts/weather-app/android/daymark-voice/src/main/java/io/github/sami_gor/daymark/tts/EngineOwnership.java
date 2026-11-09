@@ -68,12 +68,27 @@ public final class EngineOwnership {
         return initialised && generation == currentGeneration;
     }
 
+    /**
+     * True when this token is still the newest reservation. Callers check this
+     * under {@link #NATIVE_LOCK} immediately before touching the native engine,
+     * so a slow, superseded initialisation cannot overwrite or release the
+     * engine a newer generation is about to own.
+     */
+    public static synchronized boolean isLatestReservation(long generation) {
+        return generation > 0 && generation == reservedGeneration;
+    }
+
     public static synchronized long currentGeneration() {
         return currentGeneration;
     }
 
+    public static synchronized long reservedGeneration() {
+        return reservedGeneration;
+    }
+
     public static synchronized void resetForTest() {
         currentGeneration = 0;
+        reservedGeneration = 0;
         initialised = false;
     }
 }

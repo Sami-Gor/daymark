@@ -12,25 +12,42 @@ import android.util.Log;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.github.sami_gor.daymark.voice.BuildConfig;
 
 /**
  * Kokoro (pguso/kokoro) implementation of {@link LocalTtsEngine}.
  *
- * The 92 MB quantized model and the English, French and Latin American
+ * <p>The 92 MB quantized model and the English, French and Latin American
  * Spanish voice packs ship as APK assets; on first initialization they are
  * copied into the app's files directory because Kokoro loads them from paths.
  * Synthesis runs through a minimal Rust JNI bridge (libkokoro_jni.so) with
  * ONNX Runtime statically linked; nothing is downloaded at runtime.
  *
- * English keeps the existing bm_fable/Misaki path. French and Spanish use
+ * <p>English keeps the existing bm_fable/Misaki path. French and Spanish use
  * piper-plus-g2p 0.5.3 and the ff_siwis/em_alex voice packs. That is a debug
  * POC only: release builds compile {@code MULTILINGUAL_NARRATION = false},
  * materialise only bm_fable and reject French/Spanish before synthesis.
+ *
+ * <p>Lifecycle contract: the engine exposes exactly one state machine through
+ * {@link LocalTtsEngine.State}. A voice registration is observable as
+ * {@code LOADING} and only becomes {@code READY} after the native engine
+ * initialised the requested voice and the ownership generation was committed.
+ * A failed reload either restores the previously loaded voice ({@code READY},
+ * callback {@code reload-failed}) or ends in {@code ERROR}
+ * ({@code reload-failed-unrecovered}); it never stays silently {@code READY}.
+ * {@link #loadedVoices()} only ever contains voices a committed native
+ * initialisation actually loaded, never merely installed files.
+ *
+ * <p>For JVM tests every platform dependency is injectable through the
+ * package-private constructor: scheduling, native bridge, packaged assets,
+ * audio output, logging and the clock.
  */
 public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
@@ -50,10 +67,103 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478";
     private static final long VOICE_BYTES = 522_240L;
 
-    private final Context appContext;
-    private final HandlerThread workerThread;
-    private final Handler worker;
-    private final Handler main;
+    /* ------------------------------------------------------------------ *
+     * Platform seams (package-private; production implementations below). *
+     * ------------------------------------------------------------------ */
+
+    /** Serialises engine work off the UI thread and listeners onto it. */
+    interface Scheduler {
+        /** @return false when the worker has been shut down. */
+        boolean postWorker(Runnable task);
+
+        void postMain(Runnable task);
+
+        /** Stops accepting new worker tasks; queued tasks still drain. */
+        void quitWorker();
+    }
+
+    /** The native Kokoro bridge; instrumented deterministically in tests. */
+    interface NativeApi {
+        boolean ensureLoaded();
+
+        String failureReason();
+
+        String init(String modelPath, String voicesPath, String voiceName);
+
+        float[] synth(String text, String lang, String voiceName);
+
+        String streamStart(String text, String lang, String voiceName);
+
+        void streamPush(String text);
+
+        void streamFinish();
+
+        float[] streamNext();
+
+        void streamClear();
+
+        void release();
+    }
+
+    /** Materialised packaged model/voices (verified before first use). */
+    interface PackagedAssets {
+        File filesDir();
+
+        File voicesDir();
+
+        File modelFile() throws Exception;
+
+        void ensureVoice(String voiceName) throws Exception;
+    }
+
+    /** Creates one playback sink; production uses AudioTrack. */
+    interface AudioFactory {
+        AudioHandle open();
+    }
+
+    interface AudioHandle {
+        void play();
+
+        int write(short[] buffer, int offset, int size);
+
+        boolean isPlaying();
+
+        void pause();
+
+        void flush();
+
+        long playbackHeadPosition();
+
+        void stop();
+
+        void release();
+    }
+
+    interface LogSink {
+        void i(String message);
+
+        void w(String message, Throwable error);
+
+        void e(String message, Throwable error);
+    }
+
+    interface Clock {
+        long elapsedRealtime();
+
+        void sleep(long millis);
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Fields                                                              *
+     * ------------------------------------------------------------------ */
+
+    private final Scheduler scheduler;
+    private final PackagedAssets packagedAssets;
+    private final AudioFactory audioFactory;
+    private final LogSink log;
+    private final Clock clock;
+    /** Assigned by the public constructor; tests inject directly. */
+    private volatile NativeApi nativeApi;
 
     private volatile Listener listener;
     private volatile State state = State.UNINITIALIZED;
@@ -62,18 +172,22 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private volatile long generation;
     /** True only after nativeInit succeeded, so release never calls into an unloaded library. */
     private volatile boolean nativeInitialised;
-    private volatile AudioTrack audioTrack;
+    private volatile AudioHandle audioHandle;
     private int synthesisCount;
     /** Path of the materialised model, retained so the engine can be reloaded. */
     private volatile String modelPath;
     private final ReloadGuard reloadGuard = new ReloadGuard();
     /**
      * Voices the current native generation actually loaded. Derived only from
-     * successful initialisation, never from files on disk: a downloaded voice
-     * is selectable only after registerVoice reloads the engine.
+     * a committed native initialisation, never from files on disk: an
+     * installed voice is selectable only after registerVoice reloaded the
+     * engine and the generation committed.
      */
-    private volatile java.util.Set<String> loadedVoices =
-            java.util.Collections.singleton(DEFAULT_VOICE_NAME);
+    private volatile Set<String> loadedVoices = Collections.emptySet();
+    private final AtomicBoolean initializationInFlight = new AtomicBoolean();
+    private final AtomicBoolean shuttingDown = new AtomicBoolean();
+    /** Guards admission decisions and state transitions made on caller threads. */
+    private final Object lifecycleLock = new Object();
 
     private native String nativeInit(String modelPath, String voicesPath, String voiceName);
     private native float[] nativeSynth(String text, String lang, String voiceName);
@@ -83,26 +197,6 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private native float[] nativeStreamNext();
     private native void nativeStreamClear();
     private native void nativeRelease();
-
-    /** Optional voices currently installed in app-private storage. */
-    private java.util.Set<String> installedVoiceNames() {
-        java.util.Set<String> installed = new java.util.HashSet<>();
-        File dir = new File(appContext.getFilesDir(), "kokoro");
-        String[] names = dir.list();
-        if (names == null) {
-            return installed;
-        }
-        for (String name : names) {
-            if (!name.endsWith(".bin")) {
-                continue;
-            }
-            String voice = name.substring(0, name.length() - 4);
-            if (NarrationVoicePolicy.isMultilingualVoice(voice)) {
-                installed.add(voice);
-            }
-        }
-        return installed;
-    }
 
     private static String voiceSha256(String voiceName) {
         switch (voiceName) {
@@ -117,109 +211,211 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         }
     }
 
+    /** Production wiring: Android handlers, assets, AudioTrack, JNI, clock. */
     public KokoroLocalTtsEngine(Context context) {
-        this.appContext = context.getApplicationContext();
-        this.workerThread = new HandlerThread("daymark-kokoro-tts");
-        this.workerThread.start();
-        this.worker = new Handler(workerThread.getLooper());
-        this.main = new Handler(Looper.getMainLooper());
+        this(new HandlerScheduler(),
+                new AndroidPackagedAssets(context.getApplicationContext()),
+                new AndroidAudioFactory(),
+                null,
+                new AndroidLogSink(),
+                new AndroidClock());
+        this.nativeApi = new AndroidNativeApi(this);
     }
+
+    /** Test wiring: every platform dependency is supplied by the caller. */
+    KokoroLocalTtsEngine(
+            Scheduler scheduler,
+            PackagedAssets packagedAssets,
+            AudioFactory audioFactory,
+            NativeApi nativeApi,
+            LogSink log,
+            Clock clock) {
+        this.scheduler = scheduler;
+        this.packagedAssets = packagedAssets;
+        this.audioFactory = audioFactory;
+        this.nativeApi = nativeApi;
+        this.log = log;
+        this.clock = clock;
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Initialisation                                                      *
+     * ------------------------------------------------------------------ */
 
     @Override
     public void initialize(final Listener newListener) {
         this.listener = newListener;
-        setState(State.LOADING);
-        generation = EngineOwnership.beginInit();
-        worker.post(new Runnable() {
+        final long initGeneration;
+        synchronized (lifecycleLock) {
+            if (shuttingDown.get()) {
+                // The worker/handlers are gone; reporting an error is the only
+                // honest outcome. A replacement engine instance is required.
+                notifyError("engine-shutdown");
+                return;
+            }
+            if (state == State.LOADING || state == State.READY
+                    || state == State.SPEAKING || state == State.STOPPED) {
+                notifyError("operation-conflict");
+                return;
+            }
+            if (!initializationInFlight.compareAndSet(false, true)) {
+                notifyError("operation-conflict");
+                return;
+            }
+            initGeneration = EngineOwnership.beginInit();
+            generation = initGeneration;
+            nativeInitialised = false;
+            loadedVoices = Collections.emptySet();
+            setState(State.LOADING);
+        }
+        final Runnable task = new Runnable() {
             @Override
             public void run() {
-                if (!NativeLibraryState.ensureLoaded()) {
-                    String reason = NativeLibraryState.failureReason();
-                    Log.e(TAG, "initialize: native library unavailable: " + reason);
-                    // Voice is optional: report a classified failure and leave
-                    // the rest of the app fully usable.
-                    notifyError("Initialization failed: "
-                            + (reason == null ? NativeLibraryState.REASON_NATIVE_UNAVAILABLE : reason));
+                runInitialize(initGeneration);
+            }
+        };
+        if (!scheduler.postWorker(task)) {
+            initializationInFlight.set(false);
+            synchronized (lifecycleLock) {
+                if (state == State.LOADING) {
+                    setState(shuttingDown.get() ? State.UNINITIALIZED : State.ERROR);
+                }
+            }
+        }
+    }
+
+    private void runInitialize(final long initGeneration) {
+        try {
+            if (!isStillWanted(initGeneration)) {
+                return;
+            }
+            if (!nativeApi.ensureLoaded()) {
+                String reason = nativeApi.failureReason();
+                log.e("initialize: native library unavailable: " + reason, null);
+                // Voice is optional: report a classified failure and leave
+                // the rest of the app fully usable.
+                notifyError("Initialization failed: "
+                        + (reason == null ? NativeLibraryState.REASON_NATIVE_UNAVAILABLE : reason));
+                setState(State.ERROR);
+                return;
+            }
+            try {
+                long copyStart = clock.elapsedRealtime();
+                File modelFile = packagedAssets.modelFile();
+                File voicesDir = packagedAssets.voicesDir();
+                List<String> voices = NarrationVoicePolicy.packagedVoices(
+                        BuildConfig.PACKAGED_MULTILINGUAL_VOICES);
+                for (String voice : voices) {
+                    packagedAssets.ensureVoice(voice);
+                }
+                modelPath = modelFile.getAbsolutePath();
+                log.i("initialize: assets ready in " + (clock.elapsedRealtime() - copyStart)
+                        + "ms modelBytes=" + modelFile.length()
+                        + " voices=" + String.join(",", voices));
+
+                long start = clock.elapsedRealtime();
+                String error = null;
+                boolean committed = false;
+                synchronized (EngineOwnership.NATIVE_LOCK) {
+                    // Re-check under the native lock: a newer reservation must
+                    // never be overwritten by this slow initialisation.
+                    if (!isStillWanted(initGeneration)) {
+                        abandonStaleInitialisation(initGeneration);
+                        return;
+                    }
+                    error = nativeApi.init(
+                            modelFile.getAbsolutePath(),
+                            voicesDir.getAbsolutePath(),
+                            DEFAULT_VOICE_NAME);
+                    if (error == null) {
+                        // Ownership is committed only after the native engine
+                        // accepted the model/voice, and only if no newer
+                        // initialisation reserved the engine meanwhile.
+                        committed = EngineOwnership.commitInit(initGeneration);
+                        if (committed) {
+                            nativeInitialised = true;
+                            loadedVoices = Collections.singleton(DEFAULT_VOICE_NAME);
+                        } else {
+                            // Superseded during native init: release the engine
+                            // we created; the newer generation will initialise.
+                            nativeApi.release();
+                            nativeInitialised = false;
+                        }
+                    }
+                }
+                long elapsedMs = clock.elapsedRealtime() - start;
+                if (error != null) {
+                    log.e("initialize: failed: " + error, null);
+                    // Notify before the terminal state so the bridge can
+                    // preserve the specific asset/model reason for the UI.
+                    notifyError("Initialization failed: " + error);
                     setState(State.ERROR);
                     return;
                 }
-                try {
-                    File legacyVoice = new File(new File(appContext.getFilesDir(), "kokoro"), LEGACY_VOICE_FILE);
-                    if (legacyVoice.exists() && legacyVoice.delete()) {
-                        Log.i(TAG, "initialize: removed legacy " + LEGACY_VOICE_FILE);
-                    }
-                    long copyStart = SystemClock.elapsedRealtime();
-                    File modelFile = copyAssetIfNeeded(MODEL_ASSET, "model_quantized.onnx", MODEL_BYTES, MODEL_SHA256);
-                    File voicesDir = new File(appContext.getFilesDir(), "kokoro");
-                    List<String> voices = NarrationVoicePolicy.packagedVoices(
-                            BuildConfig.PACKAGED_MULTILINGUAL_VOICES);
-                    for (String voice : voices) {
-                        copyAssetIfNeeded(
-                                VOICE_ASSET_PREFIX + voice + ".bin",
-                                voice + ".bin",
-                                VOICE_BYTES,
-                                voiceSha256(voice));
-                    }
-                    modelPath = modelFile.getAbsolutePath();
-                    Log.i(TAG, "initialize: assets ready in " + (SystemClock.elapsedRealtime() - copyStart)
-                            + "ms modelBytes=" + modelFile.length()
-                            + " voices=" + String.join(",", voices));
-
-                    long start = SystemClock.elapsedRealtime();
-                    // Serialise with release: a stale instance must not clear the
-                    // engine a successful init has just installed.
-                    String error;
-                    synchronized (EngineOwnership.NATIVE_LOCK) {
-                        error = nativeInit(
-                                modelFile.getAbsolutePath(),
-                                voicesDir.getAbsolutePath(),
-                                DEFAULT_VOICE_NAME);
-                        if (error == null) {
-                            EngineOwnership.commitInit(generation);
-                            nativeInitialised = true;
-                            loadedVoices = VoiceRegistry.installed(voicesDir);
-                        }
-                    }
-                    long elapsedMs = SystemClock.elapsedRealtime() - start;
-                    if (error != null) {
-                        Log.e(TAG, "initialize: failed: " + error);
-                        // Notify before the terminal state so the bridge can
-                        // preserve the specific asset/model reason for the UI.
-                        notifyError("Initialization failed: " + error);
+                if (!committed) {
+                    if (!shuttingDown.get()) {
+                        log.w("initialize: superseded generation " + initGeneration, null);
                         setState(State.ERROR);
-                        return;
                     }
-                    Log.i(TAG, "initialize: model loaded in " + elapsedMs + "ms defaultVoice=" + DEFAULT_VOICE_NAME);
-                    setState(State.READY);
-                } catch (Throwable failure) {
-                    Log.e(TAG, "initialize: failed: " + failure.getMessage(), failure);
+                    return;
+                }
+                log.i("initialize: model loaded in " + elapsedMs
+                        + "ms defaultVoice=" + DEFAULT_VOICE_NAME);
+                setState(State.READY);
+            } catch (Throwable failure) {
+                log.e("initialize: failed: " + failure.getMessage(), failure);
+                if (!shuttingDown.get()) {
                     notifyError("Initialization failed: " + failure.getMessage());
                     setState(State.ERROR);
                 }
             }
-        });
+        } finally {
+            initializationInFlight.set(false);
+        }
     }
+
+    /**
+     * True when this operation still belongs to the newest reservation and the
+     * engine has not started shutting down.
+     */
+    private boolean isStillWanted(long initGeneration) {
+        return !shuttingDown.get() && EngineOwnership.isLatestReservation(initGeneration);
+    }
+
+    private void abandonStaleInitialisation(long initGeneration) {
+        if (!shuttingDown.get()) {
+            log.w("initialize: superseded generation " + initGeneration, null);
+            setState(State.ERROR);
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Voice registration / reload                                         *
+     * ------------------------------------------------------------------ */
 
     /** Callback for asynchronous voice registration/reload. */
     public interface VoiceOperationResult {
-        void onSuccess(java.util.Set<String> installed);
+        void onSuccess(Set<String> loadedVoices);
 
         void onError(String code);
     }
 
     /** Supported optional voices currently present in app-private storage. */
-    public java.util.Set<String> installedOptionalVoices() {
-        return VoiceRegistry.installed(new File(appContext.getFilesDir(), "kokoro"));
+    public Set<String> installedOptionalVoices() {
+        return VoiceRegistry.installed(packagedAssets.voicesDir());
     }
 
-    /** Voices loaded by the current native generation. */
-    public java.util.Set<String> loadedVoices() {
+    /**
+     * Voices loaded by the current native generation. Empty until an
+     * initialisation committed; never derived from installed files.
+     */
+    public Set<String> loadedVoices() {
         return loadedVoices;
     }
 
     /** True when the voice file is present and readable; does not imply loaded. */
     public boolean isVoiceInstalled(String voiceId) {
-        return VoiceRegistry.isInstalled(new File(appContext.getFilesDir(), "kokoro"), voiceId);
+        return VoiceRegistry.isInstalled(packagedAssets.voicesDir(), voiceId);
     }
 
     /**
@@ -227,101 +423,215 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      *
      * <p>The native engine snapshots its voice directory at initialisation, so a
      * newly installed file only becomes usable after a guarded reload. The
-     * previous generation is released only after the replacement initialises;
-     * a failed reload attempts to restore the previous voice, and the caller
-     * always receives an explicit error instead of a silent English fallback.
+     * previously loaded voice is released only once the replacement is about
+     * to initialise; a failed reload attempts to restore the previous voice,
+     * and the caller always receives an explicit error instead of a silent
+     * English fallback.
      */
     public void registerVoice(final String voiceId, final VoiceOperationResult callback) {
-        final File voicesDir = new File(appContext.getFilesDir(), "kokoro");
-        final String reason = VoiceRegistry.unavailableReason(voicesDir, voiceId);
+        final VoiceOperationResult result = callback == null ? NOOP_CALLBACK : callback;
+        final File voicesDir = packagedAssets.voicesDir();
+        String reason = VoiceRegistry.unavailableReason(voicesDir, voiceId);
         if (reason != null) {
-            callback.onError(reason);
+            result.onError(reason);
             return;
         }
-        if (state == State.SPEAKING || state == State.LOADING) {
-            callback.onError("operation-conflict");
-            return;
+        final String model;
+        final String previousVoice;
+        final long token;
+        final long reloadGeneration;
+        synchronized (lifecycleLock) {
+            if (shuttingDown.get()) {
+                result.onError("engine-shutdown");
+                return;
+            }
+            if (state == State.LOADING || state == State.SPEAKING) {
+                result.onError("operation-conflict");
+                return;
+            }
+            model = modelPath;
+            if (model == null) {
+                result.onError("engine-not-ready");
+                return;
+            }
+            if (!EngineOwnership.owns(generation) && state != State.ERROR) {
+                result.onError("engine-superseded");
+                return;
+            }
+            previousVoice = singleLoadedVoice();
+            token = reloadGuard.tryBegin();
+            if (token < 0) {
+                result.onError("operation-conflict");
+                return;
+            }
+            reloadGeneration = EngineOwnership.beginInit();
+            // The reload is observable through the existing state machine:
+            // LOADING until the replacement voice actually committed.
+            setState(State.LOADING);
         }
-        final String model = modelPath;
-        if (model == null) {
-            callback.onError("engine-not-ready");
-            return;
-        }
-        final boolean recovering = state == State.ERROR;
-        if (!EngineOwnership.owns(generation) && !recovering) {
-            callback.onError("engine-superseded");
-            return;
-        }
-        final long token = reloadGuard.tryBegin();
-        if (token < 0) {
-            callback.onError("operation-conflict");
-            return;
-        }
-        final long reloadGeneration = EngineOwnership.beginInit();
-        worker.post(new Runnable() {
+        final Runnable task = new Runnable() {
             @Override
             public void run() {
-                String failure = null;
-                java.util.Set<String> installed = VoiceRegistry.installed(voicesDir);
-                synchronized (EngineOwnership.NATIVE_LOCK) {
+                runReload(model, voicesDir, voiceId, previousVoice, token, reloadGeneration, result);
+            }
+        };
+        if (!scheduler.postWorker(task)) {
+            reloadGuard.finish(token);
+            synchronized (lifecycleLock) {
+                if (state == State.LOADING) {
+                    setState(shuttingDown.get() ? State.UNINITIALIZED : State.ERROR);
+                }
+            }
+            result.onError("engine-shutdown");
+        }
+    }
+
+    private void runReload(
+            final String model,
+            final File voicesDir,
+            final String voiceId,
+            final String previousVoice,
+            final long token,
+            final long reloadGeneration,
+            final VoiceOperationResult callback) {
+        String failure = null;
+        Set<String> loaded = null;
+        boolean stale = false;
+        boolean recovered = false;
+        synchronized (EngineOwnership.NATIVE_LOCK) {
+            if (shuttingDown.get()
+                    || !reloadGuard.isCurrent(token)
+                    || !EngineOwnership.isLatestReservation(reloadGeneration)) {
+                // A stale reload must not release, initialise or otherwise
+                // touch the native engine a newer generation may own.
+                stale = true;
+            } else {
+                try {
+                    if (nativeInitialised) {
+                        nativeApi.release();
+                        nativeInitialised = false;
+                    }
+                    String error = nativeApi.init(model, voicesDir.getAbsolutePath(), voiceId);
+                    if (error == null) {
+                        if (EngineOwnership.commitInit(reloadGeneration)) {
+                            nativeInitialised = true;
+                            generation = reloadGeneration;
+                            loaded = Collections.singleton(voiceId);
+                            loadedVoices = loaded;
+                        } else {
+                            nativeApi.release();
+                            nativeInitialised = false;
+                            stale = true;
+                        }
+                    } else {
+                        log.e("registerVoice: failed: " + error, null);
+                        String restore = nativeApi.init(
+                                model, voicesDir.getAbsolutePath(), previousVoice);
+                        if (restore == null) {
+                            if (EngineOwnership.commitInit(reloadGeneration)) {
+                                nativeInitialised = true;
+                                generation = reloadGeneration;
+                                loaded = Collections.singleton(previousVoice);
+                                loadedVoices = loaded;
+                                recovered = true;
+                                failure = "reload-failed";
+                            } else {
+                                nativeApi.release();
+                                nativeInitialised = false;
+                                stale = true;
+                            }
+                        } else {
+                            failure = "reload-failed-unrecovered";
+                        }
+                    }
+                } catch (Throwable error) {
+                    log.e("registerVoice: failed: " + error.getMessage(), error);
+                    // Never leave a released engine without attempting to
+                    // restore the previously working voice.
                     try {
                         if (nativeInitialised) {
-                            nativeRelease();
+                            nativeApi.release();
                             nativeInitialised = false;
                         }
-                        String error = nativeInit(model, voicesDir.getAbsolutePath(), voiceId);
-                        if (error == null) {
+                        String restore = nativeApi.init(
+                                model, voicesDir.getAbsolutePath(), previousVoice);
+                        if (restore == null && EngineOwnership.commitInit(reloadGeneration)) {
                             nativeInitialised = true;
-                            EngineOwnership.commitInit(reloadGeneration);
-                            loadedVoices = VoiceRegistry.installed(voicesDir);
-                        } else {
-                            // Attempt to restore the previous working voice.
-                            String restore = nativeInit(model, voicesDir.getAbsolutePath(),
-                                    DEFAULT_VOICE_NAME);
-                            nativeInitialised = restore == null;
+                            generation = reloadGeneration;
+                            loaded = Collections.singleton(previousVoice);
+                            loadedVoices = loaded;
+                            recovered = true;
                             failure = "reload-failed";
-                            if (restore != null) {
-                                failure = "reload-failed-unrecovered";
-                                setState(State.ERROR);
-                            }
-                        }
-                    } catch (Throwable error) {
-                        Log.e(TAG, "registerVoice: failed", error);
-                        // Never leave the released engine without attempting to
-                        // restore a working one, even on an unexpected throwable.
-                        try {
-                            String restore = nativeInit(model, voicesDir.getAbsolutePath(),
-                                    DEFAULT_VOICE_NAME);
-                            nativeInitialised = restore == null;
+                        } else {
                             if (restore == null) {
-                                EngineOwnership.commitInit(EngineOwnership.beginInit());
-                                loadedVoices = VoiceRegistry.installed(voicesDir);
+                                nativeApi.release();
                             }
-                        } catch (Throwable restoreFailure) {
                             nativeInitialised = false;
-                            Log.e(TAG, "registerVoice: restore failed", restoreFailure);
+                            failure = "reload-failed-unrecovered";
                         }
-                        failure = nativeInitialised ? "reload-failed" : "reload-failed-unrecovered";
+                    } catch (Throwable restoreFailure) {
+                        log.e("registerVoice: restore failed",
+                                restoreFailure);
+                        nativeInitialised = false;
+                        failure = "reload-failed-unrecovered";
                     }
                 }
-                // Snapshot currency before releasing the single-flight slot: a
-                // concurrent tryBegin must not turn a successful reload into a
-                // reported conflict.
-                boolean current = reloadGuard.isCurrent(token);
-                reloadGuard.finish(token);
-                if (!current) {
-                    callback.onError("operation-conflict");
-                    return;
+                if (failure != null && !recovered) {
+                    // Ownership no longer points at a usable engine; mark it
+                    // released so a retry can take over.
+                    loadedVoices = Collections.emptySet();
+                    EngineOwnership.claimRelease(generation);
                 }
-                if (failure != null) {
-                    callback.onError(failure);
-                    return;
-                }
-                setState(State.READY);
-                callback.onSuccess(installed);
             }
-        });
+        }
+        boolean current = reloadGuard.isCurrent(token);
+        reloadGuard.finish(token);
+        if (stale || !current) {
+            // Stale completions never publish READY or clear a newer slot.
+            if (!shuttingDown.get()) {
+                setState(State.ERROR);
+                callback.onError("operation-conflict");
+            } else {
+                callback.onError("engine-shutdown");
+            }
+            return;
+        }
+        if (failure != null) {
+            setState(recovered ? State.READY : State.ERROR);
+            callback.onError(failure);
+            return;
+        }
+        if (loaded == null) {
+            // Defensive: a current operation with no committed voice.
+            setState(State.ERROR);
+            callback.onError("reload-failed-unrecovered");
+            return;
+        }
+        setState(State.READY);
+        callback.onSuccess(loaded);
     }
+
+    private String singleLoadedVoice() {
+        Set<String> snapshot = loadedVoices;
+        if (snapshot.size() == 1) {
+            return snapshot.iterator().next();
+        }
+        return DEFAULT_VOICE_NAME;
+    }
+
+    private static final VoiceOperationResult NOOP_CALLBACK = new VoiceOperationResult() {
+        @Override
+        public void onSuccess(Set<String> loadedVoices) {
+        }
+
+        @Override
+        public void onError(String code) {
+        }
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Speech playback                                                     *
+     * ------------------------------------------------------------------ */
 
     public void speak(final String text) {
         speak(text, "en-GB", null);
@@ -358,33 +668,46 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         if (isSpeaking()) {
             stop();
         }
-        final int generation = playbackGeneration.begin();
-        final long callTimeMs = SystemClock.elapsedRealtime();
+        final int playbackToken = playbackGeneration.begin();
+        final long callTimeMs = clock.elapsedRealtime();
         setState(State.SPEAKING);
-        worker.post(new Runnable() {
+        if (!scheduler.postWorker(new Runnable() {
             @Override
             public void run() {
-                synthesizeAndPlay(text, lang, voice, segments, callTimeMs, generation);
+                synthesizeAndPlay(text, lang, voice, segments, callTimeMs, playbackToken);
             }
-        });
+        })) {
+            if (playbackGeneration.isCurrent(playbackToken)) {
+                setState(State.ERROR);
+            }
+        }
+    }
+
+    /** Optional voices currently installed in app-private storage. */
+    private Set<String> installedVoiceNames() {
+        return VoiceRegistry.installed(packagedAssets.voicesDir());
     }
 
     @Override
     public void stop() {
+        stopPlayback();
+        if (state == State.SPEAKING) {
+            setState(State.STOPPED);
+        }
+    }
+
+    private void stopPlayback() {
         playbackGeneration.invalidate();
-        AudioTrack track = audioTrack;
+        AudioHandle track = audioHandle;
         if (track != null) {
             try {
-                if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) {
+                if (track.isPlaying()) {
                     track.pause();
                 }
                 track.flush();
-            } catch (IllegalStateException ignored) {
+            } catch (RuntimeException ignored) {
                 // Track already released by the playback loop.
             }
-        }
-        if (state == State.SPEAKING) {
-            setState(State.STOPPED);
         }
     }
 
@@ -395,93 +718,35 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     @Override
     public void shutdown() {
+        if (!shuttingDown.compareAndSet(false, true)) {
+            return;
+        }
         reloadGuard.invalidate();
-        stop();
-        worker.post(new Runnable() {
+        stopPlayback();
+        loadedVoices = Collections.emptySet();
+        scheduler.postWorker(new Runnable() {
             @Override
             public void run() {
                 try {
                     synchronized (EngineOwnership.NATIVE_LOCK) {
+                        // Read the generation when the task runs: an in-flight
+                        // reload that committed a newer generation just before
+                        // shutdown must be the one released.
                         if (nativeInitialised && EngineOwnership.claimRelease(generation)) {
-                            nativeRelease();
+                            nativeApi.release();
+                            nativeInitialised = false;
                         } else {
-                            Log.i(TAG, "shutdown: skipped release for superseded generation "
+                            log.i("shutdown: skipped release for superseded generation "
                                     + generation);
                         }
                     }
                 } catch (Throwable failure) {
-                    Log.w(TAG, "shutdown: release failed: " + failure.getMessage());
+                    log.w("shutdown: release failed: " + failure.getMessage(), failure);
                 }
             }
         });
-        workerThread.quitSafely();
-        state = State.UNINITIALIZED;
-    }
-
-    /**
-     * Materialises one packaged Kokoro asset and verifies its pinned digest.
-     *
-     * <p>An existing file is reused only after its bytes match the pinned
-     * SHA-256. Otherwise the asset is copied to a temporary file, synced,
-     * verified and renamed into place, so a crash never leaves a partial file at
-     * the final path and a same-size tampered file is rejected.
-     */
-    private File copyAssetIfNeeded(
-            String assetPath,
-            String fileName,
-            long expectedBytes,
-            String expectedSha256) throws Exception {
-        File directory = new File(appContext.getFilesDir(), "kokoro");
-        if (!directory.exists() && !directory.mkdirs()) {
-            throw new IllegalStateException("Cannot create " + directory);
-        }
-        File target = new File(directory, fileName);
-        if (KokoroAssetIntegrity.matches(target, expectedBytes, expectedSha256)) {
-            return target;
-        }
-
-        File temp = new File(directory, fileName + ".part");
-        if (temp.exists() && !temp.delete()) {
-            throw new IllegalStateException("Cannot remove stale " + temp);
-        }
-        java.security.MessageDigest digest = KokoroAssetIntegrity.newSha256();
-        long copied = 0L;
-        try (InputStream input = appContext.getAssets().open(assetPath);
-             FileOutputStream output = new FileOutputStream(temp)) {
-            byte[] buffer = new byte[1 << 16];
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                if (read == 0) {
-                    continue;
-                }
-                output.write(buffer, 0, read);
-                digest.update(buffer, 0, read);
-                copied += read;
-            }
-            output.flush();
-            output.getFD().sync();
-        } catch (Exception copyFailed) {
-            temp.delete();
-            throw copyFailed;
-        }
-
-        String actual = KokoroAssetIntegrity.hex(digest.digest());
-        if (copied != expectedBytes || !actual.equals(expectedSha256)) {
-            temp.delete();
-            throw new IllegalStateException(
-                    "Kokoro asset integrity mismatch for " + fileName
-                            + ": expected " + expectedBytes + " bytes/" + expectedSha256
-                            + ", copied " + copied + " bytes/" + actual);
-        }
-        if (target.exists() && !target.delete()) {
-            temp.delete();
-            throw new IllegalStateException("Cannot replace " + target);
-        }
-        if (!temp.renameTo(target)) {
-            temp.delete();
-            throw new IllegalStateException("Cannot atomically install " + target);
-        }
-        return target;
+        scheduler.quitWorker();
+        setState(State.UNINITIALIZED);
     }
 
     private void synthesizeAndPlay(
@@ -490,14 +755,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             String voice,
             List<String> segments,
             long callTimeMs,
-            int generation) {
-        if (!isCurrent(generation)) {
+            int playbackToken) {
+        if (!isCurrent(playbackToken)) {
             return;
         }
         final long synthesisNumber = ++synthesisCount;
         boolean useSegments = segments != null && segments.size() > 1 && segmentsMatch(text, segments);
         if (segments != null && !useSegments) {
-            Log.w(TAG, "synthesis #" + synthesisNumber + ": segment plan mismatch; using whole-text synthesis");
+            log.w("synthesis #" + synthesisNumber + ": segment plan mismatch; using whole-text synthesis", null);
         }
         String streamError = null;
         try {
@@ -508,16 +773,16 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             streamError = failure.getMessage();
         }
         if (streamError == null) {
-            streamAndPlay(synthesisNumber, callTimeMs, generation);
+            streamAndPlay(synthesisNumber, callTimeMs, playbackToken);
             return;
         }
-        if (!isCurrent(generation)) {
+        if (!isCurrent(playbackToken)) {
             return;
         }
-        Log.w(TAG, "stream: unavailable (" + streamError + "); falling back to monolithic synth");
+        log.w("stream: unavailable (" + streamError + "); falling back to monolithic synth", null);
         try {
-            float[] samples = nativeSynth(text, lang, voice);
-            if (!isCurrent(generation)) {
+            float[] samples = nativeApi.synth(text, lang, voice);
+            if (!isCurrent(playbackToken)) {
                 return;
             }
             if (samples == null || samples.length == 0) {
@@ -530,7 +795,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             final Listener current = listener;
             if (current != null) {
                 final long duration = audioDurationMs;
-                main.post(new Runnable() {
+                scheduler.postMain(new Runnable() {
                     @Override
                     public void run() {
                         current.onAudioMeasured(0, duration);
@@ -538,10 +803,10 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 });
             }
 
-            playSamples(samples, callTimeMs, generation);
+            playSamples(samples, callTimeMs, playbackToken);
         } catch (Throwable failure) {
-            Log.e(TAG, "synthesis/playback failed: " + failure.getMessage(), failure);
-            if (isCurrent(generation)) {
+            log.e("synthesis/playback failed: " + failure.getMessage(), failure);
+            if (isCurrent(playbackToken)) {
                 notifyError("Synthesis failed: " + failure.getMessage());
                 setState(State.READY);
             }
@@ -557,42 +822,42 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     }
 
     private String startWholeStream(String text, String lang, String voice) {
-        String error = nativeStreamStart(text, lang, voice);
+        String error = nativeApi.streamStart(text, lang, voice);
         if (error == null) {
-            nativeStreamFinish();
+            nativeApi.streamFinish();
         }
         return error;
     }
 
     private String startSegmentedStream(List<String> segments, String lang, String voice) {
-        String error = nativeStreamStart(segments.get(0), lang, voice);
+        String error = nativeApi.streamStart(segments.get(0), lang, voice);
         if (error != null) {
             return error;
         }
         for (int i = 1; i < segments.size(); i++) {
-            nativeStreamPush(segments.get(i));
+            nativeApi.streamPush(segments.get(i));
         }
-        nativeStreamFinish();
+        nativeApi.streamFinish();
         return null;
     }
 
-    private void streamAndPlay(long synthesisNumber, long callTimeMs, int generation) {
-        if (!isCurrent(generation)) {
+    private void streamAndPlay(long synthesisNumber, long callTimeMs, int playbackToken) {
+        if (!isCurrent(playbackToken)) {
             return;
         }
-        AudioTrack track = null;
+        AudioHandle track = null;
         short[] chunk = new short[2048];
         long totalSamples = 0;
         int chunks = 0;
         boolean stopped = false;
         try {
-            track = createAudioTrack();
-            audioTrack = track;
+            track = audioFactory.open();
+            audioHandle = track;
             track.play();
 
             boolean firstWrite = true;
-            while (isCurrent(generation)) {
-                float[] samples = nativeStreamNext();
+            while (isCurrent(playbackToken)) {
+                float[] samples = nativeApi.streamNext();
                 if (samples == null) {
                     break;
                 }
@@ -603,7 +868,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 int leadSilence = leadingSilenceSamples(samples);
                 int skipSamples = trimLeadingSilence(leadSilence, chunks == 1);
                 totalSamples += samples.length - skipSamples;
-                for (int offset = skipSamples; offset < samples.length && isCurrent(generation); offset += chunk.length) {
+                for (int offset = skipSamples; offset < samples.length && isCurrent(playbackToken); offset += chunk.length) {
                     int count = Math.min(chunk.length, samples.length - offset);
                     for (int i = 0; i < count; i++) {
                         float value = Math.max(-1f, Math.min(1f, samples[offset + i]));
@@ -615,15 +880,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     }
                     if (firstWrite) {
                         firstWrite = false;
-                        Log.i(TAG, "playback: first audio buffer written "
-                                + (SystemClock.elapsedRealtime() - callTimeMs) + "ms after speak()");
+                        log.i("playback: first audio buffer written "
+                                + (clock.elapsedRealtime() - callTimeMs) + "ms after speak()");
                     }
                 }
             }
 
-            stopped = !isCurrent(generation);
+            stopped = !isCurrent(playbackToken);
             if (chunks == 0) {
-                if (isCurrent(generation)) {
+                if (isCurrent(playbackToken)) {
                     notifyError("Synthesis returned no audio");
                     setState(State.READY);
                 }
@@ -634,7 +899,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             final Listener current = listener;
             if (current != null) {
                 final long duration = audioDurationMs;
-                main.post(new Runnable() {
+                scheduler.postMain(new Runnable() {
                     @Override
                     public void run() {
                         current.onAudioMeasured(0, duration);
@@ -643,37 +908,37 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             }
 
             if (!stopped) {
-                waitForPlaybackEnd(track, totalSamples, generation);
-                stopped = !isCurrent(generation);
+                waitForPlaybackEnd(track, totalSamples, playbackToken);
+                stopped = !isCurrent(playbackToken);
             }
         } catch (Throwable failure) {
-            Log.e(TAG, "stream playback failed: " + failure.getMessage(), failure);
-            if (isCurrent(generation)) {
+            log.e("stream playback failed: " + failure.getMessage(), failure);
+            if (isCurrent(playbackToken)) {
                 notifyError("Synthesis failed: " + failure.getMessage());
                 setState(State.READY);
             }
             return;
         } finally {
             try {
-                nativeStreamClear();
+                nativeApi.streamClear();
             } catch (Throwable ignored) {
                 // Instrumentation only.
             }
-            if (audioTrack == track) {
-                audioTrack = null;
+            if (audioHandle == track) {
+                audioHandle = null;
             }
             if (track != null) {
                 try {
                     track.stop();
-                } catch (IllegalStateException ignored) {
+                } catch (RuntimeException ignored) {
                     // Already stopped.
                 }
                 track.release();
             }
-            if (isCurrent(generation)) {
+            if (isCurrent(playbackToken)) {
                 setState(State.READY);
             }
-            Log.i(TAG, "playback: finished stopped=" + stopped + " streamChunks=" + chunks);
+            log.i("playback: finished stopped=" + stopped + " streamChunks=" + chunks);
         }
     }
 
@@ -702,45 +967,29 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return Math.min(excess, msToSamples(SEGMENT_TRIM_CAP_MS));
     }
 
-    private AudioTrack createAudioTrack() {
-        int minBufferBytes = AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-        int bufferBytes = Math.max(minBufferBytes, 8192);
-        return new AudioTrack.Builder()
-                .setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build())
-                .setAudioFormat(new AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(SAMPLE_RATE)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .build())
-                .setBufferSizeInBytes(bufferBytes)
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .build();
-    }
-
-    private void waitForPlaybackEnd(AudioTrack track, long totalFrames, int generation) {
-        long deadlineMs = SystemClock.elapsedRealtime() + 5000;
-        while (isCurrent(generation) && track.getPlaybackHeadPosition() < totalFrames && SystemClock.elapsedRealtime() < deadlineMs) {
-            SystemClock.sleep(20);
+    private void waitForPlaybackEnd(AudioHandle track, long totalFrames, int playbackToken) {
+        long deadlineMs = clock.elapsedRealtime() + 5000;
+        while (isCurrent(playbackToken)
+                && track.playbackHeadPosition() < totalFrames
+                && clock.elapsedRealtime() < deadlineMs) {
+            clock.sleep(20);
         }
     }
 
-    private void playSamples(float[] samples, long callTimeMs, int generation) {
-        if (!isCurrent(generation)) {
+    private void playSamples(float[] samples, long callTimeMs, int playbackToken) {
+        if (!isCurrent(playbackToken)) {
             return;
         }
-        AudioTrack track = null;
+        AudioHandle track = null;
         boolean stopped = false;
         try {
-            track = createAudioTrack();
-            audioTrack = track;
+            track = audioFactory.open();
+            audioHandle = track;
             track.play();
 
             short[] chunk = new short[2048];
             boolean firstWrite = true;
-            for (int offset = 0; offset < samples.length && isCurrent(generation); offset += chunk.length) {
+            for (int offset = 0; offset < samples.length && isCurrent(playbackToken); offset += chunk.length) {
                 int count = Math.min(chunk.length, samples.length - offset);
                 for (int i = 0; i < count; i++) {
                     float value = Math.max(-1f, Math.min(1f, samples[offset + i]));
@@ -752,49 +1001,50 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 }
                 if (firstWrite) {
                     firstWrite = false;
-                    Log.i(TAG, "playback: first audio buffer written " + (SystemClock.elapsedRealtime() - callTimeMs) + "ms after speak()");
+                    log.i("playback: first audio buffer written "
+                            + (clock.elapsedRealtime() - callTimeMs) + "ms after speak()");
                 }
             }
-            stopped = !isCurrent(generation);
+            stopped = !isCurrent(playbackToken);
             if (!stopped) {
-                waitForPlaybackEnd(track, samples.length, generation);
-                stopped = !isCurrent(generation);
+                waitForPlaybackEnd(track, samples.length, playbackToken);
+                stopped = !isCurrent(playbackToken);
             }
         } catch (Throwable failure) {
-            Log.e(TAG, "playback failed: " + failure.getMessage(), failure);
-            if (isCurrent(generation)) {
+            log.e("playback failed: " + failure.getMessage(), failure);
+            if (isCurrent(playbackToken)) {
                 notifyError("Playback failed: " + failure.getMessage());
                 setState(State.READY);
             }
             return;
         } finally {
-            if (audioTrack == track) {
-                audioTrack = null;
+            if (audioHandle == track) {
+                audioHandle = null;
             }
             if (track != null) {
                 try {
                     track.stop();
-                } catch (IllegalStateException ignored) {
+                } catch (RuntimeException ignored) {
                     // Already stopped.
                 }
                 track.release();
             }
-            if (isCurrent(generation)) {
+            if (isCurrent(playbackToken)) {
                 setState(State.READY);
             }
-            Log.i(TAG, "playback: finished stopped=" + stopped);
+            log.i("playback: finished stopped=" + stopped);
         }
     }
 
-    private boolean isCurrent(int generation) {
-        return playbackGeneration.isCurrent(generation);
+    private boolean isCurrent(int playbackToken) {
+        return playbackGeneration.isCurrent(playbackToken);
     }
 
     private void setState(final State next) {
         state = next;
         final Listener current = listener;
         if (current != null) {
-            main.post(new Runnable() {
+            scheduler.postMain(new Runnable() {
                 @Override
                 public void run() {
                     current.onStateChanged(next);
@@ -806,12 +1056,300 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private void notifyError(final String message) {
         final Listener current = listener;
         if (current != null) {
-            main.post(new Runnable() {
+            scheduler.postMain(new Runnable() {
                 @Override
                 public void run() {
                     current.onError(message);
                 }
             });
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Production platform implementations                                 *
+     * ------------------------------------------------------------------ */
+
+    private static final class HandlerScheduler implements Scheduler {
+        private final HandlerThread workerThread;
+        private final Handler worker;
+        private final Handler main;
+
+        HandlerScheduler() {
+            this.workerThread = new HandlerThread("daymark-kokoro-tts");
+            this.workerThread.start();
+            this.worker = new Handler(workerThread.getLooper());
+            this.main = new Handler(Looper.getMainLooper());
+        }
+
+        @Override
+        public boolean postWorker(Runnable task) {
+            return worker.post(task);
+        }
+
+        @Override
+        public void postMain(Runnable task) {
+            main.post(task);
+        }
+
+        @Override
+        public void quitWorker() {
+            workerThread.quitSafely();
+        }
+    }
+
+    private static final class AndroidNativeApi implements NativeApi {
+        private final KokoroLocalTtsEngine engine;
+
+        AndroidNativeApi(KokoroLocalTtsEngine engine) {
+            this.engine = engine;
+        }
+
+        @Override
+        public boolean ensureLoaded() {
+            return NativeLibraryState.ensureLoaded();
+        }
+
+        @Override
+        public String failureReason() {
+            return NativeLibraryState.failureReason();
+        }
+
+        @Override
+        public String init(String modelPath, String voicesPath, String voiceName) {
+            return engine.nativeInit(modelPath, voicesPath, voiceName);
+        }
+
+        @Override
+        public float[] synth(String text, String lang, String voiceName) {
+            return engine.nativeSynth(text, lang, voiceName);
+        }
+
+        @Override
+        public String streamStart(String text, String lang, String voiceName) {
+            return engine.nativeStreamStart(text, lang, voiceName);
+        }
+
+        @Override
+        public void streamPush(String text) {
+            engine.nativeStreamPush(text);
+        }
+
+        @Override
+        public void streamFinish() {
+            engine.nativeStreamFinish();
+        }
+
+        @Override
+        public float[] streamNext() {
+            return engine.nativeStreamNext();
+        }
+
+        @Override
+        public void streamClear() {
+            engine.nativeStreamClear();
+        }
+
+        @Override
+        public void release() {
+            engine.nativeRelease();
+        }
+    }
+
+    private static final class AndroidLogSink implements LogSink {
+        @Override
+        public void i(String message) {
+            Log.i(TAG, message);
+        }
+
+        @Override
+        public void w(String message, Throwable error) {
+            Log.w(TAG, message, error);
+        }
+
+        @Override
+        public void e(String message, Throwable error) {
+            Log.e(TAG, message, error);
+        }
+    }
+
+    private static final class AndroidClock implements Clock {
+        @Override
+        public long elapsedRealtime() {
+            return SystemClock.elapsedRealtime();
+        }
+
+        @Override
+        public void sleep(long millis) {
+            SystemClock.sleep(millis);
+        }
+    }
+
+    /** AudioTrack-backed playback sink. */
+    private static final class AndroidAudioFactory implements AudioFactory {
+        @Override
+        public AudioHandle open() {
+            int minBufferBytes = AudioTrack.getMinBufferSize(
+                    SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+            int bufferBytes = Math.max(minBufferBytes, 8192);
+            final AudioTrack track = new AudioTrack.Builder()
+                    .setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build())
+                    .setAudioFormat(new AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(SAMPLE_RATE)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build())
+                    .setBufferSizeInBytes(bufferBytes)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build();
+            return new AudioHandle() {
+                @Override
+                public void play() {
+                    track.play();
+                }
+
+                @Override
+                public int write(short[] buffer, int offset, int size) {
+                    return track.write(buffer, offset, size);
+                }
+
+                @Override
+                public boolean isPlaying() {
+                    return track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING;
+                }
+
+                @Override
+                public void pause() {
+                    track.pause();
+                }
+
+                @Override
+                public void flush() {
+                    track.flush();
+                }
+
+                @Override
+                public long playbackHeadPosition() {
+                    return track.getPlaybackHeadPosition();
+                }
+
+                @Override
+                public void stop() {
+                    track.stop();
+                }
+
+                @Override
+                public void release() {
+                    track.release();
+                }
+            };
+        }
+    }
+
+    /** Materialises the packaged model/voices into app-private storage. */
+    private static final class AndroidPackagedAssets implements PackagedAssets {
+        private final Context context;
+
+        AndroidPackagedAssets(Context context) {
+            this.context = context;
+        }
+
+        @Override
+        public File filesDir() {
+            return context.getFilesDir();
+        }
+
+        @Override
+        public File voicesDir() {
+            File directory = new File(filesDir(), "kokoro");
+            if (!directory.exists() && !directory.mkdirs()) {
+                throw new IllegalStateException("Cannot create " + directory);
+            }
+            return directory;
+        }
+
+        @Override
+        public File modelFile() throws Exception {
+            File legacyVoice = new File(voicesDir(), LEGACY_VOICE_FILE);
+            if (legacyVoice.exists() && legacyVoice.delete()) {
+                Log.i(TAG, "initialize: removed legacy " + LEGACY_VOICE_FILE);
+            }
+            return copyAssetIfNeeded(
+                    MODEL_ASSET, "model_quantized.onnx", MODEL_BYTES, MODEL_SHA256);
+        }
+
+        @Override
+        public void ensureVoice(String voiceName) throws Exception {
+            copyAssetIfNeeded(
+                    VOICE_ASSET_PREFIX + voiceName + ".bin",
+                    voiceName + ".bin",
+                    VOICE_BYTES,
+                    voiceSha256(voiceName));
+        }
+
+        /**
+         * Materialises one packaged Kokoro asset and verifies its pinned digest.
+         *
+         * <p>An existing file is reused only after its bytes match the pinned
+         * SHA-256. Otherwise the asset is copied to a temporary file, synced,
+         * verified and renamed into place, so a crash never leaves a partial
+         * file at the final path and a same-size tampered file is rejected.
+         */
+        private File copyAssetIfNeeded(
+                String assetPath,
+                String fileName,
+                long expectedBytes,
+                String expectedSha256) throws Exception {
+            File directory = voicesDir();
+            File target = new File(directory, fileName);
+            if (KokoroAssetIntegrity.matches(target, expectedBytes, expectedSha256)) {
+                return target;
+            }
+
+            File temp = new File(directory, fileName + ".part");
+            if (temp.exists() && !temp.delete()) {
+                throw new IllegalStateException("Cannot remove stale " + temp);
+            }
+            java.security.MessageDigest digest = KokoroAssetIntegrity.newSha256();
+            long copied = 0L;
+            try (InputStream input = context.getAssets().open(assetPath);
+                 FileOutputStream output = new FileOutputStream(temp)) {
+                byte[] buffer = new byte[1 << 16];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    if (read == 0) {
+                        continue;
+                    }
+                    output.write(buffer, 0, read);
+                    digest.update(buffer, 0, read);
+                    copied += read;
+                }
+                output.flush();
+                output.getFD().sync();
+            } catch (Exception copyFailed) {
+                temp.delete();
+                throw copyFailed;
+            }
+
+            String actual = KokoroAssetIntegrity.hex(digest.digest());
+            if (copied != expectedBytes || !actual.equals(expectedSha256)) {
+                temp.delete();
+                throw new IllegalStateException(
+                        "Kokoro asset integrity mismatch for " + fileName
+                                + ": expected " + expectedBytes + " bytes/" + expectedSha256
+                                + ", copied " + copied + " bytes/" + actual);
+            }
+            if (target.exists() && !target.delete()) {
+                temp.delete();
+                throw new IllegalStateException("Cannot replace " + target);
+            }
+            if (!temp.renameTo(target)) {
+                temp.delete();
+                throw new IllegalStateException("Cannot atomically install " + target);
+            }
+            return target;
         }
     }
 }
