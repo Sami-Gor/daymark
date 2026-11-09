@@ -2,6 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 /*
@@ -18,6 +19,11 @@ import { describe, expect, it } from 'vitest';
  * expression `expect(locator).toBeVisible;` is just a property access, not a
  * promise, so the compiler and the lint rule see nothing wrong. That shape is
  * exactly the original defect, so it keeps a dedicated static check here.
+ *
+ * Multiline statements are delimited with the TypeScript tokenizer (already a
+ * workspace dependency) rather than raw character counting, so parentheses
+ * inside strings, regex literals, comments and template text cannot corrupt the
+ * statement boundary.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -134,33 +140,62 @@ function isAwaited(trimmed: string): boolean {
 }
 
 /**
- * Net number of unclosed parentheses in a source fragment.
+ * Net number of syntactic parentheses on each source line.
  *
- * A positive result means the expression continues on following lines; zero or
- * negative means it is balanced or over-closed. Used only to decide how far a
- * multiline assertion statement extends, so missing parentheses count as zero.
+ * Counting raw `(`/`)` characters is wrong: parentheses inside strings, regex
+ * literals, comments and template text are not syntax and corrupt the balance.
+ * A `)` in `page.getByText(')')` closes a multiline `expect(` early, while a
+ * `(` in a string or comment leaves it open and merges the next assertion into
+ * the statement. The TypeScript parser already separates lexical tokens from
+ * syntax, so walk its token stream and count only `OpenParenToken` and
+ * `CloseParenToken`: string, comment, regex and template text tokens cannot
+ * contribute, while `${...}` template expressions are tokenized normally and
+ * therefore do count.
  */
-function parenBalance(text: string): number {
-  return (text.match(/\(/g) ?? []).length - (text.match(/\)/g) ?? []).length;
+function parenBalanceByLine(source: string): number[] {
+  const balances = new Array<number>(source.split('\n').length).fill(0);
+  const sourceFile = ts.createSourceFile(
+    'e2e-snippet.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ false,
+    ts.ScriptKind.TS,
+  );
+  // `getChildren()` exposes the full token stream; `forEachChild()` skips
+  // punctuation tokens such as the parentheses around a parenthesized expression.
+  const stack: ts.Node[] = [...sourceFile.getChildren(sourceFile)];
+  let node = stack.pop();
+  while (node) {
+    const isOpen = node.kind === ts.SyntaxKind.OpenParenToken;
+    if (isOpen || node.kind === ts.SyntaxKind.CloseParenToken) {
+      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+      if (line < balances.length) balances[line] += isOpen ? 1 : -1;
+    } else {
+      stack.push(...node.getChildren(sourceFile));
+    }
+    node = stack.pop();
+  }
+  return balances;
 }
 
 /**
  * Collect the full assertion statement starting at `start`.
  *
  * A matcher chain can continue on the next line (`.toBeVisible();`) even when
- * the `expect(...)` call itself is balanced, so both open parentheses and a
- * leading-dot continuation are used to decide whether the statement continues.
+ * the `expect(...)` call itself is balanced, so both the token-aware parenthesis
+ * balance and a leading-dot continuation are used to decide whether the
+ * statement continues.
  */
-function collectAssertionStatement(lines: string[], start: number): string {
+function collectAssertionStatement(lines: string[], start: number, lineBalance: number[]): string {
   let text = lines[start].trim();
-  let balance = parenBalance(text);
+  let balance = lineBalance[start] ?? 0;
   let index = start;
   while (index + 1 < lines.length) {
     const next = lines[index + 1].trim();
     if (balance <= 0 && !next.startsWith('.')) break;
     index += 1;
     text += `\n${next}`;
-    balance += parenBalance(next);
+    balance += lineBalance[index] ?? 0;
   }
   return text;
 }
@@ -168,6 +203,7 @@ function collectAssertionStatement(lines: string[], start: number): string {
 /** Detect un-awaited or un-invoked Playwright async assertions in a source string. */
 export function findUnawaitedAssertions(source: string): Violation[] {
   const lines = source.split('\n');
+  const lineBalance = parenBalanceByLine(source);
   const violations: Violation[] = [];
   for (let index = 0; index < lines.length; index += 1) {
     const trimmed = lines[index].trim();
@@ -175,7 +211,7 @@ export function findUnawaitedAssertions(source: string): Violation[] {
     if (!EXPECT_STATEMENT_PATTERN.test(trimmed)) continue;
     if (isAwaited(trimmed)) continue;
 
-    const statement = collectAssertionStatement(lines, index);
+    const statement = collectAssertionStatement(lines, index, lineBalance);
 
     // Any un-awaited expect.poll is a defect regardless of which matcher follows.
     if (/\bexpect\.poll\s*\(/.test(statement)) {
@@ -305,6 +341,113 @@ describe('async assertion scanner', () => {
     expect(findUnawaitedAssertions('expect(values).toHaveLength(2);')).toEqual([]);
     expect(findUnawaitedAssertions('expect(value).toBeTruthy();')).toEqual([]);
     expect(findUnawaitedAssertions("// expect(page.getByTestId('x')).toBeVisible;")).toEqual([]);
+  });
+
+  it('ignores a closing parenthesis inside a string when collecting a multiline assertion', () => {
+    const source = [
+      'expect(',
+      "  page.getByText(')'),",
+      ').toBeVisible;',
+    ].join('\n');
+    const violations = findUnawaitedAssertions(source);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].line).toBe(1);
+    expect(violations[0].reason).toContain('un-invoked');
+    expect(violations[0].reason).toContain('toBeVisible');
+  });
+
+  it('does not let a parenthesis inside a string merge the next assertion', () => {
+    const source = [
+      "expect('(').toEqual('(');",
+      "expect(page.getByText('x')).toBeVisible;",
+    ].join('\n');
+    const violations = findUnawaitedAssertions(source);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].line).toBe(2);
+    expect(violations[0].reason).toContain('un-invoked');
+  });
+
+  it('ignores parentheses inside regex literals and character classes', () => {
+    // An escaped `)` in a regex must not close the multiline expect early; the
+    // independent second assertion must still be reported.
+    const escapedParen = [
+      'expect(',
+      '  page.getByText(/\\)/),',
+      ').toBeVisible;',
+      "expect(page.getByText('x')).toHaveText(/[()]/);",
+    ].join('\n');
+    const escapedViolations = findUnawaitedAssertions(escapedParen);
+    expect(escapedViolations.map((violation) => violation.line)).toEqual([1, 4]);
+    expect(escapedViolations[0].reason).toContain('un-invoked');
+    expect(escapedViolations[1].reason).toContain('toHaveText');
+
+    // A `(` in a character class must not merge the next assertion.
+    const characterClass = [
+      'expect(value).toMatch(/[(]/);',
+      "expect(page.getByText('x')).toBeVisible;",
+    ].join('\n');
+    const classViolations = findUnawaitedAssertions(characterClass);
+    expect(classViolations).toHaveLength(1);
+    expect(classViolations[0].line).toBe(2);
+  });
+
+  it('ignores parentheses inside line and block comments', () => {
+    // A `)` in a line comment must not close the multiline expect early.
+    const lineComment = [
+      'expect(',
+      "  page.getByText('x'), // )",
+      ').toBeVisible;',
+    ].join('\n');
+    const lineViolations = findUnawaitedAssertions(lineComment);
+    expect(lineViolations).toHaveLength(1);
+    expect(lineViolations[0].line).toBe(1);
+    expect(lineViolations[0].reason).toContain('un-invoked');
+
+    // A `(` in a block comment must not merge the next assertion.
+    const blockComment = [
+      'expect(value).toEqual(/* ( */ 1);',
+      "expect(page.getByText('x')).toBeVisible;",
+    ].join('\n');
+    const blockViolations = findUnawaitedAssertions(blockComment);
+    expect(blockViolations).toHaveLength(1);
+    expect(blockViolations[0].line).toBe(2);
+  });
+
+  it('ignores template literal text but counts parentheses inside ${} expressions', () => {
+    // A `)` in template text must not close the multiline expect early.
+    const textCloseParen = [
+      'expect(',
+      '  page.getByText(`)`),',
+      ').toBeVisible;',
+    ].join('\n');
+    const closeViolations = findUnawaitedAssertions(textCloseParen);
+    expect(closeViolations).toHaveLength(1);
+    expect(closeViolations[0].line).toBe(1);
+    expect(closeViolations[0].reason).toContain('un-invoked');
+
+    // A `(` in template text must not merge the next assertion.
+    const textOpenParen = [
+      'expect(value).toEqual(`(`);',
+      "expect(page.getByText('x')).toBeVisible;",
+    ].join('\n');
+    const openViolations = findUnawaitedAssertions(textOpenParen);
+    expect(openViolations).toHaveLength(1);
+    expect(openViolations[0].line).toBe(2);
+
+    // Parentheses inside a multiline `${...}` expression are syntactic and must
+    // keep the expect call open even though the surrounding template text also
+    // contains a parenthesis.
+    const templateExpression = [
+      'expect(',
+      '  page.getByText(`) ${(',
+      "    'x'",
+      '  )}`),',
+      ').toBeVisible;',
+    ].join('\n');
+    const expressionViolations = findUnawaitedAssertions(templateExpression);
+    expect(expressionViolations).toHaveLength(1);
+    expect(expressionViolations[0].line).toBe(1);
+    expect(expressionViolations[0].reason).toContain('un-invoked');
   });
 
   it('flags un-awaited page actions', () => {
