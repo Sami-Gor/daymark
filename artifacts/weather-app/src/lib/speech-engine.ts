@@ -68,9 +68,6 @@ export function selectSpeechEngine({
   if (!locale) {
     return { engine: 'unavailable', reason: 'unsupported-language' };
   }
-  if (locale !== 'en' && applicationId !== POC_MULTILINGUAL_APPLICATION_ID) {
-    return { engine: 'unavailable', reason: 'french-spanish-unavailable' };
-  }
   if (!nativeAvailable) {
     return { engine: 'unavailable', reason: nativeReason || 'native-unavailable' };
   }

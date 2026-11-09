@@ -39,22 +39,30 @@ describe('selectSpeechEngine', () => {
     })).toEqual({ engine: 'kokoro', reason: 'native-spanish' });
   });
 
-  it('keeps French and Spanish unavailable in a production release', () => {
+  it('selects the native engine for French and Spanish in a production release', () => {
+    // V2.1 ships multilingual narration. Availability now depends on the
+    // optional voice being installed and reported READY by the native runtime
+    // (enforced in the narration UI), not on a debug application id.
     for (const lang of ['fr-FR', 'es-419']) {
       expect(selectSpeechEngine({
         ...android,
         lang,
         nativeAvailable: true,
         applicationId: productionApplicationId,
-      })).toEqual({ engine: 'unavailable', reason: 'french-spanish-unavailable' });
+      })).toEqual({ engine: 'kokoro', reason: lang.startsWith('fr') ? 'native-french' : 'native-spanish' });
     }
+    expect(selectSpeechEngine({ ...android, lang: 'fr-FR', nativeAvailable: true }))
+      .toEqual({ engine: 'kokoro', reason: 'native-french' });
   });
 
-  it('fails closed for French and Spanish when the application identity is unknown', () => {
-    expect(selectSpeechEngine({ ...android, lang: 'fr-FR', nativeAvailable: true }))
-      .toEqual({ engine: 'unavailable', reason: 'french-spanish-unavailable' });
-    expect(selectSpeechEngine({ ...android, lang: 'es-419', nativeAvailable: true }))
-      .toEqual({ engine: 'unavailable', reason: 'french-spanish-unavailable' });
+  it('still fails closed when the native engine is unavailable', () => {
+    expect(selectSpeechEngine({
+      ...android,
+      lang: 'fr-FR',
+      nativeAvailable: false,
+      nativeReason: 'native-unavailable',
+      applicationId: productionApplicationId,
+    })).toEqual({ engine: 'unavailable', reason: 'native-unavailable' });
   });
 
   it('leaves English narration unaffected by the POC release gate', () => {

@@ -84,24 +84,6 @@ export type SpeechEnvironment = {
   applicationId?: string;
 };
 
-async function resolveApplicationId(
-  env: SpeechEnvironment,
-  lang: string | undefined,
-): Promise<string | undefined> {
-  if (env.applicationId) return env.applicationId;
-  const locale = speechLocale(lang);
-  if (!env.isNativePlatform || env.platform !== 'android' || !locale || locale === 'en') {
-    return undefined;
-  }
-  try {
-    const info = await CapacitorApp.getInfo();
-    return info.id;
-  } catch {
-    // Unknown application identity: the engine gate keeps French/Spanish off.
-    return undefined;
-  }
-}
-
 export type SpeechRouter = {
   supported: () => boolean;
   select: (lang?: string) => Promise<SpeechSelection>;
@@ -130,17 +112,13 @@ export function createSpeechRouter(
         nativeReason = 'native-unavailable';
       }
     }
-    const locale = speechLocale(lang);
-    const applicationId = locale && locale !== 'en'
-      ? await resolveApplicationId(env, lang)
-      : env.applicationId;
     return selectSpeechEngine({
       isNativePlatform: env.isNativePlatform,
       platform: env.platform,
       lang,
       nativeAvailable,
       nativeReason,
-      applicationId,
+      applicationId: env.applicationId,
     });
   }
 

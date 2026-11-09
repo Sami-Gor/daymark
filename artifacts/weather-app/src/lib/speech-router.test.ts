@@ -163,16 +163,19 @@ describe('createSpeechRouter', () => {
     expect(native.speak).not.toHaveBeenCalled();
   });
 
-  it('keeps French and Spanish narration disabled in a production release', async () => {
+  it('enables French and Spanish narration in a production release', async () => {
+    // V2.1 ships multilingual narration; readiness of the optional voice is
+    // enforced by the narration UI and the native loaded-voice set, not by a
+    // debug application id.
     for (const [text, lang] of [['Bonjour.', 'fr-FR'], ['Buenos días.', 'es-419']] as const) {
       const native = makeNative();
       const router = createSpeechRouter(androidRelease, native);
       const onError = vi.fn();
       const onEngine = vi.fn();
       await router.speak(text, lang, { onError, onEngine });
-      expect(onEngine).toHaveBeenCalledWith({ engine: 'unavailable', reason: 'french-spanish-unavailable' });
-      expect(onError).toHaveBeenCalledWith('french-spanish-unavailable');
-      expect(native.speak).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(onEngine).toHaveBeenCalledWith(expect.objectContaining({ engine: 'kokoro' }));
+      expect(native.speak).toHaveBeenCalled();
     }
   });
 
@@ -185,28 +188,24 @@ describe('createSpeechRouter', () => {
     expect(native.speak).toHaveBeenCalledWith('Good morning.', 'en-GB', undefined);
   });
 
-  it('reads the installed application ID from the native App plugin', async () => {
-    getInfoMock.mockResolvedValue({
-      id: pocApplicationId,
-      name: 'Daymark',
-      build: '2',
-      version: '2.0.0',
-    });
+  it('speaks French without consulting the native App plugin', async () => {
+    // Application identity is no longer part of engine selection; only native
+    // availability and, upstream, the voice readiness state decide.
     const native = makeNative();
     const router = createSpeechRouter(android, native);
     await router.speak('Bonjour.', 'fr-FR', {});
-    expect(getInfoMock).toHaveBeenCalledTimes(1);
+    expect(getInfoMock).not.toHaveBeenCalled();
     expect(native.speak).toHaveBeenCalledWith('Bonjour.', 'fr-FR', undefined);
   });
 
-  it('fails closed when the installed application ID cannot be read', async () => {
+  it('no longer depends on reading the installed application ID', async () => {
     getInfoMock.mockRejectedValue(new Error('unavailable'));
     const native = makeNative();
     const router = createSpeechRouter(android, native);
     const onError = vi.fn();
     await router.speak('Bonjour.', 'fr-FR', { onError });
-    expect(onError).toHaveBeenCalledWith('french-spanish-unavailable');
-    expect(native.speak).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(native.speak).toHaveBeenCalled();
   });
 
   it('surfaces an error when English Kokoro is unavailable', async () => {
