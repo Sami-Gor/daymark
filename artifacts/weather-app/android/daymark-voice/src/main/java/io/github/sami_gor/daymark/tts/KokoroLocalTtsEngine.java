@@ -12,7 +12,6 @@ import android.util.Log;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
@@ -258,6 +257,14 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 notifyError("operation-conflict");
                 return;
             }
+            if (state == State.ERROR && generation > 0
+                    && EngineOwnership.currentGeneration() != 0
+                    && EngineOwnership.currentGeneration() != generation) {
+                // Another engine instance already took over; re-initialising
+                // here would reserve and steal its native generation.
+                notifyError("engine-superseded");
+                return;
+            }
             if (!initializationInFlight.compareAndSet(false, true)) {
                 notifyError("operation-conflict");
                 return;
@@ -287,6 +294,9 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
     private void runInitialize(final long initGeneration) {
         try {
             if (!isStillWanted(initGeneration)) {
+                // A replacement instance reserved a newer generation before
+                // this task ran; never leave this instance stuck in LOADING.
+                abandonStaleInitialisation(initGeneration);
                 return;
             }
             if (!nativeApi.ensureLoaded()) {
@@ -328,18 +338,27 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                             voicesDir.getAbsolutePath(),
                             DEFAULT_VOICE_NAME);
                     if (error == null) {
-                        // Ownership is committed only after the native engine
-                        // accepted the model/voice, and only if no newer
-                        // initialisation reserved the engine meanwhile.
-                        committed = EngineOwnership.commitInit(initGeneration);
-                        if (committed) {
-                            nativeInitialised = true;
-                            loadedVoices = Collections.singleton(DEFAULT_VOICE_NAME);
-                        } else {
-                            // Superseded during native init: release the engine
-                            // we created; the newer generation will initialise.
+                        // Re-check after the (slow) native call: shutdown may
+                        // have started, or a newer generation may have been
+                        // reserved while we were inside the bridge.
+                        if (shuttingDown.get()
+                                || !EngineOwnership.isLatestReservation(initGeneration)) {
                             nativeApi.release();
                             nativeInitialised = false;
+                        } else {
+                            // Ownership is committed only after the native engine
+                            // accepted the model/voice, and only if no newer
+                            // initialisation reserved the engine meanwhile.
+                            committed = EngineOwnership.commitInit(initGeneration);
+                            if (committed) {
+                                nativeInitialised = true;
+                                loadedVoices = Collections.singleton(DEFAULT_VOICE_NAME);
+                            } else {
+                                // Superseded during commit: release the engine
+                                // we created; the newer generation will initialise.
+                                nativeApi.release();
+                                nativeInitialised = false;
+                            }
                         }
                     }
                 }
@@ -454,8 +473,11 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                 result.onError("engine-not-ready");
                 return;
             }
-            if (!EngineOwnership.owns(generation) && state != State.ERROR) {
-                result.onError("engine-superseded");
+            if (!EngineOwnership.owns(generation) && !isRecoverableError()) {
+                // A different engine instance superseded this one: retrying
+                // here would steal the replacement's native engine.
+                result.onError(EngineOwnership.currentGeneration() == 0
+                        ? "engine-not-ready" : "engine-superseded");
                 return;
             }
             previousVoice = singleLoadedVoice();
@@ -499,9 +521,7 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         boolean stale = false;
         boolean recovered = false;
         synchronized (EngineOwnership.NATIVE_LOCK) {
-            if (shuttingDown.get()
-                    || !reloadGuard.isCurrent(token)
-                    || !EngineOwnership.isLatestReservation(reloadGeneration)) {
+            if (!mayRunReload(token, reloadGeneration)) {
                 // A stale reload must not release, initialise or otherwise
                 // touch the native engine a newer generation may own.
                 stale = true;
@@ -513,7 +533,13 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                     }
                     String error = nativeApi.init(model, voicesDir.getAbsolutePath(), voiceId);
                     if (error == null) {
-                        if (EngineOwnership.commitInit(reloadGeneration)) {
+                        // Re-check after the native call: shutdown or a newer
+                        // reservation may have arrived while we were inside it.
+                        if (!mayRunReload(token, reloadGeneration)) {
+                            nativeApi.release();
+                            nativeInitialised = false;
+                            stale = true;
+                        } else if (EngineOwnership.commitInit(reloadGeneration)) {
                             nativeInitialised = true;
                             generation = reloadGeneration;
                             loaded = Collections.singleton(voiceId);
@@ -525,60 +551,82 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         }
                     } else {
                         log.e("registerVoice: failed: " + error, null);
-                        String restore = nativeApi.init(
-                                model, voicesDir.getAbsolutePath(), previousVoice);
-                        if (restore == null) {
-                            if (EngineOwnership.commitInit(reloadGeneration)) {
-                                nativeInitialised = true;
-                                generation = reloadGeneration;
-                                loaded = Collections.singleton(previousVoice);
-                                loadedVoices = loaded;
-                                recovered = true;
-                                failure = "reload-failed";
-                            } else {
-                                nativeApi.release();
-                                nativeInitialised = false;
-                                stale = true;
-                            }
+                        if (!mayRunReload(token, reloadGeneration)) {
+                            stale = true;
                         } else {
-                            failure = "reload-failed-unrecovered";
+                            // Attempt to restore the previous working voice.
+                            String restore = nativeApi.init(
+                                    model, voicesDir.getAbsolutePath(), previousVoice);
+                            if (restore == null) {
+                                if (!mayRunReload(token, reloadGeneration)) {
+                                    nativeApi.release();
+                                    nativeInitialised = false;
+                                    stale = true;
+                                } else if (EngineOwnership.commitInit(reloadGeneration)) {
+                                    nativeInitialised = true;
+                                    generation = reloadGeneration;
+                                    loaded = Collections.singleton(previousVoice);
+                                    loadedVoices = loaded;
+                                    recovered = true;
+                                    failure = "reload-failed";
+                                } else {
+                                    nativeApi.release();
+                                    nativeInitialised = false;
+                                    stale = true;
+                                }
+                            } else {
+                                failure = "reload-failed-unrecovered";
+                            }
                         }
                     }
                 } catch (Throwable error) {
                     log.e("registerVoice: failed: " + error.getMessage(), error);
                     // Never leave a released engine without attempting to
                     // restore the previously working voice.
-                    try {
-                        if (nativeInitialised) {
-                            nativeApi.release();
-                            nativeInitialised = false;
-                        }
-                        String restore = nativeApi.init(
-                                model, voicesDir.getAbsolutePath(), previousVoice);
-                        if (restore == null && EngineOwnership.commitInit(reloadGeneration)) {
-                            nativeInitialised = true;
-                            generation = reloadGeneration;
-                            loaded = Collections.singleton(previousVoice);
-                            loadedVoices = loaded;
-                            recovered = true;
-                            failure = "reload-failed";
-                        } else {
-                            if (restore == null) {
+                    if (!mayRunReload(token, reloadGeneration)) {
+                        stale = true;
+                    } else {
+                        try {
+                            if (nativeInitialised) {
                                 nativeApi.release();
+                                nativeInitialised = false;
                             }
+                            String restore = nativeApi.init(
+                                    model, voicesDir.getAbsolutePath(), previousVoice);
+                            if (restore != null) {
+                                failure = "reload-failed-unrecovered";
+                            } else if (!mayRunReload(token, reloadGeneration)
+                                    || !EngineOwnership.commitInit(reloadGeneration)) {
+                                nativeApi.release();
+                                nativeInitialised = false;
+                                stale = true;
+                            } else {
+                                nativeInitialised = true;
+                                generation = reloadGeneration;
+                                loaded = Collections.singleton(previousVoice);
+                                loadedVoices = loaded;
+                                recovered = true;
+                                failure = "reload-failed";
+                            }
+                        } catch (Throwable restoreFailure) {
+                            log.e("registerVoice: restore failed",
+                                    restoreFailure);
                             nativeInitialised = false;
                             failure = "reload-failed-unrecovered";
                         }
-                    } catch (Throwable restoreFailure) {
-                        log.e("registerVoice: restore failed",
-                                restoreFailure);
-                        nativeInitialised = false;
-                        failure = "reload-failed-unrecovered";
                     }
                 }
                 if (failure != null && !recovered) {
-                    // Ownership no longer points at a usable engine; mark it
-                    // released so a retry can take over.
+                    // No usable engine is loaded; make that ownership state
+                    // explicit so a retry can reserve the next generation.
+                    if (nativeInitialised) {
+                        try {
+                            nativeApi.release();
+                        } catch (Throwable ignored) {
+                            // Best effort: the bridge already failed.
+                        }
+                    }
+                    nativeInitialised = false;
                     loadedVoices = Collections.emptySet();
                     EngineOwnership.claimRelease(generation);
                 }
@@ -588,12 +636,16 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         reloadGuard.finish(token);
         if (stale || !current) {
             // Stale completions never publish READY or clear a newer slot.
+            callback.onError(shuttingDown.get() ? "engine-shutdown" : "operation-conflict");
             if (!shuttingDown.get()) {
                 setState(State.ERROR);
-                callback.onError("operation-conflict");
-            } else {
-                callback.onError("engine-shutdown");
             }
+            return;
+        }
+        if (shuttingDown.get()) {
+            // The voice may have committed, but shutdown owns the release and
+            // the bridge must not be told a destroyed engine is ready.
+            callback.onError("engine-shutdown");
             return;
         }
         if (failure != null) {
@@ -617,6 +669,29 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
             return snapshot.iterator().next();
         }
         return DEFAULT_VOICE_NAME;
+    }
+
+    /**
+     * A retry is only allowed when this instance still owns the newest
+     * generation. After an unrecovered reload the generation is current but
+     * unowned (so the same engine may retry); after another instance took over
+     * the generation is no longer current and a retry would steal its engine.
+     */
+    private boolean isRecoverableError() {
+        return state == State.ERROR
+                && generation > 0
+                && EngineOwnership.currentGeneration() == generation;
+    }
+
+    /**
+     * Whether this reload may still touch the native engine. Call under
+     * {@link EngineOwnership#NATIVE_LOCK}; it closes the window between the
+     * single-flight token, the ownership reservation and the native call.
+     */
+    private boolean mayRunReload(long token, long reloadGeneration) {
+        return !shuttingDown.get()
+                && reloadGuard.isCurrent(token)
+                && EngineOwnership.isLatestReservation(reloadGeneration);
     }
 
     private static final VoiceOperationResult NOOP_CALLBACK = new VoiceOperationResult() {
@@ -644,33 +719,45 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
      */
     @Override
     public void speak(final String text, final String lang, final List<String> segments) {
-        if (state != State.READY && state != State.STOPPED) {
-            notifyError("engine not ready");
-            return;
+        final String voice;
+        final int playbackToken;
+        final long callTimeMs;
+        synchronized (lifecycleLock) {
+            if (shuttingDown.get()) {
+                notifyError("engine-shutdown");
+                return;
+            }
+            if (state != State.READY && state != State.STOPPED) {
+                notifyError("engine not ready");
+                return;
+            }
+            if (!EngineOwnership.owns(generation)) {
+                // Another engine instance owns the process-wide native engine;
+                // speaking here would use (or release) its generation.
+                notifyError("engine-superseded");
+                return;
+            }
+            voice = NarrationVoicePolicy.voiceForLanguage(
+                    lang, BuildConfig.MULTILINGUAL_NARRATION, installedVoiceNames());
+            if (voice == null) {
+                notifyError("Unsupported narration language: " + lang);
+                return;
+            }
+            if (!NarrationVoicePolicy.isVoiceDistributable(
+                    voice, BuildConfig.SPANISH_VOICE_DISTRIBUTION_APPROVED)) {
+                notifyError("voice-rights-unresolved");
+                return;
+            }
+            if (!loadedVoices.contains(voice)) {
+                // The file may be installed but the native engine has not loaded it
+                // yet; never fall back to English or another voice.
+                notifyError("voice-not-loaded");
+                return;
+            }
+            playbackToken = playbackGeneration.begin();
+            callTimeMs = clock.elapsedRealtime();
+            setState(State.SPEAKING);
         }
-        final String voice = NarrationVoicePolicy.voiceForLanguage(
-                lang, BuildConfig.MULTILINGUAL_NARRATION, installedVoiceNames());
-        if (voice == null) {
-            notifyError("Unsupported narration language: " + lang);
-            return;
-        }
-        if (!NarrationVoicePolicy.isVoiceDistributable(
-                voice, BuildConfig.SPANISH_VOICE_DISTRIBUTION_APPROVED)) {
-            notifyError("voice-rights-unresolved");
-            return;
-        }
-        if (!loadedVoices.contains(voice)) {
-            // The file may be installed but the native engine has not loaded it
-            // yet; never fall back to English or another voice.
-            notifyError("voice-not-loaded");
-            return;
-        }
-        if (isSpeaking()) {
-            stop();
-        }
-        final int playbackToken = playbackGeneration.begin();
-        final long callTimeMs = clock.elapsedRealtime();
-        setState(State.SPEAKING);
         if (!scheduler.postWorker(new Runnable() {
             @Override
             public void run() {
@@ -718,8 +805,13 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
 
     @Override
     public void shutdown() {
-        if (!shuttingDown.compareAndSet(false, true)) {
-            return;
+        synchronized (lifecycleLock) {
+            // Publish the shutdown decision atomically with admission checks so
+            // a concurrent speak/register cannot transition to READY/SPEAKING
+            // after the state was set to UNINITIALIZED here.
+            if (!shuttingDown.compareAndSet(false, true)) {
+                return;
+            }
         }
         reloadGuard.invalidate();
         stopPlayback();
@@ -732,9 +824,15 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
                         // Read the generation when the task runs: an in-flight
                         // reload that committed a newer generation just before
                         // shutdown must be the one released.
-                        if (nativeInitialised && EngineOwnership.claimRelease(generation)) {
+                        boolean owned = EngineOwnership.claimRelease(generation);
+                        if (owned && nativeInitialised) {
                             nativeApi.release();
                             nativeInitialised = false;
+                        } else if (owned) {
+                            // A reload already released the native engine
+                            // before it was interrupted: only clear ownership.
+                            nativeInitialised = false;
+                            log.i("shutdown: ownership cleared without a live release");
                         } else {
                             log.i("shutdown: skipped release for superseded generation "
                                     + generation);
@@ -1040,16 +1138,26 @@ public final class KokoroLocalTtsEngine implements LocalTtsEngine {
         return playbackGeneration.isCurrent(playbackToken);
     }
 
+    /**
+     * Publishes a state transition. Shutdown is terminal: once the shutdown
+     * flag is set, only UNINITIALIZED may still be published, so a stale worker
+     * can never post READY/ERROR/SPEAKING after the engine was torn down.
+     */
     private void setState(final State next) {
-        state = next;
-        final Listener current = listener;
-        if (current != null) {
-            scheduler.postMain(new Runnable() {
-                @Override
-                public void run() {
-                    current.onStateChanged(next);
-                }
-            });
+        synchronized (lifecycleLock) {
+            if (shuttingDown.get() && next != State.UNINITIALIZED) {
+                return;
+            }
+            state = next;
+            final Listener current = listener;
+            if (current != null) {
+                scheduler.postMain(new Runnable() {
+                    @Override
+                    public void run() {
+                        current.onStateChanged(next);
+                    }
+                });
+            }
         }
     }
 
