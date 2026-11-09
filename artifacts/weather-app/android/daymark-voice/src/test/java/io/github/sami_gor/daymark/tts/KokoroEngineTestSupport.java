@@ -245,16 +245,12 @@ final class KokoroEngineTestSupport {
             }
             if (failAll || failingVoices.contains(voiceName)) {
                 lastInitSucceeded = false;
+                record("init-failed", 0, 0, voiceName);
                 if (loseInitErrorString) {
                     // The bridge failed but lost its error text: the Java side
                     // observes exactly the same null as a successful init.
                     return null;
                 }
-                return "kokoro native init failed for " + voiceName;
-            }
-            lastInitSucceeded = true;
-            successfulInitCalls += 1;
-                record("init-failed", 0, 0, voiceName);
                 return "kokoro native init failed for " + voiceName;
             }
             int instanceId;
@@ -263,6 +259,7 @@ final class KokoroEngineTestSupport {
                 activeInstanceId = instanceId;
                 successfulInitCalls += 1;
             }
+            lastInitSucceeded = true;
             record("init", instanceId, 0, voiceName);
             return null;
         }
