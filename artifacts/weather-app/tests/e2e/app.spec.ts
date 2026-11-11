@@ -2724,9 +2724,8 @@ test.describe('temperature-unit persistence', () => {
     const microValue = fahrenheit ? '69°F' : '20°C';
 
     await expect(page.getByTestId('text-current-temperature')).toHaveText(currentValue);
-    // Feels-like has no dedicated test id; the current-temperature block exposes its
-    // visible value with the selected unit. The generic aria-label was removed.
-    await expect(page.getByTestId('text-current-temperature').locator('..').getByText(feelsValue, { exact: true })).toBeVisible();
+    // Feels-like has its own stable test id; assert the displayed value with its active unit.
+    await expect(page.getByTestId('feels-like-temperature')).toHaveText(feelsValue);
 
     // Hourly: five values and the section's accessible phrase.
     await expect(page.getByTestId('list-hourly-forecast')).toHaveAttribute('aria-label', hourlyAria);
@@ -2846,8 +2845,8 @@ test.describe('temperature-unit persistence', () => {
     await mockOpenMeteo(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: '°C, Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'false');
     expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBeNull();
   });
 
@@ -2856,10 +2855,10 @@ test.describe('temperature-unit persistence', () => {
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
 
-    await page.getByRole('button', { name: 'Temperature unit: Fahrenheit' }).click();
+    await page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' }).click();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '°C, Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'false');
     expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('F');
     // The unit preference is the only app-controlled storage added.
     expect(await page.evaluate(() => Object.keys(window.localStorage))).toEqual(['daymark.unit']);
@@ -2868,8 +2867,8 @@ test.describe('temperature-unit persistence', () => {
 
     await page.reload();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '°C, Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'false');
     expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('F');
     await expectTemperatureSurfaces(page, 'F');
   });
@@ -2880,25 +2879,78 @@ test.describe('temperature-unit persistence', () => {
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
 
     // Start from a persisted Fahrenheit preference, then explicitly select Celsius.
-    await page.getByRole('button', { name: 'Temperature unit: Fahrenheit' }).click();
+    await page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' }).click();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
     expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('F');
     await expectTemperatureSurfaces(page, 'F');
 
     await page.reload();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
-    await page.getByRole('button', { name: 'Temperature unit: Celsius' }).click();
+    await page.getByRole('button', { name: '°C, Temperature unit: Celsius' }).click();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
     expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('C');
     await expectTemperatureSurfaces(page, 'C');
 
     await page.reload();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: '°C, Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'false');
     expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('C');
     await expectTemperatureSurfaces(page, 'C');
   });
+
+  const localizedUnits = {
+    fr: {
+      celsiusButton: '°C, unité de température : Celsius',
+      fahrenheitButton: '°F, unité de température : Fahrenheit',
+      celsiusSpeech: '20 degrés Celsius',
+      feelsCelsiusSpeech: '19 degrés Celsius',
+      fahrenheitSpeech: '69 degrés Fahrenheit',
+      feelsFahrenheitSpeech: '66 degrés Fahrenheit',
+    },
+    es: {
+      celsiusButton: '°C, unidad de temperatura: Celsius',
+      fahrenheitButton: '°F, unidad de temperatura: Fahrenheit',
+      celsiusSpeech: '20 grados Celsius',
+      feelsCelsiusSpeech: '19 grados Celsius',
+      fahrenheitSpeech: '69 grados Fahrenheit',
+      feelsFahrenheitSpeech: '66 grados Fahrenheit',
+    },
+  } as const;
+
+  for (const locale of ['fr', 'es'] as const) {
+    const units = localizedUnits[locale];
+    test('localized unit controls and spoken output (' + locale + ')', async ({ page }) => {
+      await mockOpenMeteo(page);
+      await page.goto('/');
+      await page.getByTestId('select-language').selectOption(locale);
+      await expect(page.getByTestId('select-language')).toHaveValue(locale);
+
+      // localized accessible names; the visible prefix is asserted separately
+      // because the aria-label replaces the button's visible text in the accessible name.
+      const celsiusButton = page.getByRole('button', { name: units.celsiusButton });
+      const fahrenheitButton = page.getByRole('button', { name: units.fahrenheitButton });
+      await expect(celsiusButton).toBeVisible();
+      await expect(celsiusButton).toHaveText('°C');
+      await expect(fahrenheitButton).toHaveText('°F');
+      await expect(celsiusButton).toHaveAttribute('aria-pressed', 'true');
+      await expect(fahrenheitButton).toHaveAttribute('aria-pressed', 'false');
+
+      await fahrenheitButton.click();
+      await expect(fahrenheitButton).toHaveAttribute('aria-pressed', 'true');
+      await expect(celsiusButton).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
+
+      // Deterministic spoken output from the pure intent layer (no browser speech/network).
+      const weather = FORECAST as unknown as WeatherPayload;
+      const celsiusSpeech = getCurrentConditions(weather, { unit: 'celsius', locale, locationName: 'London' });
+      const fahrenheitSpeech = getCurrentConditions(weather, { unit: 'fahrenheit', locale, locationName: 'London' });
+      expect(celsiusSpeech.spokenText).toContain(units.celsiusSpeech);
+      expect(celsiusSpeech.spokenText).toContain(units.feelsCelsiusSpeech);
+      expect(fahrenheitSpeech.spokenText).toContain(units.fahrenheitSpeech);
+      expect(fahrenheitSpeech.spokenText).toContain(units.feelsFahrenheitSpeech);
+    });
+  }
 
   test('a stored Fahrenheit preference is used on first paint without a Celsius frame', async ({ page }) => {
     await captureFirstPaint(page, 'F');
@@ -2915,7 +2967,7 @@ test.describe('temperature-unit persistence', () => {
     await expect(heatAlert).toContainText('35°C');
     await expect(page.getByTestId('micro-row-temperature')).toContainText('20°C');
 
-    await page.getByRole('button', { name: 'Temperature unit: Fahrenheit' }).click();
+    await page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' }).click();
     await expect(heatAlert).toContainText('95°F');
     await expect(page.getByTestId('micro-row-temperature')).toContainText('69°F');
   });
@@ -2940,7 +2992,7 @@ test.describe('temperature-unit persistence', () => {
     await mockOpenMeteo(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '°C, Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
     expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('kelvin');
   });
 
@@ -2952,10 +3004,10 @@ test.describe('temperature-unit persistence', () => {
     await mockOpenMeteo(page);
     await page.goto('/');
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '°C, Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
     // The in-memory preference still works even though it cannot be persisted.
-    await page.getByRole('button', { name: 'Temperature unit: Fahrenheit' }).click();
+    await page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' }).click();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
-    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '°F, Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
   });
 });

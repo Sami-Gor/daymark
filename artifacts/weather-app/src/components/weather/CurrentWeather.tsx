@@ -51,7 +51,7 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
         </div>
         <div className="temp-block">
           <div className="current-temp" data-testid="text-current-temperature">{displayTemp(current.temperature_2m, unit)}<sup>{unit === 'celsius' ? 'C' : 'F'}</sup></div>
-          <div className="feels">{t('current.feelsLike')}<strong>{displayTempWithUnit(current.apparent_temperature, unit)}</strong><span className="temperature-condition">{weatherCopy(currentCode, locale)}</span>{updatedLabel}</div>
+          <div className="feels">{t('current.feelsLike')}<strong data-testid="feels-like-temperature">{displayTempWithUnit(current.apparent_temperature, unit)}</strong><span className="temperature-condition">{weatherCopy(currentCode, locale)}</span>{updatedLabel}</div>
         </div>
       </section>
 
