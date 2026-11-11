@@ -20,10 +20,25 @@ name: Rebuild sherpa-onnx AAR
 # hashes and must match exactly (optionally allowing a GNU-build-ID-only
 # difference).
 #
-# Manual only, read-only permissions: it never publishes, signs, commits or
-# pushes anything. Inputs live in
+# Read-only permissions: it never publishes, signs, commits or pushes anything.
+# Inputs live in
 # android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env.
+#
+# Triggers:
+#   * pull_request: runs the same two independent builds and the byte comparison
+#     on changes to the rebuild inputs, the AAR artifacts, the docs or this
+#     workflow. Both builds are made from fresh checkouts and fresh dependency
+#     downloads in the runner's temporary directory; no cache and no prebuilt
+#     outputs are used.
+#   * workflow_dispatch: manual run; optional exact-artifact identity check.
 on:
+  pull_request:
+    paths:
+      - 'android/kokoro-poc/**'
+      - 'android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/**'
+      - '.github/workflows/rebuild-sherpa-aar.yml'
+      - 'artifacts/weather-app/android/**'
+      - 'docs/**'
   workflow_dispatch:
     inputs:
       require_full_identity:
@@ -267,7 +282,7 @@ jobs:
   package:
     name: package AAR with the upstream Gradle project
     needs: build
-    if: ${{ inputs.package_with_gradle }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.package_with_gradle }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
