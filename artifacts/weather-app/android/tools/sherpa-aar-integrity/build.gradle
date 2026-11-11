@@ -1,15 +1,12 @@
 // Test harness for gradle/sherpa-aar-integrity.gradle.
 //
-// run-tests.sh stages the AAR and pin into work/ and then runs the single
-// real task this project exposes. The inputs are read from the staged copy so
-// that the negative cases (missing AAR, mutated bytes, wrong pin) never touch
-// the committed artifact.
+// run-tests.sh stages the AAR and pin at the fixed project-relative paths the
+// plugin verifies (<thisDir>/sherpa-aar.sha256 and <thisDir>/libs) and then
+// runs the single real task this project exposes. The cases never touch the
+// committed module artifact or pin.
 //
 // Nothing here is part of the Android build: this directory is not included
 // from ../settings.gradle.
-
-ext.sherpaAarDir = file('work/aar')
-ext.sherpaAarPinFile = file('work/sherpa-aar.sha256')
 
 apply from: '../../gradle/sherpa-aar-integrity.gradle'
 

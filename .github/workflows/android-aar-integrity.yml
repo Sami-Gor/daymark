@@ -13,7 +13,9 @@ name: Android AAR integrity
 #
 # The digest is pinned in daymark-voice/sherpa-aar.sha256 and is checked by the
 # Gradle verifySherpaAar task; android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
-# carries the same digest for CI provisioning. This workflow runs the gate
+# reads this same pin for CI provisioning. It cannot be redirected: the gate
+# takes fixed project-relative paths and rejects the legacy override
+# properties. This workflow runs the gate
 # itself, the positive/negative test suite for it, and asserts that release
 # builds depend on it while debug builds and JVM unit tests do not.
 #
@@ -65,6 +67,11 @@ jobs:
   # :parakeet-assets is skipped for --dry-run, which is all these graph
   # assertions execute, so the cross-module cases stay active without it;
   # real packaging still fails closed when the model is absent.
+  #
+  # The same harness run also proves the gate cannot be redirected from
+  # Gradle project properties (the cases mutate a copy and assert that -P flags
+  # and gradle.properties are rejected) and that fetch-sherpa-onnx.sh reads the
+  # committed pin instead of carrying a duplicate digest.
   digest-and-tests:
     name: aar-digest-and-tests
     runs-on: ubuntu-latest
@@ -168,6 +175,22 @@ jobs:
       - name: Verify the committed sherpa-onnx AAR (Gradle)
         working-directory: artifacts/weather-app/android
         run: ./gradlew --no-daemon :daymark-voice:verifySherpaAar
+
+      # The gate must not be redirectable from Gradle project properties:
+      # -P flags and gradle.properties are both project properties. The
+      # harness exercises the mutation scenarios with a tampered artifact;
+      # this quick check keeps the guarantee in the release workflow too.
+      - name: Assert the AAR gate cannot be redirected
+        working-directory: artifacts/weather-app/android
+        run: |
+          set -euo pipefail
+          if ./gradlew --no-daemon --console=plain :daymark-voice:verifySherpaAar \
+              -PsherpaAarDir=/tmp/not-the-aar-dir/libs \
+              -PsherpaAarPinFile=/tmp/not-the-pin.sha256 > /tmp/aar-override-check.log 2>&1; then
+            echo "error: Gradle project properties redirected the AAR integrity gate." >&2
+            exit 1
+          fi
+          grep -q 'Unsupported sherpa-onnx AAR integrity override' /tmp/aar-override-check.log
 
       # Release builds must depend on the gate. --dry-run prints the task graph
       # without building, so this stays cheap while still proving the wiring.
