@@ -55,6 +55,12 @@ def sha256Of = { File file ->
 }
 
 gradle.taskGraph.whenReady { graph ->
+    // --dry-run executes no task and must stay usable for CI task-graph
+    // assertions without staging the 640 MiB model. Real builds still fail
+    // closed below when a packaging task runs without the model.
+    if (gradle.startParameter.dryRun) {
+        return
+    }
     def packaging = graph.allTasks.any { it.project == project }
     if (!packaging) {
         return

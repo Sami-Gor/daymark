@@ -1,0 +1,211 @@
+/*
+ * Fail-closed integrity verification for the committed sherpa-onnx Android
+ * runtime.
+ *
+ * The DaymarkVoice module consumes the AAR as a local file dependency:
+ *
+ *   daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar
+ *
+ * That artifact is a locally rebuilt v1.13.8 runtime carrying the joiner-width
+ * validation for CVE-2026-108954 / GHSA-f5q5-vp8g-wh4x. Upstream v1.13.8,
+ * v2.0.1 and master still contain the unchecked width access, so substituting
+ * the upstream AAR (or rebuilding it without the patch) silently reintroduces
+ * the vulnerability. CI verifies the digest through
+ * android/kokoro-poc/scripts/fetch-sherpa-onnx.sh, but a local release build
+ * never runs that script: `./gradlew :app:bundleRelease` would package whatever
+ * bytes happen to sit in libs/. This plugin adds the same check to Gradle and
+ * wires it into every release build path.
+ *
+ * Behaviour:
+ *   - the inputs are fixed and derived from the applying project:
+ *       pin file  <projectDir>/sherpa-aar.sha256
+ *       AAR dir   <projectDir>/libs/
+ *     In DaymarkVoice those are exactly the committed pin and the directory the
+ *     app packages; no other artifact can be substituted for them;
+ *   - the pin must contain exactly one '<sha256>  <file name>' entry;
+ *   - the gate succeeds only when that file exists in libs/ and its SHA-256
+ *     equals the pinned digest;
+ *   - it fails closed when the pin is missing, unreadable, empty, malformed or
+ *     names more than one artifact, when the AAR directory is missing, when
+ *     the pinned artifact is missing or empty, or when the digest differs;
+ *   - there are deliberately no project-property, environment-variable or
+ *     system-property overrides. A redirected verification would not cover the
+ *     artifact the release packages, so the legacy override properties
+ *     (sherpaAarPinFile / sherpaAarDir) are a hard configuration error,
+ *     including when they come from a tracked gradle.properties file;
+ *   - runs for release builds only (assemble/bundle/package/lintVital of the
+ *     release variant, in this module and in :app). Debug builds and JVM unit
+ *     tests are deliberately not wired, so local debug work and
+ *     :app:testDebugUnitTest keep working without the gate.
+ *
+ * The pin file is the single source of truth. It uses sha256sum(1) format, so
+ * it can also be checked with `shasum -a 256 -c`:
+ *
+ *   <64 hex chars>  <file name>
+ *   # comments and blank lines are ignored
+ *
+ * Usage (see daymark-voice/build.gradle):
+ *
+ *   apply from: '../gradle/sherpa-aar-integrity.gradle'
+ */
+
+// Reject the legacy override properties explicitly. They are ordinary Gradle
+// project properties, so they arrive from -P flags and gradle.properties alike.
+// Ignoring them silently would leave a tracked gradle.properties able to
+// redirect the check; failing closed keeps a single trusted artifact and pin.
+def legacyOverrideKeys = ['sherpaAarPinFile', 'sherpaAarDir']
+def activeOverrides = legacyOverrideKeys.findAll { project.hasProperty(it) }
+if (!activeOverrides.isEmpty()) {
+    throw new GradleException(
+            "Unsupported sherpa-onnx AAR integrity override(s): " +
+            "${activeOverrides.join(', ')}. The gate only verifies " +
+            "<projectDir>/sherpa-aar.sha256 against <projectDir>/libs; " +
+            "remove these project properties (for example from gradle.properties).")
+}
+
+def pinFile = project.file('sherpa-aar.sha256')
+def aarDir = project.file('libs')
+
+def sha256Of = { File file ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    file.withInputStream { input ->
+        byte[] buffer = new byte[64 * 1024]
+        int read
+        while ((read = input.read(buffer)) > 0) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+}
+
+// Parses the single-entry pin file. Anything malformed throws a
+// GradleException with the offending line, so a corrupted pin can never
+// degrade into "nothing to verify". More than one entry is rejected because
+// the release packages one committed runtime and the gate must protect it.
+def readPin = { File file ->
+    def entry = null
+    file.eachLine { rawLine, lineNumber ->
+        def line = rawLine.trim()
+        if (line.isEmpty() || line.startsWith('#')) {
+            return
+        }
+        if (entry != null) {
+            throw new GradleException(
+                    "Malformed sherpa-onnx AAR pin at ${file}:${lineNumber}: " +
+                    "the pin must contain exactly one artifact; found more than one.")
+        }
+        def fields = line.split('\\s+') as List
+        if (fields.size() != 2) {
+            throw new GradleException(
+                    "Malformed sherpa-onnx AAR pin at ${file}:${lineNumber}. " +
+                    "Expected '<sha256>  <file name>', found: '${rawLine}'.")
+        }
+        def expected = fields[0].toLowerCase(Locale.ROOT)
+        def name = fields[1]
+        if (!(expected ==~ /[0-9a-f]{64}/)) {
+            throw new GradleException(
+                    "Malformed sherpa-onnx AAR pin at ${file}:${lineNumber}: " +
+                    "'${fields[0]}' is not a 64-character hex SHA-256 digest.")
+        }
+        if (name.contains('/') || name.contains('\\')) {
+            throw new GradleException(
+                    "Malformed sherpa-onnx AAR pin at ${file}:${lineNumber}: " +
+                    "'${name}' must be a file name inside ${aarDir}.")
+        }
+        entry = [name: name, digest: expected]
+    }
+    if (entry == null) {
+        throw new GradleException(
+                "No sherpa-onnx AAR digests are pinned in ${file}. " +
+                "The integrity gate refuses to run without a pin.")
+    }
+    return entry
+}
+
+def verifySherpaAar = tasks.register('verifySherpaAar') {
+    group = 'verification'
+    description = 'Verifies the committed sherpa-onnx AAR against its pinned SHA-256.'
+    // Never UP-TO-DATE or FROM-CACHE: the gate must re-read the bytes on disk.
+    outputs.upToDateWhen { false }
+    doLast {
+        if (!pinFile.isFile()) {
+            throw new GradleException(
+                    "sherpa-onnx AAR pin file is missing: ${pinFile}. " +
+                    "Restore the committed pin before building a release.")
+        }
+        def pin = readPin(pinFile)
+        if (!aarDir.isDirectory()) {
+            throw new GradleException(
+                    "sherpa-onnx AAR directory is missing: ${aarDir}. " +
+                    "Run android/kokoro-poc/scripts/fetch-sherpa-onnx.sh to restore " +
+                    "the pinned runtime before building a release.")
+        }
+        def artifact = new File(aarDir, pin.name)
+        def failure = null
+        if (!artifact.isFile()) {
+            failure = "${pin.name}: missing (expected at ${artifact}). " +
+                    "Run android/kokoro-poc/scripts/fetch-sherpa-onnx.sh to " +
+                    "restore the pinned runtime."
+        } else if (artifact.length() == 0L) {
+            failure = "${pin.name}: empty file at ${artifact}."
+        } else {
+            def actual = sha256Of(artifact)
+            if (actual != pin.digest) {
+                failure = "${pin.name}: SHA-256 mismatch. Expected ${pin.digest}, " +
+                        "found ${actual} (${artifact.length()} bytes at ${artifact}). " +
+                        "Do not use an upstream or rebuilt sherpa-onnx AAR here."
+            } else {
+                logger.lifecycle("sherpa-onnx AAR integrity verified: ${pin.name} " +
+                        "(${pin.digest}, ${artifact.length()} bytes).")
+            }
+        }
+        if (failure != null) {
+            throw new GradleException(
+                    "The committed sherpa-onnx AAR failed its integrity check:\n  " +
+                    failure +
+                    "\nThe pinned AAR carries the CVE-2026-108954 joiner-width " +
+                    "validation. Restore the exact committed artifact; see " +
+                    "daymark-voice/SHERPA-ONNX-PROVENANCE.md.")
+        }
+    }
+}
+
+/*
+ * Wire the gate into release builds only.
+ *
+ * Task names rather than variant APIs keep this plugin usable from any Android
+ * Gradle plugin version and avoid realising AGP's variant task graph during
+ * configuration. Because the matching is lazy, it also catches tasks that AGP
+ * creates after this script is applied.
+ *
+ * `preReleaseBuild` is the release-variant pre-build hook in this module:
+ * every :daymark-voice:assembleRelease / :app:bundleRelease path passes through
+ * it. The explicit release packaging names are kept as defence in depth so a
+ * release artifact can never be produced without the check, even if a future
+ * AGP version stops exposing preReleaseBuild. Debug (preDebugBuild,
+ * testDebugUnitTest, lintDebug) is not wired.
+ */
+def isGuardedReleaseTask = { String name ->
+    name == 'preReleaseBuild' ||
+            name == 'assembleRelease' ||
+            name == 'bundleRelease' ||
+            (name.startsWith('package') && name.contains('Release')) ||
+            name.startsWith('lintVitalRelease')
+}
+
+tasks.matching { isGuardedReleaseTask(it.name) }.configureEach {
+    dependsOn verifySherpaAar
+}
+
+// The app module packages the runtime through :daymark-voice, but wire its
+// release packaging tasks as well: a release bundle, APK or signing step must
+// depend on the digest check directly, not only through the module graph.
+gradle.projectsEvaluated {
+    def appProject = rootProject.findProject(':app')
+    if (appProject == null || appProject == project) {
+        return
+    }
+    appProject.tasks.matching { isGuardedReleaseTask(it.name) }.configureEach {
+        dependsOn verifySherpaAar
+    }
+}

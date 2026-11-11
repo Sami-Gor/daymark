@@ -1,0 +1,13 @@
+# Per-case staging written by run-tests.sh. These are the fixed inputs the
+# integrity plugin reads, staged as copies of the committed module files; they
+# are never source.
+sherpa-aar.sha256
+libs/
+work/
+
+# Gradle's project-local state for the standalone test build.
+.gradle/
+build/
+
+# Per-case Gradle logs when OUT_DIR is not overridden.
+out/

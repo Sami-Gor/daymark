@@ -1,0 +1,21 @@
+// Test harness for gradle/sherpa-aar-integrity.gradle.
+//
+// run-tests.sh stages the AAR and pin at the fixed project-relative paths the
+// plugin verifies (<thisDir>/sherpa-aar.sha256 and <thisDir>/libs) and then
+// runs the single real task this project exposes. The cases never touch the
+// committed module artifact or pin.
+//
+// Nothing here is part of the Android build: this directory is not included
+// from ../settings.gradle.
+
+apply from: '../../gradle/sherpa-aar-integrity.gradle'
+
+// Tasks with the names the Android Gradle plugin creates, so the release-only
+// wiring can be asserted with --dry-run. They are registered after the plugin
+// is applied on purpose: the plugin must catch tasks that appear later.
+tasks.register('preReleaseBuild')
+tasks.register('assembleRelease')
+tasks.register('packageReleaseAar')
+tasks.register('preDebugBuild')
+tasks.register('testDebugUnitTest')
+tasks.register('lintDebug')
