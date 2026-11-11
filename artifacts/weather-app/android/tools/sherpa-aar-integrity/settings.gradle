@@ -1,0 +1,5 @@
+// Standalone Gradle build used by run-tests.sh to exercise
+// ../../gradle/sherpa-aar-integrity.gradle without the Android Gradle plugin.
+// It is deliberately not included from the Android settings.gradle: the real
+// build keeps its fixed pin and paths, and only this test build swaps inputs.
+rootProject.name = 'sherpa-aar-integrity-test'

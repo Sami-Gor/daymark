@@ -20,6 +20,13 @@ android {
     }
 }
 
+// Fail-closed SHA-256 verification of the committed sherpa-onnx runtime.
+// The pin lives in sherpa-aar.sha256 next to this file and is shared with
+// android/kokoro-poc/scripts/fetch-sherpa-onnx.sh and CI. The plugin registers
+// verifySherpaAar and wires it into every release build; debug builds and JVM
+// unit tests are unaffected. See gradle/sherpa-aar-integrity.gradle.
+apply from: '../gradle/sherpa-aar-integrity.gradle'
+
 dependencies {
     implementation project(':capacitor-android')
 

@@ -1,0 +1,10 @@
+# Per-case staging written by run-tests.sh. It holds copies of the committed
+# AAR and pin; nothing here is source.
+work/
+
+# Gradle's project-local state for the standalone test build.
+.gradle/
+build/
+
+# Per-case Gradle logs when OUT_DIR is not overridden.
+out/

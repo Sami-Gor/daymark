@@ -1,0 +1,18 @@
+# Pinned SHA-256 of the committed sherpa-onnx Android runtime.
+#
+# The artifact is the locally rebuilt v1.13.8 runtime carrying the
+# CVE-2026-108954 / GHSA-f5q5-vp8g-wh4x joiner-width validation. Upstream
+# v1.13.8, v2.0.1 and master still contain the unchecked width access, so the
+# upstream AAR must never be substituted here.
+#
+# Single source of truth for:
+#   - gradle/sherpa-aar-integrity.gradle (verifySherpaAar, run by release builds)
+#   - android/kokoro-poc/scripts/fetch-sherpa-onnx.sh (CI provisioning)
+#   - CI digest checks
+#
+# sha256sum(1) format; verify manually with:
+#   cd artifacts/weather-app/android/daymark-voice/libs &&
+#     shasum -a 256 -c ../sherpa-aar.sha256
+#
+# Provenance: daymark-voice/SHERPA-ONNX-PROVENANCE.md
+5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8  sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar
