@@ -201,6 +201,49 @@ else
   echo "FAIL idempotent-rerun: second run did not re-verify (log: $OUT_DIR/test-idempotent-second.log)"
 fi
 
+
+# 13. Cross-module dependency: the app release build must depend on the gate.
+#     :app:preReleaseBuild is asserted unconditionally (it does not need the
+#     Parakeet model); the full :app:assembleRelease graph is asserted when the
+#     model assets are present, as they are in CI after the fetch step.
+reset_work
+stage_aar
+stage_pin
+( cd "$ANDROID_DIR" && "$GRADLEW" --no-daemon --console=plain :app:preReleaseBuild --dry-run ) \
+  >"$OUT_DIR/test-app-prerelease-graph.log" 2>&1
+if [ $? -eq 0 ] && grep -Fq ":daymark-voice:verifySherpaAar" "$OUT_DIR/test-app-prerelease-graph.log"; then
+  PASS=$((PASS + 1)); echo "pass cross-module-app-prerelease"
+else
+  FAIL=$((FAIL + 1)); FAILED_CASES="$FAILED_CASES cross-module-app-prerelease"
+  echo "FAIL cross-module-app-prerelease: :app:preReleaseBuild does not depend on :daymark-voice:verifySherpaAar (log: $OUT_DIR/test-app-prerelease-graph.log)"
+fi
+
+( cd "$ANDROID_DIR" && "$GRADLEW" --no-daemon --console=plain :app:assembleRelease --dry-run ) \
+  >"$OUT_DIR/test-app-release-graph.log" 2>&1
+app_graph_status=$?
+if [ $app_graph_status -eq 0 ]; then
+  if grep -Fq ":daymark-voice:verifySherpaAar" "$OUT_DIR/test-app-release-graph.log"; then
+    PASS=$((PASS + 1)); echo "pass cross-module-app-assembleRelease"
+  else
+    FAIL=$((FAIL + 1)); FAILED_CASES="$FAILED_CASES cross-module-app-assembleRelease"
+    echo "FAIL cross-module-app-assembleRelease: graph has no :daymark-voice:verifySherpaAar (log: $OUT_DIR/test-app-release-graph.log)"
+  fi
+elif grep -Fq "The Parakeet model is missing" "$OUT_DIR/test-app-release-graph.log"; then
+  echo "SKIP cross-module-app-assembleRelease: Parakeet model assets absent (run fetch-parakeet-assets.sh)"
+else
+  FAIL=$((FAIL + 1)); FAILED_CASES="$FAILED_CASES cross-module-app-assembleRelease"
+  echo "FAIL cross-module-app-assembleRelease: dry-run did not configure (log: $OUT_DIR/test-app-release-graph.log)"
+fi
+
+( cd "$ANDROID_DIR" && "$GRADLEW" --no-daemon --console=plain :app:assembleDebug --dry-run ) \
+  >"$OUT_DIR/test-app-debug-graph.log" 2>&1
+if [ $? -eq 0 ] && ! grep -Fq ":daymark-voice:verifySherpaAar" "$OUT_DIR/test-app-debug-graph.log"; then
+  PASS=$((PASS + 1)); echo "pass cross-module-app-debug-not-wired"
+else
+  FAIL=$((FAIL + 1)); FAILED_CASES="$FAILED_CASES cross-module-app-debug-not-wired"
+  echo "FAIL cross-module-app-debug-not-wired"
+fi
+
 "$GRADLEW" --stop >/dev/null 2>&1 || true
 
 echo
