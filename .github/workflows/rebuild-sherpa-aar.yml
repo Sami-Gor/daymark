@@ -1,0 +1,336 @@
+name: Rebuild sherpa-onnx AAR
+
+# The committed AAR is produced by a manual local build, and its GNU build ID
+# depends on the NDK install path because the linker hashes the unstripped debug
+# information, which names that path. This workflow rebuilds from pinned inputs
+# and verifies the result byte for byte.
+#
+# This workflow rebuilds the arm64-v8a runtime from pinned inputs on a clean
+# runner, in two different directories, and proves byte identity with the
+# committed AAR:
+#   * the build is compiled with -ffile-prefix-map, so __FILE__ strings and
+#     DWARF name the canonical build paths recorded in the artifact and the
+#     build ID no longer depends on the runner's paths;
+#   * the AAR is repacked deterministically from the committed archive's
+#     layout with the rebuilt native libraries, so the full-archive hash is
+#     compared, not just the JNI library.
+#
+# Manual only, read-only permissions: it never publishes, signs, commits or
+# pushes anything. Inputs live in
+# android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env.
+on:
+  workflow_dispatch:
+    inputs:
+      require_full_identity:
+        description: Fail unless the rebuilt JNI library is byte-identical to the committed AAR's copy (GNU build ID included)
+        type: boolean
+        default: true
+      package_with_gradle:
+        description: Also package the AAR with the upstream Gradle project
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rebuild-sherpa-aar-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: build (${{ matrix.run }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        # Two independent builds in different directories: the determinism
+        # claim is only meaningful if the same inputs produce equal bytes twice.
+        run: [run1, run2]
+    env:
+      REQUIRE_FULL_IDENTITY: ${{ inputs.require_full_identity }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Load pinned inputs
+        run: cat android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env >> "$GITHUB_ENV"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install the pinned Android NDK
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
+          SDKMANAGER="${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          fi
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;${NDK_VERSION}" "platforms;android-34" "build-tools;34.0.0" >/dev/null
+          ANDROID_NDK="$SDK_ROOT/ndk/${NDK_VERSION}"
+          test -d "$ANDROID_NDK"
+          grep -q "^Pkg.Revision = ${NDK_VERSION}$" "$ANDROID_NDK/source.properties"
+          test -f "$ANDROID_NDK/build/cmake/android.toolchain.cmake"
+          echo "ANDROID_NDK=$ANDROID_NDK" >> "$GITHUB_ENV"
+
+      - name: Install the pinned CMake
+        run: |
+          set -euo pipefail
+          TARBALL="$RUNNER_TEMP/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz"
+          URL="https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz"
+          curl -fsSL -o "$TARBALL" "$URL"
+          echo "${CMAKE_LINUX_TARBALL_SHA256}  $TARBALL" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/tools"
+          tar -xzf "$TARBALL" -C "$RUNNER_TEMP/tools"
+          CMAKE_BIN="$RUNNER_TEMP/tools/cmake-${CMAKE_VERSION}-linux-x86_64/bin/cmake"
+          "$CMAKE_BIN" --version | head -1
+          echo "CMAKE_BIN=$CMAKE_BIN" >> "$GITHUB_ENV"
+
+      - name: Fetch sherpa-onnx at the pinned commit
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/${{ matrix.run }}/sherpa-src"
+          mkdir -p "$(dirname "$SRC")"
+          git clone --quiet --depth 1 --branch "$SHERPA_VERSION" "$SHERPA_REPO" "$SRC"
+          ACTUAL="$(git -C "$SRC" rev-parse HEAD)"
+          if [ "$ACTUAL" != "$SHERPA_COMMIT" ]; then
+            echo "::error::sherpa-onnx commit $ACTUAL does not match the pin $SHERPA_COMMIT"
+            exit 1
+          fi
+          echo "SHERPA_SRC=$SRC" >> "$GITHUB_ENV"
+
+      - name: Apply the pinned security patch
+        run: |
+          set -euo pipefail
+          PATCH="$GITHUB_WORKSPACE/$PATCH_PATH"
+          echo "$PATCH_SHA256  $PATCH" | sha256sum -c -
+          git -C "$SHERPA_SRC" apply --check "$PATCH"
+          git -C "$SHERPA_SRC" apply "$PATCH"
+          git -C "$SHERPA_SRC" status --porcelain | tee "$RUNNER_TEMP/patch-status.txt"
+          test -s "$RUNNER_TEMP/patch-status.txt"
+
+      - name: Fetch pinned ONNX Runtime
+        run: |
+          set -euo pipefail
+          ORT_DIR="$RUNNER_TEMP/ort"
+          ZIP="$RUNNER_TEMP/onnxruntime-android-${ORT_VERSION}.zip"
+          URL="https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${ORT_VERSION}/onnxruntime-android-${ORT_VERSION}.zip"
+          curl -fsSL -o "$ZIP" "$URL"
+          echo "$ORT_ZIP_SHA256  $ZIP" | sha256sum -c -
+          mkdir -p "$ORT_DIR"
+          unzip -q "$ZIP" -d "$ORT_DIR"
+          echo "$ORT_LIB_SHA256  $ORT_DIR/jni/arm64-v8a/libonnxruntime.so" | sha256sum -c -
+          echo "ORT_PREBUILT_DIR=$ORT_DIR" >> "$GITHUB_ENV"
+
+      - name: Build libsherpa-onnx-jni.so for arm64-v8a
+        env:
+          JOBS: 4
+          PREFIX_MAP: 1
+          RUN_LABEL: ${{ matrix.run }}
+        run: |
+          set -euo pipefail
+          bash android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/build-android-arm64-v8a-repro.sh \
+            "$SHERPA_SRC" 2>&1 | tee "$RUNNER_TEMP/build-$RUN_LABEL.log"
+
+      - name: Record, verify and stage outputs
+        env:
+          RUN_LABEL: ${{ matrix.run }}
+        run: |
+          set -euo pipefail
+          LIBS="$SHERPA_SRC/build-android-arm64-v8a/install/lib"
+          STAGE="$RUNNER_TEMP/stage-$RUN_LABEL"
+          mkdir -p "$STAGE"
+          cp -v "$LIBS/libsherpa-onnx-jni.so" "$LIBS/libonnxruntime.so" "$STAGE/"
+          cp -v "$RUNNER_TEMP/build-$RUN_LABEL.log" "$STAGE/build.log"
+          sha256sum "$STAGE"/*.so | tee "$STAGE/SHA256SUMS"
+          if [ "$REQUIRE_FULL_IDENTITY" = "true" ]; then
+            echo "$EXPECTED_JNI_SHA256  $STAGE/libsherpa-onnx-jni.so" | sha256sum -c -
+          fi
+          echo "STAGE=$STAGE" >> "$GITHUB_ENV"
+
+      - name: Upload build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-libs-${{ matrix.run }}
+          path: ${{ runner.temp }}/stage-${{ matrix.run }}
+          if-no-files-found: error
+          retention-days: 14
+
+  compare:
+    name: compare rebuilds and prove AAR bytes
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Load pinned inputs
+        run: cat android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env >> "$GITHUB_ENV"
+
+      - name: Fetch sherpa-onnx source for provenance
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/sherpa-src"
+          git clone --quiet --depth 1 --branch "$SHERPA_VERSION" "$SHERPA_REPO" "$SRC"
+          test "$(git -C "$SRC" rev-parse HEAD)" = "$SHERPA_COMMIT"
+          PATCH="$GITHUB_WORKSPACE/$PATCH_PATH"
+          echo "$PATCH_SHA256  $PATCH" | sha256sum -c -
+          git -C "$SRC" apply --check "$PATCH"
+          git -C "$SRC" apply "$PATCH"
+          echo "SHERPA_SRC=$SRC" >> "$GITHUB_ENV"
+          echo "PATCH_FILE=$PATCH" >> "$GITHUB_ENV"
+
+      - name: Download both rebuilds
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Compare rebuilds against each other and the committed AAR
+        run: |
+          set -euo pipefail
+          bash android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/verify-rebuild.sh \
+            "$RUNNER_TEMP/artifacts/sherpa-libs-run1" \
+            "$RUNNER_TEMP/artifacts/sherpa-libs-run2" \
+            "$GITHUB_WORKSPACE/$AAR_PATH" \
+            "$RUNNER_TEMP/verify"
+
+      - name: Summarise
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/verify/SUMMARY.md" ]; then
+            cat "$RUNNER_TEMP/verify/SUMMARY.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload verification and provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-aar-rebuild-verification
+          path: ${{ runner.temp }}/verify
+          if-no-files-found: warn
+          retention-days: 30
+
+  package:
+    name: package AAR with the upstream Gradle project
+    needs: build
+    if: ${{ inputs.package_with_gradle }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Load pinned inputs
+        run: cat android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env >> "$GITHUB_ENV"
+
+      # AGP 8.4.0 / Kotlin 1.7.20 are built for the JDK 17 toolchain.
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK packages for the AAR project
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
+          SDKMANAGER="${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          fi
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "platforms;android-34" "build-tools;34.0.0" >/dev/null
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+
+      - name: Fetch sherpa-onnx AAR project sources
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/sherpa-src"
+          git clone --quiet --depth 1 --branch "$SHERPA_VERSION" "$SHERPA_REPO" "$SRC"
+          test "$(git -C "$SRC" rev-parse HEAD)" = "$SHERPA_COMMIT"
+          echo "SHERPA_SRC=$SRC" >> "$GITHUB_ENV"
+
+      - name: Install pinned Gradle
+        run: |
+          set -euo pipefail
+          ZIP="$RUNNER_TEMP/gradle-${GRADLE_VERSION}-bin.zip"
+          curl -fsSL -o "$ZIP" "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+          echo "$GRADLE_ZIP_SHA256  $ZIP" | sha256sum -c -
+          unzip -q "$ZIP" -d "$RUNNER_TEMP/tools"
+          echo "GRADLE_BIN=$RUNNER_TEMP/tools/gradle-${GRADLE_VERSION}/bin/gradle" >> "$GITHUB_ENV"
+          echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle-home" >> "$GITHUB_ENV"
+
+      - name: Download a rebuild
+        uses: actions/download-artifact@v4
+        with:
+          name: sherpa-libs-run1
+          path: ${{ runner.temp }}/rebuilt-libs
+
+      - name: Package the AAR
+        run: |
+          set -euo pipefail
+          JNI_DIR="$SHERPA_SRC/android/SherpaOnnxAar/sherpa_onnx/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$JNI_DIR"
+          cp -v "$RUNNER_TEMP/rebuilt-libs/libsherpa-onnx-jni.so" \
+                "$RUNNER_TEMP/rebuilt-libs/libonnxruntime.so" "$JNI_DIR/"
+          cd "$SHERPA_SRC/android/SherpaOnnxAar"
+          "$GRADLE_BIN" --no-daemon :sherpa_onnx:assembleRelease
+          AAR="$SHERPA_SRC/android/SherpaOnnxAar/sherpa_onnx/build/outputs/aar/sherpa_onnx-release.aar"
+          test -f "$AAR"
+          echo "GRADLE_AAR=$AAR" >> "$GITHUB_ENV"
+
+      - name: Verify the AAR's native libraries and record provenance
+        run: |
+          set -euo pipefail
+          AAR="$GRADLE_AAR"
+          OUT="$RUNNER_TEMP/package"
+          mkdir -p "$OUT"
+          unzip -q "$AAR" -d "$OUT/unpacked"
+          echo "$EXPECTED_JNI_SHA256  $OUT/unpacked/jni/arm64-v8a/libsherpa-onnx-jni.so" | sha256sum -c -
+          echo "$ORT_LIB_SHA256  $OUT/unpacked/jni/arm64-v8a/libonnxruntime.so" | sha256sum -c -
+          ACTUAL_AAR=$(sha256sum "$AAR" | awk '{print $1}')
+          python3 - "$AAR" "$ACTUAL_AAR" "$EXPECTED_AAR_SHA256" "$GRADLE_VERSION" "$EXPECTED_JNI_SHA256" > "$OUT/gradle-aar.json" <<'PYEOF'
+          import json, sys
+          aar, actual, expected, gradle, jni = sys.argv[1:6]
+          print(json.dumps({
+              "gradle_version": gradle,
+              "aar_path": aar,
+              "aar_sha256": actual,
+              "expected_aar_sha256": expected,
+              "aar_matches_expected": actual == expected,
+              "jni_sha256_verified": jni,
+          }, indent=2, sort_keys=True))
+          PYEOF
+          cat "$OUT/gradle-aar.json"
+          cp "$AAR" "$OUT/"
+          ( cd "$OUT" && sha256sum ./*.aar > SHA256SUMS )
+          if [ "$ACTUAL_AAR" != "$EXPECTED_AAR_SHA256" ]; then
+            echo "::warning::Gradle-packaged AAR hash differs from the committed AAR (native libraries are verified identical); the archive hash is reported, not asserted."
+          fi
+          echo "PACKAGE_OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Upload the packaged AAR and its provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-aar-gradle
+          path: ${{ runner.temp }}/package
+          if-no-files-found: error
+          retention-days: 30
