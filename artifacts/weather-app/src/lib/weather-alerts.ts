@@ -1,8 +1,9 @@
 import {
   addLocationHours,
   compareLocationTimes,
-  displayTemp,
+  displayTempWithUnit,
   displayWind,
+  temperaturePhrase,
   formatLocationTime,
   getCurrentLocationTime,
   getLocationLocalDate,
@@ -35,6 +36,7 @@ export type WeatherAlert = {
   severity: AlertSeverity;
   title: string;
   summary: string;
+  spokenSummary?: string;
   startTime?: string;
   endTime?: string;
   source: string;
@@ -292,7 +294,8 @@ function heatAlert(weather: WeatherPayload, options: AlertOptions): WeatherAlert
     hazard: 'heat',
     severity,
     title: translate(locale, titleKey),
-    summary: translate(locale, 'alerts.heat.summary', { value: displayTemp(value, options.unit ?? 'celsius') }),
+    summary: translate(locale, 'alerts.heat.summary', { value: displayTempWithUnit(value, options.unit ?? 'celsius') }),
+    spokenSummary: translate(locale, 'alerts.heat.summary', { value: temperaturePhrase(value, options.unit ?? 'celsius', locale) }),
     source: translate(locale, 'alerts.source'),
   };
 }
@@ -309,7 +312,8 @@ function coldAlert(weather: WeatherPayload, options: AlertOptions): WeatherAlert
     hazard: 'cold',
     severity,
     title: translate(locale, titleKey),
-    summary: translate(locale, 'alerts.cold.summary', { value: displayTemp(value, options.unit ?? 'celsius') }),
+    summary: translate(locale, 'alerts.cold.summary', { value: displayTempWithUnit(value, options.unit ?? 'celsius') }),
+    spokenSummary: translate(locale, 'alerts.cold.summary', { value: temperaturePhrase(value, options.unit ?? 'celsius', locale) }),
     source: translate(locale, 'alerts.source'),
   };
 }

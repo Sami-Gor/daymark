@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Droplets, Thermometer } from 'lucide-react';
-import { calculateDewPointCelsius, dewPointComfort, displayTemp, type Unit, type WeatherPayload } from '@/lib/weather';
+import { calculateDewPointCelsius, dewPointComfort, displayTempWithUnit, temperaturePhrase, type Unit, type WeatherPayload } from '@/lib/weather';
 import { useLocale } from '@/hooks/use-locale';
 
 /*
@@ -50,14 +50,14 @@ export function WeatherDetails({ weather, unit }: { weather: WeatherPayload; uni
             <div className="dew-main">
               <Thermometer className="detail-icon" size={17} strokeWidth={1.7} />
               <div className="detail-label">{t('details.dewPoint')}</div>
-              <div className="detail-value">{displayTemp(dewPointC, unit)}</div>
+              <div className="detail-value">{displayTempWithUnit(dewPointC, unit)}</div>
               <div className="detail-sub"><span className={`dew-pill ${dewBand.className}`}>{dewBand.label}</span></div>
               <p className="dew-explainer">{t('details.dewFeel')} {t('details.dewExplainer')}</p>
             </div>
             <div
               className="dew-scale"
               role="img"
-              aria-label={t('dew.scaleAria', { value: displayTemp(dewPointC, unit), band: dewBand.label })}
+              aria-label={t('dew.scaleAria', { value: temperaturePhrase(dewPointC, unit, locale), band: dewBand.label })}
             >
               <div className="dew-scale-track">
                 {DEW_BANDS.map((band) => (

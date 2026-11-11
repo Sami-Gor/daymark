@@ -142,10 +142,10 @@ describe('getCurrentConditions', () => {
   it('summarises conditions for the provided location', () => {
     const response = getCurrentConditions(buildWeather(), { locationName: 'London' });
     expect(response.intent).toBe(DAYMARK_INTENTS.current);
-    expect(response.spokenText).toContain('18 degrees');
+    expect(response.spokenText).toContain('18 degrees Celsius');
     expect(response.spokenText).toContain('in London');
     expect(response.spokenText).toContain('overcast');
-    expect(response.spokenText).toContain('feels like 17 degrees');
+    expect(response.spokenText).toContain('feels like 17 degrees Celsius');
     expect(response.data?.temperature).toBe(18);
     expect(response.data?.available).toBe(true);
   });
@@ -158,7 +158,7 @@ describe('getCurrentConditions', () => {
 
   it('honours a Fahrenheit context', () => {
     const response = getCurrentConditions(buildWeather(), { unit: 'fahrenheit' });
-    expect(response.spokenText).toContain('65 degrees');
+    expect(response.spokenText).toContain('65 degrees Fahrenheit');
     expect(response.data?.temperature).toBe(65);
     expect(response.data?.unit).toBe('fahrenheit');
   });
@@ -296,8 +296,8 @@ describe('getTomorrowSummary', () => {
   it('summarises tomorrow without narrating every value', () => {
     const response = getTomorrowSummary(buildWeather());
     expect(response.spokenText).toContain('Tomorrow looks rainy');
-    expect(response.spokenText).toContain('high of 17 degrees');
-    expect(response.spokenText).toContain('low of 10 degrees');
+    expect(response.spokenText).toContain('high of 17 degrees Celsius');
+    expect(response.spokenText).toContain('low of 10 degrees Celsius');
     expect(response.spokenText).toContain('Rain is likely');
     expect(response.data?.date).toBe('2026-09-12');
   });
@@ -313,9 +313,10 @@ describe('getTodayBriefing', () => {
   it('assembles a concise spoken rundown of the day', () => {
     const response = getTodayBriefing(buildWeather(), { locationName: 'London', locale: 'en-US' });
     expect(response.intent).toBe(DAYMARK_INTENTS.today);
-    expect(response.spokenText).toContain('18 degrees in London');
+    expect(response.spokenText).toContain('18 degrees Celsius in London');
     expect(response.spokenText).toContain('Rain is likely later today');
-    expect(response.spokenText).toContain('High around 19, low around 11.');
+    expect(response.spokenText).toContain('High around 19 degrees Celsius');
+    expect(response.spokenText).toContain('low around 11 degrees Celsius.');
     expect(response.spokenText).toContain('UV is moderate.');
     // Good air quality is not read aloud; it stays in the cards.
     expect(response.spokenText).not.toContain('Air quality');

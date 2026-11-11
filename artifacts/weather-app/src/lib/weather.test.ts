@@ -7,7 +7,9 @@ import {
   compareLocationTimes,
   distanceKm,
   displayTemp,
+  displayTempWithUnit,
   dewPointComfort,
+  temperaturePhrase,
   fetchMicroClimate,
   fetchWeather,
   formatLocationDate,
@@ -358,6 +360,12 @@ describe('display helpers', () => {
     expect(displayTemp(undefined, 'celsius')).toBe('—');
     expect(displayTemp(null, 'celsius')).toBe('—');
     expect(displayTemp(Number.NaN, 'celsius')).toBe('—');
+    expect(displayTempWithUnit(20, 'fahrenheit')).toBe('68°F');
+    expect(displayTempWithUnit(20, 'celsius')).toBe('20°C');
+    expect(displayTempWithUnit(undefined, 'fahrenheit')).toBe('—');
+    expect(temperaturePhrase(20, 'celsius', 'en')).toBe('20 degrees Celsius');
+    expect(temperaturePhrase(20, 'fahrenheit', 'en')).toBe('68 degrees Fahrenheit');
+    expect(temperaturePhrase(undefined, 'celsius', 'en')).toBe('—');
   });
 
   it('categorises the UV index at boundaries', () => {
