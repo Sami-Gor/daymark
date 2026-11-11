@@ -132,11 +132,12 @@ export default function PrivacyFr() {
       <h2>Informations stockées sur votre appareil</h2>
       <p>
         Daymark stocke le code de langue dans le stockage local sous <code>daymark.locale</code>.
-        L’application Android stocke aussi une valeur d’état privée dans SharedPreferences sous
+        Daymark mémorise aussi votre choix d’unité de température (<code>C</code> ou <code>F</code>)
+        sous <code>daymark.unit</code>. L’application Android stocke aussi une valeur d’état privée dans SharedPreferences sous
         <code>daymark.permissions</code> : le booléen <code>microphone-requested</code>, utilisé
         uniquement pour éviter de répéter une demande d’autorisation de microphone après qu’elle a
         déjà été demandée ou refusée.
-        Aucune de ces valeurs n’est un historique de localisation, de recherche, de transcription ou de
+        Ce sont des préférences d’affichage et d’état de l’application, aucune de ces valeurs n’est un historique de localisation, de recherche, de transcription ou de
         météo, et Daymark n’en conserve aucun. Le service worker du web/PWA met en cache les ressources
         de l’application, et la recherche de localité utilise Cache Storage pour le jeu de données
         statique ; ce sont des ressources de l’application, pas un historique utilisateur.
@@ -144,7 +145,7 @@ export default function PrivacyFr() {
       </p>
       <p>
         Le code applicatif de Daymark n’utilise pas de cookies, de stockage de session du navigateur
-        ni d’IndexedDB pour l’état utilisateur. Vous pouvez effacer la préférence de langue et les caches de l’application
+        ni d’IndexedDB pour l’état utilisateur. Vous pouvez effacer les préférences de langue et d’unité et les caches de l’application
         en effaçant le stockage de ce site ou de cette application dans les réglages de votre
         navigateur ou de votre appareil. Effacer le stockage local ne supprime pas automatiquement les
         données déjà conservées par des fournisseurs tiers comme Open-Meteo.
@@ -213,7 +214,8 @@ export default function PrivacyFr() {
         <li>Refuser ou révoquer la localisation dans les réglages du navigateur ou de l’appareil.</li>
         <li>Sur Android, ne pas utiliser Ask Daymark et se passer du microphone.</li>
         <li>Refuser ou révoquer le microphone à tout moment.</li>
-        <li>Effacer la préférence de langue et les caches de l’application dans les réglages.</li>
+        <li>Choisir Celsius ou Fahrenheit pour l’affichage des températures. Ce choix est stocké uniquement dans le stockage local de ce navigateur ou de cette application sous <code>daymark.unit</code> ; les valeurs valides sont <code>C</code> et <code>F</code>, et Celsius est utilisée lorsqu’aucune valeur valide n’est enregistrée. Il n’est envoyé à aucun serveur, n’est pas synchronisé avec un compte et n’est pas utilisé pour la télémétrie.</li>
+        <li>Effacer les préférences de langue et d’unité et les caches de l’application dans les réglages.</li>
       </ul>
 
       <h2>Modifications et contact</h2>

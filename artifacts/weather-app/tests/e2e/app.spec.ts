@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { getCurrentConditions, getTodayBriefing } from '../../src/lib/weather-intents';
+import type { WeatherPayload } from '../../src/lib/weather';
 
 /*
  * Deterministic Open-Meteo fixtures. Timestamps are fixed so the rendered
@@ -42,6 +44,13 @@ const FORECAST = {
     sunset: ['2026-09-07T19:40'],
     uv_index_max: [3, 2, 4],
   },
+};
+
+// A deterministic forecast whose daily maximum crosses the heat-alert threshold,
+// so the alert surface can be checked in both unit modes.
+const HEAT_FORECAST = {
+  ...FORECAST,
+  daily: { ...FORECAST.daily, temperature_2m_max: [35, 36, 37] },
 };
 
 const AIR = {
@@ -406,7 +415,7 @@ test.describe('clean card redesign', () => {
     const tempDots = page.getByTestId('list-hourly-forecast').locator('.temp-dot');
     await expect(tempDots).toHaveCount(5);
     const tempValues = await page.locator('.temp-value').allTextContents();
-    expect(tempValues).toEqual(['20°', '21°', '21°', '21°', '20°']);
+    expect(tempValues).toEqual(['20°C', '21°C', '21°C', '21°C', '20°C']);
     const tempTimes = await page.locator('.temp-time').allTextContents();
     expect(tempTimes).toEqual(['Now', '1 PM', '2 PM', '3 PM', '4 PM']);
 
@@ -1355,7 +1364,7 @@ test.describe('useful bits', () => {
     // Vertical comfort scale: every band label plus a live marker at the value.
     const scale = page.locator('.dew-scale');
     await expect(scale).toBeVisible();
-    await expect(scale).toHaveAttribute('aria-label', 'Dew point scale, currently 12° (Comfortable)');
+    await expect(scale).toHaveAttribute('aria-label', 'Dew point scale, currently 12 degrees Celsius (Comfortable)');
     for (const band of ['Dry', 'Comfortable', 'Slightly humid', 'Humid', 'Very humid', 'Muggy']) {
       await expect(scale.getByText(band, { exact: true })).toHaveCount(1);
     }
@@ -1772,6 +1781,7 @@ test.describe('privacy policy page', () => {
       }
       expect(text).toContain('Open-Meteo');
       expect(text).toContain('daymark.locale');
+      expect(text).toContain('daymark.unit');
       expect(text).toContain('daymark.permissions');
       expect(text).toContain('microphone-requested');
       expect(text).toContain(expectations[policy.lang].location);
@@ -2692,4 +2702,260 @@ test('repeated location denial keeps the notice and recovery route without a pro
   await expect(page.getByTestId('button-location-retry')).toBeVisible();
   await expect(page.getByTestId('text-current-city')).toHaveText('London');
   await context.close();
+});
+
+test.describe('temperature-unit persistence', () => {
+  const hourlyValues = (unit: 'C' | 'F'): string[] => unit === 'F'
+    ? ['69°F', '70°F', '70°F', '69°F', '68°F']
+    : ['20°C', '21°C', '21°C', '21°C', '20°C'];
+
+  const dailyValues = (unit: 'C' | 'F'): Array<[string, string]> => unit === 'F'
+    ? [['70°F', '54°F'], ['66°F', '52°F'], ['72°F', '55°F']]
+    : [['21°C', '12°C'], ['19°C', '11°C'], ['22°C', '13°C']];
+
+  async function expectTemperatureSurfaces(page: Page, unit: 'C' | 'F'): Promise<void> {
+    const fahrenheit = unit === 'F';
+    const currentValue = fahrenheit ? '69°F' : '20°C';
+    const feelsValue = fahrenheit ? '66°F' : '19°C';
+    const hourlyAria = fahrenheit
+      ? 'Hourly temperature from 68 degrees Fahrenheit to 70 degrees Fahrenheit'
+      : 'Hourly temperature from 20 degrees Celsius to 21 degrees Celsius';
+    const dewValue = fahrenheit ? '54°F' : '12°C';
+    const microValue = fahrenheit ? '69°F' : '20°C';
+
+    await expect(page.getByTestId('text-current-temperature')).toHaveText(currentValue);
+    // Feels-like has no dedicated test id; the current-temperature block exposes its
+    // visible value with the selected unit. The generic aria-label was removed.
+    await expect(page.getByTestId('text-current-temperature').locator('..').getByText(feelsValue, { exact: true })).toBeVisible();
+
+    // Hourly: five values and the section's accessible phrase.
+    await expect(page.getByTestId('list-hourly-forecast')).toHaveAttribute('aria-label', hourlyAria);
+    await expect(page.getByTestId('list-hourly-forecast').getByText(/^\d+°[CF]$/)).toHaveText(hourlyValues(unit));
+
+    // Three-day forecast: every row's high and low, not just row 0.
+    const daily = dailyValues(unit);
+    for (let index = 0; index < daily.length; index += 1) {
+      const row = page.getByTestId('row-forecast-' + index);
+      await expect(row.getByText(daily[index][0], { exact: true })).toBeVisible();
+      await expect(row.getByText(daily[index][1], { exact: true })).toBeVisible();
+    }
+
+    await expect(page.getByTestId('detail-dew-point').getByText(dewValue, { exact: true })).toBeVisible();
+
+    // Micro-climate: forecast/model values and the row's accessible phrase.
+    await expect(page.getByTestId('micro-row-temperature')).toContainText(microValue);
+    await expect(page.getByTestId('micro-row-temperature')).toContainText(fahrenheit ? '0°F' : '0°C');
+  }
+
+  async function captureFirstPaint(page: Page, unit: 'C' | 'F'): Promise<void> {
+    /*
+     * This observes document mutations from before any app script runs and snapshots
+     * the test-id scoped temperature surfaces (current/feels block, hourly, daily,
+     * dew point, micro-climate and alert cards) on every mutation. It can prove that
+     * no observed mutation of those surfaces exposed a numeric value/text in the
+     * non-selected unit, and that the unit buttons never exposed the opposite
+     * aria-pressed state, during the captured sequence. It cannot prove literal
+     * browser paint frames: MutationObserver callbacks may coalesce synchronous
+     * mutations, only the listed test-id scoped surfaces (and descendant aria-labels)
+     * are sampled, and unit-less intermediate text or a wrong value fully replaced
+     * within one task before the callback cannot be seen.
+     */
+    await page.addInitScript((stored: 'C' | 'F') => {
+      try {
+        if (stored === 'F') window.localStorage.setItem('daymark.unit', 'F');
+        else window.localStorage.removeItem('daymark.unit');
+      } catch {
+        // Storage unavailable: the app defaults to Celsius; the C assertions still run.
+      }
+      type Surface = { id: string; text: string; aria: string[] };
+      type Frame = { surfaces: Surface[]; celsius: string | null; fahrenheit: string | null };
+      const frames: Frame[] = [];
+      (window as unknown as { __unitFrames: Frame[] }).__unitFrames = frames;
+      let previousKey = '';
+      const selectors = [
+        '[data-testid="text-current-temperature"]',
+        '[data-testid="list-hourly-forecast"]',
+        '[data-testid^="row-forecast-"]',
+        '[data-testid="detail-dew-point"]',
+        '[data-testid^="micro-row-"]',
+        'article[data-testid^="alert-"]',
+      ];
+      const record = () => {
+        const elements: Array<{ id: string; element: Element }> = [];
+        for (const selector of selectors) {
+          document.querySelectorAll(selector).forEach((element, index) => {
+            elements.push({ id: selector + '#' + index, element });
+          });
+        }
+        // Feels-like has no data-testid of its own; its nearest test-id anchor is the
+        // current-temperature block, whose text/aria descendants include both values.
+        const current = document.querySelector('[data-testid="text-current-temperature"]');
+        if (current?.parentElement) elements.push({ id: 'current-block', element: current.parentElement });
+
+        const surfaces: Surface[] = elements.map(({ id, element }) => {
+          const aria = [
+            element.getAttribute('aria-label'),
+            ...Array.from(element.querySelectorAll('[aria-label]')).map((child) => child.getAttribute('aria-label')),
+          ].filter((value): value is string => Boolean(value));
+          return { id, text: element.textContent ?? '', aria };
+        });
+        const celsius = document.querySelector('[data-testid="button-unit-celsius"]')?.getAttribute('aria-pressed') ?? null;
+        const fahrenheit = document.querySelector('[data-testid="button-unit-fahrenheit"]')?.getAttribute('aria-pressed') ?? null;
+        if (surfaces.length === 0 && celsius === null && fahrenheit === null) return;
+        const key = JSON.stringify({ surfaces, celsius, fahrenheit });
+        if (key === previousKey) return;
+        previousKey = key;
+        frames.push({ surfaces, celsius, fahrenheit });
+      };
+      const observer = new MutationObserver(record);
+      observer.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+      record();
+      document.addEventListener('DOMContentLoaded', record);
+    }, unit);
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText(unit === 'F' ? '69°F' : '20°C');
+
+    const frames = await page.evaluate(() => (window as unknown as {
+      __unitFrames: Array<{
+        surfaces: Array<{ id: string; text: string; aria: string[] }>;
+        celsius: string | null;
+        fahrenheit: string | null;
+      }>;
+    }).__unitFrames);
+    expect(frames.length).toBeGreaterThan(0);
+    const numericCelsius = /\d+(?:\.\d+)?\s*(?:°\s*C|degrees?\s+Celsius)\b/i;
+    const numericFahrenheit = /\d+(?:\.\d+)?\s*(?:°\s*F|degrees?\s+Fahrenheit)\b/i;
+    const wrongUnitValue = unit === 'F' ? numericCelsius : numericFahrenheit;
+    const expectedUnitValue = unit === 'F' ? numericFahrenheit : numericCelsius;
+    for (const frame of frames) {
+      for (const surface of frame.surfaces) {
+        for (const value of [surface.text, ...surface.aria]) {
+          expect(value, surface.id + ' must not expose the non-selected unit').not.toMatch(wrongUnitValue);
+        }
+      }
+      if (frame.celsius !== null) expect(frame.celsius).toBe(unit === 'C' ? 'true' : 'false');
+      if (frame.fahrenheit !== null) expect(frame.fahrenheit).toBe(unit === 'F' ? 'true' : 'false');
+    }
+    expect(frames.some((frame) => frame.surfaces.some((surface) =>
+      [surface.text, ...surface.aria].some((value) => expectedUnitValue.test(value))))).toBe(true);
+  }
+
+  test('defaults to Celsius when no unit is stored', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.removeItem('daymark.unit'));
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBeNull();
+  });
+
+  test('selecting Fahrenheit persists and survives reload, converting representative surfaces', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+
+    await page.getByRole('button', { name: 'Temperature unit: Fahrenheit' }).click();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('F');
+    // The unit preference is the only app-controlled storage added.
+    expect(await page.evaluate(() => Object.keys(window.localStorage))).toEqual(['daymark.unit']);
+
+    await expectTemperatureSurfaces(page, 'F');
+
+    await page.reload();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('F');
+    await expectTemperatureSurfaces(page, 'F');
+  });
+
+  test('selecting Celsius persists and survives reload, converting representative surfaces', async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+
+    // Start from a persisted Fahrenheit preference, then explicitly select Celsius.
+    await page.getByRole('button', { name: 'Temperature unit: Fahrenheit' }).click();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
+    expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('F');
+    await expectTemperatureSurfaces(page, 'F');
+
+    await page.reload();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
+    await page.getByRole('button', { name: 'Temperature unit: Celsius' }).click();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('C');
+    await expectTemperatureSurfaces(page, 'C');
+
+    await page.reload();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('C');
+    await expectTemperatureSurfaces(page, 'C');
+  });
+
+  test('a stored Fahrenheit preference is used on first paint without a Celsius frame', async ({ page }) => {
+    await captureFirstPaint(page, 'F');
+  });
+
+  test('the default Celsius preference is used on first paint without a Fahrenheit frame', async ({ page }) => {
+    await captureFirstPaint(page, 'C');
+  });
+
+  test('alerts and micro-climate use the selected unit', async ({ page }) => {
+    await mockOpenMeteo(page, { forecast: HEAT_FORECAST });
+    await page.goto('/');
+    const heatAlert = page.getByTestId('alert-heat');
+    await expect(heatAlert).toContainText('35°C');
+    await expect(page.getByTestId('micro-row-temperature')).toContainText('20°C');
+
+    await page.getByRole('button', { name: 'Temperature unit: Fahrenheit' }).click();
+    await expect(heatAlert).toContainText('95°F');
+    await expect(page.getByTestId('micro-row-temperature')).toContainText('69°F');
+  });
+
+  test('spoken weather output names the selected unit deterministically', () => {
+    const weather = FORECAST as unknown as WeatherPayload;
+    const celsius = getCurrentConditions(weather, { unit: 'celsius', locationName: 'London' });
+    expect(celsius.spokenText).toContain('20 degrees Celsius');
+    expect(celsius.spokenText).toContain('19 degrees Celsius');
+
+    const fahrenheit = getCurrentConditions(weather, { unit: 'fahrenheit', locationName: 'London' });
+    expect(fahrenheit.spokenText).toContain('69 degrees Fahrenheit');
+    expect(fahrenheit.spokenText).toContain('66 degrees Fahrenheit');
+
+    const briefing = getTodayBriefing(weather, { unit: 'fahrenheit', locationName: 'London' });
+    expect(briefing.spokenText).toContain('High around 70 degrees Fahrenheit');
+    expect(briefing.spokenText).toContain('low around 54 degrees Fahrenheit');
+  });
+
+  test('an invalid stored unit falls back to Celsius without crashing', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('daymark.unit', 'kelvin'));
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.evaluate(() => window.localStorage.getItem('daymark.unit'))).toBe('kelvin');
+  });
+
+  test('unavailable localStorage does not break the app and defaults to Celsius', async ({ page }) => {
+    await page.addInitScript(() => {
+      Storage.prototype.getItem = function () { throw new Error('storage blocked'); };
+      Storage.prototype.setItem = function () { throw new Error('storage blocked'); };
+    });
+    await mockOpenMeteo(page);
+    await page.goto('/');
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Celsius' })).toHaveAttribute('aria-pressed', 'true');
+    // The in-memory preference still works even though it cannot be persisted.
+    await page.getByRole('button', { name: 'Temperature unit: Fahrenheit' }).click();
+    await expect(page.getByTestId('text-current-temperature')).toHaveText('69°F');
+    await expect(page.getByRole('button', { name: 'Temperature unit: Fahrenheit' })).toHaveAttribute('aria-pressed', 'true');
+  });
 });

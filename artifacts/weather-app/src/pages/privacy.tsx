@@ -125,11 +125,13 @@ export default function Privacy() {
 
       <h2>Information stored on your device</h2>
       <p>
-        Daymark stores the language code in local storage under <code>daymark.locale</code>. The
-        Android app also stores one private app-state value in SharedPreferences named
-        <code>daymark.permissions</code>: the boolean <code>microphone-requested</code>, used only to
-        avoid repeatedly prompting for microphone permission after it has already been requested or
-        denied. Neither value is location,
+        Daymark stores the language code in local storage under <code>daymark.locale</code>. It also
+        remembers your temperature-unit choice (<code>C</code> or <code>F</code>) under
+        <code>daymark.unit</code>. The Android app also stores one private app-state value in
+        SharedPreferences named <code>daymark.permissions</code>: the boolean
+        <code>microphone-requested</code>, used only to avoid repeatedly prompting for microphone
+        permission after it has already been requested or denied. These are display and app-state
+        preferences, not location,
         search, transcript, or weather history, and Daymark stores none of those histories. The web/PWA
         service worker caches app-shell resources, and the locality lookup uses Cache Storage for the
         static dataset; those are application resources, not user history. The Android app loads the
@@ -137,7 +139,7 @@ export default function Privacy() {
       </p>
       <p>
         Daymark&rsquo;s app code does not use cookies, browser session storage, or IndexedDB for user state. You can
-        clear the locale preference and application caches by clearing this site&rsquo;s or app&rsquo;s
+        clear the language and temperature-unit preferences and application caches by clearing this site&rsquo;s or app&rsquo;s
         storage in your browser or device settings. Clearing local storage does not automatically
         delete data already retained by third-party providers such as Open-Meteo.
       </p>
@@ -204,7 +206,8 @@ export default function Privacy() {
         <li>Deny or revoke location permission in your browser or device settings.</li>
         <li>On Android, avoid Ask Daymark and use the weather features without microphone access.</li>
         <li>Deny or revoke microphone permission at any time.</li>
-        <li>Clear the locale preference and application caches in your browser or device settings.</li>
+        <li>Choose Celsius or Fahrenheit for temperature display. Your choice is stored only in this browser or app&rsquo;s local storage under <code>daymark.unit</code>; valid values are <code>C</code> and <code>F</code>, and Celsius is used when no valid value is stored. It is not sent to any server, not synced to an account, and not used for telemetry.</li>
+        <li>Clear the language and temperature-unit preferences and application caches in your browser or device settings.</li>
       </ul>
 
       <h2>Changes and contact</h2>

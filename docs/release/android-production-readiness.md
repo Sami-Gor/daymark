@@ -408,7 +408,7 @@ made that the extended soak was completed; it is not a blanket release gate.
 | Recognition transcript (**v2 candidate**, Android) | Bundled Parakeet model | No | No (in-memory only) | — | No |
 | Recognition transcript | Speech service | No | No (in-memory only) | — | No |
 | TTS narration text | Intent layer | No | Android English: no, local Kokoro; web/PWA: no voice path; Android French/Spanish: unavailable in V2, no system or network TTS | None for V2 | Daymark does not retain narration text. V1 browser/system speech is historical. |
-| Preferences | App | Web `localStorage` (`daymark.locale`); Android SharedPreferences (`daymark.permissions` / `microphone-requested`) | No | — | Until cleared |
+| Preferences | App | Web `localStorage` (`daymark.locale`, `daymark.unit`); Android SharedPreferences (`daymark.permissions` / `microphone-requested`) | No | — | Until cleared |
 | Analytics | none | — | — | — | — |
 | Crash reports | none in-app | — | — | — | — |
 | App logs | Instrumentation | logcat only | No | — | Device log buffer |

@@ -1,11 +1,12 @@
 import {
   airLevel,
   compareLocationTimes,
-  displayTemp,
+  displayTempWithUnit,
   formatLocationTime,
   getCurrentLocationTime,
   getLocationLocalDate,
   getSunProtectionWindow,
+  temperaturePhrase,
   uvLevel,
   uvValue,
   weatherCopy,
@@ -79,9 +80,9 @@ function convertTemperature(value: number | null | undefined, unit: Unit): numbe
   return Math.round(converted);
 }
 
-function spokenTemperature(value: number | null | undefined, unit: Unit): string | null {
-  const converted = convertTemperature(value, unit);
-  return converted == null ? null : `${converted}`;
+function spokenTemperature(value: number | null | undefined, unit: Unit, locale: ReturnType<typeof resolveLocale>): string | null {
+  if (value == null || Number.isNaN(value)) return null;
+  return temperaturePhrase(value, unit, locale);
 }
 
 function clockLabel(value: string | null | undefined, context: IntentContext): string | null {
@@ -132,6 +133,8 @@ export function getCurrentConditions(weather: WeatherPayload, context: IntentCon
   }
 
   const feels = convertTemperature(current.apparent_temperature, unit);
+  const temperatureText = spokenTemperature(current.temperature_2m, unit, locale) ?? '';
+  const feelsText = spokenTemperature(current.apparent_temperature, unit, locale);
   const code = current.weather_code;
   const condition = code == null ? null : weatherCopy(code, locale);
   const adjectiveKey = conditionAdjectiveKey(code);
@@ -139,14 +142,14 @@ export function getCurrentConditions(weather: WeatherPayload, context: IntentCon
   const where = place ? t('intent.place', { place }) : '';
   const hasFeels = feels != null && feels !== temperature;
   let spoken: string;
-  if (adjective && hasFeels) spoken = t('intent.current.conditionFeels', { temp: temperature, place: where, condition: adjective, feels });
-  else if (adjective) spoken = t('intent.current.condition', { temp: temperature, place: where, condition: adjective });
-  else if (hasFeels) spoken = t('intent.current.feels', { temp: temperature, place: where, feels });
-  else spoken = t('intent.current.base', { temp: temperature, place: where });
+  if (adjective && hasFeels) spoken = t('intent.current.conditionFeels', { temp: temperatureText, place: where, condition: adjective, feels: feelsText ?? '' });
+  else if (adjective) spoken = t('intent.current.condition', { temp: temperatureText, place: where, condition: adjective });
+  else if (hasFeels) spoken = t('intent.current.feels', { temp: temperatureText, place: where, feels: feelsText ?? '' });
+  else spoken = t('intent.current.base', { temp: temperatureText, place: where });
   if (current.precipitation != null && current.precipitation > 0) spoken += t('intent.current.raining');
 
-  const displayParts = [t('intent.current.displayCondition', { temp: displayTemp(current.temperature_2m, unit), condition: condition ?? '—' })];
-  if (hasFeels) displayParts.push(`${t('current.feelsLike')} ${displayTemp(current.apparent_temperature, unit)}`);
+  const displayParts = [t('intent.current.displayCondition', { temp: displayTempWithUnit(current.temperature_2m, unit), condition: condition ?? '—' })];
+  if (hasFeels) displayParts.push(`${t('current.feelsLike')} ${displayTempWithUnit(current.apparent_temperature, unit)}`);
 
   return {
     intent: DAYMARK_INTENTS.current,
@@ -441,7 +444,7 @@ export function getAlertsSummary(weather: WeatherPayload, context: IntentContext
   return {
     intent: DAYMARK_INTENTS.alerts,
     title: t('intent.title.alerts'),
-    spokenText: `${primary.title}. ${primary.summary}${extra}`,
+    spokenText: `${primary.title}. ${primary.spokenSummary ?? primary.summary}${extra}`,
     displayText: `${severityLabel}: ${primary.title}`,
     priority: primary.severity === 'moderate' ? 'normal' : 'high',
     data: {
@@ -499,8 +502,8 @@ export function getHourlySummary(weather: WeatherPayload, context: IntentContext
   const minTemperature = knownTemperatures.length ? Math.min(...knownTemperatures) : null;
   const maxTemperature = knownTemperatures.length ? Math.max(...knownTemperatures) : null;
 
-  const firstSpoken = spokenTemperature(indexes.length ? hourly.temperature_2m?.[indexes[0]] : null, unit);
-  const lastSpoken = spokenTemperature(indexes.length ? hourly.temperature_2m?.[indexes[indexes.length - 1]] : null, unit);
+  const firstSpoken = spokenTemperature(indexes.length ? hourly.temperature_2m?.[indexes[0]] : null, unit, locale);
+  const lastSpoken = spokenTemperature(indexes.length ? hourly.temperature_2m?.[indexes[indexes.length - 1]] : null, unit, locale);
   let trendClause: string | null = null;
   if (firstSpoken && lastSpoken && firstSpoken !== lastSpoken) {
     if (deltaC != null && deltaC >= 2) trendClause = t('intent.hours.trendWarming', { first: firstSpoken, last: lastSpoken });
@@ -546,7 +549,7 @@ export function getHourlySummary(weather: WeatherPayload, context: IntentContext
 
   const displayParts: string[] = [];
   if (knownTemperatures.length) {
-    displayParts.push(`${displayTemp(firstTemperature, unit)}→${displayTemp(lastTemperature, unit)}`);
+    displayParts.push(`${displayTempWithUnit(firstTemperature, unit)}→${displayTempWithUnit(lastTemperature, unit)}`);
   }
   if (peakProbability >= 20 && peakProbabilityTime) {
     displayParts.push(`${Math.round(peakProbability)}% · ${formatLocationTime(peakProbabilityTime, locale)}`);
@@ -596,8 +599,8 @@ export function getTomorrowSummary(weather: WeatherPayload, context: IntentConte
   const high = daily.temperature_2m_max?.[1];
   const low = daily.temperature_2m_min?.[1];
   const rain = daily.precipitation_probability_max?.[1];
-  const highSpoken = spokenTemperature(high, unit);
-  const lowSpoken = spokenTemperature(low, unit);
+  const highSpoken = spokenTemperature(high, unit, locale);
+  const lowSpoken = spokenTemperature(low, unit, locale);
   const adjectiveKey = conditionAdjectiveKey(code);
 
   let spoken = t('intent.tomorrow.base', { condition: adjectiveKey ? t(adjectiveKey) : t('condition.changeable') });
@@ -612,7 +615,7 @@ export function getTomorrowSummary(weather: WeatherPayload, context: IntentConte
   }
 
   const displayParts = [condition ?? '—'];
-  if (high != null && low != null) displayParts.push(`${displayTemp(high, unit)} / ${displayTemp(low, unit)}`);
+  if (high != null && low != null) displayParts.push(`${displayTempWithUnit(high, unit)} / ${displayTempWithUnit(low, unit)}`);
   if (rain != null && !Number.isNaN(rain)) displayParts.push(`${Math.round(rain)}%`);
 
   return {
@@ -636,7 +639,7 @@ export function getTomorrowSummary(weather: WeatherPayload, context: IntentConte
 
 /* Today's briefing assembles the intent layer; risk comes right after current conditions. */
 export function getTodayBriefing(weather: WeatherPayload, context: IntentContext = {}): DaymarkIntentResponse {
-  const { t } = translator(context);
+  const { t, locale } = translator(context);
   const current = getCurrentConditions(weather, context);
   const alerts = getAlertsSummary(weather, context);
   const rain = getRainSummary(weather, context);
@@ -651,8 +654,8 @@ export function getTodayBriefing(weather: WeatherPayload, context: IntentContext
    */
   const alertCount = typeof alerts.data?.count === 'number' ? alerts.data.count : 0;
   const unit = context.unit ?? DEFAULT_UNIT;
-  const maxTemp = convertTemperature(weather.daily?.temperature_2m_max?.[0], unit);
-  const minTemp = convertTemperature(weather.daily?.temperature_2m_min?.[0], unit);
+  const maxSpoken = spokenTemperature(weather.daily?.temperature_2m_max?.[0], unit, locale);
+  const minSpoken = spokenTemperature(weather.daily?.temperature_2m_min?.[0], unit, locale);
   const currentUv = weather.current?.uv_index;
   const uvLevelLabel = typeof uv.data?.level === 'string' ? uv.data.level : null;
   const aqi = typeof air.data?.aqi === 'number' ? air.data.aqi : null;
@@ -661,8 +664,8 @@ export function getTodayBriefing(weather: WeatherPayload, context: IntentContext
   const spokenParts = [current.spokenText];
   if (alertCount > 0) spokenParts.push(alerts.spokenText);
   if (rain.data?.expected === true) spokenParts.push(rain.spokenText);
-  if (maxTemp != null && minTemp != null) {
-    spokenParts.push(t('intent.today.range', { max: maxTemp, min: minTemp }));
+  if (maxSpoken && minSpoken) {
+    spokenParts.push(t('intent.today.range', { max: maxSpoken, min: minSpoken }));
   }
   if (currentUv != null && !Number.isNaN(currentUv) && currentUv >= 3 && uvLevelLabel) {
     spokenParts.push(t('intent.today.uv', { level: uvLevelLabel.toLowerCase() }));

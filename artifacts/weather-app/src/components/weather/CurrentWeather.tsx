@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Navigation, Square, Volume2 } from 'lucide-react';
-import { displayTemp, formatLocationDate, weatherCopy, type Place, type Unit, type WeatherPayload } from '@/lib/weather';
+import { displayTemp, displayTempWithUnit, formatLocationDate, weatherCopy, type Place, type Unit, type WeatherPayload } from '@/lib/weather';
 import { DAYMARK_INTENTS, getIntentResponse } from '@/lib/weather-intents';
 import type { DayCueResult } from '@/lib/day-cue';
 import { SPEECH_LANGS } from '@/lib/i18n';
@@ -51,7 +51,7 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
         </div>
         <div className="temp-block">
           <div className="current-temp" data-testid="text-current-temperature">{displayTemp(current.temperature_2m, unit)}<sup>{unit === 'celsius' ? 'C' : 'F'}</sup></div>
-          <div className="feels">{t('current.feelsLike')}<strong>{displayTemp(current.apparent_temperature, unit)}</strong><span className="temperature-condition">{weatherCopy(currentCode, locale)}</span>{updatedLabel}</div>
+          <div className="feels">{t('current.feelsLike')}<strong>{displayTempWithUnit(current.apparent_temperature, unit)}</strong><span className="temperature-condition">{weatherCopy(currentCode, locale)}</span>{updatedLabel}</div>
         </div>
       </section>
 

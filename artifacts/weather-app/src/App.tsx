@@ -15,7 +15,6 @@ import {
   WeatherFetchError,
   timeLabel,
   type Place,
-  type Unit,
   type WeatherPayload,
 } from '@/lib/weather';
 import { LoadingState } from '@/components/weather/LoadingState';
@@ -41,14 +40,15 @@ import {
 } from '@/lib/location-feedback';
 import { ensureLocalityIndex, lookupLocality } from '@/lib/locality';
 import { useLocale } from '@/hooks/use-locale';
+import { useUnit } from '@/hooks/use-unit';
 
 const LONDON = { name: 'London', admin1: 'England', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 };
 
 function Home() {
   const { t, locale } = useLocale();
+  const { unit, setUnit } = useUnit();
   const [place, setPlace] = useState<Place>(LONDON);
   const [weather, setWeather] = useState<WeatherPayload | null>(null);
-  const [unit, setUnit] = useState<Unit>('celsius');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<WeatherErrorCode | ''>('');
   const [isLocating, setIsLocating] = useState(false);
