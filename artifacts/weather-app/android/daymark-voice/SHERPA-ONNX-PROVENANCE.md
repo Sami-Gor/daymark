@@ -31,7 +31,8 @@ It is the artifact candidate for review; a clean checkout and CI obtain this
 exact binary through Git. Run
 `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` to verify it. The script
 accepts `SHERPA_ONNX_PATCHED_AAR_URL` for an externally hosted reviewed
-artifact and refuses to download the upstream unpatched AAR.
+artifact and refuses to download the upstream release AAR, which is not a
+substitute for the verified artifact.
 
 ## Patch
 
@@ -64,10 +65,10 @@ was checked with `git apply --check` before applying. The Android build used the
 documented `build-android-arm64-v8a.sh` script with:
 
 ```bash
-export ANDROID_NDK=/Users/m1/.bubblewrap/android_sdk/ndk/29.0.14206865
+export ANDROID_NDK=/path/to/ndk/29.0.14206865
 export SHERPA_ONNX_ONNXRUNTIME_VERSION=1.28.2
 export BUILD_SHARED_LIBS=ON
-export PATH=/Users/m1/.bubblewrap/android_sdk/cmake/3.22.1/bin:$PATH
+export PATH=/path/to/cmake-3.22.1/bin:$PATH
 bash ./build-android-arm64-v8a.sh
 ```
 
@@ -113,7 +114,7 @@ cp build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so \
    build-android-arm64-v8a/install/lib/libonnxruntime.so \
    android/SherpaOnnxAar/sherpa_onnx/src/main/jniLibs/arm64-v8a/
 cd android/SherpaOnnxAar
-ANDROID_HOME=/Users/m1/.bubblewrap/android_sdk \
+ANDROID_HOME=/path/to/android-sdk \
   ./gradlew --no-daemon :sherpa_onnx:assembleRelease
 ```
 
@@ -162,15 +163,36 @@ expected SONAMEs; the JNI library depends on `libandroid.so`, `liblog.so`,
   packaged hash `7a2fb92e...`, so the 8-byte difference is explained by
   symbol removal, not a substituted library.
 
-## Reproducibility limits
+## Reproducibility
 
-Only one full native build was completed because the workspace had about
-1.2 GiB free at the end of validation. A second full build was not practical
-without deleting preserved build evidence. No byte-for-byte reproducibility is
-claimed. The C++ build embeds source-path strings, so a build from a different
-checkout path can be functionally equivalent but not byte-identical. The AAR
-also depends on Gradle/AGP packaging and the resolved Android dependencies; no
-Gradle dependency-lock checksum verification was performed.
+The build record above describes the original hand-made single build, which
+made no byte-for-byte claim. The rebuild is now automated from pinned inputs:
+
+- `AAR-REBUILD.md` documents the pinned inputs, the repeatable build, the
+optional exact-artifact identity check, the provenance record and the workflow;
+- `android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env` pins
+the source commit, patch, NDK, CMake, ONNX Runtime, the expected AAR/library
+hashes and the portable canonical build paths;
+- `.github/workflows/rebuild-sherpa-aar.yml` rebuilds the runtime twice from
+identical pinned inputs and verifies that the two builds are byte-identical to
+each other; the deterministic repack is checked for repeatability.
+
+A portable rebuild is repeatable but is not byte-identical to this AAR: the
+library embeds the build's source-path strings, and the linker derives the GNU
+build ID from the unstripped debug information that names the NDK path. With the
+original build's recorded canonical source and NDK path strings supplied, the
+rebuilt JNI library matches this AAR's library including the GNU build ID
+(SHA-256 `9a730e8e70f40e6b3662a1481d5b166cc9db16f717e8a3e74e3a12a8ff525485`)
+and the deterministically repacked AAR matches this AAR
+(`5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8`). That
+exact-artifact check is maintainer-run because the recorded paths are
+machine-specific and are not committed.
+
+Residual limits: the CI workflow has not yet run on a GitHub-hosted runner;
+the optional Gradle AAR-packaging job is not verified locally (the
+deterministic repack is the archive byte gate); the NDK is pinned by revision
+and compiler version rather than an archive hash, and CMake FetchContent
+dependencies are recorded by resolved URL rather than archive checksum.
 
 ## Important limits
 
