@@ -709,13 +709,13 @@ public class ParakeetSpeechRecognitionPluginTest {
         private final AtomicBoolean released = new AtomicBoolean(false);
 
         @Override
-        public String decode(float[] samples, int sampleRate) {
+        public DecodeOutcome decode(float[] samples, int sampleRate) {
             order.add("decode:enter");
             if (duringDecode != null) {
                 duringDecode.run();
             }
             order.add("decode:return");
-            return "blocked-out transcript";
+            return DecodeOutcome.decoded("blocked-out transcript");
         }
 
         @Override
