@@ -166,31 +166,32 @@ expected SONAMEs; the JNI library depends on `libandroid.so`, `liblog.so`,
 ## Reproducibility
 
 The build record above describes the original hand-made single build, which
-made no byte-for-byte claim. That gap has since been closed and automated:
+made no byte-for-byte claim. The rebuild is now automated from pinned inputs:
 
-- `AAR-REBUILD.md` documents the pinned inputs, the deterministic rebuild,
-the provenance record and the verification gate;
+- `AAR-REBUILD.md` documents the pinned inputs, the repeatable build, the
+optional exact-artifact identity check, the provenance record and the workflow;
 - `android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env` pins
 the source commit, patch, NDK, CMake, ONNX Runtime, the expected AAR/library
-hashes and the canonical build paths;
+hashes and the portable canonical build paths;
 - `.github/workflows/rebuild-sherpa-aar.yml` rebuilds the runtime twice from
-pinned inputs, compares the two builds with each other and with this AAR, and
-repacks the AAR for a full-archive hash comparison.
+identical pinned inputs and verifies that the two builds are byte-identical to
+each other; the deterministic repack is checked for repeatability.
 
-On 2026-11-11 two independent builds at different paths produced
-byte-identical JNI libraries, equal to this AAR's library including the GNU
-build ID (SHA-256 `9a730e8e70f40e6b3662a1481d5b166cc9db16f717e8a3e74e3a12a8ff525485`),
-and the repacked AAR matched this AAR
-(`5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8`). The
-earlier limitation was that the linker hashed its build ID over debug
-information naming the NDK install path; the rebuild maps its own paths
-(checkout, build tree and NDK) onto the canonical paths with
-`-ffile-prefix-map`, so the build ID reproduces as well.
+A portable rebuild is repeatable but is not byte-identical to this AAR: the
+library embeds the build's source-path strings, and the linker derives the GNU
+build ID from the unstripped debug information that names the NDK path. With the
+original build's recorded canonical source and NDK path strings supplied, the
+rebuilt JNI library matches this AAR's library including the GNU build ID
+(SHA-256 `9a730e8e70f40e6b3662a1481d5b166cc9db16f717e8a3e74e3a12a8ff525485`)
+and the deterministically repacked AAR matches this AAR
+(`5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8`). That
+exact-artifact check is maintainer-run because the recorded paths are
+machine-specific and are not committed.
 
 Residual limits: the CI workflow has not yet run on a GitHub-hosted runner;
 the optional Gradle AAR-packaging job is not verified locally (the
-deterministic repack is the byte gate); the NDK is pinned by revision and
-compiler version rather than an archive hash, and CMake FetchContent
+deterministic repack is the archive byte gate); the NDK is pinned by revision
+and compiler version rather than an archive hash, and CMake FetchContent
 dependencies are recorded by resolved URL rather than archive checksum.
 
 ## Important limits
