@@ -14,11 +14,90 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  classify:
+    name: classify-model-dependency
     runs-on: ubuntu-latest
-    # A hung Gradle or Playwright step should fail the run, not occupy a
-    # runner for the default six hours.
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      model_required: ${{ steps.guard.outputs.model_required }}
+      reason: ${{ steps.guard.outputs.reason }}
+      reason_code: ${{ steps.guard.outputs.reason_code }}
+      exemption_verified: ${{ steps.guard.outputs.exemption_verified }}
+      decision_verified: ${{ steps.guard.outputs.decision_verified }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Classifier tests
+        run: node --test scripts/ci/classify-model-dependency.test.mjs
+
+      - name: Classify changed paths
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node scripts/ci/classify-model-dependency.mjs \
+            --event "$EVENT_NAME" \
+            --base "$PR_BASE_SHA" \
+            --head "$PR_HEAD_SHA" \
+            --before "$PUSH_BEFORE_SHA" \
+            --push-head "$PUSH_HEAD_SHA" \
+            --output classification.json
+          test -s classification.json
+          cat classification.json
+
+      # Independent guard: re-computes the raw NUL-delimited diff and verifies
+      # the exemption reason, exact allow-list and guard decision. It does not
+      # trust a bare model_required=false, and it preserves the exact
+      # allow-list exception for this CI-only diff.
+      - name: Enforce model validation for CI/classifier changes
+        id: guard
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE_SHA=$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA")
+            git diff --name-status -z --no-renames --diff-filter=ACDMRTUXB "$BASE_SHA" "$PR_HEAD_SHA" > /tmp/ci-guard-diff.z
+          elif [ -n "$PUSH_BEFORE_SHA" ] && [ "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            git diff --name-status -z --no-renames --diff-filter=ACDMRTUXB "$PUSH_BEFORE_SHA" "$PUSH_HEAD_SHA" > /tmp/ci-guard-diff.z
+          else
+            : > /tmp/ci-guard-diff.z
+          fi
+          node --input-type=module -e '
+            import { readFileSync, appendFileSync } from "node:fs";
+            import { evaluateGuard, parseNameStatusZ } from "./scripts/ci/classify-model-dependency.mjs";
+            const classification = JSON.parse(readFileSync("classification.json", "utf8"));
+            const changed = parseNameStatusZ(readFileSync("/tmp/ci-guard-diff.z"));
+            const result = evaluateGuard(classification, changed);
+            const out = process.env.GITHUB_OUTPUT;
+            if (!out) throw new Error("GITHUB_OUTPUT is unavailable");
+            appendFileSync(out, "model_required=" + String(result.model_required) + "\n");
+            appendFileSync(out, "reason=" + result.reason.replace(/\s+/g, " ").trim() + "\n");
+            appendFileSync(out, "reason_code=" + result.reason_code + "\n");
+            appendFileSync(out, "exemption_verified=" + String(result.exemption_verified) + "\n");
+            appendFileSync(out, "decision_verified=" + String(result.decision_verified) + "\n");
+            console.log(JSON.stringify(result));
+          '
+
+  independent:
+    name: model-independent
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +108,11 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
 
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
@@ -42,53 +126,23 @@ jobs:
           PORT: 5173
           BASE_PATH: /
 
-      # Capacitor 8 Android modules compile with Java 21.
-      - name: Set up Java for Android
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      # Generate the Capacitor-managed Android files that are not committed
-      # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
-      # This must happen before the unit tests: the network-boundary guard reads
-      # the bundled WebView index.html and capacitor.config.json.
+      # Generate the Capacitor-managed Android files that are not committed.
       - name: Sync Capacitor Android project
         run: pnpm --filter @workspace/weather-app exec cap sync android
 
-      # Capacitor writes the web build into Android assets. Fail before any
-      # Gradle packaging if the copied inventory or hashes do not match dist.
+      # Fail before any Gradle or browser work if the copied inventory or hashes do not match dist.
       - name: Verify Android web assets
         run: pnpm --filter @workspace/weather-app run verify:android-web-assets
 
       - name: Unit tests
         run: pnpm --filter @workspace/weather-app run test
 
-      # The sherpa-onnx runtime is a compile-time dependency of the
-      # DaymarkVoice module: the Parakeet plugin imports its classes, so the
-      # build cannot compile without it. The runtime is not committed; it is
-      # fetched here and its checksum is verified by the script.
-      - name: Fetch the sherpa-onnx runtime
-        run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
-
-      # The Parakeet model is not committed. Fetch the pinned archive and
-      # verify all four model hashes before Gradle packages the debug APK/AAB.
-      # The asset-pack ownership and integrity guards remain active.
-      - name: Fetch Parakeet model assets
-        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
-
-      # Compile the native Android modules as well as the web layer. This
-      # catches Java/API/manifest regressions in Capacitor plugin changes.
-      # The committed JVM unit tests guard the minimum-WebView gate that
-      # decides whether the WebView loads the bundle at all. One Gradle
-      # invocation rather than a second step avoids a redundant
-      # configuration phase and keeps both tasks on one resolved classpath.
-      # The DaymarkVoice module's own tests (permission lifecycle, model
-      # integrity, endpoint detection) and app lint run in the same
-      # invocation so those regressions cannot merge silently.
-      - name: Android build and unit tests
+      # JVM tests and lint are model-independent: the committed sherpa-onnx AAR
+      # supplies the runtime, and the Parakeet asset pack is not needed for
+      # these tasks. Never fetch the Parakeet script in this job.
+      - name: Android JVM tests and lint
         working-directory: artifacts/weather-app/android
-        run: ./gradlew --no-daemon :app:assembleDebug :app:bundleDebug :app:testDebugUnitTest :daymark-voice:testDebugUnitTest :app:lintDebug
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :daymark-voice:testDebugUnitTest :app:lintDebug
 
       - name: Install Playwright browser
         run: pnpm --filter @workspace/weather-app exec playwright install chromium --with-deps
@@ -100,7 +154,181 @@ jobs:
           BASE_PATH: /
           CI: 1
 
-      # Fail on criticals; highs in dev-only chains (e.g. vite tooling) are
-      # tolerated — verify reachability before bumping this to high.
+      # Fail on criticals; highs in dev-only chains (e.g. vite tooling) are tolerated.
       - name: Dependency audit
         run: pnpm audit --audit-level critical
+
+      - name: Docs validation
+        run: node scripts/ci/validate-docs.mjs
+
+      - name: Validate workflow YAML
+        run: |
+          ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].sort.each { |f| Psych.parse_file(f); puts "yaml ok: " + f }'
+
+  model:
+    name: model-dependent
+    needs: classify
+    if: needs.classify.outputs.model_required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web assets
+        run: pnpm --filter @workspace/weather-app run build
+        env:
+          PORT: 5173
+          BASE_PATH: /
+
+      - name: Sync Capacitor Android project
+        run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      - name: Verify Android web assets
+        run: pnpm --filter @workspace/weather-app run verify:android-web-assets
+
+      # Validates the pinned runtime and the pinned Parakeet archive before
+      # Gradle packages either into the debug APK/AAB. These steps fail closed;
+      # they deliberately have no continue-on-error.
+      - name: Fetch sherpa-onnx runtime
+        run: android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
+
+      - name: Fetch Parakeet model assets
+        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+
+      - name: Android model packaging
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :parakeet-assets:verifyParakeetAssets :app:assembleDebug :app:bundleDebug
+
+  verify:
+    name: verify
+    if: always()
+    needs: [classify, independent, model]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate aggregate gate
+        env:
+          CLASSIFY_RESULT: ${{ needs.classify.result }}
+          INDEPENDENT_RESULT: ${{ needs.independent.result }}
+          MODEL_RESULT: ${{ needs.model.result }}
+          MODEL_REQUIRED: ${{ needs.classify.outputs.model_required }}
+          MODEL_REASON: ${{ needs.classify.outputs.reason }}
+          MODEL_REASON_CODE: ${{ needs.classify.outputs.reason_code }}
+          EXEMPTION_VERIFIED: ${{ needs.classify.outputs.exemption_verified }}
+          DECISION_VERIFIED: ${{ needs.classify.outputs.decision_verified }}
+        run: |
+          set -euo pipefail
+          fail=0
+          prereq=1
+          echo "classifier result: $CLASSIFY_RESULT"
+          echo "model-independent result: $INDEPENDENT_RESULT"
+          echo "model-dependent result: $MODEL_RESULT"
+          echo "model required: $MODEL_REQUIRED"
+          echo "model reason code: $MODEL_REASON_CODE"
+          echo "exemption verified: $EXEMPTION_VERIFIED"
+          echo "decision verified: $DECISION_VERIFIED"
+          echo "classifier reason: $MODEL_REASON"
+
+          if [ "$CLASSIFY_RESULT" != "success" ]; then
+            echo "::error::classifier job did not succeed"
+            prereq=0
+            fail=1
+          fi
+          if [ "$INDEPENDENT_RESULT" != "success" ]; then
+            echo "::error::model-independent checks failed or did not run"
+            prereq=0
+            fail=1
+          fi
+
+          if [ "$prereq" -ne 1 ]; then
+            echo "::error::model validation was not evaluated because a prerequisite job failed"
+            echo "MODEL VALIDATION: NOT EVALUATED - prerequisite classifier or model-independent failure"
+            fail=1
+          elif [ "$MODEL_REQUIRED" = "true" ]; then
+            if [ "$DECISION_VERIFIED" != "true" ]; then
+              echo "::error::model-required decision was not independently verified"
+              echo "MODEL VALIDATION: FAIL - decision not verified"
+              fail=1
+            elif [ -z "$MODEL_REASON" ]; then
+              echo "::error::model-required reason text is missing or empty"
+              echo "MODEL VALIDATION: FAIL - reason missing"
+              fail=1
+            elif [ "$MODEL_RESULT" = "success" ]; then
+              echo "MODEL VALIDATION: PASS"
+            else
+              echo "::error::model validation was required but the model-dependent job was $MODEL_RESULT"
+              echo "MODEL VALIDATION: FAIL - required model-dependent job was $MODEL_RESULT"
+              fail=1
+            fi
+          elif [ "$MODEL_REQUIRED" = "false" ]; then
+            if [ "$DECISION_VERIFIED" != "true" ]; then
+              echo "::error::model_required=false was not independently verified"
+              echo "MODEL VALIDATION: FAIL - decision not verified"
+              fail=1
+            elif [ -z "$MODEL_REASON" ]; then
+              echo "::error::not-applicable reason text is missing or empty"
+              echo "MODEL VALIDATION: FAIL - reason missing"
+              fail=1
+            elif [ "$MODEL_RESULT" != "skipped" ]; then
+              echo "::error::model job ran even though model validation was not applicable (result $MODEL_RESULT)"
+              echo "MODEL VALIDATION: FAIL - unexpected model-dependent execution"
+              fail=1
+            elif [ "$MODEL_REASON_CODE" = "ci-control-plane-exact-allowlist" ]; then
+              if [ "$EXEMPTION_VERIFIED" != "true" ]; then
+                echo "::error::exact-allowlist reason_code was not verified by the independent guard"
+                echo "MODEL VALIDATION: FAIL - exemption not verified"
+                fail=1
+              else
+                echo "::notice title=Model validation not applicable::MODEL VALIDATION: NOT APPLICABLE - $MODEL_REASON"
+                echo "MODEL VALIDATION: NOT APPLICABLE - $MODEL_REASON"
+              fi
+            elif [ "$MODEL_REASON_CODE" = "independent-path" ]; then
+              if [ "$EXEMPTION_VERIFIED" = "true" ]; then
+                echo "::error::independent-path reason_code was inconsistent with an exemption"
+                echo "MODEL VALIDATION: FAIL - inconsistent decision"
+                fail=1
+              else
+                echo "::notice title=Model validation not applicable::MODEL VALIDATION: NOT APPLICABLE - $MODEL_REASON"
+                echo "MODEL VALIDATION: NOT APPLICABLE - $MODEL_REASON"
+              fi
+            else
+              echo "::error::model_required=false reason_code is missing or unrecognized"
+              echo "MODEL VALIDATION: FAIL - reason code invalid"
+              fail=1
+            fi
+          else
+            echo "::error::classifier did not report a boolean model requirement"
+            echo "MODEL VALIDATION: FAIL - missing or malformed classifier decision"
+            fail=1
+          fi
+
+          {
+            echo "## CI aggregate gate"
+            echo "- classifier: $CLASSIFY_RESULT"
+            echo "- model-independent: $INDEPENDENT_RESULT"
+            echo "- model-dependent: $MODEL_RESULT"
+            echo "- model required: $MODEL_REQUIRED"
+            echo "- model reason code: $MODEL_REASON_CODE"
+            echo "- exemption verified: $EXEMPTION_VERIFIED"
+            echo "- decision verified: $DECISION_VERIFIED"
+            echo "- classifier reason: $MODEL_REASON"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$fail" -ne 0 ]; then
+            exit 1
+          fi
