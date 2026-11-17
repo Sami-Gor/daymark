@@ -94,8 +94,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Load pinned inputs
-        run: cat android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env >> "$GITHUB_ENV"
+      - name: Test strict pinned-input parser
+        if: matrix.run == 'run1'
+        run: python3 android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/test_parse_aar_pins.py -v
+
+      - name: Load pinned inputs (strict parser)
+        run: |
+          python3 android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/parse_aar_pins.py \
+            android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -233,8 +239,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Load pinned inputs
-        run: cat android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env >> "$GITHUB_ENV"
+      - name: Load pinned inputs (strict parser)
+        run: |
+          python3 android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/parse_aar_pins.py \
+            android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env
 
       - name: Fetch sherpa-onnx source for provenance
         run: |
@@ -293,8 +301,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Load pinned inputs
-        run: cat android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env >> "$GITHUB_ENV"
+      - name: Load pinned inputs (strict parser)
+        run: |
+          python3 android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/parse_aar_pins.py \
+            android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env
 
       # AGP 8.4.0 / Kotlin 1.7.20 are built for the JDK 17 toolchain.
       - name: Set up Java 17
