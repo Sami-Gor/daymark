@@ -36,6 +36,12 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
+      # Type-aware async safety for the Playwright E2E suite (no-floating-promises,
+      # no-misused-promises). Deliberately-invalid fixtures are ignored by this
+      # target; tests/e2e/support/eslint-guard.test.ts proves the rules fire.
+      - name: Lint E2E async safety
+        run: pnpm --filter @workspace/weather-app run lint:e2e
+
       - name: Build
         run: pnpm run build
         env:

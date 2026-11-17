@@ -143,14 +143,17 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleRelease :app:bu
 
 Release: package `io.github.sami_gor.daymark` (versionCode 1 / versionName 1.0.0). See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
 
-## Test
+## Testing
 
 ```bash
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (236 tests)
-pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (153 tests)
+pnpm --filter @workspace/weather-app run typecheck    # app source + Playwright tests
+pnpm --filter @workspace/weather-app run lint:e2e     # type-aware async safety for the e2e suite
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (266 tests)
+pnpm --filter @workspace/weather-app run build        # production build the e2e suite serves
+pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (164 tests in 19 spec files)
 ```
 
-The e2e suite runs against a production build served by `vite preview`, mocks Open-Meteo traffic, and covers function, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), failure paths, the service worker, the served security headers, location search, voice input/output, severe-weather alerts and the English/French/Spanish interface.
+The e2e suite runs in Chromium against a production build served by `vite preview`, with Open-Meteo traffic mocked. It covers first paint and failure paths, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), location search, the service worker, served security headers, voice input/output, severe-weather alerts, the English/French/Spanish interface, and seeded randomised/boundary data. Async safety is enforced by both a type-aware ESLint pass and a static invocation scanner. See [docs/TESTING.md](docs/TESTING.md) for the newcomer guide and [docs/TESTING-ARCHITECTURE.md](docs/TESTING-ARCHITECTURE.md) for the page-object, fixture and async-safety design.
 
 ## Security
 
@@ -189,11 +192,30 @@ scripts/                  workspace tooling
 - [Android production readiness](docs/release/android-production-readiness.md) and the [Play release checklist](docs/release/play-console-checklist.md)
 - [Privacy policy](https://daymark-weather.pages.dev/privacy), also available in the app at `/privacy`, `/fr/privacy` and `/es/privacy`
 
-## What's Coming
+## Releases & What's Next
 
-**v2.0 — Coming soon**
+**v2.0.0 — Android**
 
-The next evolution of Daymark is in its final stages. Release details to follow.
+Daymark 2.0.0 has been released for Android. Get it on [Google Play](https://play.google.com/store/apps/details?id=io.github.sami_gor.daymark).
+
+**v2.1 — Coming soon**
+
+Daymark 2.1 brings a smarter, more capable Ask Daymark experience.
+
+- **Smarter weather questions** — Ask about several conditions at once, including rain, temperature, wind, snow, fog, humidity and cloud cover.
+- **More complete answers** — Get responses that cover all parts of a multi-part question, rather than answering only the first part.
+- **Improved answer quality** — More natural, organised responses with repeated information removed.
+- **Clearer forecast information** — When requested weather data is unavailable, Daymark tells you instead of guessing.
+- **Expanded language understanding** — Improved recognition of weather-related questions in English, French and Spanish.
+
+**v2.5 — Planned**
+
+Daymark 2.5 is planned to bring weather directly to your Android home screen with a new native weather widget.
+
+- **At-a-glance weather** — See current weather conditions and your selected location without opening the app.
+- **Automatic widget updates** — The widget periodically refreshes its display using the latest forecast data already saved by Daymark.
+- **Offline awareness** — Retains the last successful forecast and indicates when the information may be out of date.
+- **Privacy-first design** — Uses Daymark's existing location and weather data. The widget does not independently request your location or make background weather requests.
 
 **v3.0 — On the horizon**
 
