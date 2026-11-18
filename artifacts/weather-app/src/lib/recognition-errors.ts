@@ -186,6 +186,14 @@ export function classifyNativeStartFailure(message: string): string {
   if (/audio-capture/i.test(message)) {
     return 'audio-capture';
   }
+  // The native start call can also reject because a previous session is still
+  // live; keep those codes stable instead of collapsing them into `unknown`.
+  if (/session-busy/i.test(message)) {
+    return 'session-busy';
+  }
+  if (/invalid-session/i.test(message)) {
+    return 'invalid-session';
+  }
   if (/offline-unavailable|api-unsupported|model-missing|model-corrupt|model-preparing|runtime-unavailable/i.test(message)) {
     return 'offline-unavailable';
   }

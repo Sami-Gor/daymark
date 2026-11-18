@@ -91,6 +91,8 @@ describe('recognition error contract', () => {
     expect(classifyNativeStartFailure('permission-denied')).toBe('permission-denied');
     expect(classifyNativeStartFailure('not-allowed')).toBe('permission-blocked');
     expect(classifyNativeStartFailure('audio-capture')).toBe('audio-capture');
+    expect(classifyNativeStartFailure('session-busy')).toBe('session-busy');
+    expect(classifyNativeStartFailure('invalid-session')).toBe('invalid-session');
     expect(classifyNativeStartFailure('model-corrupt')).toBe('offline-unavailable');
     expect(classifyNativeStartFailure('aborted')).toBe('aborted');
     expect(classifyNativeStartFailure('who knows')).toBe('unknown');

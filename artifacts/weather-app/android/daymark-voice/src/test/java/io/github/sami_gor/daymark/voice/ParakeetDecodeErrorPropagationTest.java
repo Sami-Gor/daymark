@@ -1,8 +1,8 @@
 package io.github.sami_gor.daymark.voice;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.After;
@@ -121,6 +121,17 @@ public class ParakeetDecodeErrorPropagationTest {
     }
 
     @Test
+    public void nullDecodeOutcomeIsReportedAsDecodeFailedNotSilence() {
+        // Defense in depth: a decoder that violates the non-null contract must
+        // still produce an explicit failure, never silence and never a result.
+        final List<String> terminal = runDecodedSession(38, null);
+
+        assertEquals(Collections.singletonList("error:decode-failed"), terminal);
+        assertTrue(plugin.results(38).isEmpty());
+        assertTrue(plugin.errors(38).stream().noneMatch("no-speech"::equals));
+    }
+
+    @Test
     public void silenceStillReportsNoSpeech() {
         // No speech onset at all: the endpoint detector never fires, the decode
         // is never attempted and the code stays no-speech.
@@ -177,6 +188,48 @@ public class ParakeetDecodeErrorPropagationTest {
     }
 
     // ------------------------------------------------------------------
+    // The native-status seam: unobservable with the shipped AAR, but the
+    // refusal mapping is already exercised through a fake status so a future
+    // observable channel only has to be wired in production.
+    // ------------------------------------------------------------------
+
+    @Test
+    public void shippedNativeStatusCannotReportARefusal() {
+        // OfflineRecognizer.decode(stream) returns void and the stream exposes
+        // no per-decode status, so a silent refusal from the patched decoder
+        // must land in the empty bucket, never in model-rejected.
+        assertFalse("the shipped AAR cannot observe refusals",
+                NativeDecodeStatus.UNAVAILABLE.isObservable());
+        assertFalse(NativeDecodeStatus.UNAVAILABLE.refusedLastDecode());
+        assertEquals("an unobservable refusal is classified as an empty decode",
+                DecodeOutcome.Status.EMPTY,
+                ParakeetSpeechRecognitionPlugin.classifyDecodedText(
+                        "", NativeDecodeStatus.UNAVAILABLE.refusedLastDecode()).status());
+    }
+
+    @Test
+    public void observableNativeStatusMapsRefusalToModelRejected() {
+        // A native layer with a real refusal status only needs to implement
+        // this interface; the plugin and the bridge payload stay unchanged.
+        final NativeDecodeStatus observable = new NativeDecodeStatus() {
+            @Override
+            public boolean refusedLastDecode() {
+                return true;
+            }
+
+            @Override
+            public boolean isObservable() {
+                return true;
+            }
+        };
+        assertTrue(observable.isObservable());
+        assertEquals("an observable refusal is classified as REFUSED",
+                DecodeOutcome.Status.REFUSED,
+                ParakeetSpeechRecognitionPlugin.classifyDecodedText(
+                        null, observable.refusedLastDecode()).status());
+    }
+
+    // ------------------------------------------------------------------
     // Bridge payload contract: code + additive stage metadata.
     // ------------------------------------------------------------------
 
@@ -188,8 +241,13 @@ public class ParakeetDecodeErrorPropagationTest {
         // Existing codes keep their meaning and gain a stage.
         assertErrorPayload("no-speech", "no-speech", "capture");
         assertErrorPayload("audio-capture", "audio-capture", "capture");
+        assertErrorPayload("not-allowed", "not-allowed", "capture");
+        assertErrorPayload("permission-blocked", "permission-blocked", "capture");
+        assertErrorPayload("aborted", "aborted", "capture");
         assertErrorPayload("offline-unavailable", "offline-unavailable", "model");
         assertErrorPayload("session-busy", "session-busy", "session");
+        assertErrorPayload("invalid-session", "invalid-session", "session");
+        // Unknown/future codes stay explicit rather than being remapped.
         assertErrorPayload("model-corrupt", "model-corrupt", "unknown");
     }
 
