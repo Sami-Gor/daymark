@@ -14,10 +14,13 @@ name: Android AAR integrity
 # The digest is pinned in daymark-voice/sherpa-aar.sha256 and is checked by the
 # Gradle verifySherpaAar task; android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
 # reads this same pin for CI provisioning. It cannot be redirected: the gate
-# takes fixed project-relative paths and rejects the legacy override
-# properties. This workflow runs the gate
-# itself, the positive/negative test suite for it, and asserts that release
-# builds depend on it while debug builds and JVM unit tests do not.
+# takes fixed project-relative paths, requires the pin to name the AAR the
+# voice module packages, and rejects the legacy override properties in every
+# form Gradle accepts (-P flags, gradle.properties, ORG_GRADLE_PROJECT_*
+# environment variables and -Dorg.gradle.project.* system properties). This
+# workflow runs the gate itself, the positive/negative test suite for it, and
+# asserts that release builds depend on it while debug builds and JVM unit
+# tests do not.
 #
 # This is a separate workflow rather than extra steps in android-ci.yml so a
 # Gradle or runner problem here cannot block the required `verify` check.
@@ -55,7 +58,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Digest, fail-closed negative cases and the full 17-case harness.
+  # Digest, fail-closed negative cases and the full harness.
   #
   # The harness also has three cross-module cases that configure the real
   # Android Gradle project, so this job regenerates the Capacitor-managed
@@ -69,9 +72,12 @@ jobs:
   # real packaging still fails closed when the model is absent.
   #
   # The same harness run also proves the gate cannot be redirected from
-  # Gradle project properties (the cases mutate a copy and assert that -P flags
-  # and gradle.properties are rejected) and that fetch-sherpa-onnx.sh reads the
-  # committed pin instead of carrying a duplicate digest.
+  # Gradle project properties: the cases assert that -P flags, gradle.properties
+  # entries, ORG_GRADLE_PROJECT_* environment variables and
+  # -Dorg.gradle.project.* system properties are rejected (the gradle.properties
+  # case appends to the tracked file and restores it), and that
+  # fetch-sherpa-onnx.sh reads the committed pin instead of carrying a duplicate
+  # digest.
   digest-and-tests:
     name: aar-digest-and-tests
     runs-on: ubuntu-latest
@@ -118,8 +124,9 @@ jobs:
         run: pnpm --filter @workspace/weather-app exec cap sync android
 
       # Positive case (the committed AAR passes), every negative case (missing,
-      # mutated, wrong or malformed pin, path traversal) and the release-only
-      # wiring assertions, including the cross-module :app graphs.
+      # mutated, wrong/malformed/uppercase pin, path traversal, a pin naming an
+      # unpackaged file, project-property overrides) and the release-only wiring
+      # assertions, including the cross-module :app graphs.
       - name: Run the AAR integrity test suite
         working-directory: artifacts/weather-app/android/tools/sherpa-aar-integrity
         run: ./run-tests.sh
@@ -176,10 +183,12 @@ jobs:
         working-directory: artifacts/weather-app/android
         run: ./gradlew --no-daemon :daymark-voice:verifySherpaAar
 
-      # The gate must not be redirectable from Gradle project properties:
-      # -P flags and gradle.properties are both project properties. The
-      # harness exercises the mutation scenarios with a tampered artifact;
-      # this quick check keeps the guarantee in the release workflow too.
+      # The gate must not be redirectable from Gradle project properties.
+      # -P flags, gradle.properties, ORG_GRADLE_PROJECT_* environment variables
+      # and -Dorg.gradle.project.* system properties all become project
+      # properties. The harness exercises the tampered-artifact scenarios; this
+      # quick check keeps the -P and environment guarantees in the release
+      # workflow too.
       - name: Assert the AAR gate cannot be redirected
         working-directory: artifacts/weather-app/android
         run: |
@@ -191,6 +200,15 @@ jobs:
             exit 1
           fi
           grep -q 'Unsupported sherpa-onnx AAR integrity override' /tmp/aar-override-check.log
+          # An environment variable is the other common way to set project
+          # properties; it must fail closed the same way.
+          if ORG_GRADLE_PROJECT_sherpaAarPinFile=/tmp/not-the-pin.sha256 \
+              ./gradlew --no-daemon --console=plain :daymark-voice:verifySherpaAar \
+              > /tmp/aar-env-override-check.log 2>&1; then
+            echo "error: ORG_GRADLE_PROJECT_* environment variables redirected the AAR integrity gate." >&2
+            exit 1
+          fi
+          grep -q 'Unsupported sherpa-onnx AAR integrity override' /tmp/aar-env-override-check.log
 
       # Release builds must depend on the gate. --dry-run prints the task graph
       # without building, so this stays cheap while still proving the wiring.

@@ -3,12 +3,20 @@
 # Positive and negative tests for the sherpa-onnx AAR integrity gate.
 #
 # The Gradle gate derives its inputs from the applying project only
-# (<projectDir>/sherpa-aar.sha256 and <projectDir>/libs). The cases stage
+# (<projectDir>/sherpa-aar.sha256 and <projectDir>/libs). Most cases stage
 # copies at the fixed paths of the standalone Gradle project next to this
-# script and never modify the committed module artifact or pin. Additional
-# cases prove that the legacy property overrides (-P flags and
-# gradle.properties) are rejected and that the provisioning script reads the
-# committed pin instead of a hardcoded digest.
+# script. Some cases deliberately modify tracked files: the gradle.properties
+# override case appends temporary properties to the module's tracked
+# gradle.properties, and the provisioning cases rewrite the committed AAR and
+# pin. Each is restored from a backup immediately afterwards, the restored
+# SHA-256 is asserted against the original, and the EXIT trap restores them if
+# the run is interrupted. Additional cases prove that the legacy property
+# overrides are rejected in every form Gradle accepts (-P flags,
+# gradle.properties, ORG_GRADLE_PROJECT_* environment variables and
+# -Dorg.gradle.project.* system properties), that the pin must name the AAR
+# DaymarkVoice packages, that digest case handling matches
+# android/kokoro-poc/scripts/fetch-sherpa-onnx.sh, and that the provisioning
+# script reads the committed pin instead of a hardcoded digest.
 #
 # The release-only wiring is asserted with --dry-run against tasks named like
 # the ones the Android Gradle plugin creates.
@@ -224,7 +232,16 @@ run_case "fail-wrong-digest" fail "SHA-256 mismatch" :verifySherpaAar
 reset_work
 stage_aar
 printf 'not-a-digest  %s\n' "$AAR_NAME" >"$STAGE_PIN"
-run_case "fail-malformed-digest" fail "not a 64-character hex SHA-256 digest" :verifySherpaAar
+run_case "fail-malformed-digest" fail "not a 64-character lowercase hex SHA-256 digest" :verifySherpaAar
+
+# 5b. Digest case is strict. Uppercase hex used to be lowercased into
+#     acceptance here while the fetch script rejected it; the gate now rejects
+#     it too, so one pin cannot mean different things to the two verifiers.
+reset_work
+stage_aar
+UPPER_SHA="$(printf '%s' "$AAR_SHA" | tr 'a-f' 'A-F')"
+printf '%s  %s\n' "$UPPER_SHA" "$AAR_NAME" >"$STAGE_PIN"
+run_case "fail-uppercase-digest" fail "64-character lowercase hex SHA-256 digest" :verifySherpaAar
 
 # 6. An empty pin (comments only) fails closed instead of verifying nothing.
 reset_work
@@ -248,6 +265,15 @@ reset_work
 stage_aar
 printf '%s  nested/%s\n' "$AAR_SHA" "$AAR_NAME" >"$STAGE_PIN"
 run_case "fail-path-in-pin" fail "must be a file name inside" :verifySherpaAar
+
+# 9b. A pin naming a different file is rejected even when that file is present
+#     in libs/ and its digest matches: the gate binds the pin name to the AAR
+#     DaymarkVoice packages, so it cannot vouch for bytes that never ship.
+reset_work
+stage_aar
+cp "$STAGE_LIBS/$AAR_NAME" "$STAGE_LIBS/unpackaged.aar"
+printf '%s  unpackaged.aar\n' "$(sha256_of "$STAGE_LIBS/unpackaged.aar")" >"$STAGE_PIN"
+run_case "fail-pin-names-unpackaged-artifact" fail "DaymarkVoice packages" :verifySherpaAar
 
 # 10. Release builds depend on the gate (AGP task names, created after apply).
 reset_work
@@ -352,6 +378,27 @@ run_cmd_case "fail-property-override-both" fail \
   -PsherpaAarDir="$ATTACKER/libs" \
   -PsherpaAarPinFile="$ATTACKER/sherpa-aar.sha256"
 
+# 14b. Gradle also turns ORG_GRADLE_PROJECT_* environment variables into
+#      project properties; they must hit the same rejection instead of
+#      redirecting the gate.
+run_cmd_case "fail-env-property-override" fail \
+  "Unsupported sherpa-onnx AAR integrity override" "$ANDROID_DIR" \
+  env ORG_GRADLE_PROJECT_sherpaAarDir="$ATTACKER/libs" \
+  "$GRADLEW" --no-daemon --console=plain :daymark-voice:verifySherpaAar
+
+# 14c. -Dorg.gradle.project.* system properties are project properties too.
+run_cmd_case "fail-system-property-override" fail \
+  "Unsupported sherpa-onnx AAR integrity override" "$ANDROID_DIR" \
+  "$GRADLEW" --no-daemon --console=plain :daymark-voice:verifySherpaAar \
+  -Dorg.gradle.project.sherpaAarPinFile="$ATTACKER/sherpa-aar.sha256"
+
+# 14d. The packaged file name is derived from the gate script; a project
+#      property with that name must be rejected rather than pre-empting it.
+run_cmd_case "fail-property-override-packaged-name" fail \
+  "Unsupported sherpa-onnx AAR integrity override" "$ANDROID_DIR" \
+  "$GRADLEW" --no-daemon --console=plain :daymark-voice:verifySherpaAar \
+  -PsherpaAarPackagedName=evil.aar
+
 # 15. The same keys in the tracked gradle.properties are project properties
 #     too. Gradle really loads them: append them to the real file, run the
 #     gate, then restore the file and prove it is byte-identical.
@@ -402,6 +449,21 @@ printf '%s  %s\n' "$ZERO_SHA" "$AAR_NAME" >"$PIN"
 run_cmd_case "fail-fetch-pin-source-mismatch" fail "checksum mismatch for provisioned" \
   "$REPO" env -u SHERPA_ONNX_PATCHED_AAR_URL bash "$FETCH_SCRIPT"
 cp -p "$TMP/pin.bak" "$PIN"
+
+# A pin naming a different file must fail even with a valid digest: the fetch
+# script binds the pin name to the packaged AAR, exactly like the Gradle gate.
+printf '%s  some-other.aar\n' "$AAR_SHA" >"$PIN"
+run_cmd_case "fail-fetch-pin-name-mismatch" fail "sherpa-onnx AAR pin names" \
+  "$REPO" env -u SHERPA_ONNX_PATCHED_AAR_URL bash "$FETCH_SCRIPT"
+cp -p "$TMP/pin.bak" "$PIN"
+
+# Digest case handling is shared with the Gradle gate: uppercase hex is
+# rejected rather than normalised.
+UPPER_SHA="$(printf '%s' "$AAR_SHA" | tr 'a-f' 'A-F')"
+printf '%s  %s\n' "$UPPER_SHA" "$AAR_NAME" >"$PIN"
+run_cmd_case "fail-fetch-uppercase-pin" fail "64-character lowercase hex SHA-256 digest" \
+  "$REPO" env -u SHERPA_ONNX_PATCHED_AAR_URL bash "$FETCH_SCRIPT"
+cp -p "$TMP/pin.bak" "$PIN"
 RESTORE_PIN=""
 assert_equal "pass-fetch-pin-restored" \
   "$(sha256_of "$TMP/pin.bak")" "$(sha256_of "$PIN")"
@@ -414,6 +476,17 @@ if grep -Eq '[0-9a-f]{64}' "$FETCH_SCRIPT"; then
 else
   PASS=$((PASS + 1))
   echo "pass pass-fetch-no-hardcoded-digest"
+fi
+
+# The gate's packaged-name assertion is only meaningful while DaymarkVoice's
+# file dependency is built from the same property the gate checks. Guard that
+# dependency line so the plugin constant and the packaged file cannot drift
+# apart silently.
+if grep -Fq 'implementation files("libs/${sherpaAarPackagedName}")' "$MODULE_DIR/build.gradle"; then
+  PASS=$((PASS + 1)); echo "pass pass-packaged-aar-dependency-name"
+else
+  FAIL=$((FAIL + 1)); FAILED_CASES="$FAILED_CASES fail-packaged-aar-dependency-name"
+  echo "FAIL fail-packaged-aar-dependency-name: daymark-voice/build.gradle does not package libs/$AAR_NAME"
 fi
 
 assert_equal "pass-final-aar-unchanged" "$AAR_SHA" "$(sha256_of "$AAR_SRC")"

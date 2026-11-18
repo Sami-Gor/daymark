@@ -24,17 +24,21 @@ android {
 // The pin lives in sherpa-aar.sha256 next to this file and is shared with
 // android/kokoro-poc/scripts/fetch-sherpa-onnx.sh and CI. The plugin registers
 // verifySherpaAar and wires it into every release build; debug builds and JVM
-// unit tests are unaffected. See gradle/sherpa-aar-integrity.gradle.
+// unit tests are unaffected. It also requires the pin to name exactly the AAR
+// packaged below, so the pin cannot be pointed at a different artifact. See
+// gradle/sherpa-aar-integrity.gradle.
 apply from: '../gradle/sherpa-aar-integrity.gradle'
 
 dependencies {
     implementation project(':capacitor-android')
 
     // sherpa-onnx runs the Parakeet TDT 0.6B v3 int8 model on the device.
-    // This is the verified, committed CVE-2026-108954 build. The fetch script
-    // validates its pin; the abiFilters above keep only the arm64-v8a native
-    // libraries in the shipped bundle.
-    implementation files('libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar')
+    // This is the verified, committed CVE-2026-108954 build. The file name comes
+    // from gradle/sherpa-aar-integrity.gradle, the same value verifySherpaAar
+    // requires the pin to name, so the verified file and the packaged file
+    // cannot diverge. The fetch script validates the pin and its file name; the
+    // abiFilters above keep only the arm64-v8a native libraries in the bundle.
+    implementation files("libs/${sherpaAarPackagedName}")
 
     testImplementation "junit:junit:$junitVersion"
 }

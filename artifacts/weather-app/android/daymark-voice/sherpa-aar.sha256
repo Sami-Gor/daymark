@@ -10,7 +10,10 @@
 #   - android/kokoro-poc/scripts/fetch-sherpa-onnx.sh (CI provisioning)
 #   - CI digest checks
 #
-# sha256sum(1) format; verify manually with:
+# sha256sum(1) format. The digest must be lowercase hex, and the file name must
+# be exactly the AAR daymark-voice/build.gradle packages: verifySherpaAar and
+# android/kokoro-poc/scripts/fetch-sherpa-onnx.sh both reject any other name.
+# Verify manually with:
 #   cd artifacts/weather-app/android/daymark-voice/libs &&
 #     shasum -a 256 -c ../sherpa-aar.sha256
 #

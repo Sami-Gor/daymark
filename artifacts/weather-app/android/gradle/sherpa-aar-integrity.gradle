@@ -22,17 +22,24 @@
  *       AAR dir   <projectDir>/libs/
  *     In DaymarkVoice those are exactly the committed pin and the directory the
  *     app packages; no other artifact can be substituted for them;
- *   - the pin must contain exactly one '<sha256>  <file name>' entry;
+ *   - the pin must contain exactly one lowercase '<sha256>  <file name>' entry;
+ *   - the pinned file name must equal the AAR the DaymarkVoice module packages
+ *     (daymark-voice/build.gradle builds its file dependency from this same
+ *     name): a pin naming any other file is rejected even when that file
+ *     exists in libs/ with the pinned digest, because it would verify bytes
+ *     the release never ships;
  *   - the gate succeeds only when that file exists in libs/ and its SHA-256
  *     equals the pinned digest;
  *   - it fails closed when the pin is missing, unreadable, empty, malformed or
- *     names more than one artifact, when the AAR directory is missing, when
- *     the pinned artifact is missing or empty, or when the digest differs;
- *   - there are deliberately no project-property, environment-variable or
- *     system-property overrides. A redirected verification would not cover the
- *     artifact the release packages, so the legacy override properties
- *     (sherpaAarPinFile / sherpaAarDir) are a hard configuration error,
- *     including when they come from a tracked gradle.properties file;
+ *     names more than one artifact, when the pin names an unpackaged file,
+ *     when the AAR directory is missing, when the pinned artifact is missing or
+ *     empty, or when the digest differs;
+ *   - there are no override inputs. Project properties - from -P flags,
+ *     gradle.properties, ORG_GRADLE_PROJECT_* environment variables or
+ *     -Dorg.gradle.project.* system properties - would redirect the
+ *     verification away from the packaged artifact, so the legacy keys
+ *     (sherpaAarPinFile / sherpaAarDir) and the packaged file name itself are
+ *     a hard configuration error in every form;
  *   - runs for release builds only (assemble/bundle/package/lintVital of the
  *     release variant, in this module and in :app). Debug builds and JVM unit
  *     tests are deliberately not wired, so local debug work and
@@ -41,7 +48,7 @@
  * The pin file is the single source of truth. It uses sha256sum(1) format, so
  * it can also be checked with `shasum -a 256 -c`:
  *
- *   <64 hex chars>  <file name>
+ *   <64 lowercase hex chars>  <file name>
  *   # comments and blank lines are ignored
  *
  * Usage (see daymark-voice/build.gradle):
@@ -50,11 +57,17 @@
  */
 
 // Reject the legacy override properties explicitly. They are ordinary Gradle
-// project properties, so they arrive from -P flags and gradle.properties alike.
-// Ignoring them silently would leave a tracked gradle.properties able to
+// project properties, and Gradle turns -P flags, gradle.properties entries,
+// ORG_GRADLE_PROJECT_* environment variables and -Dorg.gradle.project.* system
+// properties into project properties alike. Ignoring them silently would leave
+// a tracked gradle.properties or an ambient environment variable able to
 // redirect the check; failing closed keeps a single trusted artifact and pin.
 def legacyOverrideKeys = ['sherpaAarPinFile', 'sherpaAarDir']
-def activeOverrides = legacyOverrideKeys.findAll { project.hasProperty(it) }
+// The packaged file name is derived from this script (see packagedAarName
+// below); a project property of the same name must not pre-empt that constant.
+def activeOverrides = (legacyOverrideKeys + ['sherpaAarPackagedName']).findAll {
+    project.hasProperty(it)
+}
 if (!activeOverrides.isEmpty()) {
     throw new GradleException(
             "Unsupported sherpa-onnx AAR integrity override(s): " +
@@ -65,6 +78,15 @@ if (!activeOverrides.isEmpty()) {
 
 def pinFile = project.file('sherpa-aar.sha256')
 def aarDir = project.file('libs')
+
+// The one AAR the DaymarkVoice module packages as a local file dependency. The
+// pin must name exactly this file: verifying any other name would check bytes
+// that never reach the release, so a mismatched pin is a hard failure even when
+// that other file's digest matches. The dependency in daymark-voice/build.gradle
+// is built from this same property, so the gate and the packaged file cannot
+// drift apart; run-tests.sh additionally guards that dependency line.
+def packagedAarName = 'sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar'
+ext.sherpaAarPackagedName = packagedAarName
 
 def sha256Of = { File file ->
     def digest = java.security.MessageDigest.getInstance('SHA-256')
@@ -100,12 +122,16 @@ def readPin = { File file ->
                     "Malformed sherpa-onnx AAR pin at ${file}:${lineNumber}. " +
                     "Expected '<sha256>  <file name>', found: '${rawLine}'.")
         }
-        def expected = fields[0].toLowerCase(Locale.ROOT)
+        // Lowercase only, exactly as sha256sum(1) prints it and exactly as
+        // android/kokoro-poc/scripts/fetch-sherpa-onnx.sh requires. Accepting
+        // other cases here would make the Gradle gate and the provisioning
+        // script disagree about the same pin.
+        def expected = fields[0]
         def name = fields[1]
         if (!(expected ==~ /[0-9a-f]{64}/)) {
             throw new GradleException(
                     "Malformed sherpa-onnx AAR pin at ${file}:${lineNumber}: " +
-                    "'${fields[0]}' is not a 64-character hex SHA-256 digest.")
+                    "'${fields[0]}' is not a 64-character lowercase hex SHA-256 digest.")
         }
         if (name.contains('/') || name.contains('\\')) {
             throw new GradleException(
@@ -134,6 +160,13 @@ def verifySherpaAar = tasks.register('verifySherpaAar') {
                     "Restore the committed pin before building a release.")
         }
         def pin = readPin(pinFile)
+        if (pin.name != packagedAarName) {
+            throw new GradleException(
+                    "The sherpa-onnx AAR pin at ${pinFile} names '${pin.name}', but " +
+                    "DaymarkVoice packages '${packagedAarName}'. The gate only accepts " +
+                    "the packaged artifact: verifying a differently named file would " +
+                    "leave the AAR that ships unchecked, even if its digest matches.")
+        }
         if (!aarDir.isDirectory()) {
             throw new GradleException(
                     "sherpa-onnx AAR directory is missing: ${aarDir}. " +
