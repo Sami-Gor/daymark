@@ -1,5 +1,9 @@
 name: Mirror to GitLab
 
+# Publishes the stable ref set of this GitHub repository to the public GitLab
+# copy at https://gitlab.com/Sami-Gor/daymark. The reconciliation policy and
+# the runbook for divergent refs live in docs/operations/gitlab-mirror.md.
+
 on:
   push:
   workflow_dispatch:
@@ -15,6 +19,9 @@ concurrency:
 
 jobs:
   mirror:
+    # A Dependabot push cannot change the mirrored ref set (its branches are
+    # excluded below), so those pushes do not need to run the mirror. The
+    # hourly schedule and manual dispatches always run it.
     if: github.actor != 'dependabot[bot]' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     runs-on: ubuntu-latest
@@ -37,31 +44,117 @@ jobs:
       - name: Push branches and tags to GitLab
         run: |
           set -euo pipefail
+          export LC_ALL=C
 
           cd repo.git
 
           DEST="https://oauth2:${GITLAB_TOKEN}@gitlab.com/Sami-Gor/${REPO_NAME}.git"
 
-          # Current behaviour, kept deliberately unchanged pending an owner
-          # decision (see the note below):
-          #   - every branch is published, on every push and on the hourly
-          #     schedule, so the GitLab project is a second public copy of the
-          #     whole repository, not a release-only publication;
-          #   - the push is NOT a force push, so if a branch on the GitLab
-          #     side is moved ahead of GitHub the push is rejected as
-          #     non-fast-forward and this job keeps failing on every later
-          #     push until the divergence is resolved by hand;
-          #   - deleted branches are not pruned, so a branch removed on GitHub
-          #     stays on GitLab;
-          #   - the `if:` guard above skips dependabot *pushes*, but the
-          #     hourly schedule re-publishes dependabot branches anyway.
-          # Narrowing this to an allow-list, adding --prune, or allowing a
-          # force push each change what is published or published over, so
-          # they need an explicit decision rather than a cleanup commit.
-          git push "$DEST" 'refs/heads/*:refs/heads/*'
-          git push "$DEST" 'refs/tags/*:refs/tags/*'
+          # Publish every GitHub branch and tag, one ref at a time. A
+          # non-fast-forward rejection on one branch must not prevent
+          # unrelated refs from being attempted. The step still fails after
+          # all refs have been attempted if any published ref was not
+          # mirrored.
+          #
+          # Dependabot pull-request branches (`refs/heads/dependabot/*`) are
+          # deliberately not published. Dependabot force-pushes (rebases) its
+          # PR branches whenever the base branch moves, so a non-force mirror
+          # push cannot follow a branch that was already mirrored once: the
+          # ref diverges permanently on GitLab and every later mirror run is
+          # rejected. Those refs are ephemeral PR heads rather than stable
+          # repository state, so they are skipped here and the existing
+          # GitLab-side copy is left untouched rather than overwritten.
+          # See docs/operations/gitlab-mirror.md.
+          #
+          # No --force and no --prune are used. A GitLab-only branch or tag is
+          # intentionally left alone, and a divergent stable branch must be
+          # resolved explicitly rather than being overwritten by this
+          # workflow.
+          skipped_refs=()
+          failed_refs=()
+          published_refs=0
+
+          push_ref() {
+            local ref="$1"
+            echo "::group::Push ${ref}"
+            if git push --porcelain "$DEST" "${ref}:${ref}"; then
+              echo "Mirrored ${ref}"
+              published_refs=$((published_refs + 1))
+            else
+              echo "::error::Mirror failed for ${ref}"
+              failed_refs+=("$ref")
+            fi
+            echo "::endgroup::"
+          }
+
+          while IFS= read -r ref; do
+            case "$ref" in
+              refs/heads/dependabot/*)
+                echo "Skipping ephemeral Dependabot branch ${ref}"
+                skipped_refs+=("$ref")
+                continue
+                ;;
+            esac
+            push_ref "$ref"
+          done < <(git for-each-ref --format='%(refname)' refs/heads refs/tags)
+
+          {
+            echo "### GitLab mirror summary"
+            echo "- Mirrored refs: ${published_refs}"
+            echo "- Skipped ephemeral Dependabot refs: ${#skipped_refs[@]}"
+            if (( ${#skipped_refs[@]} > 0 )); then
+              printf -- '- `%s`\n' "${skipped_refs[@]}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( ${#failed_refs[@]} > 0 )); then
+            {
+              echo "### Mirror failures"
+              printf -- '- `%s`\n' "${failed_refs[@]}"
+              echo
+              echo "No force push was attempted. Resolve each divergence explicitly."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::${#failed_refs[@]} ref(s) failed to mirror"
+            exit 1
+          fi
+
+      - name: Report refs preserved on GitLab
+        if: always()
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+
+          cd repo.git
+
+          DEST="https://oauth2:${GITLAB_TOKEN}@gitlab.com/Sami-Gor/${REPO_NAME}.git"
+
+          # Refs that exist on GitLab but not on GitHub are left in place on
+          # purpose: deleting them would discard GitLab-side history without
+          # an explicit owner decision. Report them so stale refs (for
+          # example, Dependabot branches deleted after their PR merged) stay
+          # visible and can be cleaned up deliberately.
+          git ls-remote --refs "$DEST" 'refs/heads/*' 'refs/tags/*' \
+            | awk '{print $2}' | sort > gitlab.refs
+          git for-each-ref --format='%(refname)' refs/heads refs/tags | sort > github.refs
+
+          comm -23 gitlab.refs github.refs > gitlab-only.refs || true
+
+          gitlab_only_count="$(wc -l < gitlab-only.refs | tr -d ' ')"
+          echo "GitLab-only refs preserved: ${gitlab_only_count}"
+
+          {
+            echo "### GitLab-only refs preserved (not pruned)"
+            if [ "$gitlab_only_count" -eq 0 ]; then
+              echo "- None"
+            else
+              while IFS= read -r ref; do
+                echo "- \`${ref}\`"
+              done < gitlab-only.refs
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify default branch
+        if: always()
         run: |
           set -euo pipefail
 
@@ -77,4 +170,13 @@ jobs:
           echo "GitHub ${DEFAULT_BRANCH}: ${SOURCE_SHA}"
           echo "GitLab ${DEFAULT_BRANCH}: ${DEST_SHA}"
 
-          test "$SOURCE_SHA" = "$DEST_SHA"
+          {
+            echo "### Default-branch verification"
+            echo "- GitHub: \`${DEFAULT_BRANCH}\` = \`${SOURCE_SHA}\`"
+            echo "- GitLab: \`${DEFAULT_BRANCH}\` = \`${DEST_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$SOURCE_SHA" != "$DEST_SHA" ]; then
+            echo "::error::GitHub and GitLab default-branch SHAs differ"
+            exit 1
+          fi
