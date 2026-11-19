@@ -42,26 +42,45 @@ jobs:
 
           DEST="https://oauth2:${GITLAB_TOKEN}@gitlab.com/Sami-Gor/${REPO_NAME}.git"
 
-          # Current behaviour, kept deliberately unchanged pending an owner
-          # decision (see the note below):
-          #   - every branch is published, on every push and on the hourly
-          #     schedule, so the GitLab project is a second public copy of the
-          #     whole repository, not a release-only publication;
-          #   - the push is NOT a force push, so if a branch on the GitLab
-          #     side is moved ahead of GitHub the push is rejected as
-          #     non-fast-forward and this job keeps failing on every later
-          #     push until the divergence is resolved by hand;
-          #   - deleted branches are not pruned, so a branch removed on GitHub
-          #     stays on GitLab;
-          #   - the `if:` guard above skips dependabot *pushes*, but the
-          #     hourly schedule re-publishes dependabot branches anyway.
-          # Narrowing this to an allow-list, adding --prune, or allowing a
-          # force push each change what is published or published over, so
-          # they need an explicit decision rather than a cleanup commit.
-          git push "$DEST" 'refs/heads/*:refs/heads/*'
-          git push "$DEST" 'refs/tags/*:refs/tags/*'
+          # Publish every GitHub branch and tag, one ref at a time. A
+          # non-fast-forward rejection on one branch must not prevent
+          # unrelated refs from being attempted. The step still fails after
+          # all refs have been attempted if any source ref was not mirrored.
+          #
+          # No --force and no --prune are used. A GitLab-only branch or tag is
+          # intentionally left alone, and a divergent branch must be resolved
+          # explicitly rather than being overwritten by this workflow.
+          failed_refs=()
+
+          push_ref() {
+            local ref="$1"
+            echo "::group::Push ${ref}"
+            if git push --porcelain "$DEST" "${ref}:${ref}"; then
+              echo "Mirrored ${ref}"
+            else
+              echo "::error::Mirror failed for ${ref}"
+              failed_refs+=("$ref")
+            fi
+            echo "::endgroup::"
+          }
+
+          while IFS= read -r ref; do
+            push_ref "$ref"
+          done < <(git for-each-ref --format='%(refname)' refs/heads refs/tags)
+
+          if (( ${#failed_refs[@]} > 0 )); then
+            {
+              echo "### Mirror failures"
+              printf -- '- `%s`\n' "${failed_refs[@]}"
+              echo
+              echo "No force push was attempted. Resolve each divergence explicitly."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::${#failed_refs[@]} ref(s) failed to mirror"
+            exit 1
+          fi
 
       - name: Verify default branch
+        if: always()
         run: |
           set -euo pipefail
 
@@ -77,4 +96,13 @@ jobs:
           echo "GitHub ${DEFAULT_BRANCH}: ${SOURCE_SHA}"
           echo "GitLab ${DEFAULT_BRANCH}: ${DEST_SHA}"
 
-          test "$SOURCE_SHA" = "$DEST_SHA"
+          {
+            echo "### Default-branch verification"
+            echo "- GitHub: \`${DEFAULT_BRANCH}\` = \`${SOURCE_SHA}\`"
+            echo "- GitLab: \`${DEFAULT_BRANCH}\` = \`${DEST_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$SOURCE_SHA" != "$DEST_SHA" ]; then
+            echo "::error::GitHub and GitLab default-branch SHAs differ"
+            exit 1
+          fi
