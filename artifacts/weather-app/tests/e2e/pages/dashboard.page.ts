@@ -71,6 +71,20 @@ export class DashboardPage {
     await expect(this.currentTemperature).toBeVisible();
   }
 
+  /** The weather error panel is visible and no loading state remains. */
+  async expectWeatherError(text?: string | RegExp): Promise<void> {
+    await expect(this.errorPanel).toBeVisible();
+    await expect(this.loadingLayout).toHaveCount(0);
+    if (text !== undefined) await expect(this.errorPanel).toContainText(text);
+  }
+
+  /** A retry succeeded: error panel gone, forecast visible, loading cleared. */
+  async expectWeatherRecovered(): Promise<void> {
+    await expect(this.errorPanel).toHaveCount(0);
+    await expect(this.currentTemperature).toBeVisible();
+    await expect(this.loadingLayout).toHaveCount(0);
+  }
+
   async expectBrand(): Promise<void> {
     await expect(this.brandName).toHaveText('daymark');
   }

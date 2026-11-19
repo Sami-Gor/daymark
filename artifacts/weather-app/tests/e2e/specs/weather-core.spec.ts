@@ -82,19 +82,18 @@ test.describe('weather dashboard', () => {
       }
     });
     await dashboard.goto('/');
-    await expect(dashboard.errorPanel).toBeVisible();
-    await expect(dashboard.errorPanel).toContainText("Weather data isn't available right now");
+    await dashboard.expectWeatherError("Weather data isn't available right now");
 
     failing = false;
     await dashboard.retryWeather();
+    await dashboard.expectWeatherRecovered();
     await dashboard.expectTemperature('20°C');
   });
 
   test('network failure shows friendly copy without raw browser text', async ({ api, dashboard }) => {
     await api.offline();
     await dashboard.goto('/');
-    await expect(dashboard.errorPanel).toBeVisible();
-    await expect(dashboard.errorPanel).toContainText("We couldn't reach the weather service");
+    await dashboard.expectWeatherError("We couldn't reach the weather service");
     await expect(dashboard.errorPanel).not.toContainText('Failed to fetch');
     await expect(dashboard.errorRetryButton).toBeVisible();
   });
@@ -102,10 +101,34 @@ test.describe('weather dashboard', () => {
   test('malformed API data shows a friendly error without crashing the page', async ({ api, dashboard }) => {
     await api.forecast({ current: 'garbage', hourly: 42 });
     await dashboard.goto('/');
-    await expect(dashboard.errorPanel).toBeVisible();
-    await expect(dashboard.errorPanel).toContainText('unexpected shape');
+    await dashboard.expectWeatherError('unexpected shape');
     // The page itself is alive: footer and error controls are present.
     await dashboard.expectBrand();
+  });
+
+  test('HTTP 429 maps to the friendly error and a manual retry recovers', async ({ page, api, dashboard, requests }) => {
+    await api.forecast({ reason: 'rate limited' }, { status: 429 });
+    await dashboard.goto('/');
+    await dashboard.expectWeatherError("Weather data isn't available right now");
+    await expect(dashboard.errorRetryButton).toBeVisible();
+
+    // Count forecast attempts only; ukmo_seamless is the micro-climate request.
+    const forecastRequests = (): number =>
+      requests.matching((url) => url.includes('/v1/forecast') && !url.includes('ukmo')).length;
+    await expect.poll(forecastRequests).toBe(1);
+
+    // Retry is user-driven: wait on the request/response pair and the resulting UI,
+    // never on elapsed time. The no-auto-retry invariant is pinned deterministically
+    // by API-02 in src/lib/weather-resilience.test.ts (App.tsx schedules no retry timer).
+    await api.forecast();
+    const retried = page.waitForResponse((response) =>
+      response.url().includes('/v1/forecast')
+      && !response.url().includes('ukmo')
+      && response.ok());
+    await dashboard.retryWeather();
+    await retried;
+    await dashboard.expectWeatherRecovered();
+    await expect.poll(forecastRequests).toBe(2);
   });
 });
 
