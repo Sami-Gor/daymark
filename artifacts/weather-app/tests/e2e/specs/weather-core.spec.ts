@@ -106,17 +106,29 @@ test.describe('weather dashboard', () => {
     await dashboard.expectBrand();
   });
 
-  test('HTTP 429 is handled without a retry loop', async ({ page, dashboard }) => {
-    let calls = 0;
-    await page.route('**/api.open-meteo.com/**', async (route) => {
-      calls += 1;
-      await route.fulfill({ status: 429, contentType: 'application/json', body: '{"reason":"rate limited"}' });
-    });
+  test('HTTP 429 maps to the friendly error and a manual retry recovers', async ({ page, api, dashboard, requests }) => {
+    await api.forecast({ reason: 'rate limited' }, { status: 429 });
     await dashboard.goto('/');
     await dashboard.expectWeatherError("Weather data isn't available right now");
-    // Give the app a moment it would use for an automatic retry, then assert none happened.
-    await page.waitForTimeout(1500);
-    expect(calls).toBeLessThanOrEqual(2); // one forecast + one air-quality request, nothing more
+    await expect(dashboard.errorRetryButton).toBeVisible();
+
+    // Count forecast attempts only; ukmo_seamless is the micro-climate request.
+    const forecastRequests = (): number =>
+      requests.matching((url) => url.includes('/v1/forecast') && !url.includes('ukmo')).length;
+    await expect.poll(forecastRequests).toBe(1);
+
+    // Retry is user-driven: wait on the request/response pair and the resulting UI,
+    // never on elapsed time. The no-auto-retry invariant is pinned deterministically
+    // by API-02 in src/lib/weather-resilience.test.ts (App.tsx schedules no retry timer).
+    await api.forecast();
+    const retried = page.waitForResponse((response) =>
+      response.url().includes('/v1/forecast')
+      && !response.url().includes('ukmo')
+      && response.ok());
+    await dashboard.retryWeather();
+    await retried;
+    await dashboard.expectWeatherRecovered();
+    await expect.poll(forecastRequests).toBe(2);
   });
 });
 
