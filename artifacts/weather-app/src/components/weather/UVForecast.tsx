@@ -1,4 +1,4 @@
-import { compareLocationTimes, getCurrentLocationTime, getLocationLocalDate, getSunProtectionWindow, locationTimeMs, shortDay, timeLabel, uvColor, uvLevel, uvValue, type WeatherPayload } from '@/lib/weather';
+import { compareLocationTimes, getCurrentLocationTime, getLocationLocalDate, getSunProtectionWindow, shortDay, timeLabel, uvBarColor, uvColor, uvLevel, uvValue, type WeatherPayload } from '@/lib/weather';
 import { useLocale } from '@/hooks/use-locale';
 
 export function UVForecast({ weather }: { weather: WeatherPayload }) {
@@ -41,24 +41,33 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
       ? t('uv.window.none')
       : t('uv.window.unavailable');
 
-  const todayPrefix = getLocationLocalDate(current.time) ?? getLocationLocalDate(hourlyTimes[0]) ?? '';
-  const daylightIndexes = hourlyTimes
-    .map((time, index) => ({ time, index }))
-    .filter(({ time, index }) => getLocationLocalDate(time) === todayPrefix && (hourly.uv_index?.[index] ?? 0) > 0);
-  const trackStart = daylightIndexes.length ? locationTimeMs(daylightIndexes[0].time) ?? Number.NaN : Number.NaN;
-  const lastTrackMs = daylightIndexes.length ? locationTimeMs(daylightIndexes[daylightIndexes.length - 1].time) : null;
-  const trackEnd = lastTrackMs == null ? Number.NaN : lastTrackMs + 3_600_000;
-  const nowMs = locationTimeMs(currentTime) ?? Number.NaN;
-  const nowPercent = Number.isFinite(nowMs) && Number.isFinite(trackStart) && trackEnd > trackStart
-    ? Math.max(0, Math.min(100, ((nowMs - trackStart) / (trackEnd - trackStart)) * 100))
-    : null;
-  const windowStartMs = protection.status === 'window' ? locationTimeMs(protection.window.start) : null;
-  const windowEndMs = protection.status === 'window' ? locationTimeMs(protection.window.end) : null;
-  const isProtected = (time: string) => {
-    if (protection.status !== 'window' || windowStartMs == null || windowEndMs == null) return false;
-    const ms = locationTimeMs(time);
-    return ms != null && ms >= windowStartMs && ms < windowEndMs;
+  const hourOf = (time: string) => {
+    const hour = Number(time.slice(11, 13));
+    return Number.isFinite(hour) ? hour : -1;
   };
+  const todayPrefix = getLocationLocalDate(current.time) ?? getLocationLocalDate(hourlyTimes[0]) ?? '';
+  // The timeline covers the whole daylight window (sunrise to sunset, floored
+  // to whole hours) so the curve reads as a continuous rise and fall, with
+  // every real hourly UV reading in between. When the daily window is
+  // unavailable it falls back to the hours that actually carry UV > 0.
+  const sunrise = daily.sunrise?.[0];
+  const sunset = daily.sunset?.[0];
+  const windowStartHour = sunrise && getLocationLocalDate(sunrise) === todayPrefix ? hourOf(sunrise) : null;
+  const windowEndHour = sunset && getLocationLocalDate(sunset) === todayPrefix ? hourOf(sunset) : null;
+  const timelineIndexes = hourlyTimes
+    .map((time, index) => ({ time, index }))
+    .filter(({ time, index }) => {
+      if (getLocationLocalDate(time) !== todayPrefix) return false;
+      if (windowStartHour == null || windowEndHour == null) return (hourly.uv_index?.[index] ?? 0) > 0;
+      const hour = hourOf(time);
+      return hour >= windowStartHour && hour <= windowEndHour;
+    });
+  // Bar heights are normalized against the day's visible peak; a minimum
+  // share keeps near-zero daylight hours visible as slim dots.
+  const visibleUv = timelineIndexes.map(({ index }) => Math.max(0, hourly.uv_index?.[index] ?? 0));
+  const maxVisibleUv = Math.max(visibleUv.length ? Math.max(...visibleUv) : 0, 0.1);
+  const minBarPercent = 12;
+  const barHeight = (value: number) => Math.round(minBarPercent + (value / maxVisibleUv) * (100 - minBarPercent));
 
   const peakAriaTime = peakHour?.time ? t('uv.peakAriaTime', { time: timeLabel(peakHour.time, locale) }) : '';
 
@@ -91,15 +100,23 @@ export function UVForecast({ weather }: { weather: WeatherPayload }) {
           </div>
         </div>
 
-        {daylightIndexes.length > 1 && (
-          <div className="uv-window-track" data-testid="uv-protection-timeline" aria-hidden="true">
-            {daylightIndexes.map(({ time, index }) => (
-              <span
-                className={`uv-window-seg${isProtected(time) ? ' uv-window-seg-protected' : ''}`}
-                key={`${time}-${index}`}
-              />
-            ))}
-            {nowPercent != null && <i className="uv-window-now" style={{ left: `${nowPercent}%` }} />}
+        {timelineIndexes.length > 1 && (
+          <div className="uv-timeline" data-testid="uv-protection-timeline" aria-hidden="true">
+            {timelineIndexes.map(({ time, index }) => {
+              const value = Math.max(0, hourly.uv_index?.[index] ?? 0);
+              const hour = hourOf(time);
+              return (
+                <span className="uv-timeline-col" key={`${time}-${index}`}>
+                  <span className="uv-timeline-bar-wrap">
+                    <i
+                      className="uv-timeline-bar"
+                      style={{ height: `${barHeight(value)}%`, background: uvBarColor(value) }}
+                    />
+                  </span>
+                  <small className="uv-timeline-time">{hour >= 0 && hour % 3 === 0 ? timeLabel(time, locale) : ''}</small>
+                </span>
+              );
+            })}
           </div>
         )}
 
