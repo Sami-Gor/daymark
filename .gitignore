@@ -84,6 +84,34 @@ android/local.properties
 android/*.apk
 android/*.aab
 
+# Signed release bundles uploaded to Google Play — never commit these.
+# The bundle contains the upload certificate and the shipped application code.
+/google-play-upload/
+*.aab
+
+# Google Services / Firebase configuration is environment-specific and may
+# contain a client API key. Never commit it.
+/google-services.json
+**/google-services.json
+
+# Local V2 test-build assets. These are large binary model payloads and
+# recorded test audio and must never reach the public repository.
+# The v2test source set is a local-only experiment and is not tracked in any
+# branch; only the payload directories are excluded here, so that any source
+# under src/v2test/ can still be committed deliberately if it is ever
+# published deliberately.
+/artifacts/weather-app/android/app/src/v2test/assets/
+/artifacts/weather-app/android/app/libs/
+/android/app/libs/
+
+# Store-listing artwork held locally outside the tracked documentation tree.
+/Images/
+/Phone Assets/
+/Android XR assets/
+/Chromebook screenshots/
+/10-inch tablet Assets/
+/7-inch tablet Tablet assets/
+
 # Kokoro POC build artifacts (external crate checkout + cargo/NDK leftovers)
 android/kokoro-poc/.build/
 android/.cargo/
