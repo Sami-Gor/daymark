@@ -1,0 +1,53 @@
+$ pnpm run typecheck && pnpm -r --if-present run build
+$ pnpm -r --filter "./artifacts/**" --filter "./scripts" --if-present run typecheck
+Scope: 3 of 4 workspace projects
+artifacts/weather-app typecheck$ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit
+artifacts/mockup-sandbox typecheck$ tsc -p tsconfig.json --noEmit
+artifacts/mockup-sandbox typecheck: Done
+artifacts/weather-app typecheck: Done
+Scope: 3 of 4 workspace projects
+artifacts/weather-app build$ vite build --config vite.config.ts
+artifacts/mockup-sandbox build$ vite build
+artifacts/mockup-sandbox build: vite v8.3.8 building client environment for production...
+artifacts/weather-app build: vite v8.3.8 building client environment for production...
+artifacts/mockup-sandbox build: transforming...
+artifacts/weather-app build: transforming...
+artifacts/mockup-sandbox build: ✓ 1669 modules transformed.
+artifacts/weather-app build: ✓ 1843 modules transformed.
+artifacts/mockup-sandbox build: rendering chunks...
+artifacts/mockup-sandbox build: computing gzip size...
+artifacts/mockup-sandbox build: dist/index.html                                 4.42 kB │ gzip:  1.23 kB
+artifacts/mockup-sandbox build: dist/assets/MicroClimate-BO_hP0nS.css           3.51 kB │ gzip:  1.18 kB
+artifacts/mockup-sandbox build: dist/assets/AirQualityRedesign-quHmWwtQ.css     5.03 kB │ gzip:  1.47 kB
+artifacts/mockup-sandbox build: dist/assets/DaymarkHeroRedesign-BGh35trP.css    5.56 kB │ gzip:  1.60 kB
+artifacts/mockup-sandbox build: dist/assets/UVForecastRedesign-CpFxkFK_.css     6.49 kB │ gzip:  1.75 kB
+artifacts/mockup-sandbox build: dist/assets/index-B-CMqCSW.css                 89.26 kB │ gzip: 14.97 kB
+artifacts/mockup-sandbox build: dist/assets/createLucideIcon-NupJpKlR.js        1.17 kB │ gzip:  0.67 kB
+artifacts/mockup-sandbox build: dist/assets/MicroClimate-C1BQ8KSt.js            3.09 kB │ gzip:  1.26 kB
+artifacts/mockup-sandbox build: dist/assets/AirQualityRedesign-Bnmd4rhO.js      3.19 kB │ gzip:  1.09 kB
+artifacts/mockup-sandbox build: dist/assets/DaymarkHeroRedesign-CnNqEl0W.js     3.73 kB │ gzip:  1.23 kB
+artifacts/mockup-sandbox build: dist/assets/UVForecastRedesign-DtZOLXty.js      4.09 kB │ gzip:  1.10 kB
+artifacts/mockup-sandbox build: dist/assets/index-C56u2qR2.js                 187.46 kB │ gzip: 59.82 kB
+artifacts/mockup-sandbox build: 
+artifacts/mockup-sandbox build: ✓ built in 1.90s
+artifacts/weather-app build: rendering chunks...
+artifacts/mockup-sandbox build: Done
+artifacts/weather-app build: computing gzip size...
+artifacts/weather-app build: dist/public/index.html                                       2.11 kB │ gzip:   0.77 kB
+artifacts/weather-app build: dist/public/assets/locality.worker-CEmdYeMH.js               2.33 kB
+artifacts/weather-app build: dist/public/assets/dm-mono-latin-400-5TJO7pqc.woff2          8.68 kB
+artifacts/weather-app build: dist/public/assets/dm-mono-latin-500-CO0PTrKB.woff2          8.72 kB
+artifacts/weather-app build: dist/public/assets/plus-jakarta-sans-latin-B2KjpZfh.woff2   27.27 kB
+artifacts/weather-app build: dist/public/assets/fraunces-latin-BOz5zopO.woff2            67.38 kB
+artifacts/weather-app build: dist/public/assets/index-Cu_9Cz9u.css                       75.93 kB │ gzip:  14.94 kB
+artifacts/weather-app build: dist/public/assets/web-VbMhR4hR.js                           0.31 kB │ gzip:   0.22 kB
+artifacts/weather-app build: dist/public/assets/web-0-8JFZBt.js                           0.84 kB │ gzip:   0.39 kB
+artifacts/weather-app build: dist/public/assets/index-BClJMSeL.js                       552.99 kB │ gzip: 167.81 kB
+artifacts/weather-app build: 
+artifacts/weather-app build: [plugin builtin:vite-reporter] 
+artifacts/weather-app build: (!) Some chunks are larger than 500 kB after minification. Consider:
+artifacts/weather-app build: - Using dynamic import() to code-split the application
+artifacts/weather-app build: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+artifacts/weather-app build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+artifacts/weather-app build: ✓ built in 1.98s
+artifacts/weather-app build: Done

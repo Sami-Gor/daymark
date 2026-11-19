@@ -1,0 +1,42 @@
+== Build scratch ==
+
+### 1. Shell syntax of every plan artifact
+PASS  bash -n apply-plan-a.sh
+PASS  bash -n apply-plan-b.sh
+PASS  bash -n check-state.sh
+PASS  bash -n plans-lib.sh
+PASS  bash -n restore-staged-backup.sh
+PASS  bash -n test-plans.sh
+PASS  bash -n verify-plan-a.sh
+PASS  bash -n verify-plan-b.sh
+PASS  bash -n parakeet-pins.env
+
+### 2. Plan A patch dry-run against the real repository (read-only)
+PASS  plan-a-adoption.patch applies cleanly to real HEAD
+PASS  plan-a-revert.patch is the byte-exact inverse (dry-run)
+
+### 3. Plan A applies to a scratch replica and verifies
+PASS  apply plan-a-adoption.patch to scratch replica
+PASS  verify-plan-a on scratch replica
+PASS  check-state classifies scratch Plan A as new
+PASS  check-state rejects new pins with old staging
+
+### 4. Plan A revert patch restores byte-identical files
+PASS  revert restores all six files byte-identically
+PASS  check-state classifies reverted + new staged as hazard
+
+### 5. Plan A preflight refusals
+PASS  dry-run Plan A on old pins + new staging
+PASS  Plan A refuses when staging is OLD
+PASS  check-state after Plan A dry-run still reports hazard
+
+### 6. Plan B restores OLD bytes into scratch staging
+PASS  dry-run Plan B on committed NEW staging
+FAIL  apply Plan B (restores OLD, backs up NEW) (see /Volumes/DaymarkWorkspace/Daymark/archive/reports/round4-b-plans/_validation/logs/apply-b.log)
+FAIL  verify-plan-b passes (see /Volumes/DaymarkWorkspace/Daymark/archive/reports/round4-b-plans/_validation/logs/verify-b.log)
+FAIL  check-state classifies scratch Plan B as old (see /Volumes/DaymarkWorkspace/Daymark/archive/reports/round4-b-plans/_validation/logs/check-b-old.log)
+PASS  Plan B refuses a second apply without --idempotent
+FAIL  Plan B --idempotent verifies an already-old staging (see /Volumes/DaymarkWorkspace/Daymark/archive/reports/round4-b-plans/_validation/logs/apply-b-idem.log)
+
+### 7. Reverse Plan B (rollback of the rollback)
+FAIL  restore-staged-backup returns NEW bytes (see /Volumes/DaymarkWorkspace/Daymark/archive/reports/round4-b-plans/_validation/logs/restore-new.log)

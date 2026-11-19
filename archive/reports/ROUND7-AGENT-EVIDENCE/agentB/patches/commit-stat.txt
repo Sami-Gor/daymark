@@ -1,0 +1,20 @@
+a076df3 tools(plan-remediation): fix Plan A/B rollback scripts (A1-A4, B1-B3) with regression suites
+ tools/plan-remediation/README.md                   | 118 +++++
+ tools/plan-remediation/SHA256SUMS                  |  17 +
+ tools/plan-remediation/apply-plan-a.sh             | 230 ++++++++++
+ tools/plan-remediation/apply-plan-b.sh             | 431 ++++++++++++++++++
+ tools/plan-remediation/check-state.sh              |  96 +++++
+ tools/plan-remediation/parakeet-pins.env           |  93 ++++
+ tools/plan-remediation/plan-a-adoption.patch       | 123 ++++++
+ tools/plan-remediation/plan-a-replacements.tsv     |  24 ++
+ tools/plan-remediation/plan-a-revert.patch         | 123 ++++++
+ tools/plan-remediation/plans-lib.sh                | 480 +++++++++++++++++++++
+ .../plan-remediation/refresh-evidence-manifest.sh  | 100 +++++
+ tools/plan-remediation/restore-staged-backup.sh    | 394 +++++++++++++++++
+ tools/plan-remediation/tests/test-lib.sh           | 125 ++++++
+ tools/plan-remediation/tests/test-plan-a-suite.sh  | 199 +++++++++
+ tools/plan-remediation/tests/test-plan-b-suite.sh  | 261 +++++++++++
+ .../tests/test-plans-remediation.sh                | 118 +++++
+ tools/plan-remediation/verify-plan-a.sh            | 123 ++++++
+ tools/plan-remediation/verify-plan-b.sh            | 222 ++++++++++
+ 18 files changed, 3277 insertions(+)

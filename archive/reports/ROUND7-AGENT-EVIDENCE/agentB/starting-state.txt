@@ -1,0 +1,47 @@
+baseline 2026-11-19T21:26:56Z
+repo_head=45d12748679fa67723e6a5b2d997eb7711f05c43
+/Volumes/DaymarkWorkspace/Daymark/repositories/daymark               45d1274 [public/pr54-n1-error-propagation-release-v2]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/exec-n1                  45d1274 [exec/n1]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/exec-n6-app              45d1274 [exec/n6-app]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/f15-followup             9002641 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/f15-work                 9002641 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/final-kotlin             bb25413 [final/kotlin]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/final-n1                 0cc8f31 [final/n1]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/final-n1-repro-a         0cc8f31 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/final-n1-repro-b         0cc8f31 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/integration-candidate    3aa7781 [integration/heejun-production-candidate]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/n1-work                  9002641 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/n3-work                  d6c85ea (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/n4-work                  9002641 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/n5-work                  9002641 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/negative                 86ac5da (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/next-n1                  0cc8f31 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/owner-n1                 45d1274 [owner/n1]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/owner-n6-app             3c3c437 [owner/n6-app]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/post-merge-main          6aafa15 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/pr-checkout              3e6431a [pr/2-checkout]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/pr-plugin-react          2a3f1de [pr/8-plugin-react]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/pr-setup-node            f0fb879 [pr/1-setup-node]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/pr-vite8                 d57a7cd [pr/33-vite8]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/r6-dev-v21               aedfe8a [r6/dev-v21]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/r6-pin                   9002641 [r6/pin]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/r6-pr71                  049b484 [r6/pr71]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/r6-pr74                  772cc94 [r6/pr74]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/r6-pr80                  04ec4cc [r6/pr80]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pin                   9002641 [r7/pin]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-plans                 9002641 [r7/plans]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80                  aedfe8a [r7/pr80-v21]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/remediation-mirror       aba1065 [remediation/gitlab-mirror]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/remediation-n4           57f55f5 [remediation/n4-integrity]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/review-f2                36017e9 [review/f2-asan]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/review-n3                4076589 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/review-n4                e1dc679 (detached HEAD)
+/Volumes/DaymarkWorkspace/Daymark/worktrees/round3-docs              6a69e5e [round3/docs]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/round3-integration       67bd506 [r3c3/merge-orderA]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/round3-native            0cc8f31 [fix/n1-d4-convert-order]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/round4-android-harness   b46654f [round4/android-parity]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/round4-integration       9002641 [round4/integration]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/round4-main-integration  d4370f4 [round4/gitlab-main]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/round5-planA             45d1274 [round5/planA]
+/Volumes/DaymarkWorkspace/Daymark/worktrees/round5-planB             45d1274 [round5/planB]
+/dev/disk6s1   170Gi   137Gi    33Gi    81%    3.4M  349M    1%   /Volumes/DaymarkWorkspace

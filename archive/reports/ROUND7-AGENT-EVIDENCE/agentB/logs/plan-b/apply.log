@@ -1,0 +1,77 @@
+[*] Plan B preflight (mode: APPLY)
+[*] pin state is OLD (MODEL_VERSION sha256-1, all old digests) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/repo
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+[*] archives verified (OLD preserved + NEW quarantine)
+PASS  old source encoder size
+PASS  old source encoder sha256
+PASS  old source decoder size
+PASS  old source decoder sha256
+PASS  old source joiner size
+PASS  old source joiner sha256
+PASS  old source tokens size
+PASS  old source tokens sha256
+[*] old source verified: /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+
+== Planned Plan B change ==
+source        /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+mode          APPLY
+target        t1 /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage (pre-state new)
+files         encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt (replace=3 install=0 skip=1)
+backup dir    /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-main
+
+[*] backup dir: /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-main
+[*] backup verified: 3 NEW file(s) preserved, 0 absent file(s) recorded
+[*] pre-staged 3+0 OLD file(s) and verified every temp copy
+[*] committed all renames: targets now hold the OLD bytes
+[*] Verifying Plan B (OLD staged assets restored, old pins) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/repo
+PASS  pin state is OLD
+PASS  MODEL_VERSION sha256-1 present
+PASS  MODEL_VERSION sha256-2 absent
+PASS  new archive digest absent from pins
+PASS  new encoder digest absent from pins
+PASS  new decoder digest absent from pins
+PASS  new joiner digest absent from pins
+PASS  staged model state is OLD
+PASS  staged file present: encoder.int8.onnx
+PASS  staged file present: decoder.int8.onnx
+PASS  staged file present: joiner.int8.onnx
+PASS  staged file present: tokens.txt
+PASS  staged encoder size
+PASS  staged encoder sha256
+PASS  staged decoder size
+PASS  staged decoder sha256
+PASS  staged joiner size
+PASS  staged joiner sha256
+PASS  staged tokens size
+PASS  staged tokens sha256 (unchanged bytes)
+PASS  backup provenance present and records the staging target(s) + manifest hashes
+PASS  backup encoder (NEW) (manifest + bytes = canonical NEW)
+PASS  backup decoder (NEW) (manifest + bytes = canonical NEW)
+PASS  backup joiner (NEW) (manifest + bytes = canonical NEW)
+PASS  backup tokens (NEW, shared bytes) (shared bytes; no replacement needed)
+PASS  backup manifests cover exactly the pre-Plan-B NEW bytes
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+
+Plan B state: pins OLD + staged OLD (consistent with ParakeetModelAssets,
+ParakeetModelAssetsTest, verifyParakeetAssets expectations).
+Caveat: old bytes are only reproducible from the preserved old archive;
+the upstream URL now serves the new archive, so fetch cannot recreate them.
+----------------------------------------
+checks passed: 30   failed: 0
+
+Plan B applied: staged model bytes are OLD again and consistent with the OLD pins.
+Backup: /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-main (v2 multi-target; recorded in targets.tsv)
+Remaining OWNER-GATED steps (not run here):
+  1. Confirm: ./check-state.sh --expect old --with-archives
+  2. The pre-Plan-B bytes are preserved in the backup dir shown above; the new
+     archive remains in quarantine/ for a future Plan A window.
+  3. Do NOT run fetch-parakeet-assets.sh while the old pins are in place: the
+     upstream URL now serves the NEW archive, so the archive pin check fails
+     (this was true before Plan B as well).
+  4. Record why adoption was deferred (owner decision) in the release evidence.

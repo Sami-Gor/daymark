@@ -1,0 +1,153 @@
+== Static remediation checks ==
+
+== Plan A regression suite ==
+T-PASS  all plan/remediation scripts + pins env parse (bash -n)
+T-PASS  A1: apply-plan-a.sh no longer assumes .git is a directory
+T-PASS  A1: repo root is resolved with git rev-parse --show-toplevel
+T-PASS  A2: apply-plan-a.sh has an archive pre-gate before writing
+T-PASS  A1 fixture: linked worktree has a .git file (not a directory)
+T-PASS  baseline scratch repo pins are OLD (pins OLD)
+T-PASS  main-worktree: Plan A apply + auto-verify
+T-PASS  main-worktree: root resolution logged
+T-PASS  main-worktree: apply log shows 55/0 verification
+T-PASS  main-worktree: explicit verify-plan-a run
+T-PASS  canonical Plan A suite (staging NEW) = 55 checks (55 passed / 0 failed)
+T-PASS  post-Plan-A pin-file hashes match the reviewed expected set
+T-PASS  check-state classifies patched main worktree as plan-a
+T-PASS  repeated apply is refused (pins already NEW)
+T-PASS  plan-a-revert.patch applies to the patched tree
+T-PASS  revert patch leaves a clean working tree
+T-PASS  revert patch restores the six pin files byte-identically
+T-PASS  repeat: apply again (repeated execution)
+T-PASS  repeat: reverse with git apply -R
+T-PASS  git apply -R restores the six pin files byte-identically
+T-PASS  linked-worktree: Plan A apply + auto-verify (A1 fix)
+T-PASS  linked-worktree: git root resolution logged
+T-PASS  linked-worktree: verify-plan-a
+T-PASS  linked-worktree Plan A verifier = 55 checks (55 passed / 0 failed)
+T-PASS  linked-worktree: revert patch
+T-PASS  linked-worktree revert is byte-identical
+T-PASS  linked-worktree: refuses OLD staging (Plan A needs NEW bytes)
+T-PASS  dry-run on linked worktree
+T-PASS  dry-run leaves pin files byte-identical
+T-PASS  A3: apply with --allow-missing-staging succeeds
+T-PASS  A3: verifier reports the 42-check missing-staging mode
+T-PASS  A3: missing staging is still refused without the flag
+T-PASS  A3: revert after missing-staging apply
+T-PASS  A3: revert after missing-staging apply is byte-identical
+T-PASS  A2: failed post-verify is detected
+T-PASS  A2: rollback message present
+T-PASS  A2: failed post-verify leaves no tracked changes
+T-PASS  A2: failed post-verify restores byte-identical pin files
+T-PASS  A2: no temp pre-hash files leaked into scratch repo
+T-PASS  A2: bad old archive aborts the apply
+T-PASS  A2: archive pre-gate error names the pre-gate
+T-PASS  A2: archive pre-gate aborts before touching the tree
+T-PASS  A2: archive pre-gate leaves byte-identical pin files
+T-PASS  A4: refresh-evidence-manifest --write
+T-PASS  A4: fresh manifest verifies with --check
+T-PASS  A4: stale manifest detected after a byte changes
+T-PASS  A4: manifest regenerated after change
+T-PASS  A4: manifest missing an added file is detected
+T-PASS  A4: manifest regenerated after file addition
+T-PASS  A4: self-listing manifest is detected as stale
+T-PASS  A4: manifest regenerated cleanly after self-entry
+T-PASS  A4: final manifest is current
+T-PASS  production NEW extracted bytes unchanged by suite
+T-PASS  production OLD extracted bytes unchanged by suite
+T-PASS  preserved OLD/NEW archives unchanged by suite
+SUITE RESULT (plan-a): pass=55 fail=0
+
+== Plan B regression suite (long: real 639 MiB model bytes, APFS clones) ==
+T-PASS  all plan/remediation scripts + pins env parse (bash -n)
+T-PASS  B1: targets.tsv target recording present in apply and restore
+T-PASS  B1: restore-staged-backup.sh supports --include-negative
+T-PASS  Plan B dry-run on NEW staging
+T-PASS  dry-run reports DRY-RUN OK
+T-PASS  dry-run leaves staged bytes byte-identical
+T-PASS  Plan B apply: backup NEW then restore OLD
+T-PASS  apply auto-verify reports 30/0
+T-PASS  applied staging bytes equal the canonical OLD set
+T-PASS  explicit verify-plan-b run
+T-PASS  canonical Plan B suite (main staging + backup + archives) = 30 checks (30 passed / 0 failed)
+T-PASS  check-state classifies scratch Plan B as plan-b
+T-PASS  B1: targets.tsv records exactly one target for a main-only run
+T-PASS  B1: targets.tsv records the staging path
+T-PASS  B1: backup preserves the 3 replaced NEW files (tokens shared -> not copied)
+T-PASS  B1: backup encoder bytes = canonical NEW
+T-PASS  B1: backup decoder bytes = canonical NEW
+T-PASS  B1: backup joiner bytes = canonical NEW
+T-PASS  restore dry-run on OLD staging
+T-PASS  restore dry-run reports DRY-RUN OK
+T-PASS  restore dry-run leaves bytes unchanged
+T-PASS  restore --apply returns the NEW bytes
+T-PASS  byte-identical before/after apply+restore cycle
+T-PASS  check-state after restore classifies the known hazard
+T-PASS  stale/tampered backup manifest fails verify-plan-b
+T-PASS  stale manifest reason reported
+T-PASS  stale/tampered backup manifest refused by restore
+T-PASS  restore refuses stale backup
+T-PASS  tampered backup bytes fail verify-plan-b
+T-PASS  tampered byte reason reported
+T-PASS  tampered backup bytes refused by restore
+T-PASS  stale targets.tsv fails verify-plan-b
+T-PASS  targets mismatch reported
+T-PASS  second apply on OLD staging refused without --idempotent
+T-PASS  refused second apply creates no backup dir
+T-PASS  repeat: fresh Plan B apply after restore
+T-PASS  idempotent dry-run on already-OLD staging
+T-PASS  idempotent --apply verifies only and writes nothing
+T-PASS  idempotent --apply creates no backup dir
+T-PASS  idempotent --apply leaves staged bytes byte-identical
+T-PASS  B3: restore from extracted-new source
+T-PASS  B3: extracted-new restore returns canonical NEW bytes
+T-PASS  B3: restore from NEW archive source
+T-PASS  B3: archive restore returns canonical NEW bytes
+T-PASS  B3: restore from backup source (default)
+T-PASS  B3: backup restore returns canonical NEW bytes
+T-PASS  B1: apply --include-negative to main + negative targets
+T-PASS  include-negative auto-verify reports 31/0
+T-PASS  B1: verify-plan-b --include-negative
+T-PASS  B1: include-negative verifier = 31 checks (31 passed / 0 failed)
+T-PASS  B1: targets.tsv records both targets
+T-PASS  B1: targets.tsv records the main target
+T-PASS  B1: targets.tsv records the negative target
+T-PASS  B1: target t1 backup holds its 3 replaced files
+T-PASS  B1: target t2 backup holds its 3 replaced files (no namespace collision)
+T-PASS  B1: negative target staged bytes are now canonical OLD
+T-PASS  B1: restore without --include-negative refuses a two-target backup
+T-PASS  B1: refusal explains --include-negative
+T-PASS  B1: restore --include-negative --apply reverses both targets
+T-PASS  B1: main target byte-identical after include-negative cycle
+T-PASS  B1: negative target byte-identical after include-negative cycle
+T-PASS  B2: apply into an absent staging dir (fresh checkout)
+T-PASS  B2: verify an installed-from-absent target
+T-PASS  B2: missing-target verify = 30 checks (30 passed / 0 failed)
+T-PASS  B2: absent target was populated with the 4 OLD files
+T-PASS  B2: restore removes files that were absent before Plan B
+T-PASS  B2: absent pre-state restored exactly (no model files remain)
+T-PASS  B2: injected rename failure aborts the install
+T-PASS  B2: injected failure was seen by the script
+T-PASS  B2: partial failure leaves staged bytes byte-identical
+T-PASS  B2: partial failure discards the just-created backup dir
+T-PASS  B2: no pre-stage temp files leaked
+T-PASS  B2: recovery apply after partial failure succeeds
+T-PASS  B2: verify after recovery apply
+T-PASS  B2: recovery verify = 30 checks (30 passed / 0 failed)
+T-PASS  Plan B dry-run with --repo pointing at a linked worktree
+T-PASS  linked-worktree Plan B dry-run OK
+T-PASS  production NEW extracted bytes unchanged by suite
+T-PASS  production OLD extracted bytes unchanged by suite
+T-PASS  preserved OLD/NEW archives unchanged by suite
+T-PASS  production staged model assets unchanged by suite
+T-PASS  production negative-worktree staged assets unchanged by suite
+SUITE RESULT (plan-b): pass=82 fail=0
+
+== Canonical suites ==
+Plan A verifier (55-check suite): 55 passed / 0 failed
+Plan B verifier (30-check suite): 30 passed / 0 failed
+----------------------------------------
+TOTAL: static+suite checks passed=16 failed=0
+Plan A suite: SUITE RESULT (plan-a): pass=55 fail=0
+Plan B suite: SUITE RESULT (plan-b): pass=82 fail=0
+full output: /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a-suite.out /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b-suite.out

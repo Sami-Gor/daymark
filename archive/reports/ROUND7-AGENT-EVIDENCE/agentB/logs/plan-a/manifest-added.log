@@ -1,0 +1,8 @@
+STALE: /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a/manifest-bundle/SHA256SUMS does not match the current tree (3 files)
+--- differences (generated vs recorded; - expected, + recorded) ---
+--- /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a/manifest-bundle/SHA256SUMS	2026-11-19 22:07:47
++++ /var/folders/r6/l7sx7nmx33sfvyjzrh5d4snr0000gn/T//evidence-sums.W2ahsI	2026-11-19 22:07:47
+@@ -1,2 +1,3 @@
+ 6c8842fcb80cebe2d37a50d21833ddf2c63033559760f83ad432686128d34391  ./a.txt
+ f2c82decdd7181cf98945929a62598db7e6b477e11f6e0eb0ae97020eff151ad  ./b.txt
++ae9a6306a205417afddd14316cc1d0d5e04a98f1be10865dce643925ee070ce2  ./c.txt

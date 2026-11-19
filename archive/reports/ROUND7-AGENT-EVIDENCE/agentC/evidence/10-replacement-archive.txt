@@ -1,0 +1,4 @@
+# 487,211,443-byte replacement archive that upstream now serves (NOT the pin)
+1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9  /Volumes/DaymarkWorkspace/Daymark/archive/historical-work/recovered/model.tar.bz2
+size=487211443 mtime=2026-11-11T15:13:16+0000
+expected replacement sha256 1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9

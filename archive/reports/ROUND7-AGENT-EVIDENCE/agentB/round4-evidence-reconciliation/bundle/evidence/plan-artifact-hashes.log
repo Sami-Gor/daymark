@@ -1,0 +1,22 @@
+== plan artifact hashes ==
+36a310569bba1b837c52f09a92fc8638b9489b099f54e76d9baf1eb95e6c7f0e  README.md
+516286e061b213bb705b5c66cb943c8afbbd7789dcca68348d441f736b483d02  parakeet-pins.env
+73520f6ed4a5612f4c8a2c7ffd94165aa505ee22c32ad75462454fdd8ab7dbf4  plans-lib.sh
+404dfc7fc621b07d048db81c05b6825eb873e916262ca1c7dc81cf8dce8dd9ca  check-state.sh
+3463001fd6c990f92897decc7f17c41bbd0f990b7a59e6f4751ffd44f4fd3a85  plan-a-adoption.patch
+3d90e92404a3d19e488b843d0826e4011dbbe178e2cc9aa789e554c6adcd6e8f  plan-a-revert.patch
+63991a7caf648c99d339d7c44f70dfc253402eb04bc74b42f03adbe50f7791b7  plan-a-replacements.tsv
+3031fccd6152ea83f9d7c6012dd8a99639a243912f624f00f828980c425fff0e  apply-plan-a.sh
+9f6e659c26d9d73f6a292013076ae89ab05c23ac41992d8877ed9b8fc9357f34  verify-plan-a.sh
+1b4f0467173ede9793ee789400b9802974b3a603ea4dee27b740e7f91203474f  apply-plan-b.sh
+118f2b443f9e747d6f20dd7b9823138d939121098a27e6843fdd4f48a38a7799  verify-plan-b.sh
+0b0d5322013ac5d757b89e8a2ec13ec24860f25bdb26ae55025e1b892aacde30  restore-staged-backup.sh
+15d3929684e928ee49a7eafaf24fe25c58021c7b33a8edb63893dcf936f712d5  test-plans.sh
+
+== expected post-Plan-A pin file hashes (scratch generated copies) ==
+0cc63e1ef6c341404d8cfb890b4f970c46d0ce8edbeea3d2b9f77a451b3b758a  android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+25c1a5fe721f15ba5609d9281b69305998a585276d66d8b0dfdc544386c9f0b2  artifacts/weather-app/android/parakeet-assets/build.gradle
+9c7dd88bfcf4dbb2978140bdddab48b4d85020dbb637ae172eb80e1b01188acb  artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
+6ddd6c373c7808458c94866e410563e67048995f1dcef34f7d04e02838e79019  artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
+1651f7110eee83c331de659c37b56082ff6ab99c5fd6661f6cb2f2387b907c2b  THIRD-PARTY-NOTICES.md
+a89ed582d279ec65e5b2ba7fe3e242ac38987e383f802557b4a2aef4d9bd31a5  docs/release/reproducible-build-guide.md

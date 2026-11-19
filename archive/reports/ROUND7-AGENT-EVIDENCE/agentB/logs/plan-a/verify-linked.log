@@ -1,0 +1,62 @@
+[*] Verifying Plan A (NEW coordinated pin state) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a/wt-linked
+PASS  pin state is NEW (no old literals remain)
+PASS  S1 fetch archive pin
+PASS  S2 fetch encoder pin
+PASS  S2 fetch decoder pin
+PASS  S2 fetch joiner pin
+PASS  S2 fetch tokens pin unchanged
+PASS  S3 build.gradle encoder digest
+PASS  S3 build.gradle decoder digest
+PASS  S3 build.gradle joiner digest
+PASS  S3 build.gradle tokens digest unchanged
+PASS  S4 ParakeetModelAssets encoder digest
+PASS  S4 ParakeetModelAssets decoder digest
+PASS  S4 ParakeetModelAssets joiner digest
+PASS  S4 ParakeetModelAssets tokens digest unchanged
+PASS  S4 ParakeetModelAssets encoder size
+PASS  S4 ParakeetModelAssets decoder size
+PASS  S4 ParakeetModelAssets joiner size unchanged
+PASS  S4 ParakeetModelAssets tokens size unchanged
+PASS  S4 MODEL_VERSION sha256-2
+PASS  S4 old MODEL_VERSION absent
+PASS  S5 test expected encoder size
+PASS  S5 test expected decoder size
+PASS  S5 test expected joiner size unchanged
+PASS  S5 test expected tokens size unchanged
+PASS  S6 notices archive digest (row + table)
+PASS  S6 notices encoder digest
+PASS  S6 notices decoder digest
+PASS  S6 notices joiner digest
+PASS  S6 notices tokens digest unchanged
+PASS  S7 guide encoder digest
+PASS  S7 guide decoder digest
+PASS  S7 guide joiner digest
+PASS  S7 guide archive digest
+PASS  S7 guide tokens digest unchanged
+PASS  old archive digest absent
+PASS  old encoder digest absent
+PASS  old decoder digest absent
+PASS  old joiner digest absent
+PASS  staged model state is NEW
+PASS  staged file present: encoder.int8.onnx
+PASS  staged file present: decoder.int8.onnx
+PASS  staged file present: joiner.int8.onnx
+PASS  staged file present: tokens.txt
+PASS  staged encoder size
+PASS  staged encoder sha256
+PASS  staged decoder size
+PASS  staged decoder sha256
+PASS  staged joiner size
+PASS  staged joiner sha256
+PASS  staged tokens size
+PASS  staged tokens sha256
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+
+Plan A state: pins NEW + staged NEW (consistent).
+Not covered here (owner/build/device gates): fetch twice, verifyParakeetAssets,
+bundleRelease/AAB member digests, model-dependent CI, on-device parity.
+----------------------------------------
+checks passed: 55   failed: 0

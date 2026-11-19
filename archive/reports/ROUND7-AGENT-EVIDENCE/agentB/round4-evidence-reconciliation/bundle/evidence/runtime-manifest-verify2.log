@@ -1,0 +1,19 @@
+== SHA256SUMS from repo root (42 entries) ==
+android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/generic-context-missing/decoder.onnx: OK
+android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/generic-context-missing/encoder.onnx: OK
+android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/generic-context-missing/joiner.onnx: OK
+android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/tdt-vocab-max/decoder.onnx: OK
+android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/tdt-vocab-max/encoder.onnx: OK
+android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/tdt-vocab-max/joiner.onnx: OK
+PASS=42 FAIL=0 TOTAL=42
+
+== AAR members ==
+9a730e8e70f40e6b3662a1481d5b166cc9db16f717e8a3e74e3a12a8ff525485  jni/arm64-v8a/libsherpa-onnx-jni.so
+33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1  jni/arm64-v8a/libonnxruntime.so
+8af5aa647494ec9cb6596959d6d20864377cf4a9dedf1c1b178d936bfb7cea95  classes.jar
+jni/arm64-v8a/libsherpa-onnx-jni.so 5035144
+jni/arm64-v8a/libonnxruntime.so 22249560
+classes.jar 238706
+
+== patch hash ==
+fd58558bdb9a7b82be8c2bfe7890890ca01edfedd95797e285d313b0bacd9f99  /Volumes/DaymarkWorkspace/Daymark/repositories/daymark/android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0001-joiner-width-validation.patch

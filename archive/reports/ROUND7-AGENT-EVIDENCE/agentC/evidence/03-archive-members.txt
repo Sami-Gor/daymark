@@ -1,0 +1,14 @@
+# tar -tvjf (member metadata, archive order)
+drwxr-xr-x  0 runner staff       0 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/
+-rw-r--r--  0 runner staff   93939 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt
+-rw-r--r--  0 runner staff 6355277 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx
+-rw-r--r--  0 runner staff 11845275 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx
+-rw-r--r--  0 runner staff 652184281 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx
+drwxr-xr-x  0 runner staff         0 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/
+-rw-r--r--  0 runner staff    184608 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/en.wav
+-rw-r--r--  0 runner staff    219180 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/fr.wav
+-rw-r--r--  0 runner staff    235052 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/es.wav
+-rw-r--r--  0 runner staff    121388 Aug 16  2025 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/de.wav
+
+member_count=10
+file_member_count=8

@@ -1,0 +1,7 @@
+# SHA-256 of the preserved archive (recomputed by Agent C, Round 7)
+utc=2026-11-19T21:36:36Z
+5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf  /Volumes/DaymarkWorkspace/Daymark/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+real 2.66
+user 1.76
+sys 0.10
+expected 5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf

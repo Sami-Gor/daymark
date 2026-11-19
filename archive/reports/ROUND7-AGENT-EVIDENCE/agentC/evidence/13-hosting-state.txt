@@ -1,0 +1,23 @@
+# Daymark-controlled hosting state (read-only, unauthenticated)
+utc=2026-11-19T21:38:27Z
+## repo
+{
+ "full_name": "Sami-Gor/daymark",
+ "visibility": "public",
+ "private": false,
+ "archived": false,
+ "default_branch": "main",
+ "created_at": "2026-09-07T22:54:01Z",
+ "permissions": null
+}
+
+## releases
+[{'tag': 'v2.0.0', 'draft': False, 'prerelease': False, 'immutable': False, 'assets': [{'name': 'app-release.aab', 'size': 591241973, 'digest': 'sha256:55366377d50c00dfc53e8bc2e049ec298cd5c087e2de0db2eb8353b182f771b4'}, {'name': 'PRODUCTION-BUILD-REPORT.md', 'size': 5255, 'digest': 'sha256:0ae83ac9781acbcd3d038027fca888e107d195e04aa1cae256f4005ccc0731c0'}, {'name': 'SHA256SUMS', 'size': 2054, 'digest': 'sha256:e91b70a5f087c7fc7c5fe72b5f2cbad1b870b739d1c4347b7b574adf655fcdcf'}]}]
+
+## immutable releases setting
+{
+  "message": "Requires authentication",
+  "documentation_url": "https://docs.github.com/rest",
+  "status": "401"
+}
+HTTP 401

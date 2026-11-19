@@ -1,0 +1,1172 @@
+$ playwright test
+[WebServer] $ vite preview --config vite.config.ts --host 0.0.0.0
+[WebServer] (node:94480) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 164 tests using 4 workers
+(node:94488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:94489) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:94487) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:94486) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+·················[daymark-e2e] RNG seed for "reports a geolocation timeout as a timeout, not a permission denial": 4137924573 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F·(node:94591) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+··[daymark-e2e] RNG seed for "reports position-unavailable distinctly from permission denial": 1554177286 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:94627) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "keeps the existing permission-denied message for code 1": 4019682391 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:94664) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+··[daymark-e2e] RNG seed for "shows one visual cue with no explanatory text and Hear today underneath": 3049555249 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:94696) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "a fix slower than the configured timeout reports a timeout and clears loading": 2515497831 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:94703) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+··············[daymark-e2e] RNG seed for "loading clears after denied, unavailable and timeout errors": 601635088 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:94772) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "granted geolocation loads weather from rounded coordinates without reverse geocoding": 877119679 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:94779) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "voice uses the selected location": 2807487120 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+[daymark-e2e] RNG seed for "key mobile controls meet the ~40px target at 390px and 320px": 4148636854 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+TT(node:94804) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:94803) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+····[daymark-e2e] RNG seed for "denied geolocation shows a toast and keeps the loaded weather": 2170210892 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:94863) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+·························[daymark-e2e] RNG seed for "Hear today speaks the localized briefing": 2296518021 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:94991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "alert disclaimer, severity and voice privacy note are at least 11px": 2009372684 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95009) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+···
+··[daymark-e2e] RNG seed for "hero actions meet 44px and never clip their labels in EN/FR/ES": 1840693265 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95074) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "does not persist location, search, transcript, weather or alert state": 3620052461 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T·(node:95080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+········[daymark-e2e] RNG seed for "shows the confirmed operator and contact details in every language": 2936440403 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95104) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+·[daymark-e2e] RNG seed for "states the verified data practices in every language": 3344183675 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95112) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+···[daymark-e2e] RNG seed for "Hear today speaks the briefing and toggles to Stop": 2847428120 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+·F··(node:95140) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+··[daymark-e2e] RNG seed for "renders a malicious speech transcript as inert text": 3732684615 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95159) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+········[daymark-e2e] RNG seed for "Ask Daymark accepts a French phrase": 400667804 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T·(node:95183) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+······[daymark-e2e] RNG seed for "keeps all four actions with Hear today under the cue and search first in the tools row": 3829513480 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95224) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "speech end resets the playback control": 209106512 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95232) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "keeps every hero control visible and unclipped at 320px": 781311214 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F[daymark-e2e] RNG seed for "mentions the risk in the Hear today briefing": 646408151 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+(node:95233) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+T(node:95239) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "keeps localized hero labels visible in French and Spanish": 203795439 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95250) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+····[daymark-e2e] RNG seed for "Ask Daymark accepts a Spanish phrase": 1205166550 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95266) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+··············[daymark-e2e] RNG seed for "a successful location clears the previous location error toast": 278643563 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95298) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+·[daymark-e2e] RNG seed for "changing the language stops the active narration": 2141870110 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95304) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "answers an alert question through the intent layer": 3379675044 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95310) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+···[daymark-e2e] RNG seed for "Hear today stops an active listening session": 3963144440 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95343) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "shows a narration error when playback cannot start": 1193479543 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95376) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "Ask Daymark hides when speech recognition is unsupported": 3234084878 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95421) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "shows a localized voice privacy disclosure when voice is available": 2630530896 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95427) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+·[daymark-e2e] RNG seed for "Ask Daymark resolves a rain question and shows the answer": 303584542 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+F(node:95470) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "unknown questions get the deterministic fallback, not a made-up answer": 2727376181 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:95588) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "Stop ends recognition and returns the control to idle": 2467245010 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+
+T(node:95696) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "permission errors are readable and return the UI to idle": 1747610991 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:96438) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "starting recognition stops playback and stale sessions cannot update the UI": 3688046209 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T(node:97569) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[daymark-e2e] RNG seed for "unmounting aborts recognition and stops background listening": 29705175 (derived from the test title)
+[daymark-e2e] Rerun this test with the same environment to reproduce the same data.
+T
+
+  1) [chromium] › tests/e2e/specs/day-cue.spec.ts:41:3 › day cue hero › shows one visual cue with no explanatory text and Hear today underneath 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.boundingBox: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-hear-today')
+
+
+      51 |     await expect(hero).not.toContainText('Umbrella?');
+      52 |     const cueBox = await dashboard.dayCue.boundingBox();
+    > 53 |     const hearBox = await voice.hearTodayButton.boundingBox();
+         |                                                 ^
+      54 |     expect(hearBox!.y).toBeGreaterThan(cueBox!.y);
+      55 |     await expect(voice.hearTodayButton).toBeVisible();
+      56 |     await expect(voice.hearTodayButton).toHaveText(/Hear today/);
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/day-cue.spec.ts:53:49
+
+    Error Context: test-results/specs-day-cue-day-cue-hero-d29c3-t-and-Hear-today-underneath-chromium/error-context.md
+
+  2) [chromium] › tests/e2e/specs/geolocation.spec.ts:74:3 › geolocation flow › reports a geolocation timeout as a timeout, not a permission denial 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('toast')
+    Expected substring: "took too long"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" getByTestId('toast') with timeout 5000ms
+      - waiting for getByTestId('toast')
+
+
+      79 |     await dashboard.requestDeviceLocation();
+      80 |     await geo.fail(3);
+    > 81 |     await expect(dashboard.toast).toContainText('took too long');
+         |                                   ^
+      82 |     await expect(dashboard.toast).not.toContainText('Allow location access');
+      83 |     await expect(dashboard.heroLocationButton).toHaveText('Use my location');
+      84 |   });
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/geolocation.spec.ts:81:35
+
+    Error Context: test-results/specs-geolocation-geolocat-77d77-out-not-a-permission-denial-chromium/error-context.md
+
+  3) [chromium] › tests/e2e/specs/geolocation.spec.ts:86:3 › geolocation flow › reports position-unavailable distinctly from permission denial 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('toast')
+    Expected substring: "determine your location"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" getByTestId('toast') with timeout 5000ms
+      - waiting for getByTestId('toast')
+
+
+      91 |     await dashboard.requestDeviceLocation();
+      92 |     await geo.fail(2);
+    > 93 |     await expect(dashboard.toast).toContainText('determine your location');
+         |                                   ^
+      94 |     await expect(dashboard.toast).not.toContainText('Allow location access');
+      95 |   });
+      96 |
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/geolocation.spec.ts:93:35
+
+    Error Context: test-results/specs-geolocation-geolocat-798a8-ctly-from-permission-denial-chromium/error-context.md
+
+  4) [chromium] › tests/e2e/specs/geolocation.spec.ts:97:3 › geolocation flow › keeps the existing permission-denied message for code 1 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('toast')
+    Expected substring: "Allow location access"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" getByTestId('toast') with timeout 5000ms
+      - waiting for getByTestId('toast')
+
+
+      102 |     await dashboard.requestDeviceLocation();
+      103 |     await geo.fail(1);
+    > 104 |     await expect(dashboard.toast).toContainText('Allow location access');
+          |                                   ^
+      105 |   });
+      106 |
+      107 |   test('requests mobile-friendly geolocation options', async ({ dashboard, geo }) => {
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/geolocation.spec.ts:104:35
+
+    Error Context: test-results/specs-geolocation-geolocat-acecc-n-denied-message-for-code-1-chromium/error-context.md
+
+  5) [chromium] › tests/e2e/specs/geolocation.spec.ts:130:3 › geolocation flow › a fix slower than the configured timeout reports a timeout and clears loading 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('toast')
+    Expected substring: "took too long"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" getByTestId('toast') with timeout 5000ms
+      - waiting for getByTestId('toast')
+
+
+      134 |
+      135 |     await dashboard.requestDeviceLocation();
+    > 136 |     await expect(dashboard.toast).toContainText('took too long');
+          |                                   ^
+      137 |     await expect(dashboard.heroLocationButton).toHaveText('Use my location');
+      138 |     await dashboard.expectCity('London');
+      139 |   });
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/geolocation.spec.ts:136:35
+
+    Error Context: test-results/specs-geolocation-geolocat-5cbb6--timeout-and-clears-loading-chromium/error-context.md
+
+  6) [chromium] › tests/e2e/specs/geolocation.spec.ts:172:3 › geolocation flow › loading clears after denied, unavailable and timeout errors 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('toast')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('toast') with timeout 5000ms
+      - waiting for getByTestId('toast')
+
+
+      179 |       await expect(dashboard.heroLocationButton).toHaveText('Finding you…');
+      180 |       await geo.fail(code);
+    > 181 |       await expect(dashboard.toast).toBeVisible();
+          |                                     ^
+      182 |       await expect(dashboard.heroLocationButton).toHaveText('Use my location');
+      183 |     }
+      184 |   });
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/geolocation.spec.ts:181:37
+
+    Error Context: test-results/specs-geolocation-geolocat-38097-vailable-and-timeout-errors-chromium/error-context.md
+
+  7) [chromium] › tests/e2e/specs/geolocation.spec.ts:188:3 › geolocation flow › granted geolocation loads weather from rounded coordinates without reverse geocoding 
+
+    Error: expect(received).toContain(expected) // indexOf
+
+    Expected substring: "latitude=51.51"
+    Received string:    "https://api.open-meteo.com/v1/forecast?latitude=51.5&longitude=-0.125&current=temperature_2m%2Crelative_humidity_2m%2Cdew_point_2m%2Capparent_temperature%2Cis_day%2Cprecipitation%2Crain%2Ccloud_cover%2Cweather_code%2Cwind_speed_10m%2Cwind_direction_10m%2Cwind_gusts_10m%2Cuv_index%2Cuv_index_clear_sky&hourly=temperature_2m%2Capparent_temperature%2Cprecipitation%2Crain%2Cshowers%2Csnowfall%2Cprecipitation_probability%2Cweather_code%2Cwind_speed_10m%2Cwind_gusts_10m%2Cuv_index%2Cuv_index_clear_sky&daily=weather_code%2Ctemperature_2m_max%2Ctemperature_2m_min%2Cprecipitation_sum%2Csnowfall_sum%2Cprecipitation_probability_max%2Cwind_speed_10m_max%2Cwind_gusts_10m_max%2Csunrise%2Csunset%2Cuv_index_max%2Cuv_index_clear_sky_max&forecast_days=7&timezone=auto"
+
+      204 |     expect(forecasts.length).toBeGreaterThan(0);
+      205 |     for (const url of forecasts) {
+    > 206 |       expect(url).toContain('latitude=51.51');
+          |                   ^
+      207 |       expect(url).toContain('longitude=-0.13');
+      208 |       expect(url).not.toContain('5074567');
+      209 |     }
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/geolocation.spec.ts:206:19
+
+    Error Context: test-results/specs-geolocation-geolocat-a6861-s-without-reverse-geocoding-chromium/error-context.md
+
+  8) [chromium] › tests/e2e/specs/geolocation.spec.ts:214:3 › geolocation flow › denied geolocation shows a toast and keeps the loaded weather 
+
+    Error: toast never appeared; caught: [
+      "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('toast')\nExpected substring: \u001b[32m\"Location unavailable\"\u001b[39m\nTimeou",
+      "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('toast')\nExpected substring: \u001b[32m\"Location unavailable\"\u001b[39m\nTimeou",
+      "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('toast')\nExpected substring: \u001b[32m\"Location unavailable\"\u001b[39m\nTimeou"
+    ]
+
+      232 |       }
+      233 |     }
+    > 234 |     if (!toastShown) throw new Error('toast never appeared; caught: ' + JSON.stringify(caught, null, 2));
+          |                            ^
+      235 |     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
+      236 |     await context.close();
+      237 |   });
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/geolocation.spec.ts:234:28
+
+    Error Context: test-results/specs-geolocation-geolocat-b5e3c-nd-keeps-the-loaded-weather-chromium/error-context.md
+
+  9) [chromium] › tests/e2e/specs/location-search.spec.ts:196:3 › location search › voice uses the selected location 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-hear-today')
+
+
+       at pages/voice-controls.page.ts:37
+
+      35 |
+      36 |   async startNarration(): Promise<void> {
+    > 37 |     await this.hearTodayButton.click();
+         |                                ^
+      38 |   }
+      39 |
+      40 |   async stopNarration(): Promise<void> {
+        at VoiceControlsPage.startNarration (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:37:32)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/location-search.spec.ts:203:17
+
+    Error Context: test-results/specs-location-search-loca-1e41e--uses-the-selected-location-chromium/error-context.md
+
+  10) [chromium] › tests/e2e/specs/mobile-layout.spec.ts:21:3 › mobile touch targets and legibility › key mobile controls meet the ~40px target at 390px and 320px 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.boundingBox: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for locator('[data-testid="button-hear-today"]').first()
+
+
+      13 | test.describe('mobile touch targets and legibility', () => {
+      14 |   async function expectMinHeight(page: Page, selector: string, min: number) {
+    > 15 |     const box = await page.locator(selector).first().boundingBox();
+         |                                                      ^
+      16 |     expect(box, `${selector} should be rendered`).not.toBeNull();
+      17 |     // Allow sub-pixel rendering tolerance; this is a threshold, not a snapshot.
+      18 |     expect(box!.height, `${selector} height`).toBeGreaterThanOrEqual(min - 0.5);
+        at expectMinHeight (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/mobile-layout.spec.ts:15:54)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/mobile-layout.spec.ts:35:15
+
+    Error Context: test-results/specs-mobile-layout-mobile-c3da2-x-target-at-390px-and-320px-chromium/error-context.md
+
+  11) [chromium] › tests/e2e/specs/mobile-layout.spec.ts:44:3 › mobile touch targets and legibility › alert disclaimer, severity and voice privacy note are at least 11px 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.evaluate: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('ask-privacy')
+
+
+      56 |     expect(severitySize, 'alert severity font size').toBeGreaterThanOrEqual(11);
+      57 |
+    > 58 |     const privacySize = await voice.askPrivacy.evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+         |                                                ^
+      59 |     expect(privacySize, 'voice privacy note font size').toBeGreaterThanOrEqual(11);
+      60 |   });
+      61 |
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/mobile-layout.spec.ts:58:48
+
+    Error Context: test-results/specs-mobile-layout-mobile-0491d-vacy-note-are-at-least-11px-chromium/error-context.md
+
+  12) [chromium] › tests/e2e/specs/mobile-layout.spec.ts:135:3 › mobile viewport layout › hero actions meet 44px and never clip their labels in EN/FR/ES 
+
+    Error: en action count
+
+    expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 3
+    Received:    1
+
+      142 |       const buttons = page.locator('.today-hero .local-button');
+      143 |       const count = await buttons.count();
+    > 144 |       expect(count, `${locale} action count`).toBeGreaterThanOrEqual(3);
+          |                                               ^
+      145 |       for (let index = 0; index < count; index += 1) {
+      146 |         const button = buttons.nth(index);
+      147 |         const box = await button.boundingBox();
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/mobile-layout.spec.ts:144:47
+
+    Error Context: test-results/specs-mobile-layout-mobile-806ac-ip-their-labels-in-EN-FR-ES-chromium/error-context.md
+
+  13) [chromium] › tests/e2e/specs/multilingual.spec.ts:67:3 › multilingual interface › Hear today speaks the localized briefing 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-hear-today')
+
+
+       at pages/voice-controls.page.ts:37
+
+      35 |
+      36 |   async startNarration(): Promise<void> {
+    > 37 |     await this.hearTodayButton.click();
+         |                                ^
+      38 |   }
+      39 |
+      40 |   async stopNarration(): Promise<void> {
+        at VoiceControlsPage.startNarration (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:37:32)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/multilingual.spec.ts:70:17
+
+    Error Context: test-results/specs-multilingual-multili-3ba3c-eaks-the-localized-briefing-chromium/error-context.md
+
+  14) [chromium] › tests/e2e/specs/multilingual.spec.ts:77:3 › multilingual interface › Ask Daymark accepts a French phrase 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/multilingual.spec.ts:80:17
+
+    Error Context: test-results/specs-multilingual-multili-08015-ark-accepts-a-French-phrase-chromium/error-context.md
+
+  15) [chromium] › tests/e2e/specs/multilingual.spec.ts:88:3 › multilingual interface › Ask Daymark accepts a Spanish phrase 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/multilingual.spec.ts:91:17
+
+    Error Context: test-results/specs-multilingual-multili-3d6be-rk-accepts-a-Spanish-phrase-chromium/error-context.md
+
+  16) [chromium] › tests/e2e/specs/privacy.spec.ts:28:3 › privacy-safe persisted storage › does not persist location, search, transcript, weather or alert state 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/privacy.spec.ts:38:17
+
+    Error Context: test-results/specs-privacy-privacy-safe-01f94-ript-weather-or-alert-state-chromium/error-context.md
+
+  17) [chromium] › tests/e2e/specs/privacy.spec.ts:121:3 › privacy policy pages › shows the confirmed operator and contact details in every language 
+
+    Error: expect(received).toContain(expected) // indexOf
+
+    Expected substring: "Sami Belhadj"
+    Received string:    "Privacy Policy·
+    Effective date: October 27, 2026 · Last updated: October 27, 2026·
+    English
+    Français
+    Español·
+    Daymark is a weather app for a limited web/PWA demo and a fuller Android app. Most processing happens in your browser or installed app, but Daymark sends weather, air-quality, and place-search requests directly to Open-Meteo, and the website host processes ordinary request metadata. This policy explains those flows and the choices available to you.·
+    Who operates Daymark·
+    Daymark is operated by Sami. For questions about this policy or your information, contact skylinelabdev@gmail.com.·
+    V2 and V1 transition·
+    This policy describes Daymark V2 (version 2.0.0) on the web/PWA and Android. Daymark 1.0.0 may remain installed on a device, or available through Google Play, until V2 reaches its full production release. When V2 is fully released, V1 will be removed from Google Play and official support for V1 will end. Existing V1 installations will not be deliberately disabled.·
+    V1 behaved differently: its Android build requested precise location as well as approximate location, used browser/WebView speech recognition for voice input, and could use the device’s default Android text-to-speech voice for French and Spanish narration. Those V1 behaviours apply only while a V1 installation is in use.·
+    Weather and place-search requests·
+    When the app opens, Daymark loads a forecast for London, its default place. That request is sent directly from your browser or installed app to Open-Meteo and does not require location permission.·
+    Weather, air-quality, and place-search data come fromOpen-Meteo. Requests go directly to:·
+    api.open-meteo.com — forecasts
+    air-quality-api.open-meteo.com — air quality
+    geocoding-api.open-meteo.com — place search·
+    When you type in the search box, the text you enter is sent to Open-Meteo’s geocoding service to suggest matching places. Daymark does not save your searches. Daymark does not operate a backend or application server for accounts, weather history, searches, or voice data.·
+    Location data·
+    Daymark does not request location on load. Your device location is used only when you press “Use my location” and grant permission. You can skip location entirely and use the default place or search for a place.·
+    The Android app declares ACCESS_COARSE_LOCATION only and does not declareACCESS_FINE_LOCATION. Both Android and the web/PWA snap the device-derived coordinates to a 0.025-degree grid with a 0.025-degree minimum step on your device before they are sent to Open-Meteo. At high latitudes, the longitude spacing widens just enough to keep the represented area at least 3 km²; the latitude step never goes below 0.025°. Near London this is roughly 2.8 km north/south and 1.7 km east/west (about 4.8 km²); at high latitude the longitude spacing may be wider. The grid reduces precision but does not anonymise the request: the rounded coordinates still leave your device and are sent to Open-Meteo. The app returns to its default London location when you reload or reopen it.·
+    For device location, Daymark also resolves a nearby locality name (for example, a town name) locally from a static GeoNames dataset. The web/PWA downloads the dataset from Daymark’s site and caches it locally; the Android app includes it in bundled assets. No reverse-geocoding service, including GeoNames, receives your coordinates.·
+    Web/PWA demo·
+    The web/PWA build is a limited weather demo. It has no Ask Daymark microphone control and no “Hear today” narration control. It does not request microphone permission and does not invoke browser speech-recognition or speech-synthesis APIs. The Android app provides the full voice feature set described below.·
+    Android voice input (Ask Daymark)·
+    Ask Daymark is optional on Android. It starts only when you press the microphone button and grant microphone permission. Recognition uses the bundled Parakeet TDT 0.6B v3 int8 model through the sherpa-onnx runtime on the device. Audio is captured temporarily during that user-initiated session and held in memory for recognition; Daymark does not intentionally record or persist the audio or the resulting transcript, and does not send either to a Daymark speech server. The Android voice path has no Android SpeechRecognizer, browser-speech, or online-recogniser fallback in the code. This is a source-level and automated-test statement, not an independently verified packet-level zero-egress claim.·
+    Android narration·
+    English narration is generated on your device by the bundled Kokoro model. Daymark does not store narration text. French and Spanish narration is not available in V2 and is planned for V2.2; Daymark shows an unavailable message and does not fall back to Android system TTS, a network voice, or browser speech synthesis.·
+    Information stored on your device·
+    Daymark stores the language code in local storage under daymark.locale. The Android app also stores one private app-state value in SharedPreferences nameddaymark.permissions: the boolean microphone-requested, used only to avoid repeatedly prompting for microphone permission after it has already been requested or denied. Neither value is location, search, transcript, or weather history, and Daymark stores none of those histories. The web/PWA service worker caches app-shell resources, and the locality lookup uses Cache Storage for the static dataset; those are application resources, not user history. The Android app loads the locality dataset from bundled assets.·
+    Daymark’s app code does not use cookies, browser session storage, or IndexedDB for user state. You can clear the locale preference and application caches by clearing this site’s or app’s storage in your browser or device settings. Clearing local storage does not automatically delete data already retained by third-party providers such as Open-Meteo.·
+    Third parties and retention
+    Open-Meteo — weather, air quality, and place search. Its current published privacy notice says it acts as an independent data controller, may keep troubleshooting webserver logs containing sensitive information such as geographical coordinates, and deletes those log files after 90 days. Open-Meteo also receives ordinary network request metadata, including the source IP address and requested URL, to serve the request. Daymark does not use the IP address to identify you or to determine your location; Open-Meteo’s notice says it may process IP addresses for technical reasons. Daymark does not control that retention. Please check Open-Meteo’s currentTerms & Privacy.
+    Cloudflare Pages — static hosting for the web/PWA. Cloudflare processes standard website request metadata such as IP address, requested URL, and user agent for delivery, security, and abuse prevention under its ownprivacy policy. Daymark does not claim a fixed Cloudflare retention period.
+    GeoNames — the static locality dataset and local nearest-locality lookup. No coordinates are sent to GeoNames.
+    The Parakeet speech model, Kokoro narration model, and sherpa-onnx runtime are bundled with the Android app or delivered as app assets. They run on the device for the features described above.·
+    Daymark does not include analytics, advertising, tracking pixels, or tracking SDKs. Daymark does not claim that every third-party service is independently secure or that all external processing is retained for zero days.·
+    Security·
+    The hosted web/PWA is served over HTTPS and uses the site’s configured Content Security Policy. The installed Android app loads bundled local assets; the hosted site’s HTTP security headers do not apply inside its WebView. Daymark is a static bundle with no secrets and no Daymark-operated backend. These are limited, verifiable properties; they are not a guarantee about third-party services or the entire device.·
+    Age suitability·
+    Daymark is intended for adults aged 18 and over and is not directed to children. This is a Google Play target-audience declaration, not a technical access restriction or an age gate; Daymark does not claim that no minor can access the app. It has no user accounts and Daymark does not maintain profiles, location histories, search histories, or voice-transcript histories. Daymark does not use advertising or tracking IDs. The app does not ask for a date of birth. Selecting an adult audience does not by itself resolve any separate legal or regulatory assessment, including the UK Children’s Code where applicable.·
+    Your choices
+    Use the default London forecast or place search without granting device location.
+    Deny or revoke location permission in your browser or device settings.
+    On Android, avoid Ask Daymark and use the weather features without microphone access.
+    Deny or revoke microphone permission at any time.
+    Clear the locale preference and application caches in your browser or device settings.
+    Changes and contact·
+    If Daymark’s practices change, this page will be updated and the effective date revised. Questions or concerns: skylinelabdev@gmail.com. Daymark is operated by Sami."
+
+      123 |       await privacy.goto(policy.path);
+      124 |       const text = await privacy.text();
+    > 125 |       expect(text).toContain('Sami Belhadj');
+          |                    ^
+      126 |       expect(text).toContain('skylinelabdev@gmail.com');
+      127 |     }
+      128 |   });
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/privacy.spec.ts:125:20
+
+    Error Context: test-results/specs-privacy-privacy-poli-44f78-t-details-in-every-language-chromium/error-context.md
+
+  18) [chromium] › tests/e2e/specs/privacy.spec.ts:140:3 › privacy policy pages › states the verified data practices in every language 
+
+    Error: expect(received).toContain(expected) // indexOf
+
+    Expected substring: "rounded to two decimal places"
+    Received string:    "Privacy Policy·
+    Effective date: October 27, 2026 · Last updated: October 27, 2026·
+    English
+    Français
+    Español·
+    Daymark is a weather app for a limited web/PWA demo and a fuller Android app. Most processing happens in your browser or installed app, but Daymark sends weather, air-quality, and place-search requests directly to Open-Meteo, and the website host processes ordinary request metadata. This policy explains those flows and the choices available to you.·
+    Who operates Daymark·
+    Daymark is operated by Sami. For questions about this policy or your information, contact skylinelabdev@gmail.com.·
+    V2 and V1 transition·
+    This policy describes Daymark V2 (version 2.0.0) on the web/PWA and Android. Daymark 1.0.0 may remain installed on a device, or available through Google Play, until V2 reaches its full production release. When V2 is fully released, V1 will be removed from Google Play and official support for V1 will end. Existing V1 installations will not be deliberately disabled.·
+    V1 behaved differently: its Android build requested precise location as well as approximate location, used browser/WebView speech recognition for voice input, and could use the device’s default Android text-to-speech voice for French and Spanish narration. Those V1 behaviours apply only while a V1 installation is in use.·
+    Weather and place-search requests·
+    When the app opens, Daymark loads a forecast for London, its default place. That request is sent directly from your browser or installed app to Open-Meteo and does not require location permission.·
+    Weather, air-quality, and place-search data come fromOpen-Meteo. Requests go directly to:·
+    api.open-meteo.com — forecasts
+    air-quality-api.open-meteo.com — air quality
+    geocoding-api.open-meteo.com — place search·
+    When you type in the search box, the text you enter is sent to Open-Meteo’s geocoding service to suggest matching places. Daymark does not save your searches. Daymark does not operate a backend or application server for accounts, weather history, searches, or voice data.·
+    Location data·
+    Daymark does not request location on load. Your device location is used only when you press “Use my location” and grant permission. You can skip location entirely and use the default place or search for a place.·
+    The Android app declares ACCESS_COARSE_LOCATION only and does not declareACCESS_FINE_LOCATION. Both Android and the web/PWA snap the device-derived coordinates to a 0.025-degree grid with a 0.025-degree minimum step on your device before they are sent to Open-Meteo. At high latitudes, the longitude spacing widens just enough to keep the represented area at least 3 km²; the latitude step never goes below 0.025°. Near London this is roughly 2.8 km north/south and 1.7 km east/west (about 4.8 km²); at high latitude the longitude spacing may be wider. The grid reduces precision but does not anonymise the request: the rounded coordinates still leave your device and are sent to Open-Meteo. The app returns to its default London location when you reload or reopen it.·
+    For device location, Daymark also resolves a nearby locality name (for example, a town name) locally from a static GeoNames dataset. The web/PWA downloads the dataset from Daymark’s site and caches it locally; the Android app includes it in bundled assets. No reverse-geocoding service, including GeoNames, receives your coordinates.·
+    Web/PWA demo·
+    The web/PWA build is a limited weather demo. It has no Ask Daymark microphone control and no “Hear today” narration control. It does not request microphone permission and does not invoke browser speech-recognition or speech-synthesis APIs. The Android app provides the full voice feature set described below.·
+    Android voice input (Ask Daymark)·
+    Ask Daymark is optional on Android. It starts only when you press the microphone button and grant microphone permission. Recognition uses the bundled Parakeet TDT 0.6B v3 int8 model through the sherpa-onnx runtime on the device. Audio is captured temporarily during that user-initiated session and held in memory for recognition; Daymark does not intentionally record or persist the audio or the resulting transcript, and does not send either to a Daymark speech server. The Android voice path has no Android SpeechRecognizer, browser-speech, or online-recogniser fallback in the code. This is a source-level and automated-test statement, not an independently verified packet-level zero-egress claim.·
+    Android narration·
+    English narration is generated on your device by the bundled Kokoro model. Daymark does not store narration text. French and Spanish narration is not available in V2 and is planned for V2.2; Daymark shows an unavailable message and does not fall back to Android system TTS, a network voice, or browser speech synthesis.·
+    Information stored on your device·
+    Daymark stores the language code in local storage under daymark.locale. The Android app also stores one private app-state value in SharedPreferences nameddaymark.permissions: the boolean microphone-requested, used only to avoid repeatedly prompting for microphone permission after it has already been requested or denied. Neither value is location, search, transcript, or weather history, and Daymark stores none of those histories. The web/PWA service worker caches app-shell resources, and the locality lookup uses Cache Storage for the static dataset; those are application resources, not user history. The Android app loads the locality dataset from bundled assets.·
+    Daymark’s app code does not use cookies, browser session storage, or IndexedDB for user state. You can clear the locale preference and application caches by clearing this site’s or app’s storage in your browser or device settings. Clearing local storage does not automatically delete data already retained by third-party providers such as Open-Meteo.·
+    Third parties and retention
+    Open-Meteo — weather, air quality, and place search. Its current published privacy notice says it acts as an independent data controller, may keep troubleshooting webserver logs containing sensitive information such as geographical coordinates, and deletes those log files after 90 days. Open-Meteo also receives ordinary network request metadata, including the source IP address and requested URL, to serve the request. Daymark does not use the IP address to identify you or to determine your location; Open-Meteo’s notice says it may process IP addresses for technical reasons. Daymark does not control that retention. Please check Open-Meteo’s currentTerms & Privacy.
+    Cloudflare Pages — static hosting for the web/PWA. Cloudflare processes standard website request metadata such as IP address, requested URL, and user agent for delivery, security, and abuse prevention under its ownprivacy policy. Daymark does not claim a fixed Cloudflare retention period.
+    GeoNames — the static locality dataset and local nearest-locality lookup. No coordinates are sent to GeoNames.
+    The Parakeet speech model, Kokoro narration model, and sherpa-onnx runtime are bundled with the Android app or delivered as app assets. They run on the device for the features described above.·
+    Daymark does not include analytics, advertising, tracking pixels, or tracking SDKs. Daymark does not claim that every third-party service is independently secure or that all external processing is retained for zero days.·
+    Security·
+    The hosted web/PWA is served over HTTPS and uses the site’s configured Content Security Policy. The installed Android app loads bundled local assets; the hosted site’s HTTP security headers do not apply inside its WebView. Daymark is a static bundle with no secrets and no Daymark-operated backend. These are limited, verifiable properties; they are not a guarantee about third-party services or the entire device.·
+    Age suitability·
+    Daymark is intended for adults aged 18 and over and is not directed to children. This is a Google Play target-audience declaration, not a technical access restriction or an age gate; Daymark does not claim that no minor can access the app. It has no user accounts and Daymark does not maintain profiles, location histories, search histories, or voice-transcript histories. Daymark does not use advertising or tracking IDs. The app does not ask for a date of birth. Selecting an adult audience does not by itself resolve any separate legal or regulatory assessment, including the UK Children’s Code where applicable.·
+    Your choices
+    Use the default London forecast or place search without granting device location.
+    Deny or revoke location permission in your browser or device settings.
+    On Android, avoid Ask Daymark and use the weather features without microphone access.
+    Deny or revoke microphone permission at any time.
+    Clear the locale preference and application caches in your browser or device settings.
+    Changes and contact·
+    If Daymark’s practices change, this page will be updated and the effective date revised. Questions or concerns: skylinelabdev@gmail.com. Daymark is operated by Sami."
+
+      147 |       expect(text).toContain('Open-Meteo');
+      148 |       expect(text).toContain('daymark.locale');
+    > 149 |       expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].location);
+          |                    ^
+      150 |       expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].speech);
+      151 |       expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].audience);
+      152 |       expect(text).not.toMatch(/collects? no data/i);
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/privacy.spec.ts:149:20
+
+    Error Context: test-results/specs-privacy-privacy-poli-6dc86-practices-in-every-language-chromium/error-context.md
+
+  19) [chromium] › tests/e2e/specs/security.spec.ts:101:3 › hostile input is rendered inert (XSS) › renders a malicious speech transcript as inert text 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/security.spec.ts:110:17
+
+    Error Context: test-results/specs-security-hostile-inp-9b18a-ch-transcript-as-inert-text-chromium/error-context.md
+
+  20) [chromium] › tests/e2e/specs/voice.spec.ts:14:3 › voice playback and Ask Daymark › Hear today speaks the briefing and toggles to Stop 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('button-hear-today')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('button-hear-today') with timeout 5000ms
+      - waiting for getByTestId('button-hear-today')
+
+
+      14 |   test('Hear today speaks the briefing and toggles to Stop', async ({ dashboard, speech, voice }) => {
+      15 |     await dashboard.open();
+    > 16 |     await expect(voice.hearTodayButton).toBeVisible();
+         |                                         ^
+      17 |     await expect(voice.hearTodayButton).toHaveText(/Hear today/);
+      18 |
+      19 |     await voice.startNarration();
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:16:41
+
+    Error Context: test-results/specs-voice-voice-playback-cea96-riefing-and-toggles-to-Stop-chromium/error-context.md
+
+  21) [chromium] › tests/e2e/specs/voice.spec.ts:32:3 › voice playback and Ask Daymark › speech end resets the playback control 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-hear-today')
+
+
+       at pages/voice-controls.page.ts:37
+
+      35 |
+      36 |   async startNarration(): Promise<void> {
+    > 37 |     await this.hearTodayButton.click();
+         |                                ^
+      38 |   }
+      39 |
+      40 |   async stopNarration(): Promise<void> {
+        at VoiceControlsPage.startNarration (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:37:32)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:34:17
+
+    Error Context: test-results/specs-voice-voice-playback-07feb-resets-the-playback-control-chromium/error-context.md
+
+  22) [chromium] › tests/e2e/specs/voice.spec.ts:41:3 › voice playback and Ask Daymark › changing the language stops the active narration 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-hear-today')
+
+
+       at pages/voice-controls.page.ts:37
+
+      35 |
+      36 |   async startNarration(): Promise<void> {
+    > 37 |     await this.hearTodayButton.click();
+         |                                ^
+      38 |   }
+      39 |
+      40 |   async stopNarration(): Promise<void> {
+        at VoiceControlsPage.startNarration (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:37:32)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:43:17
+
+    Error Context: test-results/specs-voice-voice-playback-150f3--stops-the-active-narration-chromium/error-context.md
+
+  23) [chromium] › tests/e2e/specs/voice.spec.ts:51:3 › voice playback and Ask Daymark › Hear today stops an active listening session 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:53:17
+
+    Error Context: test-results/specs-voice-voice-playback-6df70-an-active-listening-session-chromium/error-context.md
+
+  24) [chromium] › tests/e2e/specs/voice.spec.ts:63:5 › voice playback and Ask Daymark › when playback cannot start › shows a narration error when playback cannot start 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-hear-today')
+
+
+       at pages/voice-controls.page.ts:37
+
+      35 |
+      36 |   async startNarration(): Promise<void> {
+    > 37 |     await this.hearTodayButton.click();
+         |                                ^
+      38 |   }
+      39 |
+      40 |   async stopNarration(): Promise<void> {
+        at VoiceControlsPage.startNarration (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:37:32)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:67:19
+
+    Error Context: test-results/specs-voice-voice-playback-32736--when-playback-cannot-start-chromium/error-context.md
+
+  25) [chromium] › tests/e2e/specs/voice.spec.ts:79:5 › voice playback and Ask Daymark › without speech recognition › Ask Daymark hides when speech recognition is unsupported 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('button-hear-today')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('button-hear-today') with timeout 5000ms
+      - waiting for getByTestId('button-hear-today')
+
+
+      83 |
+      84 |       await voice.expectAskHidden();
+    > 85 |       await expect(voice.hearTodayButton).toBeVisible();
+         |                                           ^
+      86 |     });
+      87 |   });
+      88 |
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:85:43
+
+    Error Context: test-results/specs-voice-voice-playback-c9c92--recognition-is-unsupported-chromium/error-context.md
+
+  26) [chromium] › tests/e2e/specs/voice.spec.ts:89:3 › voice playback and Ask Daymark › shows a localized voice privacy disclosure when voice is available 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('ask-privacy')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('ask-privacy') with timeout 5000ms
+      - waiting for getByTestId('ask-privacy')
+
+
+      92 |
+      93 |     const note = voice.askPrivacy;
+    > 94 |     await expect(note).toBeVisible();
+         |                        ^
+      95 |     await expect(note).toContainText('handled by your browser or device');
+      96 |     expect(await note.evaluate((element) => element.tabIndex)).toBe(-1);
+      97 |
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:94:24
+
+    Error Context: test-results/specs-voice-voice-playback-1e4a7-ure-when-voice-is-available-chromium/error-context.md
+
+  27) [chromium] › tests/e2e/specs/voice.spec.ts:124:3 › voice playback and Ask Daymark › Ask Daymark resolves a rain question and shows the answer 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByTestId('button-ask-daymark')
+    Expected pattern: /Ask Daymark/
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" getByTestId('button-ask-daymark') with timeout 5000ms
+      - waiting for getByTestId('button-ask-daymark')
+
+
+      124 |   test('Ask Daymark resolves a rain question and shows the answer', async ({ dashboard, page, speech, voice }) => {
+      125 |     await dashboard.open();
+    > 126 |     await expect(voice.askButton).toHaveText(/Ask Daymark/);
+          |                                   ^
+      127 |
+      128 |     await voice.toggleListening();
+      129 |     await expect(voice.askButton).toHaveText(/Stop/);
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:126:35
+
+    Error Context: test-results/specs-voice-voice-playback-3b68c-estion-and-shows-the-answer-chromium/error-context.md
+
+  28) [chromium] › tests/e2e/specs/voice.spec.ts:149:3 › voice playback and Ask Daymark › unknown questions get the deterministic fallback, not a made-up answer 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:151:17
+
+    Error Context: test-results/specs-voice-voice-playback-a32c7-llback-not-a-made-up-answer-chromium/error-context.md
+
+  29) [chromium] › tests/e2e/specs/voice.spec.ts:159:3 › voice playback and Ask Daymark › Stop ends recognition and returns the control to idle 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:161:17
+
+    Error Context: test-results/specs-voice-voice-playback-bcdf8-returns-the-control-to-idle-chromium/error-context.md
+
+  30) [chromium] › tests/e2e/specs/voice.spec.ts:170:3 › voice playback and Ask Daymark › permission errors are readable and return the UI to idle 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:172:17
+
+    Error Context: test-results/specs-voice-voice-playback-0f5ff-e-and-return-the-UI-to-idle-chromium/error-context.md
+
+  31) [chromium] › tests/e2e/specs/voice.spec.ts:180:3 › voice playback and Ask Daymark › starting recognition stops playback and stale sessions cannot update the UI 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-hear-today')
+
+
+      183 |     const ask = voice.askButton;
+      184 |
+    > 185 |     await hear.click();
+          |                ^
+      186 |     await expect(hear).toHaveText(/Stop/);
+      187 |     await ask.click();
+      188 |     await expect(hear).toHaveText(/Hear today/);
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:185:16
+
+    Error Context: test-results/specs-voice-voice-playback-09016-ssions-cannot-update-the-UI-chromium/error-context.md
+
+  32) [chromium] › tests/e2e/specs/voice.spec.ts:213:3 › voice playback and Ask Daymark › unmounting aborts recognition and stops background listening 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/voice.spec.ts:215:17
+
+    Error Context: test-results/specs-voice-voice-playback-6da2a--stops-background-listening-chromium/error-context.md
+
+  33) [chromium] › tests/e2e/specs/weather-alerts.spec.ts:43:3 › weather alerts › mentions the risk in the Hear today briefing 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-hear-today')
+
+
+       at pages/voice-controls.page.ts:37
+
+      35 |
+      36 |   async startNarration(): Promise<void> {
+    > 37 |     await this.hearTodayButton.click();
+         |                                ^
+      38 |   }
+      39 |
+      40 |   async stopNarration(): Promise<void> {
+        at VoiceControlsPage.startNarration (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:37:32)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/weather-alerts.spec.ts:46:17
+
+    Error Context: test-results/specs-weather-alerts-weath-e6d28--in-the-Hear-today-briefing-chromium/error-context.md
+
+  34) [chromium] › tests/e2e/specs/weather-alerts.spec.ts:51:3 › weather alerts › answers an alert question through the intent layer 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByTestId('button-ask-daymark')
+
+
+       at pages/voice-controls.page.ts:45
+
+      43 |
+      44 |   async toggleListening(): Promise<void> {
+    > 45 |     await this.askButton.click();
+         |                          ^
+      46 |   }
+      47 |
+      48 |   async expectAskHidden(): Promise<void> {
+        at VoiceControlsPage.toggleListening (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/pages/voice-controls.page.ts:45:26)
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/weather-alerts.spec.ts:54:17
+
+    Error Context: test-results/specs-weather-alerts-weath-10b40-on-through-the-intent-layer-chromium/error-context.md
+
+  35) [chromium] › tests/e2e/specs/weather-core.spec.ts:119:3 › hero action hierarchy › keeps all four actions with Hear today under the cue and search first in the tools row 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('button-hear-today')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('button-hear-today') with timeout 5000ms
+      - waiting for getByTestId('button-hear-today')
+
+
+      120 |     await expect(search.input).toBeVisible();
+      121 |     await expect(dashboard.heroLocationButton).toBeVisible();
+    > 122 |     await expect(voice.hearTodayButton).toBeVisible();
+          |                                         ^
+      123 |     await expect(voice.askButton).toBeVisible();
+      124 |
+      125 |     const cuePrecedesHearToday = await page.evaluate(() => {
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/weather-core.spec.ts:122:41
+
+    Error Context: test-results/specs-weather-core-hero-ac-2cae5-arch-first-in-the-tools-row-chromium/error-context.md
+
+  36) [chromium] › tests/e2e/specs/weather-core.spec.ts:143:3 › hero action hierarchy › keeps every hero control visible and unclipped at 320px 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('button-hear-today')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('button-hear-today') with timeout 5000ms
+      - waiting for getByTestId('button-hear-today')
+
+
+      150 |     await expect(search.input).toBeVisible();
+      151 |     await expect(dashboard.heroLocationButton).toBeVisible();
+    > 152 |     await expect(voice.hearTodayButton).toBeVisible();
+          |                                         ^
+      153 |     await expect(voice.askButton).toBeVisible();
+      154 |     await expect(voice.askPrivacy).toBeVisible();
+      155 |   });
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/weather-core.spec.ts:152:41
+
+    Error Context: test-results/specs-weather-core-hero-ac-e41ad-ible-and-unclipped-at-320px-chromium/error-context.md
+
+  37) [chromium] › tests/e2e/specs/weather-core.spec.ts:157:3 › hero action hierarchy › keeps localized hero labels visible in French and Spanish 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('button-hear-today')
+    Expected pattern: /Écouter/
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" getByTestId('button-hear-today') with timeout 5000ms
+      - waiting for getByTestId('button-hear-today')
+
+
+      158 |     await dashboard.setLanguage('fr');
+      159 |     await expect(dashboard.heroLocationButton).toHaveText(/Utiliser ma position/);
+    > 160 |     await expect(voice.hearTodayButton).toContainText(/Écouter/);
+          |                                         ^
+      161 |     await expect(voice.askButton).toContainText(/Demander à Daymark/);
+      162 |
+      163 |     await dashboard.setLanguage('es');
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/weather-core.spec.ts:160:41
+
+    Error Context: test-results/specs-weather-core-hero-ac-cbea0-sible-in-French-and-Spanish-chromium/error-context.md
+
+  38) [chromium] › tests/e2e/specs/weather-refresh.spec.ts:124:3 › non-destructive weather refresh › a successful location clears the previous location error toast 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('toast')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('toast') with timeout 5000ms
+      - waiting for getByTestId('toast')
+
+
+      129 |     await dashboard.requestDeviceLocation();
+      130 |     await geo.fail(1);
+    > 131 |     await expect(dashboard.toast).toBeVisible();
+          |                                   ^
+      132 |
+      133 |     await dashboard.requestDeviceLocation();
+      134 |     await expect(dashboard.toast).toHaveCount(0);
+        at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/tests/e2e/specs/weather-refresh.spec.ts:131:35
+
+    Error Context: test-results/specs-weather-refresh-non--adc90-evious-location-error-toast-chromium/error-context.md
+
+  38 failed
+    [chromium] › tests/e2e/specs/day-cue.spec.ts:41:3 › day cue hero › shows one visual cue with no explanatory text and Hear today underneath 
+    [chromium] › tests/e2e/specs/geolocation.spec.ts:74:3 › geolocation flow › reports a geolocation timeout as a timeout, not a permission denial 
+    [chromium] › tests/e2e/specs/geolocation.spec.ts:86:3 › geolocation flow › reports position-unavailable distinctly from permission denial 
+    [chromium] › tests/e2e/specs/geolocation.spec.ts:97:3 › geolocation flow › keeps the existing permission-denied message for code 1 
+    [chromium] › tests/e2e/specs/geolocation.spec.ts:130:3 › geolocation flow › a fix slower than the configured timeout reports a timeout and clears loading 
+    [chromium] › tests/e2e/specs/geolocation.spec.ts:172:3 › geolocation flow › loading clears after denied, unavailable and timeout errors 
+    [chromium] › tests/e2e/specs/geolocation.spec.ts:188:3 › geolocation flow › granted geolocation loads weather from rounded coordinates without reverse geocoding 
+    [chromium] › tests/e2e/specs/geolocation.spec.ts:214:3 › geolocation flow › denied geolocation shows a toast and keeps the loaded weather 
+    [chromium] › tests/e2e/specs/location-search.spec.ts:196:3 › location search › voice uses the selected location 
+    [chromium] › tests/e2e/specs/mobile-layout.spec.ts:21:3 › mobile touch targets and legibility › key mobile controls meet the ~40px target at 390px and 320px 
+    [chromium] › tests/e2e/specs/mobile-layout.spec.ts:44:3 › mobile touch targets and legibility › alert disclaimer, severity and voice privacy note are at least 11px 
+    [chromium] › tests/e2e/specs/mobile-layout.spec.ts:135:3 › mobile viewport layout › hero actions meet 44px and never clip their labels in EN/FR/ES 
+    [chromium] › tests/e2e/specs/multilingual.spec.ts:67:3 › multilingual interface › Hear today speaks the localized briefing 
+    [chromium] › tests/e2e/specs/multilingual.spec.ts:77:3 › multilingual interface › Ask Daymark accepts a French phrase 
+    [chromium] › tests/e2e/specs/multilingual.spec.ts:88:3 › multilingual interface › Ask Daymark accepts a Spanish phrase 
+    [chromium] › tests/e2e/specs/privacy.spec.ts:28:3 › privacy-safe persisted storage › does not persist location, search, transcript, weather or alert state 
+    [chromium] › tests/e2e/specs/privacy.spec.ts:121:3 › privacy policy pages › shows the confirmed operator and contact details in every language 
+    [chromium] › tests/e2e/specs/privacy.spec.ts:140:3 › privacy policy pages › states the verified data practices in every language 
+    [chromium] › tests/e2e/specs/security.spec.ts:101:3 › hostile input is rendered inert (XSS) › renders a malicious speech transcript as inert text 
+    [chromium] › tests/e2e/specs/voice.spec.ts:14:3 › voice playback and Ask Daymark › Hear today speaks the briefing and toggles to Stop 
+    [chromium] › tests/e2e/specs/voice.spec.ts:32:3 › voice playback and Ask Daymark › speech end resets the playback control 
+    [chromium] › tests/e2e/specs/voice.spec.ts:41:3 › voice playback and Ask Daymark › changing the language stops the active narration 
+    [chromium] › tests/e2e/specs/voice.spec.ts:51:3 › voice playback and Ask Daymark › Hear today stops an active listening session 
+    [chromium] › tests/e2e/specs/voice.spec.ts:63:5 › voice playback and Ask Daymark › when playback cannot start › shows a narration error when playback cannot start 
+    [chromium] › tests/e2e/specs/voice.spec.ts:79:5 › voice playback and Ask Daymark › without speech recognition › Ask Daymark hides when speech recognition is unsupported 
+    [chromium] › tests/e2e/specs/voice.spec.ts:89:3 › voice playback and Ask Daymark › shows a localized voice privacy disclosure when voice is available 
+    [chromium] › tests/e2e/specs/voice.spec.ts:124:3 › voice playback and Ask Daymark › Ask Daymark resolves a rain question and shows the answer 
+    [chromium] › tests/e2e/specs/voice.spec.ts:149:3 › voice playback and Ask Daymark › unknown questions get the deterministic fallback, not a made-up answer 
+    [chromium] › tests/e2e/specs/voice.spec.ts:159:3 › voice playback and Ask Daymark › Stop ends recognition and returns the control to idle 
+    [chromium] › tests/e2e/specs/voice.spec.ts:170:3 › voice playback and Ask Daymark › permission errors are readable and return the UI to idle 
+    [chromium] › tests/e2e/specs/voice.spec.ts:180:3 › voice playback and Ask Daymark › starting recognition stops playback and stale sessions cannot update the UI 
+    [chromium] › tests/e2e/specs/voice.spec.ts:213:3 › voice playback and Ask Daymark › unmounting aborts recognition and stops background listening 
+    [chromium] › tests/e2e/specs/weather-alerts.spec.ts:43:3 › weather alerts › mentions the risk in the Hear today briefing 
+    [chromium] › tests/e2e/specs/weather-alerts.spec.ts:51:3 › weather alerts › answers an alert question through the intent layer 
+    [chromium] › tests/e2e/specs/weather-core.spec.ts:119:3 › hero action hierarchy › keeps all four actions with Hear today under the cue and search first in the tools row 
+    [chromium] › tests/e2e/specs/weather-core.spec.ts:143:3 › hero action hierarchy › keeps every hero control visible and unclipped at 320px 
+    [chromium] › tests/e2e/specs/weather-core.spec.ts:157:3 › hero action hierarchy › keeps localized hero labels visible in French and Spanish 
+    [chromium] › tests/e2e/specs/weather-refresh.spec.ts:124:3 › non-destructive weather refresh › a successful location clears the previous location error toast 
+  126 passed (6.3m)
+[ELIFECYCLE] Command failed with exit code 1.

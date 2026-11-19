@@ -1,0 +1,21 @@
+[*] Reverse Plan B preflight (mode: APPLY, source: backup)
+[*] backup provenance, targets and per-target manifests verified
+[*] targets: 1 (main /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage)
+[*] source bytes: the verified backup (exact pre-Plan-B state)
+
+== Planned reverse-Plan-B change ==
+backup dir    /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-main
+source        backup
+mode          APPLY
+target        t1 /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage (state old)
+actions       3 write/remove, 0 skip
+
+[*] pre-staged and hash-verified every replacement; destination bytes saved for rollback
+[*]   restored encoder.int8.onnx
+[*]   restored decoder.int8.onnx
+[*]   restored joiner.int8.onnx
+
+OK: staged bytes restored from source 'backup' for 1 target(s).
+Backup retained at /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-main (can be removed once Plan A pins are applied and the
+old archive is preserved; keep it until the owner-gated window closes).
+State: pre-Plan-B hazard (pins OLD + staged NEW) unless Plan A pins are applied.

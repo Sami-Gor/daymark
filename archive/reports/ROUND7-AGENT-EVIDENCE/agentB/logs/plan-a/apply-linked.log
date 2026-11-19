@@ -1,0 +1,109 @@
+[*] repository root /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a/wt-linked
+[*] Plan A preflight (mode: APPLY)
+WARN:  HEAD c77b6f6e17dd1f57cc9640c041b84530c2cb8e08 differs from planning baseline 45d12748679fa67723e6a5b2d997eb7711f05c43 (allowed)
+PASS  Plan A patch present
+[*] git apply --check passed at /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a/wt-linked
+[*] patch sha256 3463001fd6c990f92897decc7f17c41bbd0f990b7a59e6f4751ffd44f4fd3a85
+[*] six pin files are clean in the working tree
+[*] pin state is OLD (4/5/5/5/1 literals, MODEL_VERSION sha256-1)
+[*] staged assets are NEW bytes (match Plan A target digests)
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+[*] archives verified (OLD preserved + NEW quarantine)
+
+== Planned change set ==
+ .../kokoro-poc/scripts/fetch-parakeet-assets.sh    |    8 ++++----
+ .../android/parakeet-assets/build.gradle           |    6 +++---
+ .../daymark/voice/ParakeetModelAssets.java         |   12 ++++++------
+ .../daymark/voice/ParakeetModelAssetsTest.java     |    2 +-
+ THIRD-PARTY-NOTICES.md                             |   10 +++++-----
+ docs/release/reproducible-build-guide.md           |    8 ++++----
+ 6 files changed, 23 insertions(+), 23 deletions(-)
+
+[*] patch applied to working tree at /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a/wt-linked (not staged, not committed)
+[*] Verifying Plan A (NEW coordinated pin state) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a/wt-linked
+PASS  pin state is NEW (no old literals remain)
+PASS  S1 fetch archive pin
+PASS  S2 fetch encoder pin
+PASS  S2 fetch decoder pin
+PASS  S2 fetch joiner pin
+PASS  S2 fetch tokens pin unchanged
+PASS  S3 build.gradle encoder digest
+PASS  S3 build.gradle decoder digest
+PASS  S3 build.gradle joiner digest
+PASS  S3 build.gradle tokens digest unchanged
+PASS  S4 ParakeetModelAssets encoder digest
+PASS  S4 ParakeetModelAssets decoder digest
+PASS  S4 ParakeetModelAssets joiner digest
+PASS  S4 ParakeetModelAssets tokens digest unchanged
+PASS  S4 ParakeetModelAssets encoder size
+PASS  S4 ParakeetModelAssets decoder size
+PASS  S4 ParakeetModelAssets joiner size unchanged
+PASS  S4 ParakeetModelAssets tokens size unchanged
+PASS  S4 MODEL_VERSION sha256-2
+PASS  S4 old MODEL_VERSION absent
+PASS  S5 test expected encoder size
+PASS  S5 test expected decoder size
+PASS  S5 test expected joiner size unchanged
+PASS  S5 test expected tokens size unchanged
+PASS  S6 notices archive digest (row + table)
+PASS  S6 notices encoder digest
+PASS  S6 notices decoder digest
+PASS  S6 notices joiner digest
+PASS  S6 notices tokens digest unchanged
+PASS  S7 guide encoder digest
+PASS  S7 guide decoder digest
+PASS  S7 guide joiner digest
+PASS  S7 guide archive digest
+PASS  S7 guide tokens digest unchanged
+PASS  old archive digest absent
+PASS  old encoder digest absent
+PASS  old decoder digest absent
+PASS  old joiner digest absent
+PASS  staged model state is NEW
+PASS  staged file present: encoder.int8.onnx
+PASS  staged file present: decoder.int8.onnx
+PASS  staged file present: joiner.int8.onnx
+PASS  staged file present: tokens.txt
+PASS  staged encoder size
+PASS  staged encoder sha256
+PASS  staged decoder size
+PASS  staged decoder sha256
+PASS  staged joiner size
+PASS  staged joiner sha256
+PASS  staged tokens size
+PASS  staged tokens sha256
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+
+Plan A state: pins NEW + staged NEW (consistent).
+Not covered here (owner/build/device gates): fetch twice, verifyParakeetAssets,
+bundleRelease/AAB member digests, model-dependent CI, on-device parity.
+----------------------------------------
+checks passed: 55   failed: 0
+
+== Post-apply pin-file hashes ==
+0cc63e1ef6c341404d8cfb890b4f970c46d0ce8edbeea3d2b9f77a451b3b758a  android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+25c1a5fe721f15ba5609d9281b69305998a585276d66d8b0dfdc544386c9f0b2  artifacts/weather-app/android/parakeet-assets/build.gradle
+9c7dd88bfcf4dbb2978140bdddab48b4d85020dbb637ae172eb80e1b01188acb  artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
+6ddd6c373c7808458c94866e410563e67048995f1dcef34f7d04e02838e79019  artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
+1651f7110eee83c331de659c37b56082ff6ab99c5fd6661f6cb2f2387b907c2b  THIRD-PARTY-NOTICES.md
+a89ed582d279ec65e5b2ba7fe3e242ac38987e383f802557b4a2aef4d9bd31a5  docs/release/reproducible-build-guide.md
+
+Plan A applied and statically verified. Remaining OWNER-GATED steps (not run here):
+  1. Inspect: git -C <repo> diff --stat; review plan-a-adoption.patch + plan-a-replacements.tsv.
+  2. Commit exactly once, e.g.:
+       git -C <repo> add <six files>
+       git -C <repo> commit -m "Adopt Parakeet TDT 0.6B v3 int8 replacement (sha256-2)"
+  3. Reproducibility: run android/kokoro-poc/scripts/fetch-parakeet-assets.sh twice
+     (upstream URL now serves the new archive) and confirm staged hashes unchanged.
+  4. Build: ./gradlew :parakeet-assets:verifyParakeetAssets :app:bundleRelease
+     (and ParakeetModelAssetsTest); verify AAB asset-pack member digests = new hashes.
+  5. CI: model-dependent + aggregate jobs green on the pin-change branch.
+  6. Device: on-device parity/integrity/performance matrix on arm64-v8a API>=29
+     with the shipped patched AAR + ORT 1.28.2 (round3 A2/A5 gates).
+  7. Evidence: record owner approval + results; keep the old archive untouched.

@@ -1,0 +1,8 @@
+Thu Nov 19 22:19:51 UTC 2026
+ProductName:		macOS
+ProductVersion:		26.5.2
+BuildVersion:		25F84
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+git version 2.50.1 (Apple Git-155)
+6.02
+/dev/disk6s1   170Gi   138Gi    32Gi    82%    3.4M  335M    1%   /Volumes/DaymarkWorkspace

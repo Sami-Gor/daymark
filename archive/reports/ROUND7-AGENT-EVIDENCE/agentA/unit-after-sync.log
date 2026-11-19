@@ -1,0 +1,149 @@
+
+ RUN  v5.1.1 /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app
+
+ ✓ src/lib/i18n.test.ts (14 tests) 53ms
+stderr | src/lib/weather.test.ts > fetchWeather > degrades gracefully when only air quality fails
+weather: HTTP 500 
+
+stderr | src/lib/weather.test.ts > fetchWeather > throws a friendly message for HTTP 4xx/5xx
+weather: HTTP 500 
+weather: HTTP 500 
+
+stderr | src/lib/weather.test.ts > fetchWeather > throws a friendly message for HTTP 4xx/5xx
+weather: HTTP 404 
+weather: HTTP 404 
+
+stderr | src/lib/weather.test.ts > fetchWeather > reports a typed network failure without raw browser text
+weather: network request failed TypeError: Failed to fetch
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.test.ts:227:75
+    at fetch (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/spy.BO0hTE3G.js:377:25)
+    at getJson (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:237:22)
+    at fetchWeather (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:307:26)
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.test.ts:228:18
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:1695:35
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:2864:26
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3402:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3397:10)
+weather: network request failed TypeError: Failed to fetch
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.test.ts:227:75
+    at fetch (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/spy.BO0hTE3G.js:377:25)
+    at getJson (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:237:22)
+    at fetchWeather (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:308:29)
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.test.ts:228:18
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:1695:35
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:2864:26
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3402:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3397:10)
+
+stderr | src/lib/weather.test.ts > fetchWeather > reports a typed network failure without raw browser text
+weather: network request failed TypeError: Failed to fetch
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.test.ts:227:75
+    at fetch (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/spy.BO0hTE3G.js:377:25)
+    at getJson (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:237:22)
+    at fetchWeather (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:307:26)
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.test.ts:229:18
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:2864:20
+weather: network request failed TypeError: Failed to fetch
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.test.ts:227:75
+    at fetch (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/spy.BO0hTE3G.js:377:25)
+    at getJson (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:237:22)
+    at fetchWeather (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:308:29)
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.test.ts:229:18
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:2864:20
+
+stderr | src/lib/weather.test.ts > fetchWeather > keeps forecast failure primary even when air quality succeeds
+weather: HTTP 500 
+
+ ✓ tests/e2e/support/awaits.test.ts (17 tests) 216ms
+stderr | src/lib/weather.test.ts > searchPlaces > rejects when the geocoding service fails
+weather: HTTP 500 
+
+ ✓ src/lib/weather.test.ts (57 tests) 368ms
+ ✓ src/lib/android-web-assets.test.ts (6 tests) 691ms
+ ✓ src/lib/weather-alerts.test.ts (12 tests) 97ms
+ ✓ src/lib/voice-input-native.test.ts (30 tests) 91ms
+ ✓ tests/e2e/support/rng.test.ts (14 tests) 69ms
+ ✓ src/lib/xss-regression.test.ts (3 tests) 73ms
+ ✓ src/lib/voice-input-native-watchdog.test.ts (12 tests) 40ms
+ ✓ src/lib/android-voice-implementation.test.ts (8 tests) 14ms
+ ✓ src/lib/weather-intents.test.ts (89 tests) 162ms
+ ✓ src/lib/storage-surface.test.ts (4 tests) 18ms
+ ✓ src/lib/location-feedback.test.ts (6 tests) 12ms
+ ✓ src/lib/speech-privacy.test.ts (5 tests) 9ms
+stderr | src/lib/weather-errors.test.ts > WeatherFetchError > reports an HTTP failure as the http code
+weather: HTTP 503 
+weather: HTTP 503 
+
+stderr | src/lib/speech-router.test.ts > createSpeechRouter > surfaces an error when native playback fails
+DaymarkSpeech native speak failed Error: engine error
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/speech-router.test.ts:100:36
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:1695:35
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:2864:26
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3402:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3397:10)
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3381:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3339:10)
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3989:64
+
+ ✓ src/lib/speech-router.test.ts (10 tests) 10ms
+stderr | src/lib/weather-errors.test.ts > WeatherFetchError > reports a transport failure as network
+weather: network request failed TypeError: Failed to fetch
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather-errors.test.ts:71:22
+    at fetch (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/spy.BO0hTE3G.js:377:25)
+    at getJson (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:237:22)
+    at fetchWeather (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:307:26)
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather-errors.test.ts:73:18
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:1695:35
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:2864:26
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3402:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3397:10)
+weather: network request failed TypeError: Failed to fetch
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather-errors.test.ts:71:22
+    at fetch (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/spy.BO0hTE3G.js:377:25)
+    at getJson (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:237:22)
+    at fetchWeather (/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather.ts:308:29)
+    at /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/src/lib/weather-errors.test.ts:73:18
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:1695:35
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:2864:26
+    at file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3402:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/node_modules/.pnpm/vitest@5.1.1_@types+node@25.9.5_vite@8.3.8_@types+node@25.9.5_esbuild@0.28.1_jiti@2.7.0_tsx@4.23.1_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.zBhXlcZQ.js:3397:10)
+
+ ✓ src/lib/weather-errors.test.ts (9 tests) 117ms
+ ✓ src/lib/network-boundary.test.ts (14 tests) 1213ms
+ ✓ src/lib/speech-ui-state.test.ts (5 tests) 8ms
+ ✓ src/lib/safe-console.test.ts (4 tests) 21ms
+ ✓ src/lib/locality-lookup.test.ts (10 tests) 5ms
+ ✓ src/lib/android-manifest-permissions.test.ts (4 tests) 4ms
+ ✓ src/lib/tts-segmentation.test.ts (10 tests) 8ms
+ ✓ src/lib/security-headers.test.ts (1 test) 10ms
+ ✓ src/lib/speech-engine.test.ts (6 tests) 5ms
+ ✓ src/lib/day-cue.test.ts (12 tests) 7ms
+ ✓ src/lib/location-privacy.test.ts (13 tests) 39ms
+ ✓ src/lib/logging-config.test.ts (4 tests) 6ms
+ ✓ src/lib/android-voice-model-loading.test.ts (10 tests) 4ms
+ ✓ src/lib/deep-links.test.ts (4 tests) 3ms
+ ✓ src/lib/system-speech-offline.test.ts (8 tests) 3ms
+ ✓ src/lib/capacitor-geolocation-rescue.test.ts (9 tests | 1 skipped) 2103ms
+   ✓ geolocation rescue decision table (compiled JVM harness, no Gradle/device) (2)
+     ✓ the patched store classes allow coarse-only grants at every API level 2089ms
+ ✓ tests/e2e/support/eslint-guard.test.ts (4 tests) 2697ms
+   ✓ type-aware ESLint async guard (4)
+     ✓ configures the required rules as errors with ignoreVoid disabled 709ms
+     ✓ reports the expected rule for every deliberately-invalid fixture 1965ms
+
+ Test Files  32 passed (32)
+      Tests  413 passed | 1 skipped (414)
+   Start at  21:29:05
+   Duration  3.16s (tests 69%, import 25%, transform 5%, worker 1%)
+
+    Isolate  32 workers spawned · ~134ms startup each (spawn + environment, per file)
+             at least ~477ms faster with isolate: false — reuses workers across files instead of one per file
+

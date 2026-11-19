@@ -1,0 +1,118 @@
+=== targeted Plan B re-validation after staged_class token fix (scratch) ===
+PASS  verify-plan-b on scratch OLD staging + NEW-byte backup
+PASS  check-state classifies scratch Plan B as old
+PASS  Plan B --idempotent on scratch OLD staging
+--- continuation: undo + repeatability ---
+[*] Reverse Plan B preflight (mode: APPLY)
+PASS  backup provenance present
+PASS  backup manifest present
+PASS  backup file present: encoder.int8.onnx
+PASS  backup file present: decoder.int8.onnx
+PASS  backup file present: joiner.int8.onnx
+PASS  backup file present: tokens.txt
+PASS  backup encoder sha256 (NEW)
+PASS  backup decoder sha256 (NEW)
+PASS  backup joiner sha256 (NEW)
+PASS  backup tokens sha256 (NEW)
+[*] target staging state: old -> will restore NEW bytes
+[*] restored NEW encoder.int8.onnx
+[*] restored NEW decoder.int8.onnx
+[*] restored NEW joiner.int8.onnx
+[*] restored NEW tokens.txt
+PASS  restored staging state is NEW
+OK: staged NEW bytes restored from _validation/backup-b
+Current state: pins 'old' + staged NEW. Run ./check-state.sh for the classification.
+PASS  restore-staged-backup returns NEW bytes
+== Plan state ==
+repo            _validation/repo-old
+staging         _validation/staging-b
+pins_state      old
+staged_state    new
+overall_state   hazard-staged-new-pinned-old
+
+== pin literal counts (six files, exact expected values) ==
+new_archive=0
+new_encoder=0
+new_decoder=0
+new_joiner=0
+new_model_version=0
+old_archive=4
+old_encoder=5
+old_decoder=5
+old_joiner=5
+old_model_version=1
+tokens=5
+new_encoder_size=0
+new_decoder_size=0
+old_encoder_size=2
+old_decoder_size=2
+
+== staged files ==
+encoder.int8.onnx 652282294 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479 new
+decoder.int8.onnx 11845274 0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5 new
+joiner.int8.onnx 6355277 cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98 new
+tokens.txt 93939 d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d shared
+
+RESULT: state matches expectation (mixed)
+PASS  check-state classifies restored staging + old pins as hazard
+[*] Plan B preflight (mode: DRY-RUN)
+[*] pin state is OLD (MODEL_VERSION sha256-1, all old digests)
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+PASS  old source encoder size
+PASS  old source encoder sha256
+PASS  old source decoder size
+PASS  old source decoder sha256
+PASS  old source joiner size
+PASS  old source joiner sha256
+PASS  old source tokens size
+PASS  old source tokens sha256
+[*] target _validation/staging-b is NEW bytes -> will back up then restore OLD
+
+== Planned Plan B change ==
+source        /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+backup dir    _validation/backup-repeat-dry (approx 639 MiB of NEW bytes)
+target        _validation/staging-b (state new)
+files         encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt
+
+DRY-RUN OK: old source verified, targets classified, no files were written.
+Re-run with --apply to back up NEW bytes and restore the OLD staged bytes.
+PASS  Plan B dry-run on restored hazard staging (repeatable)
+[*] Plan B preflight (mode: DRY-RUN)
+ERROR: pin state is 'new', expected 'old'; Plan B cannot restore old assets under new pins (use Plan A or a full revert first)
+PASS  Plan B refuses when pins are NEW
+== Plan state ==
+repo            /Volumes/DaymarkWorkspace/Daymark/repositories/daymark
+staging         /Volumes/DaymarkWorkspace/Daymark/repositories/daymark/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet
+pins_state      old
+staged_state    new
+overall_state   hazard-staged-new-pinned-old
+
+== pin literal counts (six files, exact expected values) ==
+new_archive=0
+new_encoder=0
+new_decoder=0
+new_joiner=0
+new_model_version=0
+old_archive=4
+old_encoder=5
+old_decoder=5
+old_joiner=5
+old_model_version=1
+tokens=5
+new_encoder_size=0
+new_decoder_size=0
+old_encoder_size=2
+old_decoder_size=2
+
+== staged files ==
+encoder.int8.onnx 652282294 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479 new
+decoder.int8.onnx 11845274 0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5 new
+joiner.int8.onnx 6355277 cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98 new
+tokens.txt 93939 d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d shared
+
+RESULT: state matches expectation (mixed)
+PASS  real repo/staging untouched (hazard state)
+targeted rerun continuation: pass=5 fail=0

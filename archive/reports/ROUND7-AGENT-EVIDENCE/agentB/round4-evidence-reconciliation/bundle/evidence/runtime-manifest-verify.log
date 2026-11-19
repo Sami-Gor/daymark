@@ -1,0 +1,75 @@
+== AAR hash ==
+5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8  artifacts/weather-app/android/daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar
+size=10214077 mtime=1794406498 mode=-rw-r--r--
+
+== fetch-sherpa-onnx.sh pins ==
+9:# contain the unchecked joiner-width path, so the ordinary release AAR must
+20:AAR_NAME="sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar"
+21:AAR_SHA256="5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8"
+24:AAR_URL="${SHERPA_ONNX_PATCHED_AAR_URL:-}"
+33:if [ -f "$LIBS/$AAR_NAME" ]; then
+34:  actual="$(shasum -a 256 "$LIBS/$AAR_NAME" | awk '{print $1}')"
+35:  if [ "$actual" = "$AAR_SHA256" ]; then
+36:    echo "ok: using provisioned patched $AAR_NAME"
+41:if [ -z "$AAR_URL" ]; then
+42:  echo "error: the patched sherpa-onnx AAR is not provisioned." >&2
+43:  echo "expected: $LIBS/$AAR_NAME" >&2
+44:  echo "sha256:   $AAR_SHA256" >&2
+45:  echo "Set SHERPA_ONNX_PATCHED_AAR_URL to a reviewed artifact, or copy" >&2
+46:  echo "the verified AAR into place. Do not use the upstream v1.13.8 AAR." >&2
+54:curl -sL --fail -o "$TMP/$AAR_NAME" "$AAR_URL"
+56:actual="$(shasum -a 256 "$TMP/$AAR_NAME" | awk '{print $1}')"
+57:if [ "$actual" != "$AAR_SHA256" ]; then
+58:  echo "checksum mismatch for $AAR_NAME: $actual != $AAR_SHA256" >&2
+62:cp "$TMP/$AAR_NAME" "$LIBS/$AAR_NAME"
+63:echo "installed: $LIBS/$AAR_NAME"
+
+== SHA256SUMS verify ==
+shasum: android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/tdt-vocab-max/encoder.onnx: No such file or directory
+android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/tdt-vocab-max/encoder.onnx: FAILED open or read
+shasum: android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/tdt-vocab-max/joiner.onnx: No such file or directory
+android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/fixtures/cve-2026-108954/tdt-vocab-max/joiner.onnx: FAILED open or read
+shasum: WARNING: 42 listed files could not be read
+entries=42
+
+== provenance ==
+# sherpa-onnx CVE-2026-108954 provenance
+
+This module pins a locally rebuilt sherpa-onnx 1.13.8 Android runtime containing
+the joiner-width validation for **CVE-2026-108954 / GHSA-f5q5-vp8g-wh4x**.
+
+**Review state:** the tracked AAR in this branch was rebuilt from the current
+PR #54 source in a disposable checkout. It is not independently approved,
+merged or released; this commit is the artifact candidate for review. The
+original `release/v2-candidate` baseline AAR is not this artifact.
+
+## Artifact
+
+| Field | Value |
+|---|---|
+| AAR | `sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar` |
+| AAR SHA-256 | `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8` |
+| `libsherpa-onnx-jni.so` SHA-256 | `9a730e8e70f40e6b3662a1481d5b166cc9db16f717e8a3e74e3a12a8ff525485` |
+| `libonnxruntime.so` SHA-256 (AAR) | `33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1` |
+| `libonnxruntime.so` SHA-256 (APK after AGP strip) | `7a2fb92eb67037837c3f0e428bd732fd0d05ced0546d9e740090c07573d8249a` |
+| ABI | `arm64-v8a` only |
+| Source version | sherpa-onnx `v1.13.8`, commit `11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf` |
+| Patch | `android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0001-joiner-width-validation.patch` |
+| Patch SHA-256 | `fd58558bdb9a7b82be8c2bfe7890890ca01edfedd95797e285d313b0bacd9f99` |
+| NDK / CMake / ORT | `29.0.14206865` / `3.22.1` / `1.28.2` |
+| AAR Gradle / AGP | `8.6` / `8.4.0` |
+| AAR size | 10,214,077 bytes |
+
+The rebuilt AAR is tracked in this branch at
+`artifacts/weather-app/android/daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar`.
+It is the artifact candidate for review; a clean checkout and CI obtain this
+exact binary through Git. Run
+`android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` to verify it. The script
+accepts `SHERPA_ONNX_PATCHED_AAR_URL` for an externally hosted reviewed
+artifact and refuses to download the upstream unpatched AAR.
+
+## Patch
+
+The source patch is stored at
+`android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0001-joiner-width-validation.patch`
+and has SHA-256

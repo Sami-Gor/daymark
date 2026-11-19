@@ -1,0 +1,4 @@
+[*] Reverse Plan B preflight (mode: DRY-RUN, source: backup)
+      manifest sha256 mismatch for target t1 (stale/tampered manifest)
+      encoder.int8.onnx manifest sha256 != canonical NEW digest
+ERROR: backup is stale/tampered/incomplete; refusing to restore from it

@@ -1,0 +1,58 @@
+[*] Plan B preflight (mode: APPLY)
+[*] pin state is OLD (MODEL_VERSION sha256-1, all old digests) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/repo
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+[*] archives verified (OLD preserved + NEW quarantine)
+PASS  old source encoder size
+PASS  old source encoder sha256
+PASS  old source decoder size
+PASS  old source decoder sha256
+PASS  old source joiner size
+PASS  old source joiner sha256
+PASS  old source tokens size
+PASS  old source tokens sha256
+[*] old source verified: /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+
+== Planned Plan B change ==
+source        /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+mode          APPLY
+target        t1 /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage (pre-state old)
+files         encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt (replace=0 install=0 skip=4)
+backup dir    /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-idem-apply
+
+[*] all targets already OLD; --idempotent given, verifying only (no backup, no writes)
+[*] Verifying Plan B (OLD staged assets restored, old pins) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/repo
+PASS  pin state is OLD
+PASS  MODEL_VERSION sha256-1 present
+PASS  MODEL_VERSION sha256-2 absent
+PASS  new archive digest absent from pins
+PASS  new encoder digest absent from pins
+PASS  new decoder digest absent from pins
+PASS  new joiner digest absent from pins
+PASS  staged model state is OLD
+PASS  staged file present: encoder.int8.onnx
+PASS  staged file present: decoder.int8.onnx
+PASS  staged file present: joiner.int8.onnx
+PASS  staged file present: tokens.txt
+PASS  staged encoder size
+PASS  staged encoder sha256
+PASS  staged decoder size
+PASS  staged decoder sha256
+PASS  staged joiner size
+PASS  staged joiner sha256
+PASS  staged tokens size
+PASS  staged tokens sha256 (unchanged bytes)
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+
+Plan B state: pins OLD + staged OLD (consistent with ParakeetModelAssets,
+ParakeetModelAssetsTest, verifyParakeetAssets expectations).
+Caveat: old bytes are only reproducible from the preserved old archive;
+the upstream URL now serves the new archive, so fetch cannot recreate them.
+----------------------------------------
+checks passed: 24   failed: 0
+IDEMPOTENT OK: targets are already in the consistent OLD state.

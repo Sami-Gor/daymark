@@ -1,0 +1,29 @@
+=== HF resumable-download test (decoder.int8.onnx) ===
+url=https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/decoder.int8.onnx
+start_utc=2026-11-19T21:33:44Z
+--- step 1: deliberately interrupted download (--max-time 1) ---
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 11.2M    0 66506    0     0  66500      0  0:02:58  0:00:01  0:02:57  191k
+curl: (28) Operation timed out after 643 milliseconds with 66506 out of 11845275 bytes received
+step1_exit=28
+partial_size=66506 bytes
+--- step 2: resume with -C - (Range request) ---
+HTTP/2 302 
+content-length: 1040
+accept-ranges: bytes
+HTTP/2 206 
+accept-ranges: bytes
+content-length: 1
+content-range: bytes 0-0/11845275
+** Resuming transfer from byte position 66506
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  1040  100  1040    0     0   2627      0 --:--:-- --:--:-- --:--:--  2632
+  2 11.2M    2  237k    0     0   268k      0  0:00:42 --:--:--  0:00:42  268k 11 11.2M   11 1293k    0     0   684k      0  0:00:16  0:00:01  0:00:15 1053k 22 11.2M   22 2556k    0     0   884k      0  0:00:12  0:00:02  0:00:10 1158k 32 11.2M   32 3740k    0     0   961k      0  0:00:11  0:00:03  0:00:08 1166k 42 11.2M   42 4859k    0     0   993k      0  0:00:11  0:00:04  0:00:07 1155k 49 11.2M   49 5659k    0     0   960k      0  0:00:11  0:00:05  0:00:06 1083k 55 11.2M   55 6362k    0     0   923k      0  0:00:12  0:00:06  0:00:06 1013k 62 11.2M   62 7146k    0     0   905k      0  0:00:12  0:00:07  0:00:05  917k 67 11.2M   67 7785k    0     0   875k      0  0:00:13  0:00:08  0:00:05  809k 77 11.2M   77 8905k    0     0   900k      0  0:00:12  0:00:09  0:00:03  809k 95 11.2M   95 10.7M    0     0  1010k      0  0:00:11  0:00:10  0:00:01 1068k100 11.2M  100 11.2M    0     0  1038k      0  0:00:11  0:00:11 --:--:-- 1229k
+resume_http_code=206 bytes=11778769 time=11.071470s
+resume_exit=0
+final_size=11845275 bytes
+--- step 3: verify full-file hash equals pin ---
+179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e  /Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/hf-resume/decoder.int8.onnx
+expected=179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e
+end_utc=2026-11-19T21:33:57Z
+EXIT=0

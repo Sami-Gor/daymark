@@ -1,0 +1,3460 @@
+From a076df3f1366de83e9607dad697f01fe088cd1ff Mon Sep 17 00:00:00 2001
+From: "Agent B (round 7)" <agent-b@round7.local>
+Date: Thu, 19 Nov 2026 22:04:56 +0000
+Subject: [PATCH] tools(plan-remediation): fix Plan A/B rollback scripts
+ (A1-A4, B1-B3) with regression suites
+
+Remediation of the Round 4 Plan A (pin adoption) / Plan B (old-asset restore)
+kit, per the Round 5/6 review findings:
+
+Plan A:
+- A1 linked-worktree-safe repo root resolution (git rev-parse --show-toplevel
+  instead of [ -d .git ]; applies at the repository root)
+- A2 archive pre-gate before any write + transactional EXIT-trap rollback that
+  proves the six pin files byte-identical to pre-apply SHA-256 values
+- A3 --allow-missing-staging threaded into verify-plan-a (42/0 mode)
+- A4 refresh-evidence-manifest.sh: byte-regenerated, complete-coverage,
+  self-entry-free evidence manifests (corrected round-4 manifest in evidence)
+
+Plan B:
+- B1 v2 multi-target backup layout (targets.tsv + per-target manifests) makes
+  --include-negative fully reversible and hash-verified
+- B2 per-file all-or-nothing pre-stage/commit with manifest rollback and exact
+  undo of absent targets
+- B3 alternate recovery sources: backup / extracted-new / NEW archive
+- --negative-staging override so include-negative runs can target an isolated
+  worktree
+
+Tests: tools/plan-remediation/tests/ (main + linked worktree, positive/
+negative modes, partial failure, repeated execution, stale manifests,
+byte-identical before/after hashes) and the canonical 55-check Plan A /
+30-check Plan B verifier suites.
+
+No production model/pin/AAR/archive change; no push/merge.
+---
+ tools/plan-remediation/README.md              | 118 +++++
+ tools/plan-remediation/SHA256SUMS             |  17 +
+ tools/plan-remediation/apply-plan-a.sh        | 230 +++++++++
+ tools/plan-remediation/apply-plan-b.sh        | 431 ++++++++++++++++
+ tools/plan-remediation/check-state.sh         |  96 ++++
+ tools/plan-remediation/parakeet-pins.env      |  93 ++++
+ tools/plan-remediation/plan-a-adoption.patch  | 123 +++++
+ .../plan-remediation/plan-a-replacements.tsv  |  24 +
+ tools/plan-remediation/plan-a-revert.patch    | 123 +++++
+ tools/plan-remediation/plans-lib.sh           | 480 ++++++++++++++++++
+ .../refresh-evidence-manifest.sh              | 100 ++++
+ .../plan-remediation/restore-staged-backup.sh | 394 ++++++++++++++
+ tools/plan-remediation/tests/test-lib.sh      | 125 +++++
+ .../tests/test-plan-a-suite.sh                | 199 ++++++++
+ .../tests/test-plan-b-suite.sh                | 261 ++++++++++
+ .../tests/test-plans-remediation.sh           | 118 +++++
+ tools/plan-remediation/verify-plan-a.sh       | 123 +++++
+ tools/plan-remediation/verify-plan-b.sh       | 222 ++++++++
+ 18 files changed, 3277 insertions(+)
+ create mode 100644 tools/plan-remediation/README.md
+ create mode 100644 tools/plan-remediation/SHA256SUMS
+ create mode 100755 tools/plan-remediation/apply-plan-a.sh
+ create mode 100755 tools/plan-remediation/apply-plan-b.sh
+ create mode 100755 tools/plan-remediation/check-state.sh
+ create mode 100644 tools/plan-remediation/parakeet-pins.env
+ create mode 100644 tools/plan-remediation/plan-a-adoption.patch
+ create mode 100644 tools/plan-remediation/plan-a-replacements.tsv
+ create mode 100644 tools/plan-remediation/plan-a-revert.patch
+ create mode 100755 tools/plan-remediation/plans-lib.sh
+ create mode 100755 tools/plan-remediation/refresh-evidence-manifest.sh
+ create mode 100755 tools/plan-remediation/restore-staged-backup.sh
+ create mode 100755 tools/plan-remediation/tests/test-lib.sh
+ create mode 100755 tools/plan-remediation/tests/test-plan-a-suite.sh
+ create mode 100755 tools/plan-remediation/tests/test-plan-b-suite.sh
+ create mode 100755 tools/plan-remediation/tests/test-plans-remediation.sh
+ create mode 100755 tools/plan-remediation/verify-plan-a.sh
+ create mode 100755 tools/plan-remediation/verify-plan-b.sh
+
+diff --git a/tools/plan-remediation/README.md b/tools/plan-remediation/README.md
+new file mode 100644
+index 0000000..b0959f9
+--- /dev/null
++++ b/tools/plan-remediation/README.md
+@@ -0,0 +1,118 @@
++# Plan A / Plan B remediation kit (Round 7, agent B)
++
++Status: **REMEDIATED + REGRESSION-TESTED in disposable T5 scratch. NOT APPLIED.**
++No production model byte, pin, AAR, archive, worktree or repository file was
++changed. Authority: T5 `/Volumes/DaymarkWorkspace/Daymark`.
++
++This directory is the reviewable deliverable for the Round 7 Plan A/B rollback
++script remediation. It started from `archive/reports/round4-b-plans` (2.5 GiB,
++originals untouched) and fixes the defects confirmed by the Round 5/6 reviews
++(`round5-b4-b6-plan-tests-20261118.md`, `round5-b1-b3-plans-review-20261118.md`,
++`ROUND6-AGENT-EVIDENCE/agent4-plans.md`):
++
++| Defect | Severity | Fix in this kit |
++|---|---|---|
++| **A1** `apply-plan-a.sh` rejects linked worktrees (`[ -d "$REPO/.git" ]`; in a linked worktree `.git` is a file) and `git apply` is cwd-relative | medium | `plans-lib.sh:git_repo_root()` resolves `git -C <dir> rev-parse --show-toplevel`; every apply runs at the resolved repository root. Read-only verifiers keep working on plain non-git replicas via `repo_dir()`. |
++| **A2** Failed post-verify leaves the six pin files half-adopted; archive failures are only noticed after the patch landed | medium | `apply-plan-a.sh` now has a pre-apply archive gate (`check_archives` + `FAIL_COUNT=0` before any write) and an EXIT-trap transactional rollback: any failure after `git apply` reverses the patch, proves the working tree clean, and compares all six files to their pre-apply SHA-256 values. |
++| **A3** `--allow-missing-staging` can never pass the verifier (fresh checkout: apply pins, then fetch) | medium | `verify-plan-a.sh --allow-missing-staging` skips only the 13 staged-byte checks (42 checks instead of 55) and warns; `apply-plan-a.sh` threads the flag through. |
++| **A4** Stale/inconsistent round-4 evidence manifest (`plans-lib.sh` hash stale, missing regeneration log, impossible self-entry) | low | `refresh-evidence-manifest.sh` regenerates/verifies SHA-256 manifests from the actual bytes, lists every file (omissions fail), never lists itself, and `--check` fails on any difference. Corrected manifest + analysis in the agent-B evidence bundle. |
++| **B1** `--include-negative` is not reversible: both targets are flattened into one backup namespace, restore has no flag and no target record | medium/low | v2 backup layout: `BACKUP_DIR/targets.tsv` records every target path + pre-state, each target gets `targets/<id>/backup-manifest.tsv` + its own files. `restore-staged-backup.sh --include-negative` restores exactly the recorded targets; all bytes are verified against manifests and canonical NEW/OLD SHA-256 + size values. Legacy round-4 flat backups are still accepted (single target). |
++| **B2** Per-file install is not transactional; partial/absent targets can be overwritten without a recoverable backup; idempotent `--apply` created a broken backup | medium | Per-file planning (`replace` / `install` / `skip`; unknown bytes refused), every existing byte backed up and verified BEFORE any destination is touched, ALL old files pre-staged next to their destinations and hash-verified, then renames committed; commit or post-verify failure rolls every target back from the manifest and deletes the just-created backup dir when the rollback is byte-identical. `missing` targets are installed and can be undone exactly (files removed again). `--idempotent --apply` verifies only, writes nothing, creates no backup. |
++| **B3** Recovery depends on one backup directory | low | `restore-staged-backup.sh --source backup|extracted-new|archive`: exact pre-state undo from the backup (including removing files that were absent before Plan B), or forced-NEW recovery from the verified `extracted-new` tree / the quarantined NEW archive. Source bytes are re-verified against canonical NEW sizes/digests. |
++
++Everything else (pin values, the adoption/revert patches, the 20-reference pin
++surface, staged-byte facts, archive evidence) is copied byte-identically from
++the round-4 kit; the patches are unchanged because the pin surface did not
++change.
++
++## Contents
++
++| File | Purpose |
++|---|---|
++| `parakeet-pins.env` | Canonical OLD/NEW digests, sizes, versions, paths (values unchanged); `PLAN_ROOT` self-resolves; adds v2 backup-layout constants. |
++| `plans-lib.sh` | Read-only helpers: hashing, literal counts, classification, repo/worktree root resolution, per-file classification, APFS-clone copies, v2/legacy backup manifest + provenance verification. |
++| `check-state.sh` | Classify tree: `plan-a` / `plan-b` / `hazard-*` / `inconsistent`; `--repo` accepts a linked worktree/subdirectory. |
++| `plan-a-adoption.patch` / `plan-a-revert.patch` / `plan-a-replacements.tsv` | Byte-identical round-4 artifacts (SHA-256 pinned in `SHA256SUMS`). |
++| `apply-plan-a.sh` | Plan A preflight + archive gate + transactional apply (dry-run default). |
++| `verify-plan-a.sh` | Assert consistent NEW state (canonical 55 checks; 42 with `--allow-missing-staging`). |
++| `apply-plan-b.sh` | Plan B preflight + per-file v2 backup + pre-staged atomic restore + rollback (dry-run default). |
++| `verify-plan-b.sh` | Assert consistent OLD state + v2/legacy backup integrity (canonical 30 checks; 31 with `--include-negative`). |
++| `restore-staged-backup.sh` | Reverse Plan B: multi-target, `--include-negative`, `--source backup|extracted-new|archive`, hash-verified pre-stage/commit. |
++| `refresh-evidence-manifest.sh` | Regenerate (`--write` default) or verify (`--check`) a SHA-256 evidence manifest. |
++| `tests/test-lib.sh` | Shared harness (scratch clones, hash sets, assertions, fault injectors). |
++| `tests/test-plan-a-suite.sh` | Plan A regression suite (main + linked worktree, positive/negative, rollback, missing staging, stale manifest, byte-identical revert). |
++| `tests/test-plan-b-suite.sh` | Plan B regression suite (backup/restore, include-negative, partial failure, repeated/idempotent, stale manifests, alternate sources, byte-identical cycles). |
++| `tests/test-plans-remediation.sh` | Master runner: static defect checks + both suites + canonical 55/30 counts. |
++| `SHA256SUMS` | Regenerated manifest of this directory (never lists itself). |
++
++## Usage (owner-gated; identical CLI to the round-4 kit)
++
++    cd tools/plan-remediation
++    ./check-state.sh --expect any --include-negative --with-archives
++    ./apply-plan-a.sh                    # dry-run; refuses half-applied states
++    ./apply-plan-a.sh --apply            # transactional apply + auto-verify
++    ./apply-plan-a.sh --apply --allow-missing-staging   # fresh checkout, fetch later
++    ./apply-plan-b.sh                    # dry-run
++    ./apply-plan-b.sh --apply            # v2 backup + pre-staged OLD restore + verify
++    ./apply-plan-b.sh --apply --include-negative        # main + negative worktree
++    ./apply-plan-b.sh --apply --include-negative --negative-staging DIR  # isolated target override
++    ./restore-staged-backup.sh --backup-dir DIR --apply # exact pre-Plan-B undo
++    ./restore-staged-backup.sh --backup-dir DIR --include-negative --apply
++    ./restore-staged-backup.sh --backup-dir DIR --source extracted-new --apply
++    ./refresh-evidence-manifest.sh --check .            # or: . (regenerate)
++
++`--backup-dir` is mandatory for restore; apply defaults to
++`quarantine/parakeet-20261118/staged-new-backup-<UTC>` and refuses to reuse an
++existing directory. `--negative-staging DIR` overrides the default
++`worktrees/negative/.../parakeet` target for `--include-negative` runs (used by
++the tests so they never write a real worktree).
++
++Exit codes: 0 success/match, 1 failure/mismatch/refusal, 2 usage.
++
++## v2 backup layout (reversibility record)
++
++    BACKUP-PROVENANCE.txt         format_version=2, target_count,
++                                  targets_tsv_sha256, manifest_sha256_<id>
++    targets.tsv                   <id>	<target path>	<pre-class>
++    targets/<id>/backup-manifest.tsv
++                                  <file>	<pre_state>	<size>	<sha256>
++    targets/<id>/<file>           backed-up pre-Plan-B bytes (NEW)
++    install-manifest.tsv          what this run installed (evidence)
++
++Every manifest and the targets file are pinned by SHA-256 in the provenance, so
++a stale or tampered manifest is detected by `verify-plan-b.sh` and refused by
++`restore-staged-backup.sh`. Files that were absent before Plan B are recorded as
++`pre_state=missing` (restore removes them again); `tokens.txt` bytes are shared
++between OLD and NEW so it is never replaced and needs no backup.
++
++## Tests and exact counts
++
++    ./tests/test-plans-remediation.sh
++
++The master runner clones fixtures from T5 (APFS copy-on-write), so the ~639 MiB
++model bytes are never duplicated on disk and production bytes are only read.
++Canonical counts (see `archive/reports/ROUND7-AGENT-EVIDENCE/agentB/`):
++
++* Plan A verifier suite: **55 checks passed / 0 failed** (with NEW staging).
++  Missing-staging mode is **42 / 0** (13 staged-byte checks intentionally skipped).
++* Plan B verifier suite: **30 checks passed / 0 failed** (main staging + v2
++  backup + archives); **31 / 0** with `--include-negative`.
++
++Runtime: Plan A suite ~3 min; Plan B suite ~12-15 min (deliberate full-size
++hashing of the real 639 MiB model files).
++
++## Guarantees / limitations
++
++* All test writes are under `$T5/cache/round7/plans/test-run`; every target is an
++  APFS clone. The suites re-hash the real staged assets, quarantine extracts and
++  archives before and after and fail if anything changed.
++* The scripts still require the T5 evidence paths (archives, quarantine
++  extracts); they are not portable to an arbitrary CI runner without that data.
++* `apply-plan-a.sh` refuses to run on a HEAD other than the planning baseline
++  unless `--allow-head` is given; the linked-worktree tests use scratch repos
++  whose six pin files are byte-identical to the baseline.
++* Legacy (round 4) flat backups remain restorable for one target, but have no
++  multi-target record; `--include-negative` is refused for them.
++* The owner gates from round 4 (single reviewed commit, fetch-twice,
++  `verifyParakeetAssets`, AAB member digests, model-dependent CI, on-device
++  parity/performance) are unchanged and are NOT satisfied by this kit.
+diff --git a/tools/plan-remediation/SHA256SUMS b/tools/plan-remediation/SHA256SUMS
+new file mode 100644
+index 0000000..072e577
+--- /dev/null
++++ b/tools/plan-remediation/SHA256SUMS
+@@ -0,0 +1,17 @@
++22ae172af1d256c74f312a8da7d78bb61453b6d5b6b2a1a5600c69c4e0b3cfc6  ./README.md
++df1ae17d10174c2fc780162e739f8205906aa038279df3fa708f4a05356da201  ./apply-plan-a.sh
++a3d3b1c682cee9142ac9f77c1cf5e056bb5d3407a656b62621f9287639f10d75  ./apply-plan-b.sh
++dd0954bae8e7a177ea3bbe2a2c6799a31e38834050a1698109ccd404da303c15  ./check-state.sh
++4c39840684df93a12909d141ca6312a254d6d5ac44479a120827097f9ba3e356  ./parakeet-pins.env
++3463001fd6c990f92897decc7f17c41bbd0f990b7a59e6f4751ffd44f4fd3a85  ./plan-a-adoption.patch
++63991a7caf648c99d339d7c44f70dfc253402eb04bc74b42f03adbe50f7791b7  ./plan-a-replacements.tsv
++3d90e92404a3d19e488b843d0826e4011dbbe178e2cc9aa789e554c6adcd6e8f  ./plan-a-revert.patch
++660644e3d6c6b1e69f14a1642204f68229614fa6bd25b07d2458481635a973e7  ./plans-lib.sh
++9f74fd98b7715e6801a50f74d65f22b8ab461568fcedb70d576b063803b625b2  ./refresh-evidence-manifest.sh
++d131fbc8882d73bbd477db73bd5301c2bac9bccac940c36c5e34a8e830d2f728  ./restore-staged-backup.sh
++bd01aaf85330a59ebc67d08fac7ddbca50d146faf6da345d1e8057bf8927be7f  ./tests/test-lib.sh
++f07911029cc627ab647109220d3cb2d2a66043c87888f2140198e2ea66b2c84b  ./tests/test-plan-a-suite.sh
++2ede38d38b24fe692c0ff5f74fd3780072708a29aa3393311c888589b7cba774  ./tests/test-plan-b-suite.sh
++fbdd559998ef20e3ddca1e8c213ec7678b959fadbf360632d6dd6cd6a714d182  ./tests/test-plans-remediation.sh
++3c1128b1f40dfd2ec9404cec57b48f97de5493c8eb5886ca10488a9904177501  ./verify-plan-a.sh
++2a8cb27ffef3a67c1c145386c3bf9045841f00948afe55d9b01b68acb53b7d3d  ./verify-plan-b.sh
+diff --git a/tools/plan-remediation/apply-plan-a.sh b/tools/plan-remediation/apply-plan-a.sh
+new file mode 100755
+index 0000000..9d1c9ff
+--- /dev/null
++++ b/tools/plan-remediation/apply-plan-a.sh
+@@ -0,0 +1,230 @@
++#!/usr/bin/env bash
++# Plan A -- coordinated Parakeet replacement adoption (pin update only).
++#
++# Applies plan-a-adoption.patch to the six pin-bearing files as ONE coordinated
++# change, after preflight checks. DRY-RUN BY DEFAULT: nothing is written unless
++# --apply is given. This script never commits, pushes, fetches the model, runs
++# Gradle, or changes staged model assets.
++#
++# Remediation copy (Round 7, agent B) fixes:
++#   A1  linked-worktree detection: uses "git -C rev-parse" instead of
++#       [ -d "$REPO/.git" ], and resolves the repository top level so a
++#       worktree/subdirectory argument applies at the right root.
++#   A2  transactional rollback: any failure after the patch is applied
++#       (post-verify, fetch-script syntax, unexpected error) reverses the patch
++#       and proves the six files byte-identical to their pre-apply hashes.
++#       Archive verification is now a pre-gate: a bad archive aborts before any
++#       write instead of being discovered after the patch landed.
++#   A3  --allow-missing-staging is threaded into verify-plan-a.sh.
++#
++# Usage:
++#   ./apply-plan-a.sh [--repo DIR] [--staging DIR] [--patch FILE] [--apply]
++#                     [--allow-head] [--allow-missing-staging]
++#
++# Exit: 0 = dry-run clean / patch applied and verified; 1 = preflight/verify
++# failure (and, after --apply, the patch has been rolled back).
++set -euo pipefail
++HERE=$(cd "$(dirname "$0")" && pwd -P)
++. "$HERE/parakeet-pins.env"
++. "$HERE/plans-lib.sh"
++
++REPO=$REPO_ROOT
++STAGING=$STAGING_DIR
++PATCH="$HERE/$PLAN_A_PATCH_NAME"
++APPLY=0
++ALLOW_HEAD=0
++ALLOW_MISSING_STAGING=0
++APPLIED=0
++KEEP_APPLIED=0
++PRE_HASHES=""
++
++usage() { sed -n '2,30p' "$0"; exit 2; }
++
++while [ $# -gt 0 ]; do
++  case "$1" in
++    --repo) REPO=$2; shift 2 ;;
++    --staging) STAGING=$2; shift 2 ;;
++    --patch) PATCH=$2; shift 2 ;;
++    --apply) APPLY=1; shift ;;
++    --allow-head) ALLOW_HEAD=1; shift ;;
++    --allow-missing-staging) ALLOW_MISSING_STAGING=1; shift ;;
++    -h|--help) usage ;;
++    *) die "unknown argument: $1" ;;
++  esac
++done
++
++require_cmd git
++require_cmd shasum
++require_cmd grep
++
++# A1: resolve the real repository root. In a linked worktree .git is a file,
++# so only git itself can tell us whether REPO is a checkout; and git apply is
++# cwd-relative, so a subdirectory argument must be lifted to the top level.
++REPO_INPUT=$REPO
++REPO=$(git_repo_root "$REPO")
++if [ "$REPO" != "$REPO_INPUT" ]; then
++  log "resolved repository root $REPO (from $REPO_INPUT; linked-worktree/subdirectory handling)"
++else
++  log "repository root $REPO"
++fi
++
++case "$PATCH" in
++  /*) : ;;
++  *) PATCH=$(pwd)/$PATCH ;;
++esac
++
++PRE_HASHES=$(mktemp "${TMPDIR:-/tmp}/plan-a-prehash.XXXXXX") || die "mktemp failed"
++record_pre_hashes() {
++  local f
++  : > "$PRE_HASHES"
++  for f in $PIN_FILES; do
++    printf '%s\t%s\n' "$f" "$(sha256_file "$REPO/$f")" >> "$PRE_HASHES"
++  done
++}
++
++rollback_applied_patch() {
++  local f h h2 ok=1
++  [ "$APPLIED" = 1 ] || return 0
++  warn "post-apply failure: reversing the Plan A patch (transactional rollback)"
++  if git -C "$REPO" apply -R "$PATCH" 2>/dev/null; then
++    log "rollback: patch reversed"
++  else
++    warn "AUTOMATIC ROLLBACK FAILED; manual restore: git -C \"$REPO\" apply -R \"$PATCH\""
++    return 1
++  fi
++  if [ -n "$(git -C "$REPO" status --porcelain -- $PIN_FILES)" ]; then
++    warn "rollback left working-tree changes in the pin files:"
++    git -C "$REPO" status --porcelain -- $PIN_FILES >&2
++    return 1
++  fi
++  while IFS=$'\t' read -r f h; do
++    [ -n "$f" ] || continue
++    h2=$(sha256_file "$REPO/$f")
++    if [ "$h" != "$h2" ]; then
++      warn "rollback hash mismatch for $f (expected $h, got $h2)"
++      ok=0
++    fi
++  done < "$PRE_HASHES"
++  if [ "$ok" = 1 ]; then
++    log "rollback complete: all six pin files byte-identical to their pre-apply hashes"
++    APPLIED=0
++    return 0
++  fi
++  warn "rollback incomplete: hashes differ from pre-apply state"
++  return 1
++}
++
++cleanup_on_exit() {
++  local rc=$?
++  if [ "$APPLIED" = 1 ] && [ "$KEEP_APPLIED" != 1 ]; then
++    rollback_applied_patch || warn "transactional rollback incomplete; see manual command above"
++  fi
++  if [ -n "$PRE_HASHES" ] && [ -f "$PRE_HASHES" ]; then rm -f "$PRE_HASHES"; fi
++  exit "$rc"
++}
++trap cleanup_on_exit EXIT
++
++log "Plan A preflight (mode: $([ "$APPLY" = 1 ] && echo APPLY || echo DRY-RUN))"
++
++# 1. repository, baseline HEAD, pre-apply hashes.
++record_pre_hashes
++HEAD_SHA=$(git -C "$REPO" rev-parse HEAD)
++if [ "$HEAD_SHA" != "$PLAN_A_BASELINE_SHA" ]; then
++  if [ "$ALLOW_HEAD" = 1 ]; then
++    warn "HEAD $HEAD_SHA differs from planning baseline $PLAN_A_BASELINE_SHA (allowed)"
++  else
++    die "HEAD $HEAD_SHA != planning baseline $PLAN_A_BASELINE_SHA; regenerate/refresh the patch or pass --allow-head after review"
++  fi
++else
++  log "HEAD matches planning baseline $PLAN_A_BASELINE_SHA"
++fi
++
++# 2. patch present and applies cleanly at the resolved root.
++check_file "Plan A patch present" "$PATCH"
++git -C "$REPO" apply --check "$PATCH"
++log "git apply --check passed at $REPO"
++log "patch sha256 $(sha256_file "$PATCH")"
++
++# 3. the six pin files are unmodified in the working tree.
++DIRTY=$(git -C "$REPO" status --porcelain -- $PIN_FILES)
++if [ -n "$DIRTY" ]; then
++  echo "$DIRTY" >&2
++  die "working tree changes present in pin files; commit/stash them first"
++fi
++log "six pin files are clean in the working tree"
++
++# 4. start state must be PINS OLD (no partial adoption) and no new literal yet.
++PINS=$(pins_state "$REPO")
++[ "$PINS" = old ] || die "pin state is '$PINS', expected 'old' (already adopted or partial); refusing"
++log "pin state is OLD (4/5/5/5/1 literals, MODEL_VERSION sha256-1)"
++
++# 5. staged model assets must be the NEW bytes (Plan A adopts exactly those bytes).
++STAGED=$(staged_class "$STAGING")
++if [ "$STAGED" = new ]; then
++  log "staged assets are NEW bytes (match Plan A target digests)"
++elif [ "$STAGED" = missing ] && [ "$ALLOW_MISSING_STAGING" = 1 ]; then
++  warn "staged assets missing (allowed); run fetch-parakeet-assets.sh after applying the pins"
++else
++  die "staged assets are '$STAGED', expected 'new'; Plan A adopts the new staged bytes. Run ./apply-plan-b.sh instead if staging must stay old."
++fi
++
++# 6. archives: old preserved and unchanged, new quarantine verified.
++#    A2 pre-gate: a failed archive check must abort BEFORE any pin write.
++check_archives
++if [ "$FAIL_COUNT" -ne 0 ]; then
++  die "archive verification failed ($FAIL_COUNT checks); refusing to apply any pin change (pre-gate)"
++fi
++log "archives verified (OLD preserved + NEW quarantine)"
++
++# 7. show the exact change set.
++echo
++echo "== Planned change set =="
++git -C "$REPO" apply --stat "$PATCH"
++echo
++
++if [ "$APPLY" -ne 1 ]; then
++  echo "DRY-RUN OK: preflight passed and patch applies cleanly; NO FILES WERE CHANGED."
++  echo "Re-run with --apply to apply the pin update as one working-tree change."
++  exit 0
++fi
++
++# Apply.
++git -C "$REPO" apply "$PATCH"
++APPLIED=1
++log "patch applied to working tree at $REPO (not staged, not committed)"
++
++# Verify immediately using the same code the owner will use.
++VERIFY_ARGS=(--repo "$REPO" --staging "$STAGING")
++if [ "$ALLOW_MISSING_STAGING" = 1 ]; then VERIFY_ARGS+=(--allow-missing-staging); fi
++if ! "$HERE/verify-plan-a.sh" "${VERIFY_ARGS[@]}"; then
++  warn "post-apply verification FAILED"
++  die "Plan A apply failed verification; the patch has been rolled back"
++fi
++
++# Fetch-script static sanity: syntax is unchanged, but the archive URL now serves
++# the new bytes; reproducibility gates are owner-run (network + build).
++bash -n "$REPO/$PIN_FETCH" || die "fetch script syntax check failed"
++
++echo
++echo "== Post-apply pin-file hashes =="
++for f in $PIN_FILES; do
++  echo "$(sha256_file "$REPO/$f")  $f"
++done
++
++KEEP_APPLIED=1
++cat <<'GATES'
++
++Plan A applied and statically verified. Remaining OWNER-GATED steps (not run here):
++  1. Inspect: git -C <repo> diff --stat; review plan-a-adoption.patch + plan-a-replacements.tsv.
++  2. Commit exactly once, e.g.:
++       git -C <repo> add <six files>
++       git -C <repo> commit -m "Adopt Parakeet TDT 0.6B v3 int8 replacement (sha256-2)"
++  3. Reproducibility: run android/kokoro-poc/scripts/fetch-parakeet-assets.sh twice
++     (upstream URL now serves the new archive) and confirm staged hashes unchanged.
++  4. Build: ./gradlew :parakeet-assets:verifyParakeetAssets :app:bundleRelease
++     (and ParakeetModelAssetsTest); verify AAB asset-pack member digests = new hashes.
++  5. CI: model-dependent + aggregate jobs green on the pin-change branch.
++  6. Device: on-device parity/integrity/performance matrix on arm64-v8a API>=29
++     with the shipped patched AAR + ORT 1.28.2 (round3 A2/A5 gates).
++  7. Evidence: record owner approval + results; keep the old archive untouched.
++GATES
+diff --git a/tools/plan-remediation/apply-plan-b.sh b/tools/plan-remediation/apply-plan-b.sh
+new file mode 100755
+index 0000000..e11bb30
+--- /dev/null
++++ b/tools/plan-remediation/apply-plan-b.sh
+@@ -0,0 +1,431 @@
++#!/usr/bin/env bash
++# Plan B -- restore the OLD staged Parakeet assets (rollback to a consistent
++# pinned-old state). DRY-RUN BY DEFAULT: nothing is written unless --apply.
++#
++# The old bytes are restored from the preserved T5 evidence, never from the
++# network: the upstream URL now serves the NEW archive, so re-fetching cannot
++# reproduce the pinned OLD bytes.
++#
++# The current NEW staged bytes are backed up first, so the change is reversible
++# with restore-staged-backup.sh.
++#
++# Remediation copy (Round 7, agent B) fixes:
++#   B1  --include-negative is now fully reversible: each target is recorded in
++#       BACKUP_DIR/targets.tsv and gets its own directory + manifest, so two
++#       staging targets no longer collide in one flat backup namespace. Every
++#       backed-up file is hash/size-verified against the canonical NEW bytes.
++#   B2  per-file, all-or-nothing install: every OLD source file is pre-staged
++#       next to its destination and hash-verified BEFORE any rename; only then
++#       are the renames committed. On commit failure the pre-Plan-B bytes are
++#       restored from the backup manifest. A failed post-verify also performs a
++#       full transactional rollback. Files already OLD are skipped, unknown
++#       bytes are refused, so a partially-restored target is repaired safely.
++#   B3  recovery-source contract documented and consumed by the reverse
++#       script: backup / extracted-new / NEW archive. apply-plan-b.sh keeps
++#       --source extracted|extracted-old|archive for the OLD bytes.
++#
++# Usage:
++#   ./apply-plan-b.sh [--repo DIR] [--staging DIR] [--source extracted|archive]
++#                     [--backup-dir DIR] [--apply] [--idempotent]
++#                     [--include-negative] [--negative-staging DIR]
++#
++# Exit: 0 = dry-run clean / old bytes restored and verified; 1 = refusal/failure
++# (on failure after --apply, the targets are rolled back to their pre-apply bytes).
++set -euo pipefail
++HERE=$(cd "$(dirname "$0")" && pwd -P)
++. "$HERE/parakeet-pins.env"
++. "$HERE/plans-lib.sh"
++
++REPO=$REPO_ROOT
++STAGING=$STAGING_DIR
++SOURCE=extracted
++BACKUP_DIR=""
++APPLY=0
++IDEMPOTENT=0
++INCLUDE_NEGATIVE=0
++NEGATIVE_STAGING="$NEGATIVE_STAGING_DIR"
++STAMP=$(date -u +%Y%m%dT%H%M%SZ)
++
++WORK=""
++TMP_FILES=""
++CREATED_BACKUP=0
++INSTALL_STARTED=0
++TARGET_IDS=()
++TARGET_PATHS=()
++TARGET_PRE=()
++
++usage() { sed -n '2,40p' "$0"; exit 2; }
++
++while [ $# -gt 0 ]; do
++  case "$1" in
++    --repo) REPO=$2; shift 2 ;;
++    --staging) STAGING=$2; shift 2 ;;
++    --source) SOURCE=$2; shift 2 ;;
++    --backup-dir) BACKUP_DIR=$2; shift 2 ;;
++    --apply) APPLY=1; shift ;;
++    --idempotent) IDEMPOTENT=1; shift ;;
++    --include-negative) INCLUDE_NEGATIVE=1; shift ;;
++    --negative-staging) NEGATIVE_STAGING=$2; shift 2 ;;
++    -h|--help) usage ;;
++    *) die "unknown argument: $1" ;;
++  esac
++done
++
++require_cmd tar
++require_cmd shasum
++require_cmd grep
++
++[ -z "$BACKUP_DIR" ] && BACKUP_DIR="$QUARANTINE_DIR/staged-new-backup-$STAMP"
++
++WORK=$(mktemp -d "${TMPDIR:-/tmp}/r7-plan-b.XXXXXX") || die "mktemp failed"
++
++remove_tmp_path() { # path
++  local p=$1 out="" t
++  for t in $TMP_FILES; do [ "$t" = "$p" ] || out="$out $t"; done
++  TMP_FILES=$out
++}
++
++cleanup_on_exit() {
++  local rc=$? t
++  for t in $TMP_FILES; do rm -f "$t" 2>/dev/null || true; done
++  if [ -n "$WORK" ] && [ -d "$WORK" ]; then rm -rf "$WORK" 2>/dev/null || true; fi
++  exit "$rc"
++}
++trap cleanup_on_exit EXIT
++
++# Restore the pre-Plan-B bytes of one target from its backup manifest.
++restore_target_pre_state() { # target_id target_path
++  local tid=$1 tp=$2 tdir manifest f pre size sha got ok=1
++  tdir="$BACKUP_DIR/targets/$tid"
++  manifest="$tdir/$BACKUP_TARGET_MANIFEST"
++  if [ ! -f "$manifest" ]; then warn "no manifest for target $tid"; return 1; fi
++  while IFS=$'\t' read -r f pre size sha; do
++    [ -n "$f" ] || continue
++    case "$f" in \#*) continue ;; esac
++    case "$pre" in
++      new)
++        if [ ! -f "$tdir/$f" ]; then warn "backup file missing during rollback: $tdir/$f"; ok=0; continue; fi
++        if ! copy_preserving "$tdir/$f" "$tp/.plan-b-rb.$f"; then warn "rollback copy failed: $f"; ok=0; continue; fi
++        mkdir -p "$tp"
++        got=$(sha256_file "$tp/.plan-b-rb.$f")
++        if [ "$got" != "$sha" ]; then rm -f "$tp/.plan-b-rb.$f"; warn "rollback temp hash mismatch: $f"; ok=0; continue; fi
++        if ! mv -f "$tp/.plan-b-rb.$f" "$tp/$f"; then rm -f "$tp/.plan-b-rb.$f"; warn "rollback rename failed: $f"; ok=0; fi ;;
++      missing)
++        rm -f "$tp/$f" ;;
++      *) warn "invalid pre_state '$pre' for $f"; ok=0 ;;
++    esac
++  done < "$manifest"
++  [ "$ok" = 1 ] || return 1
++  return 0
++}
++
++rollback_installed() { # -> 0 when every target is byte-identical to pre-apply
++  local rows tid tp pre ok=1
++  [ "$INSTALL_STARTED" = 1 ] || return 0
++  warn "transactional rollback: restoring pre-Plan-B staged bytes for every target"
++  if [ "$(backup_layout "$BACKUP_DIR")" != v2 ]; then
++    warn "cannot roll back: backup is not a v2 multi-target backup"
++    return 1
++  fi
++  rows=$(backup_read_targets "$BACKUP_DIR")
++  while IFS=$'\t' read -r tid tp pre; do
++    [ -n "$tid" ] || continue
++    if ! restore_target_pre_state "$tid" "$tp"; then ok=0; fi
++  done <<EOF
++$rows
++EOF
++  if [ "$ok" = 1 ]; then
++    log "rollback complete: targets restored to their pre-apply bytes"
++    INSTALL_STARTED=0
++    return 0
++  fi
++  warn "rollback INCOMPLETE; backup retained at $BACKUP_DIR for manual recovery"
++  return 1
++}
++
++discard_backup_if_created() {
++  [ "$CREATED_BACKUP" = 1 ] || return 0
++  rm -rf "$BACKUP_DIR" 2>/dev/null || true
++  CREATED_BACKUP=0
++  log "discarded the backup directory created by this failed run (no target was changed)"
++}
++
++# ---------------------------------------------------------------------------
++log "Plan B preflight (mode: $([ "$APPLY" = 1 ] && echo APPLY || echo DRY-RUN))"
++
++# 1. repository/pin files (works for linked worktrees: read-only, no .git test).
++REPO=$(repo_dir "$REPO")
++PINS=$(pins_state "$REPO")
++[ "$PINS" = old ] || die "pin state is '$PINS', expected 'old'; Plan B cannot restore old assets under new pins (use Plan A or a full revert first)"
++log "pin state is OLD (MODEL_VERSION sha256-1, all old digests) in $REPO"
++
++# 2. archived evidence -- pre-gate before any target is touched.
++check_archives
++if [ "$FAIL_COUNT" -ne 0 ]; then
++  die "archive verification failed ($FAIL_COUNT checks); refusing to touch staged assets (pre-gate)"
++fi
++PASS_COUNT=0; FAIL_COUNT=0
++log "archives verified (OLD preserved + NEW quarantine)"
++
++# 3. resolve the OLD source bytes and verify them against pins.
++SRC=""
++case "$SOURCE" in
++  extracted|extracted-old)
++    SRC=$OLD_EXTRACTED
++    [ -d "$SRC" ] || die "extracted-old directory missing: $SRC (re-extract from the preserved archive or use --source archive)"
++    ;;
++  archive)
++    log "extracting preserved old archive to $WORK (read-only source)"
++    tar -xjf "$OLD_ARCHIVE" -C "$WORK" || die "old archive extraction failed"
++    SRC="$WORK/$ARCHIVE_MEMBER_DIR"
++    ;;
++  *) die "--source must be extracted (alias extracted-old) or archive" ;;
++esac
++for f in $MODEL_FILES; do
++  [ -f "$SRC/$f" ] || die "old source file missing: $SRC/$f"
++done
++check_eq "old source encoder size" "$OLD_ENCODER_SIZE" "$(file_size "$SRC/encoder.int8.onnx")"
++check_eq "old source encoder sha256" "$OLD_ENCODER_SHA256" "$(sha256_file "$SRC/encoder.int8.onnx")"
++check_eq "old source decoder size" "$OLD_DECODER_SIZE" "$(file_size "$SRC/decoder.int8.onnx")"
++check_eq "old source decoder sha256" "$OLD_DECODER_SHA256" "$(sha256_file "$SRC/decoder.int8.onnx")"
++check_eq "old source joiner size" "$OLD_JOINER_SIZE" "$(file_size "$SRC/joiner.int8.onnx")"
++check_eq "old source joiner sha256" "$OLD_JOINER_SHA256" "$(sha256_file "$SRC/joiner.int8.onnx")"
++check_eq "old source tokens size" "$OLD_TOKENS_SIZE" "$(file_size "$SRC/tokens.txt")"
++check_eq "old source tokens sha256" "$OLD_TOKENS_SHA256" "$(sha256_file "$SRC/tokens.txt")"
++[ "$FAIL_COUNT" = 0 ] || die "old source bytes do not match the pinned old values"
++PASS_COUNT=0; FAIL_COUNT=0
++log "old source verified: $SRC"
++
++# 4. targets (main staging, optionally the negative worktree) -- de-duplicated.
++add_target() { # id path
++  local id=$1 p=$2 rp i
++  rp=$(cd "$p" 2>/dev/null && pwd -P) || rp=$p
++  i=0
++  while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++    if [ "${TARGET_PATHS[$i]}" = "$rp" ]; then
++      die "duplicate staging target: $rp (main and negative targets must differ)"
++    fi
++    i=$((i + 1))
++  done
++  TARGET_IDS+=("$id")
++  TARGET_PATHS+=("$rp")
++  TARGET_PRE+=("$(staged_class "$rp")")
++}
++
++add_target t1 "$STAGING"
++if [ "$INCLUDE_NEGATIVE" = 1 ]; then
++  [ -d "$NEGATIVE_STAGING" ] || die "negative staging dir missing: $NEGATIVE_STAGING (pass --negative-staging DIR to override)"
++  add_target t2 "$NEGATIVE_STAGING"
++fi
++
++# 5. per-file plan: replace NEW->OLD, install when missing, skip OLD, refuse other.
++PLAN_TSV="$WORK/plan.tsv"
++: > "$PLAN_TSV"
++ANY_WRITE=0
++REPLACE_COUNT=0
++INSTALL_COUNT=0
++SKIP_COUNT=0
++i=0
++while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++  tp=${TARGET_PATHS[$i]}
++  tid=${TARGET_IDS[$i]}
++  if [ ! -d "$tp" ]; then warn "target $tp does not exist yet; it will be created on --apply"; fi
++  for f in $MODEL_FILES; do
++    if [ -e "$tp/$f" ]; then st=$(file_state "$tp" "$f"); else st=missing; fi
++    case "$st" in
++      old|shared) act=skip ;;
++      new) act=replace ;;
++      missing) act=install ;;
++      *) die "target $tp file $f is neither canonical OLD nor canonical NEW bytes (state '$st'); inspect before restoring" ;;
++    esac
++    printf '%s\t%s\t%s\t%s\n' "$tid" "$tp" "$f" "$act" >> "$PLAN_TSV"
++    case "$act" in
++      replace) ANY_WRITE=1; REPLACE_COUNT=$((REPLACE_COUNT + 1)) ;;
++      install) ANY_WRITE=1; INSTALL_COUNT=$((INSTALL_COUNT + 1)) ;;
++      skip) SKIP_COUNT=$((SKIP_COUNT + 1)) ;;
++    esac
++  done
++  i=$((i + 1))
++done
++
++echo
++echo "== Planned Plan B change =="
++echo "source        $SRC"
++echo "mode          $([ "$APPLY" = 1 ] && echo APPLY || echo DRY-RUN)"
++i=0
++while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++  echo "target        ${TARGET_IDS[$i]} ${TARGET_PATHS[$i]} (pre-state $(staged_class "${TARGET_PATHS[$i]}"))"
++  i=$((i + 1))
++done
++echo "files         $MODEL_FILES (replace=$REPLACE_COUNT install=$INSTALL_COUNT skip=$SKIP_COUNT)"
++echo "backup dir    $BACKUP_DIR"
++echo
++
++if [ "$ANY_WRITE" = 0 ]; then
++  if [ "$IDEMPOTENT" = 1 ]; then
++    log "all targets already OLD; --idempotent given, verifying only (no backup, no writes)"
++    VERIFY_ARGS=(--repo "$REPO" --staging "${TARGET_PATHS[0]}")
++    if [ "$INCLUDE_NEGATIVE" = 1 ]; then VERIFY_ARGS+=(--include-negative); fi
++    "$HERE/verify-plan-b.sh" "${VERIFY_ARGS[@]}" || die "idempotent verify failed"
++    echo "IDEMPOTENT OK: targets are already in the consistent OLD state."
++    exit 0
++  fi
++  die "all targets already have OLD bytes; pass --idempotent to verify only"
++fi
++
++if [ "$APPLY" -ne 1 ]; then
++  echo "DRY-RUN OK: old source verified, targets classified, no files were written."
++  echo "Re-run with --apply to back up current bytes and restore the OLD staged bytes."
++  exit 0
++fi
++
++# ---------------------------------------------------------------------------
++# Apply phase 1 -- backup every byte we are about to replace (defects B1/B2).
++if [ -e "$BACKUP_DIR" ]; then
++  die "backup dir already exists: $BACKUP_DIR (choose a fresh --backup-dir; stale backups are never overwritten)"
++fi
++mkdir -p "$BACKUP_DIR/targets" || die "cannot create backup dir: $BACKUP_DIR"
++CREATED_BACKUP=1
++log "backup dir: $BACKUP_DIR"
++
++{
++  echo "# plan-b-backup v2 -- target_id<TAB>target_path<TAB>pre_class"
++  i=0
++  while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++    printf '%s\t%s\t%s\n' "${TARGET_IDS[$i]}" "${TARGET_PATHS[$i]}" "${TARGET_PRE[$i]}"
++    i=$((i + 1))
++  done
++} > "$BACKUP_DIR/$BACKUP_TARGETS_TSV"
++
++i=0
++while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++  tid=${TARGET_IDS[$i]}
++  tp=${TARGET_PATHS[$i]}
++  tdir="$BACKUP_DIR/targets/$tid"
++  mkdir -p "$tdir"
++  manifest="$tdir/$BACKUP_TARGET_MANIFEST"
++  : > "$manifest"
++  while IFS=$'\t' read -r ptid ptp f act; do
++    [ "$ptid" = "$tid" ] || continue
++    case "$act" in
++      replace)
++        copy_preserving "$tp/$f" "$tdir/$f" || { discard_backup_if_created; die "backup copy failed: $tp/$f"; }
++        got_sha=$(sha256_file "$tdir/$f")
++        got_size=$(file_size "$tdir/$f")
++        if [ "$got_sha" != "$(new_sha "$f")" ] || [ "$got_size" != "$(new_size "$f")" ]; then
++          discard_backup_if_created
++          die "backup $f does not hold the canonical NEW bytes (sha=$got_sha size=$got_size)"
++        fi
++        printf '%s\t%s\t%s\t%s\n' "$f" new "$got_size" "$got_sha" >> "$manifest"
++        ;;
++      install)
++        printf '%s\t%s\t-\t-\n' "$f" missing >> "$manifest"
++        ;;
++    esac
++  done < "$PLAN_TSV"
++  i=$((i + 1))
++done
++
++{
++  echo "# Plan B staged-asset backup (v2 multi-target)"
++  echo "created_utc=$STAMP"
++  echo "source_repo=$REPO"
++  echo "plan_script=apply-plan-b.sh"
++  echo "old_archive_sha256=$OLD_ARCHIVE_SHA256"
++  echo "new_archive_sha256=$NEW_ARCHIVE_SHA256"
++  echo "format_version=$BACKUP_FORMAT_VERSION"
++  echo "target_count=${#TARGET_PATHS[@]}"
++  echo "targets_tsv_sha256=$(sha256_file "$BACKUP_DIR/$BACKUP_TARGETS_TSV")"
++  i=0
++  while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++    tid=${TARGET_IDS[$i]}
++    echo "manifest_sha256_$tid=$(sha256_file "$BACKUP_DIR/targets/$tid/$BACKUP_TARGET_MANIFEST")"
++    i=$((i + 1))
++  done
++} > "$BACKUP_DIR/$BACKUP_PROVENANCE_FILE"
++
++if ! backup_check_tree "$BACKUP_DIR"; then
++  discard_backup_if_created
++  die "backup verification failed; refusing to modify any target"
++fi
++log "backup verified: $REPLACE_COUNT NEW file(s) preserved, $INSTALL_COUNT absent file(s) recorded"
++
++# Apply phase 2 -- pre-stage every OLD file next to its destination and verify.
++while IFS=$'\t' read -r tid tp f act; do
++  [ "$act" = skip ] && continue
++  mkdir -p "$tp" || { discard_backup_if_created; die "cannot create target dir: $tp"; }
++  tmp="$tp/.plan-b-tmp.$STAMP.$$.$f"
++  copy_preserving "$SRC/$f" "$tmp" || { discard_backup_if_created; die "pre-stage copy failed: $SRC/$f -> $tmp"; }
++  TMP_FILES="$TMP_FILES $tmp"
++  got_sha=$(sha256_file "$tmp")
++  got_size=$(file_size "$tmp")
++  if [ "$got_sha" != "$(old_sha "$f")" ] || [ "$got_size" != "$(old_size "$f")" ]; then
++    discard_backup_if_created
++    die "pre-staged $f hash/size mismatch (sha=$got_sha size=$got_size); no destination was touched"
++  fi
++done < "$PLAN_TSV"
++log "pre-staged $REPLACE_COUNT+$INSTALL_COUNT OLD file(s) and verified every temp copy"
++
++# Apply phase 3 -- commit the renames; all-or-nothing per run.
++INSTALL_STARTED=1
++while IFS=$'\t' read -r tid tp f act; do
++  [ "$act" = skip ] && continue
++  tmp="$tp/.plan-b-tmp.$STAMP.$$.$f"
++  if ! mv -f "$tmp" "$tp/$f"; then
++    warn "rename failed: $tmp -> $tp/$f"
++    if rollback_installed; then
++      discard_backup_if_created
++    else
++      warn "backup retained at $BACKUP_DIR for manual recovery"
++    fi
++    die "install commit failed for $f; targets were rolled back where possible"
++  fi
++  remove_tmp_path "$tmp"
++  got_sha=$(sha256_file "$tp/$f")
++  if [ "$got_sha" != "$(old_sha "$f")" ]; then
++    warn "installed $f hash mismatch after rename"
++    if rollback_installed; then
++      discard_backup_if_created
++    else
++      warn "backup retained at $BACKUP_DIR for manual recovery"
++    fi
++    die "installed bytes for $f are not the pinned OLD bytes; targets were rolled back where possible"
++  fi
++done < "$PLAN_TSV"
++INSTALL_STARTED=0
++log "committed all renames: targets now hold the OLD bytes"
++
++# Record what was installed (evidence; also lets a reviewer re-derive the result).
++: > "$BACKUP_DIR/$BACKUP_INSTALL_MANIFEST"
++while IFS=$'\t' read -r tid tp f act; do
++  [ "$act" = skip ] && continue
++  printf '%s\t%s\t%s\t%s\t%s\n' "$tid" "$tp" "$f" "$(file_size "$tp/$f")" "$(sha256_file "$tp/$f")" >> "$BACKUP_DIR/$BACKUP_INSTALL_MANIFEST"
++done < "$PLAN_TSV"
++
++# Apply phase 4 -- verify; a failure rolls every target back to its pre-state.
++VERIFY_ARGS=(--repo "$REPO" --staging "${TARGET_PATHS[0]}" --backup-dir "$BACKUP_DIR")
++if [ "$INCLUDE_NEGATIVE" = 1 ]; then VERIFY_ARGS+=(--include-negative); fi
++if ! "$HERE/verify-plan-b.sh" "${VERIFY_ARGS[@]}"; then
++  warn "post-apply verification FAILED"
++  INSTALL_STARTED=1
++  if rollback_installed; then
++    discard_backup_if_created
++  else
++    warn "transactional rollback incomplete; backup retained at $BACKUP_DIR"
++  fi
++  die "Plan B apply failed verification; targets were rolled back to their pre-apply bytes"
++fi
++
++cat <<GATES
++
++Plan B applied: staged model bytes are OLD again and consistent with the OLD pins.
++Backup: $BACKUP_DIR (v2 multi-target; recorded in targets.tsv)
++Remaining OWNER-GATED steps (not run here):
++  1. Confirm: ./check-state.sh --expect old --with-archives
++  2. The pre-Plan-B bytes are preserved in the backup dir shown above; the new
++     archive remains in quarantine/ for a future Plan A window.
++  3. Do NOT run fetch-parakeet-assets.sh while the old pins are in place: the
++     upstream URL now serves the NEW archive, so the archive pin check fails
++     (this was true before Plan B as well).
++  4. Record why adoption was deferred (owner decision) in the release evidence.
++GATES
+diff --git a/tools/plan-remediation/check-state.sh b/tools/plan-remediation/check-state.sh
+new file mode 100755
+index 0000000..71d6001
+--- /dev/null
++++ b/tools/plan-remediation/check-state.sh
+@@ -0,0 +1,96 @@
++#!/usr/bin/env bash
++# Classify a working tree as a consistent Plan A (new) state, a consistent
++# Plan B (old) state, or an inconsistent/hazard state. Read-only.
++#
++# Remediation copy (Round 7, agent B): --repo may name a linked git worktree
++# (or any subdirectory of one); the pin files are resolved at the repository
++# top level. No other behavioural change.
++#
++# Usage:
++#   ./check-state.sh [--repo DIR] [--staging DIR] [--expect new|old|any|mixed]
++#                    [--include-negative] [--with-archives]
++#
++# Exit 0 = state matches --expect (default any), 1 = mismatch, 2 = usage error.
++set -euo pipefail
++HERE=$(cd "$(dirname "$0")" && pwd -P)
++. "$HERE/parakeet-pins.env"
++. "$HERE/plans-lib.sh"
++
++REPO=$REPO_ROOT
++STAGING=$STAGING_DIR
++EXPECT=any
++INCLUDE_NEGATIVE=0
++WITH_ARCHIVES=0
++
++usage() { sed -n '2,14p' "$0"; exit 2; }
++
++while [ $# -gt 0 ]; do
++  case "$1" in
++    --repo) REPO=$2; shift 2 ;;
++    --staging) STAGING=$2; shift 2 ;;
++    --expect) EXPECT=$2; shift 2 ;;
++    --include-negative) INCLUDE_NEGATIVE=1; shift ;;
++    --with-archives) WITH_ARCHIVES=1; shift ;;
++    -h|--help) usage ;;
++    *) die "unknown argument: $1" ;;
++  esac
++done
++
++require_cmd shasum
++require_cmd grep
++
++REPO=$(repo_dir "$REPO")
++
++PINS=$(pins_state "$REPO")
++STAGED=$(staged_class "$STAGING")
++
++STATE=inconsistent
++if [ "$PINS" = new ] && [ "$STAGED" = new ]; then STATE=plan-a
++elif [ "$PINS" = old ] && [ "$STAGED" = old ]; then STATE=plan-b
++elif [ "$PINS" = old ] && [ "$STAGED" = new ]; then STATE=hazard-staged-new-pinned-old
++elif [ "$PINS" = new ] && [ "$STAGED" = old ]; then STATE=hazard-pinned-new-staged-old
++fi
++
++echo "== Plan state =="
++echo "repo            $REPO"
++echo "staging         $STAGING"
++echo "pins_state      $PINS"
++echo "staged_state    $STAGED"
++echo "overall_state   $STATE"
++echo
++
++echo "== pin literal counts (six files, exact expected values) =="
++pins_table "$REPO"
++echo
++
++echo "== staged files =="
++staged_report "$STAGING"
++echo
++
++if [ "$INCLUDE_NEGATIVE" = 1 ]; then
++  echo "== negative worktree staging (informational; only Plan B --include-negative writes it) =="
++  echo "negative_staging $NEGATIVE_STAGING_DIR"
++  echo "negative_staged_state $(staged_class "$NEGATIVE_STAGING_DIR")"
++  echo
++fi
++
++if [ "$WITH_ARCHIVES" = 1 ]; then
++  check_archives
++  echo
++fi
++
++RESULT=1
++case "$EXPECT" in
++  any) RESULT=0 ;;
++  new) if [ "$STATE" = plan-a ]; then RESULT=0; fi ;;
++  old) if [ "$STATE" = plan-b ]; then RESULT=0; fi ;;
++  mixed) if [ "$STATE" != plan-a ] && [ "$STATE" != plan-b ]; then RESULT=0; fi ;;
++  *) die "invalid --expect value: $EXPECT" ;;
++esac
++
++if [ "$RESULT" = 0 ]; then
++  echo "RESULT: state matches expectation ($EXPECT)"
++else
++  echo "RESULT: state does NOT match expectation ($EXPECT)"
++fi
++exit "$RESULT"
+diff --git a/tools/plan-remediation/parakeet-pins.env b/tools/plan-remediation/parakeet-pins.env
+new file mode 100644
+index 0000000..05875ac
+--- /dev/null
++++ b/tools/plan-remediation/parakeet-pins.env
+@@ -0,0 +1,93 @@
++#!/usr/bin/env bash
++# Canonical Parakeet model pin values for Round 4 Plan A (adoption) and Plan B
++# (restore old staged assets). Read-only data file: defines variables only.
++#
++# Remediation copy (Round 7, agent B). The pin values are byte-identical to
++# archive/reports/round4-b-plans/parakeet-pins.env (verified in the evidence
++# manifest); only PLAN_ROOT and the backup-layout constants are adjusted so
++# this directory is self-contained.
++#
++# Authority: T5 /Volumes/DaymarkWorkspace/Daymark.
++# Usage:  . "$(dirname "$0")/parakeet-pins.env"
++
++T5_DEFAULT="/Volumes/DaymarkWorkspace/Daymark"
++if [ -z "${T5:-}" ]; then T5="$T5_DEFAULT"; fi
++
++# Directory that contains this env file and the corrected scripts/patches.
++# Resolved from the file itself so a copied kit never points back at T5 originals.
++PLAN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
++
++REPO_ROOT="$T5/repositories/daymark"
++STAGING_DIR="$REPO_ROOT/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet"
++NEGATIVE_STAGING_DIR="$T5/worktrees/negative/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet"
++QUARANTINE_DIR="$T5/quarantine/parakeet-20261118"
++OLD_ARCHIVE="$T5/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
++NEW_ARCHIVE="$QUARANTINE_DIR/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
++ARCHIVE_MEMBER_DIR="sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
++OLD_EXTRACTED="$QUARANTINE_DIR/extracted-old/$ARCHIVE_MEMBER_DIR"
++NEW_EXTRACTED="$QUARANTINE_DIR/extracted-new/$ARCHIVE_MEMBER_DIR"
++EVIDENCE_DIR="$T5/archive/reports/round4-b-evidence-20261118"
++
++# Commit the Plan A patch was generated against (repo HEAD at planning time).
++PLAN_A_BASELINE_SHA="45d12748679fa67723e6a5b2d997eb7711f05c43"
++PLAN_A_BASELINE_DESC="repositories/daymark 45d1274 (public/pr54-n1-error-propagation-release-v2)"
++
++# Pin-bearing files, repo-relative.
++PIN_FETCH="android/kokoro-poc/scripts/fetch-parakeet-assets.sh"
++PIN_GRADLE="artifacts/weather-app/android/parakeet-assets/build.gradle"
++PIN_JAVA="artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java"
++PIN_TEST="artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java"
++PIN_NOTICES="THIRD-PARTY-NOTICES.md"
++PIN_GUIDE="docs/release/reproducible-build-guide.md"
++PIN_FILES="$PIN_FETCH $PIN_GRADLE $PIN_JAVA $PIN_TEST $PIN_NOTICES $PIN_GUIDE"
++
++# ------- OLD (currently pinned everywhere; Plan B restores staged bytes) -------
++OLD_ARCHIVE_SHA256="5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
++OLD_ENCODER_SHA256="acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"
++OLD_DECODER_SHA256="179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e"
++OLD_JOINER_SHA256="3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3"
++OLD_TOKENS_SHA256="d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
++OLD_ARCHIVE_SIZE=487170055
++OLD_ENCODER_SIZE=652184281
++OLD_DECODER_SIZE=11845275
++OLD_JOINER_SIZE=6355277
++OLD_TOKENS_SIZE=93939
++OLD_MODEL_VERSION="parakeet-tdt-0.6b-v3-int8-sha256-1"
++
++# ------- NEW (Plan A target; already the staged bytes) -------
++NEW_ARCHIVE_SHA256="1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9"
++NEW_ENCODER_SHA256="1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479"
++NEW_DECODER_SHA256="0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5"
++NEW_JOINER_SHA256="cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98"
++NEW_TOKENS_SHA256="d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
++NEW_ARCHIVE_SIZE=487211443
++NEW_ENCODER_SIZE=652282294
++NEW_DECODER_SIZE=11845274
++NEW_JOINER_SIZE=6355277
++NEW_TOKENS_SIZE=93939
++NEW_MODEL_VERSION="parakeet-tdt-0.6b-v3-int8-sha256-2"
++
++# Expected occurrence counts of each digest/version literal inside the six PIN_FILES.
++PIN_COUNT_ARCHIVE=4          # fetch 1 + notices 2 + guide 1
++PIN_COUNT_MEMBER=5           # fetch/build.gradle/ParakeetModelAssets/notices/guide
++PIN_COUNT_SIZE=2             # ParakeetModelAssets + ParakeetModelAssetsTest
++PIN_COUNT_MODEL_VERSION=1
++
++# Model file names, in ParakeetModelAssets order.
++MODEL_FILES="encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt"
++
++# Plan artifacts (relative to PLAN_ROOT).
++PLAN_A_PATCH_NAME="plan-a-adoption.patch"
++PLAN_A_REVERT_PATCH_NAME="plan-a-revert.patch"
++
++# ---- Plan B backup layout (v2) ------------------------------------------------
++# v2 backups are multi-target: targets.tsv lists every staged target that was
++# modified, and each target has its own directory + manifest, so
++# --include-negative no longer flattens two targets into one namespace.
++BACKUP_FORMAT_VERSION="2"
++BACKUP_TARGETS_TSV="targets.tsv"
++BACKUP_PROVENANCE_FILE="BACKUP-PROVENANCE.txt"
++BACKUP_TARGET_MANIFEST="backup-manifest.tsv"
++BACKUP_INSTALL_MANIFEST="install-manifest.tsv"
++# Legacy (round 4) backups keep BACKUP_DIR/backup-manifest.tsv + flat files and
++# have no targets.tsv; restore/verify still accept them for one target.
+diff --git a/tools/plan-remediation/plan-a-adoption.patch b/tools/plan-remediation/plan-a-adoption.patch
+new file mode 100644
+index 0000000..d0a8dbc
+--- /dev/null
++++ b/tools/plan-remediation/plan-a-adoption.patch
+@@ -0,0 +1,123 @@
++--- a/android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+++++ b/android/kokoro-poc/scripts/fetch-parakeet-assets.sh
++@@ -18,11 +18,11 @@
++ ASSETS="$REPO/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet"
++ 
++ ARCHIVE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
++-ARCHIVE_SHA256="5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+++ARCHIVE_SHA256="1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9"
++ 
++-ENCODER_SHA256="acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"
++-DECODER_SHA256="179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e"
++-JOINER_SHA256="3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3"
+++ENCODER_SHA256="1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479"
+++DECODER_SHA256="0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5"
+++JOINER_SHA256="cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98"
++ TOKENS_SHA256="d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
++ 
++ WORK="$(mktemp -d)"
++--- a/artifacts/weather-app/android/parakeet-assets/build.gradle
+++++ b/artifacts/weather-app/android/parakeet-assets/build.gradle
++@@ -36,9 +36,9 @@
++ // android/kokoro-poc/scripts/fetch-parakeet-assets.sh. The same values are
++ // compiled into the app, where they are checked again before the model loads.
++ def modelSha256 = [
++-    "encoder.int8.onnx": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
++-    "decoder.int8.onnx": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
++-    "joiner.int8.onnx":  "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+++    "encoder.int8.onnx": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+++    "decoder.int8.onnx": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+++    "joiner.int8.onnx":  "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
++     "tokens.txt":        "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
++ ]
++ 
++--- a/artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
+++++ b/artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
++@@ -26,8 +26,8 @@
++ 
++     /** Exact byte lengths; a truncated or partial copy must be treated as corrupt. */
++     public static final long[] MODEL_FILE_SIZES = {
++-        652184281L,
++-        11845275L,
+++        652282294L,
+++        11845274L,
++         6355277L,
++         93939L,
++     };
++@@ -42,9 +42,9 @@
++      * authority for what may be loaded.
++      */
++     public static final String[] MODEL_FILE_SHA256 = {
++-        "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
++-        "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
++-        "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+++        "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+++        "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+++        "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
++         "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
++     };
++ 
++@@ -55,7 +55,7 @@
++      * written for a different identifier is treated as stale and the model is
++      * re-hashed before it may be used.
++      */
++-    public static final String MODEL_VERSION = "parakeet-tdt-0.6b-v3-int8-sha256-1";
+++    public static final String MODEL_VERSION = "parakeet-tdt-0.6b-v3-int8-sha256-2";
++ 
++     /** Directory inside the app's private files directory the model is materialised into. */
++     public static final String MODEL_DIRECTORY = "parakeet-v3-model";
++--- a/artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
+++++ b/artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
++@@ -115,7 +115,7 @@
++ 
++     @Test
++     public void modelFileSizesMatchPinnedValues() {
++-        long[] expected = {652184281L, 11845275L, 6355277L, 93939L};
+++        long[] expected = {652282294L, 11845274L, 6355277L, 93939L};
++         assertEquals(expected.length, ParakeetModelAssets.MODEL_FILE_SIZES.length);
++         for (int i = 0; i < expected.length; i++) {
++             assertEquals(expected[i], ParakeetModelAssets.MODEL_FILE_SIZES[i]);
++--- a/THIRD-PARTY-NOTICES.md
+++++ b/THIRD-PARTY-NOTICES.md
++@@ -9,7 +9,7 @@
++ 
++ | Component | Version | Licence | Redistributed in | Notes |
++ |---|---|---|---|---|
++-| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
+++| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
++ | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (Android AAR) | 1.13.8 | **Apache-2.0** | V2 candidate (Android) | Fetched at build time by `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` from the [v1.13.8 release](https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar), SHA-256 `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96`. Contains the sherpa-onnx JNI libraries and, in turn, the ONNX Runtime libraries below. |
++ | [ONNX Runtime](https://github.com/microsoft/onnxruntime) (bundled in the sherpa-onnx AAR) | 1.18.1 (as shipped in the AAR) | **MIT** | V2 candidate (Android) | `libonnxruntime.so` and the sherpa JNI libraries, arm64-v8a only. |
++ | [pguso/kokoro](https://github.com/pguso/kokoro) runtime | `kokoro-en` 0.1.5, commit `b42bd5cf915163607cb51984cabf273dcf09755e` | Apache-2.0 | v1.0.0 and V2 candidate | `android/kokoro-poc/README.md` has the full build and licence matrix. |
++@@ -46,10 +46,10 @@
++ 
++ | Artefact | SHA-256 |
++ |---|---|
++-| `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
++-| `encoder.int8.onnx` | `acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247` |
++-| `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
++-| `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
+++| `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9` |
+++| `encoder.int8.onnx` | `1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479` |
+++| `decoder.int8.onnx` | `0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5` |
+++| `joiner.int8.onnx` | `cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98` |
++ | `tokens.txt` | `d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d` |
++ | `sherpa-onnx-1.13.8.aar` | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
++ | `model_quantized.onnx` (Kokoro) | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
++--- a/docs/release/reproducible-build-guide.md
+++++ b/docs/release/reproducible-build-guide.md
++@@ -205,11 +205,11 @@
++ | Kokoro model | `onnx/model_quantized.onnx` | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
++ | Kokoro voice | `bm_fable.bin` | `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1` |
++ | sherpa-onnx | 1.13.8 AAR | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
++-| Parakeet encoder | `encoder.int8.onnx` | `acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247` |
++-| Parakeet decoder | `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
++-| Parakeet joiner | `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
+++| Parakeet encoder | `encoder.int8.onnx` | `1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479` |
+++| Parakeet decoder | `decoder.int8.onnx` | `0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5` |
+++| Parakeet joiner | `joiner.int8.onnx` | `cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98` |
++ | Parakeet tokens | `tokens.txt` | `d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d` |
++-| Parakeet archive | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
+++| Parakeet archive | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9` |
++ 
++ The NDK's `libc++_shared.so` used by the Kokoro build was
++ `0c52cfab2df0d957d8b346a2bdc5ae8d71feca2591924d77e1cd724d5bf74352`
+diff --git a/tools/plan-remediation/plan-a-replacements.tsv b/tools/plan-remediation/plan-a-replacements.tsv
+new file mode 100644
+index 0000000..1636d05
+--- /dev/null
++++ b/tools/plan-remediation/plan-a-replacements.tsv
+@@ -0,0 +1,24 @@
++site	file	old	new	matches
++S1/P1 ARCHIVE_SHA256	android/kokoro-poc/scripts/fetch-parakeet-assets.sh	5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf	1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9	1
++S2/P2 ENCODER_SHA256	android/kokoro-poc/scripts/fetch-parakeet-assets.sh	acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247	1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479	1
++S2/P3 DECODER_SHA256	android/kokoro-poc/scripts/fetch-parakeet-assets.sh	179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e	0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5	1
++S2/P4 JOINER_SHA256	android/kokoro-poc/scripts/fetch-parakeet-assets.sh	3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3	cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98	1
++S3/P6 encoder digest	artifacts/weather-app/android/parakeet-assets/build.gradle	acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247	1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479	1
++S3/P6 decoder digest	artifacts/weather-app/android/parakeet-assets/build.gradle	179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e	0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5	1
++S3/P6 joiner digest	artifacts/weather-app/android/parakeet-assets/build.gradle	3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3	cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98	1
++S4/P8 encoder size	artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java	652184281L	652282294L	1
++S4/P8 decoder size	artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java	11845275L	11845274L	1
++S4/P7 encoder digest	artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java	acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247	1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479	1
++S4/P7 decoder digest	artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java	179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e	0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5	1
++S4/P7 joiner digest	artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java	3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3	cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98	1
++S4/P9 MODEL_VERSION	artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java	parakeet-tdt-0.6b-v3-int8-sha256-1	parakeet-tdt-0.6b-v3-int8-sha256-2	1
++S5/P10 expected sizes	artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java	652184281L	652282294L	1
++S5/P10 expected sizes (decoder, same line)	artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java	11845275L	11845274L	1
++S6/P11+P12 archive digest (row 12 + table)	THIRD-PARTY-NOTICES.md	5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf	1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9	2
++S6/P12 encoder digest	THIRD-PARTY-NOTICES.md	acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247	1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479	1
++S6/P12 decoder digest	THIRD-PARTY-NOTICES.md	179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e	0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5	1
++S6/P12 joiner digest	THIRD-PARTY-NOTICES.md	3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3	cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98	1
++S7/P13 encoder digest	docs/release/reproducible-build-guide.md	acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247	1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479	1
++S7/P13 decoder digest	docs/release/reproducible-build-guide.md	179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e	0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5	1
++S7/P13 joiner digest	docs/release/reproducible-build-guide.md	3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3	cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98	1
++S7/P13 archive digest	docs/release/reproducible-build-guide.md	5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf	1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9	1
+diff --git a/tools/plan-remediation/plan-a-revert.patch b/tools/plan-remediation/plan-a-revert.patch
+new file mode 100644
+index 0000000..4624e1d
+--- /dev/null
++++ b/tools/plan-remediation/plan-a-revert.patch
+@@ -0,0 +1,123 @@
++--- a/android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+++++ b/android/kokoro-poc/scripts/fetch-parakeet-assets.sh
++@@ -18,11 +18,11 @@
++ ASSETS="$REPO/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet"
++ 
++ ARCHIVE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
++-ARCHIVE_SHA256="1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9"
+++ARCHIVE_SHA256="5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
++ 
++-ENCODER_SHA256="1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479"
++-DECODER_SHA256="0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5"
++-JOINER_SHA256="cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98"
+++ENCODER_SHA256="acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"
+++DECODER_SHA256="179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e"
+++JOINER_SHA256="3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3"
++ TOKENS_SHA256="d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
++ 
++ WORK="$(mktemp -d)"
++--- a/artifacts/weather-app/android/parakeet-assets/build.gradle
+++++ b/artifacts/weather-app/android/parakeet-assets/build.gradle
++@@ -36,9 +36,9 @@
++ // android/kokoro-poc/scripts/fetch-parakeet-assets.sh. The same values are
++ // compiled into the app, where they are checked again before the model loads.
++ def modelSha256 = [
++-    "encoder.int8.onnx": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
++-    "decoder.int8.onnx": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
++-    "joiner.int8.onnx":  "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
+++    "encoder.int8.onnx": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+++    "decoder.int8.onnx": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+++    "joiner.int8.onnx":  "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
++     "tokens.txt":        "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
++ ]
++ 
++--- a/artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
+++++ b/artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
++@@ -26,8 +26,8 @@
++ 
++     /** Exact byte lengths; a truncated or partial copy must be treated as corrupt. */
++     public static final long[] MODEL_FILE_SIZES = {
++-        652282294L,
++-        11845274L,
+++        652184281L,
+++        11845275L,
++         6355277L,
++         93939L,
++     };
++@@ -42,9 +42,9 @@
++      * authority for what may be loaded.
++      */
++     public static final String[] MODEL_FILE_SHA256 = {
++-        "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
++-        "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
++-        "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
+++        "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+++        "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+++        "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
++         "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
++     };
++ 
++@@ -55,7 +55,7 @@
++      * written for a different identifier is treated as stale and the model is
++      * re-hashed before it may be used.
++      */
++-    public static final String MODEL_VERSION = "parakeet-tdt-0.6b-v3-int8-sha256-2";
+++    public static final String MODEL_VERSION = "parakeet-tdt-0.6b-v3-int8-sha256-1";
++ 
++     /** Directory inside the app's private files directory the model is materialised into. */
++     public static final String MODEL_DIRECTORY = "parakeet-v3-model";
++--- a/artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
+++++ b/artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
++@@ -115,7 +115,7 @@
++ 
++     @Test
++     public void modelFileSizesMatchPinnedValues() {
++-        long[] expected = {652282294L, 11845274L, 6355277L, 93939L};
+++        long[] expected = {652184281L, 11845275L, 6355277L, 93939L};
++         assertEquals(expected.length, ParakeetModelAssets.MODEL_FILE_SIZES.length);
++         for (int i = 0; i < expected.length; i++) {
++             assertEquals(expected[i], ParakeetModelAssets.MODEL_FILE_SIZES[i]);
++--- a/THIRD-PARTY-NOTICES.md
+++++ b/THIRD-PARTY-NOTICES.md
++@@ -9,7 +9,7 @@
++ 
++ | Component | Version | Licence | Redistributed in | Notes |
++ |---|---|---|---|---|
++-| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
+++| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
++ | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (Android AAR) | 1.13.8 | **Apache-2.0** | V2 candidate (Android) | Fetched at build time by `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` from the [v1.13.8 release](https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar), SHA-256 `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96`. Contains the sherpa-onnx JNI libraries and, in turn, the ONNX Runtime libraries below. |
++ | [ONNX Runtime](https://github.com/microsoft/onnxruntime) (bundled in the sherpa-onnx AAR) | 1.18.1 (as shipped in the AAR) | **MIT** | V2 candidate (Android) | `libonnxruntime.so` and the sherpa JNI libraries, arm64-v8a only. |
++ | [pguso/kokoro](https://github.com/pguso/kokoro) runtime | `kokoro-en` 0.1.5, commit `b42bd5cf915163607cb51984cabf273dcf09755e` | Apache-2.0 | v1.0.0 and V2 candidate | `android/kokoro-poc/README.md` has the full build and licence matrix. |
++@@ -46,10 +46,10 @@
++ 
++ | Artefact | SHA-256 |
++ |---|---|
++-| `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9` |
++-| `encoder.int8.onnx` | `1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479` |
++-| `decoder.int8.onnx` | `0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5` |
++-| `joiner.int8.onnx` | `cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98` |
+++| `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
+++| `encoder.int8.onnx` | `acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247` |
+++| `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
+++| `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
++ | `tokens.txt` | `d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d` |
++ | `sherpa-onnx-1.13.8.aar` | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
++ | `model_quantized.onnx` (Kokoro) | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
++--- a/docs/release/reproducible-build-guide.md
+++++ b/docs/release/reproducible-build-guide.md
++@@ -205,11 +205,11 @@
++ | Kokoro model | `onnx/model_quantized.onnx` | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
++ | Kokoro voice | `bm_fable.bin` | `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1` |
++ | sherpa-onnx | 1.13.8 AAR | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
++-| Parakeet encoder | `encoder.int8.onnx` | `1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479` |
++-| Parakeet decoder | `decoder.int8.onnx` | `0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5` |
++-| Parakeet joiner | `joiner.int8.onnx` | `cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98` |
+++| Parakeet encoder | `encoder.int8.onnx` | `acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247` |
+++| Parakeet decoder | `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
+++| Parakeet joiner | `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
++ | Parakeet tokens | `tokens.txt` | `d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d` |
++-| Parakeet archive | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9` |
+++| Parakeet archive | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
++ 
++ The NDK's `libc++_shared.so` used by the Kokoro build was
++ `0c52cfab2df0d957d8b346a2bdc5ae8d71feca2591924d77e1cd724d5bf74352`
+diff --git a/tools/plan-remediation/plans-lib.sh b/tools/plan-remediation/plans-lib.sh
+new file mode 100755
+index 0000000..69137fe
+--- /dev/null
++++ b/tools/plan-remediation/plans-lib.sh
+@@ -0,0 +1,480 @@
++#!/usr/bin/env bash
++# Shared read-only helpers for the Parakeet Plan A/B rollout scripts.
++#
++# Remediation copy (Round 7, agent B). Behaviour is identical to
++# archive/reports/round4-b-plans/plans-lib.sh for every existing helper; the
++# additions are repo/worktree resolution, per-file classification, APFS-clone
++# copies, and Plan B backup-layout verification used by the fixed scripts.
++#
++# Sourced after parakeet-pins.env. No side effects at source time.
++
++PASS_COUNT=0
++FAIL_COUNT=0
++
++die()  { echo "ERROR: $*" >&2; exit 1; }
++warn() { echo "WARN:  $*" >&2; }
++log()  { echo "[*] $*"; }
++note() { echo "NOTE:  $*"; }
++pass() { PASS_COUNT=$((PASS_COUNT + 1)); echo "PASS  $*"; }
++fail() { FAIL_COUNT=$((FAIL_COUNT + 1)); echo "FAIL  $*"; }
++
++check_eq() { # name expected actual
++  if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (expected $2, got $3)"; fi
++}
++
++check_ne() { # name value forbidden
++  if [ "$2" != "$3" ]; then pass "$1"; else fail "$1 (forbidden value present: $3)"; fi
++}
++
++check_file() { # name path
++  if [ -f "$2" ]; then pass "$1"; else fail "$1 (missing: $2)"; fi
++}
++
++require_cmd() {
++  command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
++}
++
++file_size() { # prints decimal byte size
++  wc -c < "$1" | tr -d ' '
++}
++
++sha256_file() {
++  shasum -a 256 "$1" | awk '{print $1}'
++}
++
++# ---------------------------------------------------------------------------
++# Repository / worktree resolution (defect A1).
++# A linked git worktree has a .git *file*, not a directory, so the round 4
++# preflight [ -d "$REPO/.git" ] rejected every worktree. Resolve through git
++# itself instead, and always operate on the repository top level (defect A1
++# repo-root handling: git apply is cwd-relative, so a subdirectory argument
++# must never be used as the apply root).
++# ---------------------------------------------------------------------------
++
++# repo_dir DIR -> absolute directory that holds the six pin files. Uses the git
++# top level when DIR is inside a worktree; falls back to DIR for plain copies
++# (the read-only verifiers must also work on non-git scratch replicas).
++repo_dir() {
++  local dir=$1 top
++  [ -d "$dir" ] || die "directory not found: $dir"
++  if command -v git >/dev/null 2>&1; then
++    top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || true)
++    if [ -n "$top" ] && [ -d "$top" ]; then echo "$top"; return 0; fi
++  fi
++  (cd "$dir" && pwd -P)
++}
++
++# git_repo_root DIR -> absolute top level of a real git checkout/worktree,
++# dying (not falling back) when DIR is not a git repository.
++git_repo_root() {
++  local dir=$1 top
++  command -v git >/dev/null 2>&1 || die "required command not found: git"
++  top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || true)
++  [ -n "$top" ] || die "not a git repository or linked worktree: $dir (linked worktrees have a .git file; git -C must resolve it)"
++  [ -d "$top" ] || die "git reported a missing top level for $dir: $top"
++  echo "$top"
++}
++
++# copy_preserving SRC DST -> APFS clone when the filesystem supports it
++# (copy-on-write, cheap for the ~639 MiB model files), else a byte copy.
++# A clone is a real independent file: later writes/renames cannot modify SRC.
++copy_preserving() {
++  local src=$1 dst=$2
++  cp -c -p "$src" "$dst" >/dev/null 2>&1 && return 0
++  cp -p "$src" "$dst"
++}
++
++count_literal() { # file literal -> occurrence count
++  local file=$1 lit=$2
++  if [ ! -f "$file" ]; then echo 0; return 0; fi
++  grep -F -o -- "$lit" "$file" 2>/dev/null | wc -l | tr -d ' '
++}
++
++count_in_pins() { # repo literal -> total occurrences across the six pin files
++  local repo=$1 lit=$2 total=0 f n
++  for f in $PIN_FILES; do
++    n=$(count_literal "$repo/$f" "$lit")
++    total=$((total + n))
++  done
++  echo "$total"
++}
++
++pins_state() { # repo -> new | old | mixed | missing
++  local repo=$1 f
++  for f in $PIN_FILES; do
++    if [ ! -f "$repo/$f" ]; then echo missing; return 0; fi
++  done
++  local na ne nd nj nv nt oa oe od oj ov ot nse nsd ose osd
++  na=$(count_in_pins "$repo" "$NEW_ARCHIVE_SHA256")
++  ne=$(count_in_pins "$repo" "$NEW_ENCODER_SHA256")
++  nd=$(count_in_pins "$repo" "$NEW_DECODER_SHA256")
++  nj=$(count_in_pins "$repo" "$NEW_JOINER_SHA256")
++  nv=$(count_in_pins "$repo" "$NEW_MODEL_VERSION")
++  nt=$(count_in_pins "$repo" "$NEW_TOKENS_SHA256")
++  oa=$(count_in_pins "$repo" "$OLD_ARCHIVE_SHA256")
++  oe=$(count_in_pins "$repo" "$OLD_ENCODER_SHA256")
++  od=$(count_in_pins "$repo" "$OLD_DECODER_SHA256")
++  oj=$(count_in_pins "$repo" "$OLD_JOINER_SHA256")
++  ov=$(count_in_pins "$repo" "$OLD_MODEL_VERSION")
++  ot=$(count_in_pins "$repo" "$OLD_TOKENS_SHA256")
++  nse=$(count_in_pins "$repo" "${NEW_ENCODER_SIZE}L")
++  nsd=$(count_in_pins "$repo" "${NEW_DECODER_SIZE}L")
++  ose=$(count_in_pins "$repo" "${OLD_ENCODER_SIZE}L")
++  osd=$(count_in_pins "$repo" "${OLD_DECODER_SIZE}L")
++  local new_ok=0 old_ok=0
++  if [ "$na" = "$PIN_COUNT_ARCHIVE" ] && [ "$ne" = "$PIN_COUNT_MEMBER" ] && [ "$nd" = "$PIN_COUNT_MEMBER" ] &&
++     [ "$nj" = "$PIN_COUNT_MEMBER" ] && [ "$nt" = "$PIN_COUNT_MEMBER" ] && [ "$nv" = "$PIN_COUNT_MODEL_VERSION" ] &&
++     [ "$nse" = "$PIN_COUNT_SIZE" ] && [ "$nsd" = "$PIN_COUNT_SIZE" ] &&
++     [ "$oa" = 0 ] && [ "$oe" = 0 ] && [ "$od" = 0 ] && [ "$oj" = 0 ] && [ "$ov" = 0 ]; then new_ok=1; fi
++  if [ "$na" = 0 ] && [ "$ne" = 0 ] && [ "$nd" = 0 ] && [ "$nj" = 0 ] && [ "$nv" = 0 ] &&
++     [ "$oa" = "$PIN_COUNT_ARCHIVE" ] && [ "$oe" = "$PIN_COUNT_MEMBER" ] && [ "$od" = "$PIN_COUNT_MEMBER" ] &&
++     [ "$oj" = "$PIN_COUNT_MEMBER" ] && [ "$ot" = "$PIN_COUNT_MEMBER" ] && [ "$ov" = "$PIN_COUNT_MODEL_VERSION" ] &&
++     [ "$ose" = "$PIN_COUNT_SIZE" ] && [ "$osd" = "$PIN_COUNT_SIZE" ] &&
++     [ "$nse" = 0 ] && [ "$nsd" = 0 ]; then old_ok=1; fi
++  if [ "$new_ok" = 1 ]; then echo new
++  elif [ "$old_ok" = 1 ]; then echo old
++  else echo mixed; fi
++}
++
++pins_table() { # repo -> human-readable literal counts (label count)
++  local repo=$1
++  echo "new_archive=$(count_in_pins "$repo" "$NEW_ARCHIVE_SHA256")"
++  echo "new_encoder=$(count_in_pins "$repo" "$NEW_ENCODER_SHA256")"
++  echo "new_decoder=$(count_in_pins "$repo" "$NEW_DECODER_SHA256")"
++  echo "new_joiner=$(count_in_pins "$repo" "$NEW_JOINER_SHA256")"
++  echo "new_model_version=$(count_in_pins "$repo" "$NEW_MODEL_VERSION")"
++  echo "old_archive=$(count_in_pins "$repo" "$OLD_ARCHIVE_SHA256")"
++  echo "old_encoder=$(count_in_pins "$repo" "$OLD_ENCODER_SHA256")"
++  echo "old_decoder=$(count_in_pins "$repo" "$OLD_DECODER_SHA256")"
++  echo "old_joiner=$(count_in_pins "$repo" "$OLD_JOINER_SHA256")"
++  echo "old_model_version=$(count_in_pins "$repo" "$OLD_MODEL_VERSION")"
++  echo "tokens=$(count_in_pins "$repo" "$NEW_TOKENS_SHA256")"
++  echo "new_encoder_size=$(count_in_pins "$repo" "${NEW_ENCODER_SIZE}L")"
++  echo "new_decoder_size=$(count_in_pins "$repo" "${NEW_DECODER_SIZE}L")"
++  echo "old_encoder_size=$(count_in_pins "$repo" "${OLD_ENCODER_SIZE}L")"
++  echo "old_decoder_size=$(count_in_pins "$repo" "${OLD_DECODER_SIZE}L")"
++}
++
++staged_class() { # staging-dir -> new | old | mixed | missing
++  local dir=$1 f h
++  local new_hits=0 old_hits=0 missing=0 other=0
++  for f in $MODEL_FILES; do
++    if [ ! -f "$dir/$f" ]; then missing=1; continue; fi
++    h=$(sha256_file "$dir/$f")
++    case "$f" in
++      encoder.int8.onnx)
++        if [ "$h" = "$NEW_ENCODER_SHA256" ]; then new_hits=$((new_hits + 1));
++        elif [ "$h" = "$OLD_ENCODER_SHA256" ]; then old_hits=$((old_hits + 1)); else other=1; fi ;;
++      decoder.int8.onnx)
++        if [ "$h" = "$NEW_DECODER_SHA256" ]; then new_hits=$((new_hits + 1));
++        elif [ "$h" = "$OLD_DECODER_SHA256" ]; then old_hits=$((old_hits + 1)); else other=1; fi ;;
++      joiner.int8.onnx)
++        if [ "$h" = "$NEW_JOINER_SHA256" ]; then new_hits=$((new_hits + 1));
++        elif [ "$h" = "$OLD_JOINER_SHA256" ]; then old_hits=$((old_hits + 1)); else other=1; fi ;;
++      tokens.txt)
++        # tokens.txt is byte-identical in the OLD and NEW archives: it must not
++        # influence the OLD/NEW class, only prove it is one of the two.
++        if [ "$h" != "$NEW_TOKENS_SHA256" ] && [ "$h" != "$OLD_TOKENS_SHA256" ]; then other=1; fi ;;
++    esac
++  done
++  if [ "$missing" = 1 ]; then echo missing
++  elif [ "$other" = 1 ]; then echo mixed
++  elif [ "$new_hits" = 3 ] && [ "$old_hits" = 0 ]; then echo new
++  elif [ "$old_hits" = 3 ] && [ "$new_hits" = 0 ]; then echo old
++  else echo mixed; fi
++}
++
++staged_report() { # staging-dir -> per-file hash/size/class
++  local dir=$1 f h s
++  for f in $MODEL_FILES; do
++    if [ ! -f "$dir/$f" ]; then echo "$f missing - -"; continue; fi
++    h=$(sha256_file "$dir/$f")
++    s=$(file_size "$dir/$f")
++    local cls=other
++    case "$f" in
++      encoder.int8.onnx)
++        if [ "$h" = "$NEW_ENCODER_SHA256" ]; then cls=new; elif [ "$h" = "$OLD_ENCODER_SHA256" ]; then cls=old; fi ;;
++      decoder.int8.onnx)
++        if [ "$h" = "$NEW_DECODER_SHA256" ]; then cls=new; elif [ "$h" = "$OLD_DECODER_SHA256" ]; then cls=old; fi ;;
++      joiner.int8.onnx)
++        if [ "$h" = "$NEW_JOINER_SHA256" ]; then cls=new; elif [ "$h" = "$OLD_JOINER_SHA256" ]; then cls=old; fi ;;
++      tokens.txt)
++        if [ "$h" = "$NEW_TOKENS_SHA256" ] || [ "$h" = "$OLD_TOKENS_SHA256" ]; then cls=shared; fi ;;
++    esac
++    echo "$f $s $h $cls"
++  done
++}
++
++# ---- per-file canonical values (Plan B per-file transaction support) -------
++
++new_sha() { case "$1" in
++  encoder.int8.onnx) echo "$NEW_ENCODER_SHA256" ;;
++  decoder.int8.onnx) echo "$NEW_DECODER_SHA256" ;;
++  joiner.int8.onnx) echo "$NEW_JOINER_SHA256" ;;
++  tokens.txt) echo "$NEW_TOKENS_SHA256" ;;
++  *) echo "" ;; esac; }
++
++new_size() { case "$1" in
++  encoder.int8.onnx) echo "$NEW_ENCODER_SIZE" ;;
++  decoder.int8.onnx) echo "$NEW_DECODER_SIZE" ;;
++  joiner.int8.onnx) echo "$NEW_JOINER_SIZE" ;;
++  tokens.txt) echo "$NEW_TOKENS_SIZE" ;;
++  *) echo "" ;; esac; }
++
++old_sha() { case "$1" in
++  encoder.int8.onnx) echo "$OLD_ENCODER_SHA256" ;;
++  decoder.int8.onnx) echo "$OLD_DECODER_SHA256" ;;
++  joiner.int8.onnx) echo "$OLD_JOINER_SHA256" ;;
++  tokens.txt) echo "$OLD_TOKENS_SHA256" ;;
++  *) echo "" ;; esac; }
++
++old_size() { case "$1" in
++  encoder.int8.onnx) echo "$OLD_ENCODER_SIZE" ;;
++  decoder.int8.onnx) echo "$OLD_DECODER_SIZE" ;;
++  joiner.int8.onnx) echo "$OLD_JOINER_SIZE" ;;
++  tokens.txt) echo "$OLD_TOKENS_SIZE" ;;
++  *) echo "" ;; esac; }
++
++# file_state DIR FILE -> new | old | shared | other | missing
++# "shared" is returned for tokens.txt, whose bytes are identical in both states.
++file_state() {
++  local dir=$1 f=$2 h
++  if [ ! -e "$dir/$f" ]; then echo missing; return 0; fi
++  if [ ! -f "$dir/$f" ]; then echo other; return 0; fi
++  h=$(sha256_file "$dir/$f")
++  case "$f" in
++    encoder.int8.onnx)
++      if [ "$h" = "$NEW_ENCODER_SHA256" ]; then echo new; return 0; fi
++      if [ "$h" = "$OLD_ENCODER_SHA256" ]; then echo old; return 0; fi ;;
++    decoder.int8.onnx)
++      if [ "$h" = "$NEW_DECODER_SHA256" ]; then echo new; return 0; fi
++      if [ "$h" = "$OLD_DECODER_SHA256" ]; then echo old; return 0; fi ;;
++    joiner.int8.onnx)
++      if [ "$h" = "$NEW_JOINER_SHA256" ]; then echo new; return 0; fi
++      if [ "$h" = "$OLD_JOINER_SHA256" ]; then echo old; return 0; fi ;;
++    tokens.txt)
++      if [ "$h" = "$NEW_TOKENS_SHA256" ] || [ "$h" = "$OLD_TOKENS_SHA256" ]; then echo shared; return 0; fi ;;
++  esac
++  echo other
++}
++
++check_archives() { # verifies both archives size+sha; logs PASS/FAIL
++  if [ -f "$OLD_ARCHIVE" ]; then
++    check_eq "old archive size" "$OLD_ARCHIVE_SIZE" "$(file_size "$OLD_ARCHIVE")"
++    check_eq "old archive sha256" "$OLD_ARCHIVE_SHA256" "$(sha256_file "$OLD_ARCHIVE")"
++  else
++    fail "old archive present ($OLD_ARCHIVE)"
++  fi
++  if [ -f "$NEW_ARCHIVE" ]; then
++    check_eq "new archive size" "$NEW_ARCHIVE_SIZE" "$(file_size "$NEW_ARCHIVE")"
++    check_eq "new archive sha256" "$NEW_ARCHIVE_SHA256" "$(sha256_file "$NEW_ARCHIVE")"
++  else
++    fail "new archive present ($NEW_ARCHIVE)"
++  fi
++}
++
++summary() {
++  echo "----------------------------------------"
++  echo "checks passed: $PASS_COUNT   failed: $FAIL_COUNT"
++  if [ "$FAIL_COUNT" -ne 0 ]; then return 1; fi
++  return 0
++}
++
++# ---------------------------------------------------------------------------
++# Plan B backup layout helpers (defects B1/B2/B3).
++#
++# v2 layout:
++#   BACKUP_DIR/BACKUP-PROVENANCE.txt
++#   BACKUP_DIR/targets.tsv                       id <TAB> target path <TAB> pre-class
++#   BACKUP_DIR/targets/<id>/backup-manifest.tsv  file <TAB> pre_state <TAB> size <TAB> sha256
++#   BACKUP_DIR/targets/<id>/<file>               backed-up pre-existing bytes
++#
++# legacy layout (round 4): BACKUP_DIR/backup-manifest.tsv (file size sha) +
++# flat files; only a single target and only pre_state=new rows.
++# ---------------------------------------------------------------------------
++
++backup_layout() { # backup-dir -> v2 | legacy | none
++  local b=$1
++  if [ -f "$b/$BACKUP_TARGETS_TSV" ]; then echo v2; return 0; fi
++  if [ -f "$b/backup-manifest.tsv" ]; then echo legacy; return 0; fi
++  echo none
++}
++
++backup_provenance_get() { # backup-dir key -> value (empty when absent)
++  local b=$1 k=$2
++  [ -f "$b/$BACKUP_PROVENANCE_FILE" ] || return 0
++  grep "^$k=" "$b/$BACKUP_PROVENANCE_FILE" 2>/dev/null | head -1 | cut -d= -f2-
++}
++
++backup_target_dir() { # backup-dir target-id -> directory holding that target's backup
++  local b=$1 tid=$2 layout
++  layout=$(backup_layout "$b")
++  if [ "$layout" = v2 ]; then echo "$b/targets/$tid"; else echo "$b"; fi
++}
++
++backup_target_manifest() { # backup-dir target-id -> manifest path
++  echo "$(backup_target_dir "$1" "$2")/$BACKUP_TARGET_MANIFEST"
++}
++
++backup_read_targets() { # backup-dir -> id<TAB>path<TAB>pre_class lines (v2 only)
++  local b=$1
++  [ "$(backup_layout "$b")" = v2 ] || return 0
++  grep -v '^#' "$b/$BACKUP_TARGETS_TSV" 2>/dev/null | grep -v '^[[:space:]]*$' || true
++}
++
++backup_target_count() { # backup-dir -> number of recorded targets
++  local b=$1 n=0
++  if [ "$(backup_layout "$b")" = v2 ]; then
++    n=$(backup_read_targets "$b" | wc -l | tr -d ' ')
++  elif [ "$(backup_layout "$b")" = legacy ]; then
++    n=1
++  fi
++  echo "$n"
++}
++
++# backup_check_provenance BACKUP_DIR -> 0 ok, 1 bad; prints issue lines.
++backup_check_provenance() {
++  local b=$1 layout issues=0 fmt count actual rec tid path pre
++  if [ ! -f "$b/$BACKUP_PROVENANCE_FILE" ]; then
++    echo "missing provenance: $b/$BACKUP_PROVENANCE_FILE"; return 1
++  fi
++  layout=$(backup_layout "$b")
++  if [ "$layout" = none ]; then
++    echo "backup dir has neither targets.tsv nor backup-manifest.tsv"; return 1
++  fi
++  if [ "$layout" = legacy ]; then
++    for k in created_utc source_repo plan_script old_archive_sha256 new_archive_sha256; do
++      if [ -z "$(backup_provenance_get "$b" "$k")" ]; then echo "legacy provenance missing $k"; issues=$((issues + 1)); fi
++    done
++    [ "$issues" = 0 ] && return 0
++    return 1
++  fi
++  fmt=$(backup_provenance_get "$b" format_version)
++  if [ "$fmt" != "$BACKUP_FORMAT_VERSION" ]; then
++    echo "provenance format_version '$fmt' != '$BACKUP_FORMAT_VERSION'"; issues=$((issues + 1))
++  fi
++  if [ ! -f "$b/$BACKUP_TARGETS_TSV" ]; then
++    echo "missing targets.tsv"; issues=$((issues + 1))
++  else
++    actual=$(sha256_file "$b/$BACKUP_TARGETS_TSV")
++    rec=$(backup_provenance_get "$b" targets_tsv_sha256)
++    if [ -z "$rec" ]; then echo "provenance missing targets_tsv_sha256"; issues=$((issues + 1))
++    elif [ "$rec" != "$actual" ]; then echo "targets.tsv sha256 mismatch (stale/tampered manifest)"; issues=$((issues + 1)); fi
++  fi
++  count=$(backup_provenance_get "$b" target_count)
++  actual=$(backup_target_count "$b")
++  if [ -z "$count" ]; then echo "provenance missing target_count"; issues=$((issues + 1))
++  elif [ "$count" != "$actual" ]; then echo "provenance target_count $count != recorded $actual"; issues=$((issues + 1)); fi
++  while IFS=$'\t' read -r tid path pre; do
++    [ -n "$tid" ] || continue
++    if [ -z "$path" ] || [ -z "$pre" ]; then
++      echo "malformed targets.tsv line: $tid"; issues=$((issues + 1)); continue
++    fi
++    rec=$(backup_provenance_get "$b" "manifest_sha256_$tid")
++    if [ -z "$rec" ]; then
++      echo "provenance missing manifest_sha256_$tid"; issues=$((issues + 1)); continue
++    fi
++    if [ ! -f "$(backup_target_manifest "$b" "$tid")" ]; then
++      echo "missing manifest for target $tid"; issues=$((issues + 1)); continue
++    fi
++    actual=$(sha256_file "$(backup_target_manifest "$b" "$tid")")
++    if [ "$rec" != "$actual" ]; then
++      echo "manifest sha256 mismatch for target $tid (stale/tampered manifest)"; issues=$((issues + 1))
++    fi
++  done <<EOF
++$(backup_read_targets "$b")
++EOF
++  if [ "$issues" -ne 0 ]; then return 1; fi
++  return 0
++}
++
++# backup_check_manifest BACKUP_DIR TARGET_ID -> 0 ok, 1 bad; prints issues.
++# Validates: file names, pre_state values, duplicates, per-file size/hash against
++# the canonical NEW values, no unlisted/missing backup files.
++backup_check_manifest() {
++  local b=$1 tid=$2 layout tdir manifest f pre size sha extra issues=0 seen=" " m found
++  layout=$(backup_layout "$b")
++  tdir=$(backup_target_dir "$b" "$tid")
++  manifest="$tdir/$BACKUP_TARGET_MANIFEST"
++  if [ ! -f "$manifest" ]; then echo "missing manifest: $manifest"; return 1; fi
++  if [ "$layout" = v2 ]; then
++    while IFS=$'\t' read -r f pre size sha extra; do
++      [ -n "$f" ] || continue
++      case "$f" in \#*) continue ;; esac
++      found=0
++      for m in $MODEL_FILES; do [ "$m" = "$f" ] && found=1; done
++      if [ "$found" != 1 ]; then echo "manifest lists unknown file: $f"; issues=$((issues + 1)); continue; fi
++      case "$seen" in *" $f "*) echo "duplicate manifest entry: $f"; issues=$((issues + 1)); continue ;; esac
++      seen="$seen$f "
++      case "$pre" in
++        new)
++          if [ "$size" != "$(new_size "$f")" ]; then echo "$f manifest size $size != canonical $(new_size "$f")"; issues=$((issues + 1)); fi
++          if [ "$sha" != "$(new_sha "$f")" ]; then echo "$f manifest sha256 != canonical NEW digest"; issues=$((issues + 1)); fi
++          if [ ! -f "$tdir/$f" ]; then echo "backup file missing: $f"; issues=$((issues + 1));
++          else
++            if [ "$(file_size "$tdir/$f")" != "$(new_size "$f")" ]; then echo "$f backup size mismatch"; issues=$((issues + 1)); fi
++            if [ "$(sha256_file "$tdir/$f")" != "$(new_sha "$f")" ]; then echo "$f backup sha256 mismatch (stale/tampered backup)"; issues=$((issues + 1)); fi
++          fi ;;
++        missing)
++          if [ -e "$tdir/$f" ]; then echo "backup file present although pre_state=missing: $f"; issues=$((issues + 1)); fi ;;
++        *) echo "invalid pre_state '$pre' for $f"; issues=$((issues + 1)) ;;
++      esac
++    done < "$manifest"
++  else
++    while IFS=$'\t' read -r f size sha extra; do
++      [ -n "$f" ] || continue
++      case "$f" in \#*) continue ;; esac
++      found=0
++      for m in $MODEL_FILES; do [ "$m" = "$f" ] && found=1; done
++      if [ "$found" != 1 ]; then echo "manifest lists unknown file: $f"; issues=$((issues + 1)); continue; fi
++      case "$seen" in *" $f "*) echo "duplicate manifest entry: $f"; issues=$((issues + 1)); continue ;; esac
++      seen="$seen$f "
++      if [ "$size" != "$(new_size "$f")" ]; then echo "$f manifest size $size != canonical $(new_size "$f")"; issues=$((issues + 1)); fi
++      if [ "$sha" != "$(new_sha "$f")" ]; then echo "$f manifest sha256 != canonical NEW digest"; issues=$((issues + 1)); fi
++      if [ ! -f "$tdir/$f" ]; then echo "backup file missing: $f"; issues=$((issues + 1));
++      else
++        if [ "$(file_size "$tdir/$f")" != "$(new_size "$f")" ]; then echo "$f backup size mismatch"; issues=$((issues + 1)); fi
++        if [ "$(sha256_file "$tdir/$f")" != "$(new_sha "$f")" ]; then echo "$f backup sha256 mismatch (stale/tampered backup)"; issues=$((issues + 1)); fi
++      fi
++    done < "$manifest"
++  fi
++  # Every model file that exists in the backup dir must be listed; no strays.
++  for m in $MODEL_FILES; do
++    if [ -e "$tdir/$m" ]; then
++      case "$seen" in *" $m "*) : ;; *) echo "unlisted backup file: $m"; issues=$((issues + 1)) ;; esac
++    fi
++  done
++  for f in "$tdir"/*; do
++    [ -e "$f" ] || continue
++    [ -f "$f" ] || continue
++    m=$(basename "$f")
++    [ "$m" = "$BACKUP_TARGET_MANIFEST" ] && continue
++    case " $MODEL_FILES " in *" $m "*) : ;; *) echo "unexpected file in backup dir: $m"; issues=$((issues + 1)) ;; esac
++  done
++  if [ "$seen" = " " ]; then echo "manifest has no entries"; issues=$((issues + 1)); fi
++  if [ "$issues" -ne 0 ]; then return 1; fi
++  return 0
++}
++
++# backup_check_tree BACKUP_DIR [TARGET_ID...] -> 0 ok; prints issue lines.
++# Cross-checks provenance, targets, manifests and bytes. With no target ids it
++# checks every recorded target.
++backup_check_tree() {
++  local b=$1 issues=0 tid rest ids="" target
++  shift || true
++  if [ "$#" -gt 0 ]; then ids="$*"; else
++    if [ "$(backup_layout "$b")" = v2 ]; then
++      while IFS=$'\t' read -r tid rest; do [ -n "$tid" ] && ids="$ids $tid"; done <<EOF
++$(backup_read_targets "$b")
++EOF
++    else
++      ids="t1"
++    fi
++  fi
++  backup_check_provenance "$b" || issues=$((issues + 1))
++  for target in $ids; do
++    backup_check_manifest "$b" "$target" || issues=$((issues + 1))
++  done
++  if [ "$issues" -ne 0 ]; then return 1; fi
++  return 0
++}
+diff --git a/tools/plan-remediation/refresh-evidence-manifest.sh b/tools/plan-remediation/refresh-evidence-manifest.sh
+new file mode 100755
+index 0000000..2971c67
+--- /dev/null
++++ b/tools/plan-remediation/refresh-evidence-manifest.sh
+@@ -0,0 +1,100 @@
++#!/usr/bin/env bash
++# Regenerate or verify a SHA-256 evidence manifest for a reviewable bundle.
++#
++# Why this exists (defect A4): the round 4 evidence manifest
++# archive/reports/round4-b-evidence-20261118/SHA256SUMS.txt went stale after
++# plans-lib.sh was fixed (it still recorded 73520f6e...), listed files that did
++# not exist in its directory, omitted the regeneration log, and contained a
++# self-entry whose hash can never be correct. This tool makes the manifest a
++# reproducible artifact instead of a hand-maintained snapshot:
++#   * it is generated from the actual bytes (never edited by hand);
++#   * it lists every regular file under the bundle root, so omissions fail;
++#   * it never lists itself (self-hash is impossible);
++#   * --check fails on a missing/stale/tampered manifest and prints a diff.
++#
++# Usage:
++#   ./refresh-evidence-manifest.sh [--check] [--name NAME] DIR
++#
++# Default NAME is SHA256SUMS. --check exits 0 when current, 1 when stale/missing.
++set -euo pipefail
++
++CHECK=0
++NAME=SHA256SUMS
++DIR=""
++
++usage() { sed -n '2,22p' "$0"; exit 2; }
++
++while [ $# -gt 0 ]; do
++  case "$1" in
++    --check) CHECK=1; shift ;;
++    --name) NAME=$2; shift 2 ;;
++    -h|--help) usage ;;
++    -*) die "unknown option: $1" ;;
++    *) DIR=$1; shift ;;
++  esac
++done
++
++[ -n "$DIR" ] || die "DIR is required"
++[ -d "$DIR" ] || die "not a directory: $DIR"
++case "$NAME" in
++  */*|.|..) die "--name must be a plain file name" ;;
++esac
++
++DIR=$(cd "$DIR" && pwd -P)
++MANIFEST="$DIR/$NAME"
++TMP=$(mktemp "${TMPDIR:-/tmp}/evidence-sums.XXXXXX") || die "mktemp failed"
++trap 'rm -f "$TMP"' EXIT
++
++# Every regular file under the bundle root, excluding the manifest itself, in a
++# stable C-locale order. (Bundles are text/evidence trees; no .git directories
++# are expected. Excluding .git keeps the tool usable on a checkout.)
++(
++  cd "$DIR"
++  find . -type f ! -name "$NAME" ! -path './.git/*' -print | LC_ALL=C sort
++) > "$TMP.list" || die "file enumeration failed"
++
++COUNT=0
++: > "$TMP"
++while IFS= read -r f; do
++  [ -n "$f" ] || continue
++  if [ ! -f "$DIR/$f" ]; then die "listed path disappeared: $f"; fi
++  # Hash with a path relative to the bundle root so the manifest is portable
++  # (shasum -c must work from $DIR, not just on the machine that wrote it).
++  ( cd "$DIR" && shasum -a 256 "$f" ) >> "$TMP"
++  COUNT=$((COUNT + 1))
++done < "$TMP.list"
++rm -f "$TMP.list"
++
++if [ "$COUNT" = 0 ]; then
++  die "no files found under $DIR (refusing to write an empty manifest)"
++fi
++# Guard against a stale manifest listing itself.
++if [ -f "$MANIFEST" ] && grep -q -E "[[:space:]]\./$NAME$" "$MANIFEST" 2>/dev/null; then
++  if [ "$CHECK" = 1 ]; then
++    echo "STALE: $NAME lists itself (self-hash is impossible)" >&2
++    exit 1
++  fi
++fi
++if grep -q -E "[[:space:]]\./$NAME$" "$TMP" 2>/dev/null; then
++  die "internal error: generated manifest lists itself"
++fi
++
++if [ "$CHECK" = 1 ]; then
++  if [ ! -f "$MANIFEST" ]; then
++    echo "STALE: manifest missing: $MANIFEST" >&2
++    echo "run: $0 $DIR (without --check) to regenerate it" >&2
++    exit 1
++  fi
++  if cmp -s "$TMP" "$MANIFEST"; then
++    echo "OK: $NAME is current ($COUNT files)"
++    exit 0
++  fi
++  echo "STALE: $MANIFEST does not match the current tree ($COUNT files)" >&2
++  echo "--- differences (generated vs recorded; - expected, + recorded) ---" >&2
++  diff -u "$MANIFEST" "$TMP" 2>/dev/null | sed -n '1,80p' >&2 || true
++  exit 1
++fi
++
++mv -f "$TMP" "$MANIFEST" || die "cannot write manifest: $MANIFEST"
++trap - EXIT
++echo "WROTE: $MANIFEST ($COUNT files)"
+diff --git a/tools/plan-remediation/restore-staged-backup.sh b/tools/plan-remediation/restore-staged-backup.sh
+new file mode 100755
+index 0000000..22bac9f
+--- /dev/null
++++ b/tools/plan-remediation/restore-staged-backup.sh
+@@ -0,0 +1,394 @@
++#!/usr/bin/env bash
++# Reverse Plan B -- restore the pre-Plan-B staged model bytes (normally the NEW
++# bytes backed up by apply-plan-b.sh). DRY-RUN BY DEFAULT.
++#
++# Remediation copy (Round 7, agent B) fixes:
++#   B1  restores every target recorded in BACKUP_DIR/targets.tsv, including the
++#       negative worktree via --include-negative, instead of silently restoring
++#       only one staging dir. Per-file hash verification against the manifest
++#       (or the canonical NEW digests for recovery sources) is mandatory.
++#   B2  pre-stage all bytes + verify, then commit renames; current bytes are
++#       saved first so a commit failure can be rolled back.
++#   B3  alternate recovery sources: --source backup (default; exact pre-state,
++#       including removing files that were absent before Plan B),
++#       --source extracted-new, --source archive (force a consistent NEW set).
++#   A4  stale/tampered backup manifests are refused (provenance pins the
++#       targets.tsv and per-target manifest sha256 values).
++#
++# Usage:
++#   ./restore-staged-backup.sh --backup-dir DIR [--repo DIR] [--staging DIR]
++#                              [--source backup|extracted-new|archive]
++#                              [--include-negative] [--apply] [--idempotent]
++set -euo pipefail
++HERE=$(cd "$(dirname "$0")" && pwd -P)
++. "$HERE/parakeet-pins.env"
++. "$HERE/plans-lib.sh"
++
++REPO=$REPO_ROOT
++STAGING=$STAGING_DIR
++BACKUP_DIR=""
++SOURCE=backup
++APPLY=0
++IDEMPOTENT=0
++INCLUDE_NEGATIVE=0
++
++WORK=""
++TMP_FILES=""
++PRE_FILES=""
++COMMIT_STARTED=0
++TARGET_IDS=()
++TARGET_PATHS=()
++TARGET_SRCS=()
++
++usage() { sed -n '2,28p' "$0"; exit 2; }
++
++while [ $# -gt 0 ]; do
++  case "$1" in
++    --repo) REPO=$2; shift 2 ;;
++    --staging) STAGING=$2; shift 2 ;;
++    --backup-dir) BACKUP_DIR=$2; shift 2 ;;
++    --source) SOURCE=$2; shift 2 ;;
++    --apply) APPLY=1; shift ;;
++    --idempotent) IDEMPOTENT=1; shift ;;
++    --include-negative) INCLUDE_NEGATIVE=1; shift ;;
++    -h|--help) usage ;;
++    *) die "unknown argument: $1" ;;
++  esac
++done
++
++require_cmd shasum
++require_cmd grep
++[ -n "$BACKUP_DIR" ] || die "--backup-dir is required"
++[ -d "$BACKUP_DIR" ] || die "backup dir not found: $BACKUP_DIR"
++LAYOUT=$(backup_layout "$BACKUP_DIR")
++[ "$LAYOUT" != none ] || die "backup dir is not a Plan B backup (no targets.tsv/backup-manifest.tsv): $BACKUP_DIR"
++
++WORK=$(mktemp -d "${TMPDIR:-/tmp}/r7-plan-b-restore.XXXXXX") || die "mktemp failed"
++
++cleanup_on_exit() {
++  local rc=$? t
++  for t in $TMP_FILES; do rm -f "$t" 2>/dev/null || true; done
++  for t in $PRE_FILES; do rm -f "$t" 2>/dev/null || true; done
++  if [ -n "$WORK" ] && [ -d "$WORK" ]; then rm -rf "$WORK" 2>/dev/null || true; fi
++  exit "$rc"
++}
++trap cleanup_on_exit EXIT
++
++remove_tmp_path() { # path
++  local p=$1 out="" t
++  for t in $TMP_FILES; do [ "$t" = "$p" ] || out="$out $t"; done
++  TMP_FILES=$out
++}
++
++STAGING=$(cd "$STAGING" 2>/dev/null && pwd -P) || STAGING=$STAGING
++
++log "Reverse Plan B preflight (mode: $([ "$APPLY" = 1 ] && echo APPLY || echo DRY-RUN), source: $SOURCE)"
++
++# ---------------------------------------------------------------------------
++# 1. Validate the backup itself (manifests + backed-up bytes) for the backup
++#    source; for alternate sources the manifests are still the target record.
++# ---------------------------------------------------------------------------
++if ! detail=$(backup_check_tree "$BACKUP_DIR" 2>&1); then
++  printf '%s\n' "$detail" | sed 's/^/      /'
++  die "backup is stale/tampered/incomplete; refusing to restore from it"
++fi
++log "backup provenance, targets and per-target manifests verified"
++
++# 2. Build the target list (v2 multi-target or legacy single-target).
++if [ "$LAYOUT" = v2 ]; then
++  ROWS=$(backup_read_targets "$BACKUP_DIR")
++  COUNT=$(backup_target_count "$BACKUP_DIR")
++  [ -n "$ROWS" ] || die "targets.tsv records no targets"
++  MAIN_ID=""
++  MAIN_PATH=""
++  OTHER_ID=""
++  OTHER_PATH=""
++  while IFS=$'\t' read -r tid path pre; do
++    [ -n "$tid" ] || continue
++    if [ "$path" = "$STAGING" ]; then
++      MAIN_ID=$tid; MAIN_PATH=$path
++    else
++      if [ -n "$OTHER_ID" ]; then die "backup records more than two targets; refusing (unsupported layout)"; fi
++      OTHER_ID=$tid; OTHER_PATH=$path
++    fi
++  done <<EOF
++$ROWS
++EOF
++  if [ -z "$MAIN_ID" ]; then
++    if [ "$COUNT" = 1 ]; then
++      while IFS=$'\t' read -r tid path pre; do [ -n "$tid" ] || continue; MAIN_ID=$tid; MAIN_PATH=$path; done <<EOF
++$ROWS
++EOF
++      warn "--staging $STAGING does not match the recorded target $MAIN_PATH; using the recorded target"
++    else
++      die "backup records targets but none matches --staging $STAGING; pass the recorded path (see $BACKUP_DIR/$BACKUP_TARGETS_TSV)"
++    fi
++  fi
++  if [ -n "$OTHER_ID" ]; then
++    if [ "$INCLUDE_NEGATIVE" != 1 ]; then
++      die "backup records a second target ($OTHER_PATH); re-run with --include-negative to restore all recorded targets"
++    fi
++    TARGET_IDS+=("$MAIN_ID"); TARGET_PATHS+=("$MAIN_PATH")
++    TARGET_IDS+=("$OTHER_ID"); TARGET_PATHS+=("$OTHER_PATH")
++  else
++    if [ "$INCLUDE_NEGATIVE" = 1 ]; then
++      die "backup has no second (negative) target; drop --include-negative"
++    fi
++    TARGET_IDS+=("$MAIN_ID"); TARGET_PATHS+=("$MAIN_PATH")
++  fi
++else
++  # legacy flat backup: one target, positional --staging.
++  if [ "$INCLUDE_NEGATIVE" = 1 ]; then
++    die "legacy (round 4) backup has no negative target record; --include-negative is not reversible for it"
++  fi
++  TARGET_IDS+=("t1"); TARGET_PATHS+=("$STAGING")
++fi
++log "targets: ${#TARGET_PATHS[@]} (main $STAGING)"
++
++# ---------------------------------------------------------------------------
++# 3. Resolve the recovery source.
++# ---------------------------------------------------------------------------
++case "$SOURCE" in
++  backup)
++    log "source bytes: the verified backup (exact pre-Plan-B state)"
++    ;;
++  extracted-new)
++    [ -d "$NEW_EXTRACTED" ] || die "extracted-new directory missing: $NEW_EXTRACTED"
++    for f in $MODEL_FILES; do
++      [ -f "$NEW_EXTRACTED/$f" ] || die "recovery source missing: $NEW_EXTRACTED/$f"
++      check_eq "recovery source $f size" "$(new_size "$f")" "$(file_size "$NEW_EXTRACTED/$f")"
++      check_eq "recovery source $f sha256" "$(new_sha "$f")" "$(sha256_file "$NEW_EXTRACTED/$f")"
++    done
++    [ "$FAIL_COUNT" = 0 ] || die "extracted-new recovery source does not match canonical NEW bytes"
++    PASS_COUNT=0; FAIL_COUNT=0
++    ;;
++  archive)
++    log "extracting NEW archive to $WORK (read-only recovery source)"
++    tar -xjf "$NEW_ARCHIVE" -C "$WORK" || die "new archive extraction failed"
++    NEW_EXTRACTED="$WORK/$ARCHIVE_MEMBER_DIR"
++    for f in $MODEL_FILES; do
++      [ -f "$NEW_EXTRACTED/$f" ] || die "recovery source missing: $NEW_EXTRACTED/$f"
++      check_eq "recovery source $f size" "$(new_size "$f")" "$(file_size "$NEW_EXTRACTED/$f")"
++      check_eq "recovery source $f sha256" "$(new_sha "$f")" "$(sha256_file "$NEW_EXTRACTED/$f")"
++    done
++    [ "$FAIL_COUNT" = 0 ] || die "archive recovery source does not match canonical NEW bytes"
++    PASS_COUNT=0; FAIL_COUNT=0
++    ;;
++  *) die "--source must be backup, extracted-new or archive" ;;
++esac
++
++# ---------------------------------------------------------------------------
++# 4. Build the per-file action plan.
++#    backup source  -> restore manifest pre_state: new = write recorded bytes,
++#                      missing = remove the file Plan B installed.
++#    other sources  -> force every model file to its canonical NEW bytes.
++# ---------------------------------------------------------------------------
++PLAN_TSV="$WORK/restore-plan.tsv"
++: > "$PLAN_TSV"
++ANY_WRITE=0
++i=0
++while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++  tid=${TARGET_IDS[$i]}
++  tp=${TARGET_PATHS[$i]}
++  if [ ! -d "$tp" ]; then warn "target dir does not exist: $tp"; fi
++  if [ "$SOURCE" = backup ]; then
++    tdir=$(backup_target_dir "$BACKUP_DIR" "$tid")
++    manifest="$tdir/$BACKUP_TARGET_MANIFEST"
++    if [ "$LAYOUT" = legacy ]; then tdir="$BACKUP_DIR"; manifest="$BACKUP_DIR/backup-manifest.tsv"; fi
++    while IFS=$'\t' read -r f pre size sha extra; do
++      [ -n "$f" ] || continue
++      case "$f" in \#*) continue ;; esac
++      if [ "$LAYOUT" != v2 ]; then sha=$size; size=$pre; pre=new; fi
++      case "$pre" in
++        new)
++          if [ -f "$tp/$f" ] && [ "$(sha256_file "$tp/$f")" = "$sha" ]; then
++            act=skip
++          else
++            act=write
++          fi
++          printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$tid" "$tp" "$f" "$act" "$size" "$sha" >> "$PLAN_TSV"
++          ;;
++        missing)
++          if [ -e "$tp/$f" ]; then act=remove; else act=skip; fi
++          printf '%s\t%s\t%s\t%s\t-\t-\n' "$tid" "$tp" "$f" "$act" >> "$PLAN_TSV"
++          ;;
++        *) die "invalid pre_state '$pre' in $manifest" ;;
++      esac
++      [ "$act" = skip ] || ANY_WRITE=1
++    done < "$manifest"
++  else
++    for f in $MODEL_FILES; do
++      st=missing
++      if [ -e "$tp/$f" ]; then st=$(file_state "$tp" "$f"); fi
++      case "$st" in
++        new|shared) act=skip ;;
++        old|missing) act=write ;;
++        *) warn "target $tp file $f holds unknown bytes; recovery source will overwrite it"; act=write ;;
++      esac
++      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$tid" "$tp" "$f" "$act" "$(new_size "$f")" "$(new_sha "$f")" >> "$PLAN_TSV"
++      [ "$act" = skip ] || ANY_WRITE=1
++    done
++  fi
++  i=$((i + 1))
++done
++
++echo
++echo "== Planned reverse-Plan-B change =="
++echo "backup dir    $BACKUP_DIR"
++echo "source        $SOURCE"
++echo "mode          $([ "$APPLY" = 1 ] && echo APPLY || echo DRY-RUN)"
++i=0
++while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++  echo "target        ${TARGET_IDS[$i]} ${TARGET_PATHS[$i]} (state $(staged_class "${TARGET_PATHS[$i]}"))"
++  i=$((i + 1))
++done
++echo "actions       $(grep -c -v 'skip$' "$PLAN_TSV" || true) write/remove, $(grep -c 'skip$' "$PLAN_TSV" || true) skip"
++echo
++
++if [ "$ANY_WRITE" = 0 ]; then
++  if [ "$IDEMPOTENT" = 1 ]; then
++    log "targets already match the requested source state; --idempotent given, verifying only"
++    APPLY=0
++  else
++    die "targets already match the requested source state; pass --idempotent to verify only"
++  fi
++fi
++
++if [ "$APPLY" -ne 1 ]; then
++  echo "DRY-RUN OK: backup/source verified and action plan built; no files were written."
++  echo "Re-run with --apply to restore the staged bytes."
++  exit 0
++fi
++
++# ---------------------------------------------------------------------------
++# 5. Pre-stage every write, saving current bytes for commit rollback.
++# ---------------------------------------------------------------------------
++while IFS=$'\t' read -r tid tp f act size sha; do
++  [ -n "$f" ] || continue
++  [ "$act" = skip ] && continue
++  mkdir -p "$tp" || die "cannot create target dir: $tp"
++  if [ "$act" = remove ]; then
++    # save the current file for rollback, but stage no replacement
++    presave="$WORK/pre.$tid.$f"
++    copy_preserving "$tp/$f" "$presave" || die "cannot save current bytes: $tp/$f"
++    PRE_FILES="$PRE_FILES $presave"
++    continue
++  fi
++  if [ "$SOURCE" = backup ]; then
++    src_file="$(backup_target_dir "$BACKUP_DIR" "$tid")/$f"
++    if [ "$LAYOUT" = legacy ]; then src_file="$BACKUP_DIR/$f"; fi
++  else
++    src_file="$NEW_EXTRACTED/$f"
++  fi
++  [ -f "$src_file" ] || die "source file missing: $src_file"
++  if [ -e "$tp/$f" ]; then
++    presave="$WORK/pre.$tid.$f"
++    copy_preserving "$tp/$f" "$presave" || die "cannot save current bytes: $tp/$f"
++    PRE_FILES="$PRE_FILES $presave"
++  fi
++  tmp="$tp/.plan-b-restore-tmp.$$.$f"
++  copy_preserving "$src_file" "$tmp" || die "pre-stage copy failed: $src_file -> $tmp"
++  TMP_FILES="$TMP_FILES $tmp"
++  got=$(sha256_file "$tmp")
++  if [ "$got" != "$sha" ] || [ "$(file_size "$tmp")" != "$size" ]; then
++    die "pre-staged $f hash/size mismatch (got $got); no destination was touched"
++  fi
++done < "$PLAN_TSV"
++log "pre-staged and hash-verified every replacement; destination bytes saved for rollback"
++
++restore_commit_rollback() {
++  local tid tp f act size sha presave ok=1
++  warn "commit failure: restoring the pre-restore bytes saved in $WORK"
++  while IFS=$'\t' read -r tid tp f act size sha; do
++    [ -n "$f" ] || continue
++    [ "$act" = skip ] && continue
++    presave="$WORK/pre.$tid.$f"
++    if [ -f "$presave" ]; then
++      cp -p "$presave" "$tp/.plan-b-restore-rb.$f" 2>/dev/null || { ok=0; continue; }
++      mv -f "$tp/.plan-b-restore-rb.$f" "$tp/$f" || ok=0
++    else
++      rm -f "$tp/$f"
++    fi
++  done < "$PLAN_TSV"
++  [ "$ok" = 1 ] || warn "rollback incomplete; re-run this script with --apply to converge"
++}
++
++# 6. Commit the renames/removals; roll back on failure.
++COMMIT_STARTED=1
++while IFS=$'\t' read -r tid tp f act size sha; do
++  [ -n "$f" ] || continue
++  [ "$act" = skip ] && continue
++  if [ "$act" = remove ]; then
++    if ! rm -f "$tp/$f"; then
++      restore_commit_rollback
++      die "failed to remove $tp/$f"
++    fi
++    log "  removed $f (was absent before Plan B)"
++    continue
++  fi
++  tmp="$tp/.plan-b-restore-tmp.$$.$f"
++  if ! mv -f "$tmp" "$tp/$f"; then
++    restore_commit_rollback
++    die "rename failed: $tmp -> $tp/$f"
++  fi
++  remove_tmp_path "$tmp"
++  got=$(sha256_file "$tp/$f")
++  if [ "$got" != "$sha" ]; then
++    restore_commit_rollback
++    die "restored $f hash mismatch after rename"
++  fi
++  log "  restored $f"
++done < "$PLAN_TSV"
++COMMIT_STARTED=0
++
++# ---------------------------------------------------------------------------
++# 7. Verify the final state byte-for-byte against the requested source.
++# ---------------------------------------------------------------------------
++FAILED=0
++i=0
++while [ "$i" -lt "${#TARGET_PATHS[@]}" ]; do
++  tid=${TARGET_IDS[$i]}
++  tp=${TARGET_PATHS[$i]}
++  if [ "$SOURCE" = backup ]; then
++    tdir=$(backup_target_dir "$BACKUP_DIR" "$tid")
++    manifest="$tdir/$BACKUP_TARGET_MANIFEST"
++    if [ "$LAYOUT" = legacy ]; then
++      tdir="$BACKUP_DIR"
++      manifest="$BACKUP_DIR/backup-manifest.tsv"
++    fi
++    while IFS=$'\t' read -r f pre size sha extra; do
++      [ -n "$f" ] || continue
++      case "$f" in \#*) continue ;; esac
++      if [ "$LAYOUT" != v2 ]; then sha=$size; size=$pre; pre=new; fi
++      case "$pre" in
++        new)
++          if [ ! -f "$tp/$f" ] || [ "$(sha256_file "$tp/$f")" != "$sha" ]; then
++            warn "post-restore mismatch: $tp/$f"; FAILED=$((FAILED + 1))
++          fi ;;
++        missing)
++          if [ -e "$tp/$f" ]; then warn "post-restore file should be absent: $tp/$f"; FAILED=$((FAILED + 1)); fi ;;
++      esac
++    done < "$manifest"
++  else
++    if [ "$(staged_class "$tp")" != new ]; then
++      warn "post-restore target is not a consistent NEW set: $tp"
++      staged_report "$tp" | sed 's/^/      /'
++      FAILED=$((FAILED + 1))
++    fi
++  fi
++  i=$((i + 1))
++done
++
++if [ "$FAILED" -ne 0 ]; then
++  die "reverse Plan B verification failed ($FAILED target/file mismatches)"
++fi
++
++echo
++echo "OK: staged bytes restored from source '$SOURCE' for ${#TARGET_PATHS[@]} target(s)."
++echo "Backup retained at $BACKUP_DIR (can be removed once Plan A pins are applied and the"
++echo "old archive is preserved; keep it until the owner-gated window closes)."
++if [ "$SOURCE" = backup ]; then
++  echo "State: pre-Plan-B hazard (pins OLD + staged NEW) unless Plan A pins are applied."
++else
++  echo "State: staged NEW (hazard with OLD pins; run apply-plan-a.sh under an approved window)."
++fi
+diff --git a/tools/plan-remediation/tests/test-lib.sh b/tools/plan-remediation/tests/test-lib.sh
+new file mode 100755
+index 0000000..f8dc619
+--- /dev/null
++++ b/tools/plan-remediation/tests/test-lib.sh
+@@ -0,0 +1,125 @@
++#!/usr/bin/env bash
++# Shared harness for the Round 7 Plan A/B remediation regression suites.
++set -uo pipefail
++TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
++KIT=$(cd "$TEST_DIR/.." && pwd -P)
++. "$KIT/parakeet-pins.env"
++. "$KIT/plans-lib.sh"
++TEST_PASS=0
++TEST_FAIL=0
++t_pass() { TEST_PASS=$((TEST_PASS + 1)); echo "T-PASS  $*"; }
++t_fail() { TEST_FAIL=$((TEST_FAIL + 1)); echo "T-FAIL  $*"; }
++t_info() { echo "T-INFO  $*"; }
++TEST_SUITE=${TEST_SUITE:-misc}
++ROOT=${PLANS_TEST_ROOT:-$T5/cache/round7/plans/test-run}
++SCRATCH="$ROOT/$TEST_SUITE"
++LOGS="$SCRATCH/logs"
++suite_setup() {
++  rm -rf "$SCRATCH"
++  mkdir -p "$SCRATCH" "$LOGS"
++}
++
++require_fixtures() {
++  local ok=1
++  [ -f "$OLD_ARCHIVE" ] || { t_fail "fixture missing: $OLD_ARCHIVE"; ok=0; }
++  [ -f "$NEW_ARCHIVE" ] || { t_fail "fixture missing: $NEW_ARCHIVE"; ok=0; }
++  [ -d "$OLD_EXTRACTED" ] || { t_fail "fixture missing: $OLD_EXTRACTED"; ok=0; }
++  [ -d "$NEW_EXTRACTED" ] || { t_fail "fixture missing: $NEW_EXTRACTED"; ok=0; }
++  [ "$ok" = 1 ] || { echo "SUITE RESULT: pass=$TEST_PASS fail=$TEST_FAIL"; exit 1; }
++}
++run_expect_ok() {
++  local desc=$1 lf=$2; shift 2
++  if "$@" >"$lf" 2>&1; then t_pass "$desc"; else
++    t_fail "$desc (exit $?; see $lf)"
++    tail -5 "$lf" | sed 's/^/    /'
++  fi
++}
++run_expect_fail() {
++  local desc=$1 lf=$2; shift 2
++  if "$@" >"$lf" 2>&1; then
++    t_fail "$desc (unexpectedly succeeded; see $lf)"
++  else
++    t_pass "$desc"
++  fi
++}
++assert_eq() { if [ "$2" = "$3" ]; then t_pass "$1"; else t_fail "$1 (expected '$2', got '$3')"; fi }
++assert_file() { if [ -f "$2" ]; then t_pass "$1"; else t_fail "$1 (missing $2)"; fi }
++assert_absent() { if [ ! -e "$2" ]; then t_pass "$1"; else t_fail "$1 (unexpectedly present: $2)"; fi }
++assert_grep() { if grep -q -E "$2" "$3" 2>/dev/null; then t_pass "$1"; else t_fail "$1 (pattern '$2' not in $3)"; fi }
++log_counts() { awk '/checks passed:/ {print $3, $5; found=1} END {if (!found) print "0 0"}' "$1"; }
++assert_counts() {
++  local got p f
++  got=$(log_counts "$2"); p=${got% *}; f=${got#* }
++  if [ "$p" = "$3" ] && [ "$f" = "$4" ]; then t_pass "$1 ($p passed / $f failed)"; else t_fail "$1 (expected $3/$4, log says $p/$f)"; fi
++}
++hash_set() {
++  local dir=$1 out=$2 f
++  : > "$out"
++  ( cd "$dir" 2>/dev/null || { for f in $MODEL_FILES; do echo "MISSING  $f"; done > "$out"; exit 0; }
++    for f in $MODEL_FILES; do
++      if [ -f "$f" ]; then shasum -a 256 "$f"; else echo "MISSING  $f"; fi
++    done > "$out" )
++}
++hash_pin_files() {
++  local repo=$1 out=$2 f
++  : > "$out"
++  ( cd "$repo" || exit 1; for f in $PIN_FILES; do shasum -a 256 "$f" >> "$out"; done )
++}
++assert_same_bytes() {
++  if cmp -s "$2" "$3"; then t_pass "$1"; else t_fail "$1 (byte sets differ)"; diff "$2" "$3" | sed -n '1,10p' | sed 's/^/    /'; fi
++}
++assert_pins_old() {
++  local st; st=$(pins_state "$2")
++  if [ "$st" = old ]; then t_pass "$1 (pins OLD)"; else t_fail "$1 (pins '$st')"; fi
++}
++
++make_pin_repo() {
++  local dst=$1 f src
++  src=${PIN_SOURCE_REPO:-$REPO_ROOT}
++  mkdir -p "$dst"
++  for f in $PIN_FILES; do
++    mkdir -p "$dst/$(dirname "$f")"
++    cp -p "$src/$f" "$dst/$f"
++  done
++  git -C "$dst" init -q
++  git -C "$dst" add -A
++  git -C "$dst" -c user.email=plan@test -c user.name=plan commit -q -m "scratch old-pin baseline"
++}
++clone_model_dir() {
++  local src=$1 dst=$2 f
++  mkdir -p "$dst"
++  for f in $MODEL_FILES; do
++    copy_preserving "$src/$f" "$dst/$f" || { t_fail "clone failed: $src/$f"; return 1; }
++  done
++}
++new_staging() { clone_model_dir "$NEW_EXTRACTED" "$1"; }
++old_staging() { clone_model_dir "$OLD_EXTRACTED" "$1"; }
++make_fake_kit() {
++  local dst=$1
++  rm -rf "$dst"
++  cp -R "$KIT" "$dst"
++  chmod +x "$dst"/*.sh
++}
++make_mv_shim() {
++  local dir=$1
++  mkdir -p "$dir"
++  cat > "$dir/mv" <<'SHIM'
++#!/bin/sh
++countfile=${MV_SHIM_COUNTER:-/tmp/mv-shim-count}
++c=0
++[ -f "$countfile" ] && c=$(cat "$countfile")
++c=$((c + 1))
++echo "$c" > "$countfile"
++if [ "$c" -eq "${MV_SHIM_FAIL_AT:-2}" ]; then
++  echo "mv: injected failure (test shim, invocation $c)" >&2
++  exit 1
++fi
++exec /bin/mv "$@"
++SHIM
++  chmod +x "$dir/mv"
++}
++suite_finish() {
++  echo
++  echo "SUITE RESULT ($TEST_SUITE): pass=$TEST_PASS fail=$TEST_FAIL"
++  [ "$TEST_FAIL" = 0 ]
++}
+diff --git a/tools/plan-remediation/tests/test-plan-a-suite.sh b/tools/plan-remediation/tests/test-plan-a-suite.sh
+new file mode 100755
+index 0000000..91a0a2f
+--- /dev/null
++++ b/tools/plan-remediation/tests/test-plan-a-suite.sh
+@@ -0,0 +1,199 @@
++#!/usr/bin/env bash
++# Plan A remediation regression suite (Round 7, agent B).
++#
++# Covers defect fixes A1 (linked worktree + repo root), A2 (transactional
++# rollback + archive pre-gate), A3 (--allow-missing-staging), A4 (stale evidence
++# manifest tooling), plus the canonical 55-check Plan A verifier suite and
++# byte-identical apply/revert evidence. All writes happen under the disposable
++# T5 cache scratch; the real repo/staging/quarantine files are only read.
++TEST_SUITE=plan-a
++export TEST_SUITE
++. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/test-lib.sh"
++
++suite_setup
++require_fixtures
++
++KIT="$KIT"
++LOG="$LOGS"
++PASS=0
++FAIL=0
++
++t_info "kit: $KIT"
++t_info "scratch: $SCRATCH"
++
++# ---- fixture read-only snapshot (proves no production bytes were changed) ---
++hash_set "$NEW_EXTRACTED" "$SCRATCH/fixtures-new-pre.sha"
++hash_set "$OLD_EXTRACTED" "$SCRATCH/fixtures-old-pre.sha"
++shasum -a 256 "$OLD_ARCHIVE" "$NEW_ARCHIVE" > "$SCRATCH/archives-pre.sha"
++
++# ---- 1. static / syntax -----------------------------------------------------
++SYNTAX_FAIL=0
++for s in "$KIT"/*.sh "$KIT"/parakeet-pins.env "$KIT"/tests/*.sh; do
++  bash -n "$s" || SYNTAX_FAIL=$((SYNTAX_FAIL + 1))
++done
++assert_eq "all plan/remediation scripts + pins env parse (bash -n)" 0 "$SYNTAX_FAIL"
++
++if grep -v '^[[:space:]]*#' "$KIT/apply-plan-a.sh" | grep -q '\[ -d "\$REPO/\.git" \]'; then
++  t_fail "A1: apply-plan-a.sh still uses the [ -d \$REPO/.git ] worktree-unsafe check"
++else
++  t_pass "A1: apply-plan-a.sh no longer assumes .git is a directory"
++fi
++if grep -q 'rev-parse --show-toplevel' "$KIT/plans-lib.sh"; then
++  t_pass "A1: repo root is resolved with git rev-parse --show-toplevel"
++else
++  t_fail "A1: git rev-parse root resolution missing from plans-lib.sh"
++fi
++if grep -q 'pre-gate' "$KIT/apply-plan-a.sh"; then
++  t_pass "A2: apply-plan-a.sh has an archive pre-gate before writing"
++else
++  t_fail "A2: archive pre-gate missing"
++fi
++
++# ---- 2. scratch repositories (main + linked worktree) -----------------------
++make_pin_repo "$SCRATCH/repo-main"
++git -C "$SCRATCH/repo-main" worktree add -q --detach "$SCRATCH/wt-linked" 2>>"$LOG/setup.log" \
++  || t_fail "could not create linked worktree fixture"
++if [ -f "$SCRATCH/wt-linked/.git" ]; then
++  t_pass "A1 fixture: linked worktree has a .git file (not a directory)"
++else
++  t_fail "A1 fixture: linked worktree .git file missing"
++fi
++hash_pin_files "$SCRATCH/repo-main" "$SCRATCH/baseline.sha"
++assert_pins_old "baseline scratch repo pins are OLD" "$SCRATCH/repo-main"
++
++# ---- 3. main-worktree apply / verify / revert -------------------------------
++run_expect_ok "main-worktree: Plan A apply + auto-verify" "$LOG/apply-main.log" \
++  "$KIT/apply-plan-a.sh" --repo "$SCRATCH/repo-main" --staging "$NEW_EXTRACTED" --allow-head --apply
++assert_grep "main-worktree: root resolution logged" "repository root" "$LOG/apply-main.log"
++assert_grep "main-worktree: apply log shows 55/0 verification" "checks passed: 55" "$LOG/apply-main.log"
++
++run_expect_ok "main-worktree: explicit verify-plan-a run" "$LOG/verify-main.log" \
++  "$KIT/verify-plan-a.sh" --repo "$SCRATCH/repo-main" --staging "$NEW_EXTRACTED"
++assert_counts "canonical Plan A suite (staging NEW) = 55 checks" "$LOG/verify-main.log" 55 0
++
++cat > "$SCRATCH/expected-post.sha" <<'EXPECTED'
++0cc63e1ef6c341404d8cfb890b4f970c46d0ce8edbeea3d2b9f77a451b3b758a  android/kokoro-poc/scripts/fetch-parakeet-assets.sh
++25c1a5fe721f15ba5609d9281b69305998a585276d66d8b0dfdc544386c9f0b2  artifacts/weather-app/android/parakeet-assets/build.gradle
++9c7dd88bfcf4dbb2978140bdddab48b4d85020dbb637ae172eb80e1b01188acb  artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
++6ddd6c373c7808458c94866e410563e67048995f1dcef34f7d04e02838e79019  artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
++1651f7110eee83c331de659c37b56082ff6ab99c5fd6661f6cb2f2387b907c2b  THIRD-PARTY-NOTICES.md
++a89ed582d279ec65e5b2ba7fe3e242ac38987e383f802557b4a2aef4d9bd31a5  docs/release/reproducible-build-guide.md
++EXPECTED
++hash_pin_files "$SCRATCH/repo-main" "$SCRATCH/post.sha"
++assert_same_bytes "post-Plan-A pin-file hashes match the reviewed expected set" "$SCRATCH/expected-post.sha" "$SCRATCH/post.sha"
++
++run_expect_ok "check-state classifies patched main worktree as plan-a" "$LOG/check-a-new.log" \
++  "$KIT/check-state.sh" --repo "$SCRATCH/repo-main" --staging "$NEW_EXTRACTED" --expect new
++
++run_expect_fail "repeated apply is refused (pins already NEW)" "$LOG/apply-twice.log" \
++  "$KIT/apply-plan-a.sh" --repo "$SCRATCH/repo-main" --staging "$NEW_EXTRACTED" --allow-head --apply
++
++run_expect_ok "plan-a-revert.patch applies to the patched tree" "$LOG/revert-patch.log" \
++  git -C "$SCRATCH/repo-main" apply "$KIT/plan-a-revert.patch"
++assert_eq "revert patch leaves a clean working tree" "" "$(git -C "$SCRATCH/repo-main" status --porcelain)"
++hash_pin_files "$SCRATCH/repo-main" "$SCRATCH/reverted.sha"
++assert_same_bytes "revert patch restores the six pin files byte-identically" "$SCRATCH/baseline.sha" "$SCRATCH/reverted.sha"
++
++run_expect_ok "repeat: apply again (repeated execution)" "$LOG/apply-again.log" \
++  "$KIT/apply-plan-a.sh" --repo "$SCRATCH/repo-main" --staging "$NEW_EXTRACTED" --allow-head --apply
++run_expect_ok "repeat: reverse with git apply -R" "$LOG/apply-reverse.log" \
++  git -C "$SCRATCH/repo-main" apply -R "$KIT/plan-a-adoption.patch"
++hash_pin_files "$SCRATCH/repo-main" "$SCRATCH/reverted2.sha"
++assert_same_bytes "git apply -R restores the six pin files byte-identically" "$SCRATCH/baseline.sha" "$SCRATCH/reverted2.sha"
++
++
++# ---- 4. linked-worktree apply / verify / revert -----------------------------
++run_expect_ok "linked-worktree: Plan A apply + auto-verify (A1 fix)" "$LOG/apply-linked.log" \
++  "$KIT/apply-plan-a.sh" --repo "$SCRATCH/wt-linked" --staging "$NEW_EXTRACTED" --allow-head --apply
++assert_grep "linked-worktree: git root resolution logged" "repository root" "$LOG/apply-linked.log"
++run_expect_ok "linked-worktree: verify-plan-a" "$LOG/verify-linked.log" \
++  "$KIT/verify-plan-a.sh" --repo "$SCRATCH/wt-linked" --staging "$NEW_EXTRACTED"
++assert_counts "linked-worktree Plan A verifier = 55 checks" "$LOG/verify-linked.log" 55 0
++run_expect_ok "linked-worktree: revert patch" "$LOG/revert-linked.log" \
++  git -C "$SCRATCH/wt-linked" apply "$KIT/plan-a-revert.patch"
++hash_pin_files "$SCRATCH/wt-linked" "$SCRATCH/linked-reverted.sha"
++assert_same_bytes "linked-worktree revert is byte-identical" "$SCRATCH/baseline.sha" "$SCRATCH/linked-reverted.sha"
++
++run_expect_fail "linked-worktree: refuses OLD staging (Plan A needs NEW bytes)" "$LOG/apply-linked-old.log" \
++  "$KIT/apply-plan-a.sh" --repo "$SCRATCH/wt-linked" --staging "$OLD_EXTRACTED" --allow-head
++
++# ---- 5. dry-run is side-effect free ----------------------------------------
++hash_pin_files "$SCRATCH/wt-linked" "$SCRATCH/dry-before.sha"
++run_expect_ok "dry-run on linked worktree" "$LOG/dry-linked.log" \
++  "$KIT/apply-plan-a.sh" --repo "$SCRATCH/wt-linked" --staging "$NEW_EXTRACTED" --allow-head
++hash_pin_files "$SCRATCH/wt-linked" "$SCRATCH/dry-after.sha"
++assert_same_bytes "dry-run leaves pin files byte-identical" "$SCRATCH/dry-before.sha" "$SCRATCH/dry-after.sha"
++
++# ---- 6. A3: --allow-missing-staging fresh-checkout workflow ----------------
++run_expect_ok "A3: apply with --allow-missing-staging succeeds" "$LOG/apply-missing.log" \
++  "$KIT/apply-plan-a.sh" --repo "$SCRATCH/wt-linked" --staging "$SCRATCH/absent-staging" --allow-head --allow-missing-staging --apply
++assert_grep "A3: verifier reports the 42-check missing-staging mode" "checks passed: 42" "$LOG/apply-missing.log"
++run_expect_fail "A3: missing staging is still refused without the flag" "$LOG/apply-missing-refused.log" \
++  "$KIT/apply-plan-a.sh" --repo "$SCRATCH/wt-linked" --staging "$SCRATCH/absent-staging" --allow-head --apply
++run_expect_ok "A3: revert after missing-staging apply" "$LOG/revert-missing.log" \
++  git -C "$SCRATCH/wt-linked" apply -R "$KIT/plan-a-adoption.patch"
++hash_pin_files "$SCRATCH/wt-linked" "$SCRATCH/missing-reverted.sha"
++assert_same_bytes "A3: revert after missing-staging apply is byte-identical" "$SCRATCH/baseline.sha" "$SCRATCH/missing-reverted.sha"
++
++# ---- 7. A2: transactional rollback when post-verify fails ------------------
++make_fake_kit "$SCRATCH/fake-kit-verify"
++cat > "$SCRATCH/fake-kit-verify/verify-plan-a.sh" <<'FAKE'
++#!/usr/bin/env bash
++echo "FAIL  forced verifier failure (fault injection)" >&2
++exit 1
++FAKE
++chmod +x "$SCRATCH/fake-kit-verify/verify-plan-a.sh"
++run_expect_fail "A2: failed post-verify is detected" "$LOG/rollback.log" \
++  "$SCRATCH/fake-kit-verify/apply-plan-a.sh" --repo "$SCRATCH/wt-linked" --staging "$NEW_EXTRACTED" --allow-head --apply
++assert_grep "A2: rollback message present" "reversing the Plan A patch" "$LOG/rollback.log"
++assert_eq "A2: failed post-verify leaves no tracked changes" "" "$(git -C "$SCRATCH/wt-linked" status --porcelain)"
++hash_pin_files "$SCRATCH/wt-linked" "$SCRATCH/rollback.sha"
++assert_same_bytes "A2: failed post-verify restores byte-identical pin files" "$SCRATCH/baseline.sha" "$SCRATCH/rollback.sha"
++assert_eq "A2: no temp pre-hash files leaked into scratch repo" "" "$(git -C "$SCRATCH/wt-linked" status --porcelain)"
++
++# ---- 8. A2: archive failure pre-gate (no write before gate) ----------------
++make_fake_kit "$SCRATCH/fake-kit-gate"
++sed -i '' "s|^OLD_ARCHIVE=.*|OLD_ARCHIVE=\"$SCRATCH/absent-old.tar.bz2\"|" "$SCRATCH/fake-kit-gate/parakeet-pins.env"
++run_expect_fail "A2: bad old archive aborts the apply" "$LOG/gate.log" \
++  "$SCRATCH/fake-kit-gate/apply-plan-a.sh" --repo "$SCRATCH/wt-linked" --staging "$NEW_EXTRACTED" --allow-head --apply
++assert_grep "A2: archive pre-gate error names the pre-gate" "pre-gate" "$LOG/gate.log"
++assert_eq "A2: archive pre-gate aborts before touching the tree" "" "$(git -C "$SCRATCH/wt-linked" status --porcelain)"
++hash_pin_files "$SCRATCH/wt-linked" "$SCRATCH/gate.sha"
++assert_same_bytes "A2: archive pre-gate leaves byte-identical pin files" "$SCRATCH/baseline.sha" "$SCRATCH/gate.sha"
++
++# ---- 9. A4: stale evidence manifest tooling --------------------------------
++MB="$SCRATCH/manifest-bundle"
++mkdir -p "$MB"
++printf 'alpha\n' > "$MB/a.txt"
++printf 'beta\n' > "$MB/b.txt"
++run_expect_ok "A4: refresh-evidence-manifest --write" "$LOG/manifest-write.log" \
++  "$KIT/refresh-evidence-manifest.sh" "$MB"
++run_expect_ok "A4: fresh manifest verifies with --check" "$LOG/manifest-check.log" \
++  "$KIT/refresh-evidence-manifest.sh" --check "$MB"
++printf 'alpha-changed\n' > "$MB/a.txt"
++run_expect_fail "A4: stale manifest detected after a byte changes" "$LOG/manifest-stale.log" \
++  "$KIT/refresh-evidence-manifest.sh" --check "$MB"
++run_expect_ok "A4: manifest regenerated after change" "$LOG/manifest-rewrite.log" \
++  "$KIT/refresh-evidence-manifest.sh" "$MB"
++printf 'gamma\n' > "$MB/c.txt"
++run_expect_fail "A4: manifest missing an added file is detected" "$LOG/manifest-added.log" \
++  "$KIT/refresh-evidence-manifest.sh" --check "$MB"
++run_expect_ok "A4: manifest regenerated after file addition" "$LOG/manifest-rewrite2.log" \
++  "$KIT/refresh-evidence-manifest.sh" "$MB"
++printf '0000000000000000000000000000000000000000000000000000000000000000  ./SHA256SUMS\n' >> "$MB/SHA256SUMS"
++run_expect_fail "A4: self-listing manifest is detected as stale" "$LOG/manifest-self.log" \
++  "$KIT/refresh-evidence-manifest.sh" --check "$MB"
++run_expect_ok "A4: manifest regenerated cleanly after self-entry" "$LOG/manifest-rewrite3.log" \
++  "$KIT/refresh-evidence-manifest.sh" "$MB"
++run_expect_ok "A4: final manifest is current" "$LOG/manifest-final.log" \
++  "$KIT/refresh-evidence-manifest.sh" --check "$MB"
++
++# ---- 10. fixture integrity --------------------------------------------------
++hash_set "$NEW_EXTRACTED" "$SCRATCH/fixtures-new-post.sha"
++hash_set "$OLD_EXTRACTED" "$SCRATCH/fixtures-old-post.sha"
++assert_same_bytes "production NEW extracted bytes unchanged by suite" "$SCRATCH/fixtures-new-pre.sha" "$SCRATCH/fixtures-new-post.sha"
++assert_same_bytes "production OLD extracted bytes unchanged by suite" "$SCRATCH/fixtures-old-pre.sha" "$SCRATCH/fixtures-old-post.sha"
++shasum -a 256 "$OLD_ARCHIVE" "$NEW_ARCHIVE" > "$SCRATCH/archives-post.sha"
++assert_same_bytes "preserved OLD/NEW archives unchanged by suite" "$SCRATCH/archives-pre.sha" "$SCRATCH/archives-post.sha"
++
++suite_finish
+diff --git a/tools/plan-remediation/tests/test-plan-b-suite.sh b/tools/plan-remediation/tests/test-plan-b-suite.sh
+new file mode 100755
+index 0000000..86d145a
+--- /dev/null
++++ b/tools/plan-remediation/tests/test-plan-b-suite.sh
+@@ -0,0 +1,261 @@
++#!/usr/bin/env bash
++# Plan B remediation regression suite (Round 7, agent B).
++#
++# Covers defect fixes B1 (--include-negative reversibility: targets.tsv,
++# restore --include-negative, hash verification), B2 (per-file pre-stage +
++# all-or-nothing commit + transactional rollback, partial-failure repair),
++# B3 (alternate recovery sources backup/extracted-new/archive), stale manifest
++# detection (A4/B3), repeated execution, and the canonical 30-check Plan B
++# verifier suite with byte-identical before/after hashes.
++#
++# All staging targets are APFS clones under the disposable T5 cache scratch; the
++# real repository/staged assets/quarantine/archives are only ever read.
++TEST_SUITE=plan-b
++export TEST_SUITE
++. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/test-lib.sh"
++
++suite_setup
++require_fixtures
++
++KIT="$KIT"
++LOG="$LOGS"
++
++t_info "kit: $KIT"
++t_info "scratch: $SCRATCH"
++
++# ---- fixture / production read-only snapshots ------------------------------
++hash_set "$NEW_EXTRACTED" "$SCRATCH/fixtures-new-pre.sha"
++hash_set "$OLD_EXTRACTED" "$SCRATCH/fixtures-old-pre.sha"
++shasum -a 256 "$OLD_ARCHIVE" "$NEW_ARCHIVE" > "$SCRATCH/archives-pre.sha"
++if [ -d "$STAGING_DIR" ]; then hash_set "$STAGING_DIR" "$SCRATCH/real-staging-pre.sha"; fi
++if [ -d "$NEGATIVE_STAGING_DIR" ]; then hash_set "$NEGATIVE_STAGING_DIR" "$SCRATCH/real-negative-pre.sha"; fi
++
++SYNTAX_FAIL=0
++for s in "$KIT"/*.sh "$KIT"/parakeet-pins.env "$KIT"/tests/*.sh; do bash -n "$s" || SYNTAX_FAIL=$((SYNTAX_FAIL + 1)); done
++assert_eq "all plan/remediation scripts + pins env parse (bash -n)" 0 "$SYNTAX_FAIL"
++
++if grep -q 'targets.tsv' "$KIT/apply-plan-b.sh" && grep -q 'targets.tsv' "$KIT/restore-staged-backup.sh"; then
++  t_pass "B1: targets.tsv target recording present in apply and restore"
++else
++  t_fail "B1: targets.tsv target recording missing"
++fi
++if grep -q -- '--include-negative' "$KIT/restore-staged-backup.sh"; then
++  t_pass "B1: restore-staged-backup.sh supports --include-negative"
++else
++  t_fail "B1: restore --include-negative missing"
++fi
++
++# ---- scratch repo + staging clones ----------------------------------------
++make_pin_repo "$SCRATCH/repo"
++git -C "$SCRATCH/repo" worktree add -q --detach "$SCRATCH/wt" 2>>"$LOG/setup.log" || t_fail "linked worktree fixture failed"
++STAGE="$SCRATCH/stage"
++NEG="$SCRATCH/stage-neg"
++B1="$SCRATCH/backup-main"
++new_staging "$STAGE"
++new_staging "$NEG"
++old_staging "$SCRATCH/old-ref"
++hash_set "$STAGE" "$SCRATCH/stage-before.sha"
++hash_set "$SCRATCH/old-ref" "$SCRATCH/old-ref.sha"
++
++# ---- 1. dry-run is side-effect free ---------------------------------------
++run_expect_ok "Plan B dry-run on NEW staging" "$LOG/dry.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B1"
++assert_grep "dry-run reports DRY-RUN OK" "DRY-RUN OK" "$LOG/dry.log"
++hash_set "$STAGE" "$SCRATCH/stage-after-dry.sha"
++assert_same_bytes "dry-run leaves staged bytes byte-identical" "$SCRATCH/stage-before.sha" "$SCRATCH/stage-after-dry.sha"
++
++# ---- 2. canonical apply + 30-check verifier ------------------------------
++run_expect_ok "Plan B apply: backup NEW then restore OLD" "$LOG/apply.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B1" --apply
++assert_grep "apply auto-verify reports 30/0" "checks passed: 30" "$LOG/apply.log"
++hash_set "$STAGE" "$SCRATCH/stage-old.sha"
++assert_same_bytes "applied staging bytes equal the canonical OLD set" "$SCRATCH/old-ref.sha" "$SCRATCH/stage-old.sha"
++
++run_expect_ok "explicit verify-plan-b run" "$LOG/verify.log" \
++  "$KIT/verify-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B1"
++assert_counts "canonical Plan B suite (main staging + backup + archives) = 30 checks" "$LOG/verify.log" 30 0
++
++run_expect_ok "check-state classifies scratch Plan B as plan-b" "$LOG/check-old.log" \
++  "$KIT/check-state.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --expect old
++
++TARGET_ROWS=$(grep -c -v '^#' "$B1/targets.tsv" || true)
++assert_eq "B1: targets.tsv records exactly one target for a main-only run" 1 "$TARGET_ROWS"
++assert_grep "B1: targets.tsv records the staging path" "$SCRATCH/stage" "$B1/targets.tsv"
++BACKUP_FILES=$(ls "$B1/targets/t1" | grep -c -E '^(encoder|decoder|joiner)\.int8\.onnx$' || true)
++assert_eq "B1: backup preserves the 3 replaced NEW files (tokens shared -> not copied)" 3 "$BACKUP_FILES"
++assert_eq "B1: backup encoder bytes = canonical NEW" "$NEW_ENCODER_SHA256" "$(sha256_file "$B1/targets/t1/encoder.int8.onnx")"
++assert_eq "B1: backup decoder bytes = canonical NEW" "$NEW_DECODER_SHA256" "$(sha256_file "$B1/targets/t1/decoder.int8.onnx")"
++assert_eq "B1: backup joiner bytes = canonical NEW" "$NEW_JOINER_SHA256" "$(sha256_file "$B1/targets/t1/joiner.int8.onnx")"
++
++# ---- 3. reverse restore is byte-identical --------------------------------
++hash_set "$STAGE" "$SCRATCH/pre-restore.sha"
++run_expect_ok "restore dry-run on OLD staging" "$LOG/restore-dry.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B1"
++assert_grep "restore dry-run reports DRY-RUN OK" "DRY-RUN OK" "$LOG/restore-dry.log"
++hash_set "$STAGE" "$SCRATCH/post-restore-dry.sha"
++assert_same_bytes "restore dry-run leaves bytes unchanged" "$SCRATCH/pre-restore.sha" "$SCRATCH/post-restore-dry.sha"
++
++run_expect_ok "restore --apply returns the NEW bytes" "$LOG/restore.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B1" --apply
++hash_set "$STAGE" "$SCRATCH/restored.sha"
++assert_same_bytes "byte-identical before/after apply+restore cycle" "$SCRATCH/stage-before.sha" "$SCRATCH/restored.sha"
++run_expect_ok "check-state after restore classifies the known hazard" "$LOG/check-hazard.log" \
++  "$KIT/check-state.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --expect mixed
++
++
++# ---- 4. stale/tampered backup artifacts are refused (A4/B3) ---------------
++# Put staging OLD so verification reaches the backup checks.
++rm -rf "$STAGE"; old_staging "$STAGE"
++
++cp -cR "$B1" "$SCRATCH/backup-tamper-manifest" 2>/dev/null || cp -R "$B1" "$SCRATCH/backup-tamper-manifest"
++TM="$SCRATCH/backup-tamper-manifest/targets/t1/backup-manifest.tsv"
++awk 'BEGIN{OFS="\t"} $1=="encoder.int8.onnx"{$4="deadbeefdeadbeef"} {print}' "$TM" > "$TM.tmp" && mv -f "$TM.tmp" "$TM"
++run_expect_fail "stale/tampered backup manifest fails verify-plan-b" "$LOG/verify-stale-manifest.log" \
++  "$KIT/verify-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-tamper-manifest" --no-archives
++assert_grep "stale manifest reason reported" "stale|mismatch" "$LOG/verify-stale-manifest.log"
++run_expect_fail "stale/tampered backup manifest refused by restore" "$LOG/restore-stale-manifest.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-tamper-manifest"
++assert_grep "restore refuses stale backup" "stale|tampered|refusing" "$LOG/restore-stale-manifest.log"
++
++cp -cR "$B1" "$SCRATCH/backup-tamper-bytes" 2>/dev/null || cp -R "$B1" "$SCRATCH/backup-tamper-bytes"
++cp -c -p "$OLD_EXTRACTED/encoder.int8.onnx" "$SCRATCH/backup-tamper-bytes/targets/t1/encoder.int8.onnx"
++run_expect_fail "tampered backup bytes fail verify-plan-b" "$LOG/verify-stale-bytes.log" \
++  "$KIT/verify-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-tamper-bytes" --no-archives
++assert_grep "tampered byte reason reported" "sha256 mismatch|stale|tampered" "$LOG/verify-stale-bytes.log"
++run_expect_fail "tampered backup bytes refused by restore" "$LOG/restore-stale-bytes.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-tamper-bytes"
++
++cp -cR "$B1" "$SCRATCH/backup-tamper-targets" 2>/dev/null || cp -R "$B1" "$SCRATCH/backup-tamper-targets"
++printf 't9\t%s\tnew\n' "$SCRATCH/other-target" >> "$SCRATCH/backup-tamper-targets/targets.tsv"
++run_expect_fail "stale targets.tsv fails verify-plan-b" "$LOG/verify-stale-targets.log" \
++  "$KIT/verify-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-tamper-targets" --no-archives
++assert_grep "targets mismatch reported" "target_count|mismatch" "$LOG/verify-stale-targets.log"
++
++# ---- 5. repeated execution and idempotence --------------------------------
++run_expect_fail "second apply on OLD staging refused without --idempotent" "$LOG/apply-twice-refused.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-should-not-exist" --apply
++assert_absent "refused second apply creates no backup dir" "$SCRATCH/backup-should-not-exist"
++
++rm -rf "$STAGE"; new_staging "$STAGE"
++B2="$SCRATCH/backup-repeat"
++run_expect_ok "repeat: fresh Plan B apply after restore" "$LOG/apply-repeat.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B2" --apply
++hash_set "$STAGE" "$SCRATCH/idem-before.sha"
++run_expect_ok "idempotent dry-run on already-OLD staging" "$LOG/apply-idem-dry.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-idem-dry" --idempotent
++run_expect_ok "idempotent --apply verifies only and writes nothing" "$LOG/apply-idem-apply.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-idem-apply" --idempotent --apply
++assert_absent "idempotent --apply creates no backup dir" "$SCRATCH/backup-idem-apply"
++hash_set "$STAGE" "$SCRATCH/idem-after.sha"
++assert_same_bytes "idempotent --apply leaves staged bytes byte-identical" "$SCRATCH/idem-before.sha" "$SCRATCH/idem-after.sha"
++
++# ---- 6. B3 alternate recovery sources -------------------------------------
++run_expect_ok "B3: restore from extracted-new source" "$LOG/restore-extracted-new.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B2" --source extracted-new --apply
++hash_set "$STAGE" "$SCRATCH/alt-new.sha"
++assert_same_bytes "B3: extracted-new restore returns canonical NEW bytes" "$SCRATCH/stage-before.sha" "$SCRATCH/alt-new.sha"
++
++rm -rf "$STAGE"; old_staging "$STAGE"
++run_expect_ok "B3: restore from NEW archive source" "$LOG/restore-archive.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B2" --source archive --apply
++hash_set "$STAGE" "$SCRATCH/alt-archive.sha"
++assert_same_bytes "B3: archive restore returns canonical NEW bytes" "$SCRATCH/stage-before.sha" "$SCRATCH/alt-archive.sha"
++
++rm -rf "$STAGE"; old_staging "$STAGE"
++run_expect_ok "B3: restore from backup source (default)" "$LOG/restore-backup.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$B2" --source backup --apply
++hash_set "$STAGE" "$SCRATCH/alt-backup.sha"
++assert_same_bytes "B3: backup restore returns canonical NEW bytes" "$SCRATCH/stage-before.sha" "$SCRATCH/alt-backup.sha"
++
++
++# ---- 7. B1 --include-negative: two targets, reversible --------------------
++rm -rf "$STAGE" "$NEG"; new_staging "$STAGE"; new_staging "$NEG"
++hash_set "$STAGE" "$SCRATCH/neg-main-before.sha"
++hash_set "$NEG" "$SCRATCH/neg-target-before.sha"
++BNEG="$SCRATCH/backup-negative"
++run_expect_ok "B1: apply --include-negative to main + negative targets" "$LOG/apply-negative.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --include-negative --negative-staging "$NEG" --backup-dir "$BNEG" --apply
++assert_grep "include-negative auto-verify reports 31/0" "checks passed: 31" "$LOG/apply-negative.log"
++run_expect_ok "B1: verify-plan-b --include-negative" "$LOG/verify-negative.log" \
++  "$KIT/verify-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --include-negative --negative-staging "$NEG" --backup-dir "$BNEG"
++assert_counts "B1: include-negative verifier = 31 checks" "$LOG/verify-negative.log" 31 0
++ROWS=$(grep -c -v '^#' "$BNEG/targets.tsv" || true)
++assert_eq "B1: targets.tsv records both targets" 2 "$ROWS"
++assert_grep "B1: targets.tsv records the main target" "$SCRATCH/stage" "$BNEG/targets.tsv"
++assert_grep "B1: targets.tsv records the negative target" "$SCRATCH/stage-neg" "$BNEG/targets.tsv"
++T1F=$(ls "$BNEG/targets/t1" | grep -c -E '^(encoder|decoder|joiner)\.int8\.onnx$' || true)
++T2F=$(ls "$BNEG/targets/t2" | grep -c -E '^(encoder|decoder|joiner)\.int8\.onnx$' || true)
++assert_eq "B1: target t1 backup holds its 3 replaced files" 3 "$T1F"
++assert_eq "B1: target t2 backup holds its 3 replaced files (no namespace collision)" 3 "$T2F"
++hash_set "$NEG" "$SCRATCH/neg-main-old.sha"
++assert_same_bytes "B1: negative target staged bytes are now canonical OLD" "$SCRATCH/old-ref.sha" "$SCRATCH/neg-main-old.sha"
++
++run_expect_fail "B1: restore without --include-negative refuses a two-target backup" "$LOG/restore-negative-refused.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$BNEG"
++assert_grep "B1: refusal explains --include-negative" "include-negative" "$LOG/restore-negative-refused.log"
++run_expect_ok "B1: restore --include-negative --apply reverses both targets" "$LOG/restore-negative.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --include-negative --backup-dir "$BNEG" --apply
++hash_set "$STAGE" "$SCRATCH/neg-main-after.sha"
++hash_set "$NEG" "$SCRATCH/neg-target-after.sha"
++assert_same_bytes "B1: main target byte-identical after include-negative cycle" "$SCRATCH/neg-main-before.sha" "$SCRATCH/neg-main-after.sha"
++assert_same_bytes "B1: negative target byte-identical after include-negative cycle" "$SCRATCH/neg-target-before.sha" "$SCRATCH/neg-target-after.sha"
++
++# ---- 8. missing target directory: install then exact undo ------------------
++MISS="$SCRATCH/stage-missing"
++rm -rf "$MISS"
++BMISS="$SCRATCH/backup-missing"
++run_expect_ok "B2: apply into an absent staging dir (fresh checkout)" "$LOG/apply-missing.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$MISS" --backup-dir "$BMISS" --apply
++run_expect_ok "B2: verify an installed-from-absent target" "$LOG/verify-missing.log" \
++  "$KIT/verify-plan-b.sh" --repo "$SCRATCH/repo" --staging "$MISS" --backup-dir "$BMISS"
++assert_counts "B2: missing-target verify = 30 checks" "$LOG/verify-missing.log" 30 0
++FCOUNT=$(ls "$MISS" 2>/dev/null | grep -c -E '\.(onnx|txt)$' || true)
++assert_eq "B2: absent target was populated with the 4 OLD files" 4 "$FCOUNT"
++run_expect_ok "B2: restore removes files that were absent before Plan B" "$LOG/restore-missing.log" \
++  "$KIT/restore-staged-backup.sh" --repo "$SCRATCH/repo" --staging "$MISS" --backup-dir "$BMISS" --apply
++LEFT=$(ls "$MISS" 2>/dev/null | grep -c -E '\.(onnx|txt)$' || true)
++assert_eq "B2: absent pre-state restored exactly (no model files remain)" 0 "$LEFT"
++
++# ---- 9. partial failure: commit rename fails, target untouched ------------
++rm -rf "$STAGE"; new_staging "$STAGE"
++hash_set "$STAGE" "$SCRATCH/partial-before.sha"
++make_mv_shim "$SCRATCH/shim"
++BFail="$SCRATCH/backup-partial-fail"
++rm -f "$SCRATCH/mv-shim-count"
++run_expect_fail "B2: injected rename failure aborts the install" "$LOG/apply-partial-fail.log" \
++  env PATH="$SCRATCH/shim:$PATH" MV_SHIM_COUNTER="$SCRATCH/mv-shim-count" MV_SHIM_FAIL_AT=2 \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$BFail" --apply
++assert_grep "B2: injected failure was seen by the script" "injected failure|rename failed" "$LOG/apply-partial-fail.log"
++hash_set "$STAGE" "$SCRATCH/partial-after.sha"
++assert_same_bytes "B2: partial failure leaves staged bytes byte-identical" "$SCRATCH/partial-before.sha" "$SCRATCH/partial-after.sha"
++assert_absent "B2: partial failure discards the just-created backup dir" "$BFail"
++assert_eq "B2: no pre-stage temp files leaked" "" "$(ls -a "$STAGE" | grep -E '^\.plan-b-tmp' || true)"
++run_expect_ok "B2: recovery apply after partial failure succeeds" "$LOG/apply-partial-recovery.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-partial-recovery" --apply
++run_expect_ok "B2: verify after recovery apply" "$LOG/verify-partial-recovery.log" \
++  "$KIT/verify-plan-b.sh" --repo "$SCRATCH/repo" --staging "$STAGE" --backup-dir "$SCRATCH/backup-partial-recovery"
++assert_counts "B2: recovery verify = 30 checks" "$LOG/verify-partial-recovery.log" 30 0
++
++# ---- 10. linked worktree is accepted by Plan B ----------------------------
++rm -rf "$STAGE"; new_staging "$STAGE"
++run_expect_ok "Plan B dry-run with --repo pointing at a linked worktree" "$LOG/dry-linked.log" \
++  "$KIT/apply-plan-b.sh" --repo "$SCRATCH/wt" --staging "$STAGE" --backup-dir "$SCRATCH/backup-linked"
++assert_grep "linked-worktree Plan B dry-run OK" "DRY-RUN OK" "$LOG/dry-linked.log"
++
++# ---- 11. production bytes unchanged by the suite -------------------------
++hash_set "$NEW_EXTRACTED" "$SCRATCH/fixtures-new-post.sha"
++hash_set "$OLD_EXTRACTED" "$SCRATCH/fixtures-old-post.sha"
++assert_same_bytes "production NEW extracted bytes unchanged by suite" "$SCRATCH/fixtures-new-pre.sha" "$SCRATCH/fixtures-new-post.sha"
++assert_same_bytes "production OLD extracted bytes unchanged by suite" "$SCRATCH/fixtures-old-pre.sha" "$SCRATCH/fixtures-old-post.sha"
++shasum -a 256 "$OLD_ARCHIVE" "$NEW_ARCHIVE" > "$SCRATCH/archives-post.sha"
++assert_same_bytes "preserved OLD/NEW archives unchanged by suite" "$SCRATCH/archives-pre.sha" "$SCRATCH/archives-post.sha"
++if [ -f "$SCRATCH/real-staging-pre.sha" ]; then
++  hash_set "$STAGING_DIR" "$SCRATCH/real-staging-post.sha"
++  assert_same_bytes "production staged model assets unchanged by suite" "$SCRATCH/real-staging-pre.sha" "$SCRATCH/real-staging-post.sha"
++fi
++if [ -f "$SCRATCH/real-negative-pre.sha" ]; then
++  hash_set "$NEGATIVE_STAGING_DIR" "$SCRATCH/real-negative-post.sha"
++  assert_same_bytes "production negative-worktree staged assets unchanged by suite" "$SCRATCH/real-negative-pre.sha" "$SCRATCH/real-negative-post.sha"
++fi
++
++suite_finish
+diff --git a/tools/plan-remediation/tests/test-plans-remediation.sh b/tools/plan-remediation/tests/test-plans-remediation.sh
+new file mode 100755
+index 0000000..fc266c8
+--- /dev/null
++++ b/tools/plan-remediation/tests/test-plans-remediation.sh
+@@ -0,0 +1,118 @@
++#!/usr/bin/env bash
++# Round 7 Plan A/B remediation -- master regression runner.
++#
++# 1. static defect checks (each remediation is actually present in the shipped
++#    scripts, and the unsafe round-4 patterns are gone);
++# 2. Plan A regression suite (main worktree + linked worktree, positive/negative,
++#    rollback, missing staging, stale manifest, byte-identical revert);
++# 3. Plan B regression suite (backup/restore, include-negative, partial failure,
++#    repeated execution, stale manifests, alternate sources, byte-identical);
++# 4. canonical verifier suite counts: Plan A 55 checks, Plan B 30 checks.
++#
++# Usage: ./tests/test-plans-remediation.sh
++# Exit 0 only when every static check and both suites pass.
++set -uo pipefail
++TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
++KIT=$(cd "$TEST_DIR/.." && pwd -P)
++. "$KIT/parakeet-pins.env"
++. "$KIT/plans-lib.sh"
++
++ROOT=${PLANS_TEST_ROOT:-$T5/cache/round7/plans/test-run}
++RUNLOG="$ROOT/remediation-run-$(date -u +%Y%m%dT%H%M%SZ).log"
++mkdir -p "$ROOT"
++: > "$RUNLOG"
++
++PASS=0
++FAIL=0
++chk() { # name condition-result(0 ok)
++  if [ "$2" = 0 ]; then PASS=$((PASS + 1)); echo "STATIC PASS  $1"; else FAIL=$((FAIL + 1)); echo "STATIC FAIL  $1"; fi
++}
++has() { grep -q -E "$2" "$1"; }
++
++echo "== Static remediation checks ==" | tee -a "$RUNLOG"
++
++if has "$KIT/apply-plan-a.sh" 'git_repo_root' &&
++   ! grep -v '^[[:space:]]*#' "$KIT/apply-plan-a.sh" | grep -q '\[ -d "\$REPO/\.git" \]'; then
++  chk "A1 linked-worktree-safe repo root resolution in apply-plan-a.sh" 0
++else
++  chk "A1 linked-worktree-safe repo root resolution in apply-plan-a.sh" 1
++fi
++
++has "$KIT/apply-plan-a.sh" 'rollback_applied_patch'
++chk "A2 transactional rollback present in apply-plan-a.sh" $?
++
++has "$KIT/apply-plan-a.sh" 'pre-gate'
++chk "A2 archive failure pre-gate present in apply-plan-a.sh" $?
++
++has "$KIT/verify-plan-a.sh" 'allow-missing-staging'
++chk "A3 --allow-missing-staging implemented in verify-plan-a.sh" $?
++
++has "$KIT/refresh-evidence-manifest.sh" 'self-hash is impossible'
++chk "A4 stale evidence manifest regenerator/verifier present" $?
++
++has "$KIT/apply-plan-b.sh" 'BACKUP_TARGETS_TSV'
++chk "B1 targets.tsv multi-target backup layout present" $?
++
++has "$KIT/restore-staged-backup.sh" 'include-negative'
++chk "B1 restore --include-negative implemented" $?
++
++has "$KIT/apply-plan-b.sh" 'pre-staged'
++chk "B2 pre-stage + hash verification implemented" $?
++
++has "$KIT/apply-plan-b.sh" 'rollback_installed'
++chk "B2 transactional install rollback implemented" $?
++
++has "$KIT/restore-staged-backup.sh" 'extracted-new'
++chk "B3 alternate recovery source (extracted-new/archive) implemented" $?
++
++if grep -q -E '(^|[^a-z])(curl|wget)[[:space:]]' "$KIT"/*.sh 2>/dev/null ||
++   grep -q -E 'git[[:space:]]+(commit|push|merge|reset)[[:space:]]' "$KIT"/*.sh 2>/dev/null; then
++  chk "no network calls or git write commands in remediation scripts" 1
++else
++  chk "no network calls or git write commands in remediation scripts" 0
++fi
++
++SYNTAX_FAIL=0
++for s in "$KIT"/*.sh "$KIT"/parakeet-pins.env "$KIT"/tests/*.sh; do bash -n "$s" || SYNTAX_FAIL=$((SYNTAX_FAIL + 1)); done
++chk "every remediation script parses (bash -n)" "$SYNTAX_FAIL"
++echo | tee -a "$RUNLOG"
++
++echo "== Plan A regression suite ==" | tee -a "$RUNLOG"
++"$TEST_DIR/test-plan-a-suite.sh" > "$ROOT/plan-a-suite.out" 2>&1
++A_RC=$?
++grep -E '^(T-PASS|T-FAIL|SUITE RESULT)' "$ROOT/plan-a-suite.out" | tee -a "$RUNLOG"
++A_SUM=$(grep '^SUITE RESULT' "$ROOT/plan-a-suite.out" | tail -1)
++echo | tee -a "$RUNLOG"
++
++echo "== Plan B regression suite (long: real 639 MiB model bytes, APFS clones) ==" | tee -a "$RUNLOG"
++"$TEST_DIR/test-plan-b-suite.sh" > "$ROOT/plan-b-suite.out" 2>&1
++B_RC=$?
++grep -E '^(T-PASS|T-FAIL|SUITE RESULT)' "$ROOT/plan-b-suite.out" | tee -a "$RUNLOG"
++B_SUM=$(grep '^SUITE RESULT' "$ROOT/plan-b-suite.out" | tail -1)
++echo | tee -a "$RUNLOG"
++
++# ---- canonical verifier suite counts ---------------------------------------
++A_COUNTS="missing"; B_COUNTS="missing"
++if [ -f "$ROOT/plan-a/logs/verify-main.log" ]; then A_COUNTS=$(awk '/checks passed:/ {print $3" passed / "$5" failed"}' "$ROOT/plan-a/logs/verify-main.log"); fi
++if [ -f "$ROOT/plan-b/logs/verify.log" ]; then B_COUNTS=$(awk '/checks passed:/ {print $3" passed / "$5" failed"}' "$ROOT/plan-b/logs/verify.log"); fi
++
++echo "== Canonical suites ==" | tee -a "$RUNLOG"
++echo "Plan A verifier (55-check suite): $A_COUNTS" | tee -a "$RUNLOG"
++echo "Plan B verifier (30-check suite): $B_COUNTS" | tee -a "$RUNLOG"
++
++A_OK=0; B_OK=0
++[ "$A_COUNTS" = "55 passed / 0 failed" ] && A_OK=1
++[ "$B_COUNTS" = "30 passed / 0 failed" ] && B_OK=1
++chk "canonical Plan A 55-check suite is 55/0" "$((1 - A_OK))"
++chk "canonical Plan B 30-check suite is 30/0" "$((1 - B_OK))"
++echo
++
++if [ "$A_RC" = 0 ]; then chk "Plan A regression suite passed" 0; else chk "Plan A regression suite passed" 1; fi
++if [ "$B_RC" = 0 ]; then chk "Plan B regression suite passed" 0; else chk "Plan B regression suite passed" 1; fi
++
++echo "----------------------------------------" | tee -a "$RUNLOG"
++echo "TOTAL: static+suite checks passed=$PASS failed=$FAIL" | tee -a "$RUNLOG"
++echo "Plan A suite: $A_SUM" | tee -a "$RUNLOG"
++echo "Plan B suite: $B_SUM" | tee -a "$RUNLOG"
++echo "full output: $ROOT/plan-a-suite.out $ROOT/plan-b-suite.out" | tee -a "$RUNLOG"
++[ "$FAIL" = 0 ]
+diff --git a/tools/plan-remediation/verify-plan-a.sh b/tools/plan-remediation/verify-plan-a.sh
+new file mode 100755
+index 0000000..a075ba9
+--- /dev/null
++++ b/tools/plan-remediation/verify-plan-a.sh
+@@ -0,0 +1,123 @@
++#!/usr/bin/env bash
++# Plan A verifier -- asserts a working tree is in the consistent NEW (Plan A)
++# state: all 24 coordinated literal edits in place, MODEL_VERSION sha256-2,
++# staged model bytes = new archive members, old archive preserved. Read-only.
++#
++# Remediation copy (Round 7, agent B):
++#   A1  --repo may be a linked worktree or subdirectory (pin files resolved at
++#       the git top level; plain non-git replicas still work).
++#   A3  new --allow-missing-staging: the documented fresh-checkout workflow
++#       (apply pins first, run fetch afterwards) now verifies cleanly instead
++#       of reporting 13 impossible staged-byte failures. This intentionally
++#       yields 42 checks instead of the 55 that run when staging is present.
++#
++# Canonical suite (staging present, archives verified): 55 checks.
++#
++# Usage: ./verify-plan-a.sh [--repo DIR] [--staging DIR] [--no-archives]
++#                           [--allow-missing-staging] [--quiet]
++set -euo pipefail
++HERE=$(cd "$(dirname "$0")" && pwd -P)
++. "$HERE/parakeet-pins.env"
++. "$HERE/plans-lib.sh"
++
++REPO=$REPO_ROOT
++STAGING=$STAGING_DIR
++WITH_ARCHIVES=1
++ALLOW_MISSING_STAGING=0
++QUIET=0
++
++while [ $# -gt 0 ]; do
++  case "$1" in
++    --repo) REPO=$2; shift 2 ;;
++    --staging) STAGING=$2; shift 2 ;;
++    --no-archives) WITH_ARCHIVES=0; shift ;;
++    --allow-missing-staging) ALLOW_MISSING_STAGING=1; shift ;;
++    --quiet) QUIET=1; shift ;;
++    -h|--help) sed -n '2,18p' "$0"; exit 2 ;;
++    *) die "unknown argument: $1" ;;
++  esac
++done
++
++require_cmd shasum
++require_cmd grep
++
++REPO=$(repo_dir "$REPO")
++
++log "Verifying Plan A (NEW coordinated pin state) in $REPO"
++
++# 1. Global classification.
++check_eq "pin state is NEW (no old literals remain)" new "$(pins_state "$REPO")"
++
++# 2. Per-site literal placement (24 literal edits; tokens deliberately unchanged).
++check_eq "S1 fetch archive pin" 1 "$(count_literal "$REPO/$PIN_FETCH" "$NEW_ARCHIVE_SHA256")"
++check_eq "S2 fetch encoder pin" 1 "$(count_literal "$REPO/$PIN_FETCH" "$NEW_ENCODER_SHA256")"
++check_eq "S2 fetch decoder pin" 1 "$(count_literal "$REPO/$PIN_FETCH" "$NEW_DECODER_SHA256")"
++check_eq "S2 fetch joiner pin" 1 "$(count_literal "$REPO/$PIN_FETCH" "$NEW_JOINER_SHA256")"
++check_eq "S2 fetch tokens pin unchanged" 1 "$(count_literal "$REPO/$PIN_FETCH" "$NEW_TOKENS_SHA256")"
++check_eq "S3 build.gradle encoder digest" 1 "$(count_literal "$REPO/$PIN_GRADLE" "$NEW_ENCODER_SHA256")"
++check_eq "S3 build.gradle decoder digest" 1 "$(count_literal "$REPO/$PIN_GRADLE" "$NEW_DECODER_SHA256")"
++check_eq "S3 build.gradle joiner digest" 1 "$(count_literal "$REPO/$PIN_GRADLE" "$NEW_JOINER_SHA256")"
++check_eq "S3 build.gradle tokens digest unchanged" 1 "$(count_literal "$REPO/$PIN_GRADLE" "$NEW_TOKENS_SHA256")"
++check_eq "S4 ParakeetModelAssets encoder digest" 1 "$(count_literal "$REPO/$PIN_JAVA" "$NEW_ENCODER_SHA256")"
++check_eq "S4 ParakeetModelAssets decoder digest" 1 "$(count_literal "$REPO/$PIN_JAVA" "$NEW_DECODER_SHA256")"
++check_eq "S4 ParakeetModelAssets joiner digest" 1 "$(count_literal "$REPO/$PIN_JAVA" "$NEW_JOINER_SHA256")"
++check_eq "S4 ParakeetModelAssets tokens digest unchanged" 1 "$(count_literal "$REPO/$PIN_JAVA" "$NEW_TOKENS_SHA256")"
++check_eq "S4 ParakeetModelAssets encoder size" 1 "$(count_literal "$REPO/$PIN_JAVA" "${NEW_ENCODER_SIZE}L")"
++check_eq "S4 ParakeetModelAssets decoder size" 1 "$(count_literal "$REPO/$PIN_JAVA" "${NEW_DECODER_SIZE}L")"
++check_eq "S4 ParakeetModelAssets joiner size unchanged" 1 "$(count_literal "$REPO/$PIN_JAVA" "${NEW_JOINER_SIZE}L")"
++check_eq "S4 ParakeetModelAssets tokens size unchanged" 1 "$(count_literal "$REPO/$PIN_JAVA" "${NEW_TOKENS_SIZE}L")"
++check_eq "S4 MODEL_VERSION sha256-2" 1 "$(count_literal "$REPO/$PIN_JAVA" "$NEW_MODEL_VERSION")"
++check_eq "S4 old MODEL_VERSION absent" 0 "$(count_literal "$REPO/$PIN_JAVA" "$OLD_MODEL_VERSION")"
++check_eq "S5 test expected encoder size" 1 "$(count_literal "$REPO/$PIN_TEST" "${NEW_ENCODER_SIZE}L")"
++check_eq "S5 test expected decoder size" 1 "$(count_literal "$REPO/$PIN_TEST" "${NEW_DECODER_SIZE}L")"
++check_eq "S5 test expected joiner size unchanged" 1 "$(count_literal "$REPO/$PIN_TEST" "${NEW_JOINER_SIZE}L")"
++check_eq "S5 test expected tokens size unchanged" 1 "$(count_literal "$REPO/$PIN_TEST" "${NEW_TOKENS_SIZE}L")"
++check_eq "S6 notices archive digest (row + table)" 2 "$(count_literal "$REPO/$PIN_NOTICES" "$NEW_ARCHIVE_SHA256")"
++check_eq "S6 notices encoder digest" 1 "$(count_literal "$REPO/$PIN_NOTICES" "$NEW_ENCODER_SHA256")"
++check_eq "S6 notices decoder digest" 1 "$(count_literal "$REPO/$PIN_NOTICES" "$NEW_DECODER_SHA256")"
++check_eq "S6 notices joiner digest" 1 "$(count_literal "$REPO/$PIN_NOTICES" "$NEW_JOINER_SHA256")"
++check_eq "S6 notices tokens digest unchanged" 1 "$(count_literal "$REPO/$PIN_NOTICES" "$NEW_TOKENS_SHA256")"
++check_eq "S7 guide encoder digest" 1 "$(count_literal "$REPO/$PIN_GUIDE" "$NEW_ENCODER_SHA256")"
++check_eq "S7 guide decoder digest" 1 "$(count_literal "$REPO/$PIN_GUIDE" "$NEW_DECODER_SHA256")"
++check_eq "S7 guide joiner digest" 1 "$(count_literal "$REPO/$PIN_GUIDE" "$NEW_JOINER_SHA256")"
++check_eq "S7 guide archive digest" 1 "$(count_literal "$REPO/$PIN_GUIDE" "$NEW_ARCHIVE_SHA256")"
++check_eq "S7 guide tokens digest unchanged" 1 "$(count_literal "$REPO/$PIN_GUIDE" "$NEW_TOKENS_SHA256")"
++
++# 3. No old digest survives anywhere in the six files.
++check_eq "old archive digest absent" 0 "$(count_in_pins "$REPO" "$OLD_ARCHIVE_SHA256")"
++check_eq "old encoder digest absent" 0 "$(count_in_pins "$REPO" "$OLD_ENCODER_SHA256")"
++check_eq "old decoder digest absent" 0 "$(count_in_pins "$REPO" "$OLD_DECODER_SHA256")"
++check_eq "old joiner digest absent" 0 "$(count_in_pins "$REPO" "$OLD_JOINER_SHA256")"
++
++# 4. Staged bytes equal the Plan A target (must already be new; Plan A does not move model files).
++STAGED=$(staged_class "$STAGING")
++if [ "$STAGED" = missing ] && [ "$ALLOW_MISSING_STAGING" = 1 ]; then
++  warn "staged assets are missing; --allow-missing-staging given, so the 13 staged-byte checks are skipped"
++  note "run fetch-parakeet-assets.sh (or Plan B) before shipping; verify again without the flag"
++else
++  check_eq "staged model state is NEW" new "$STAGED"
++  for f in $MODEL_FILES; do
++    check_file "staged file present: $f" "$STAGING/$f"
++  done
++  check_eq "staged encoder size" "$NEW_ENCODER_SIZE" "$(file_size "$STAGING/encoder.int8.onnx")"
++  check_eq "staged encoder sha256" "$NEW_ENCODER_SHA256" "$(sha256_file "$STAGING/encoder.int8.onnx")"
++  check_eq "staged decoder size" "$NEW_DECODER_SIZE" "$(file_size "$STAGING/decoder.int8.onnx")"
++  check_eq "staged decoder sha256" "$NEW_DECODER_SHA256" "$(sha256_file "$STAGING/decoder.int8.onnx")"
++  check_eq "staged joiner size" "$NEW_JOINER_SIZE" "$(file_size "$STAGING/joiner.int8.onnx")"
++  check_eq "staged joiner sha256" "$NEW_JOINER_SHA256" "$(sha256_file "$STAGING/joiner.int8.onnx")"
++  check_eq "staged tokens size" "$NEW_TOKENS_SIZE" "$(file_size "$STAGING/tokens.txt")"
++  check_eq "staged tokens sha256" "$NEW_TOKENS_SHA256" "$(sha256_file "$STAGING/tokens.txt")"
++fi
++
++# 5. Archive evidence and preservation.
++if [ "$WITH_ARCHIVES" = 1 ]; then
++  check_archives
++fi
++
++echo
++if [ "$QUIET" -ne 1 ]; then
++  echo "Plan A state: pins NEW + staged NEW (consistent)."
++  echo "Not covered here (owner/build/device gates): fetch twice, verifyParakeetAssets,"
++  echo "bundleRelease/AAB member digests, model-dependent CI, on-device parity."
++fi
++summary
+diff --git a/tools/plan-remediation/verify-plan-b.sh b/tools/plan-remediation/verify-plan-b.sh
+new file mode 100755
+index 0000000..c02f6f7
+--- /dev/null
++++ b/tools/plan-remediation/verify-plan-b.sh
+@@ -0,0 +1,222 @@
++#!/usr/bin/env bash
++# Plan B verifier -- asserts a working tree is in the consistent OLD (Plan B)
++# state: old pins + old staged bytes + MODEL_VERSION sha256-1, with the
++# pre-Plan-B bytes preserved in a backup dir. Read-only.
++#
++# Remediation copy (Round 7, agent B):
++#   A1  --repo may be a linked worktree or subdirectory.
++#   B1  backup verification is now target-aware (targets.tsv): every recorded
++#       target's manifest is checked, so an --include-negative backup can no
++#       longer hide a collided/overwritten target. Backup files are verified
++#       against the canonical NEW sizes/digests and against their manifest.
++#   A4/B3 stale manifests are detected: provenance stores the sha256 of
++#       targets.tsv and of every target manifest, so a stale or tampered
++#       manifest fails verification instead of being silently trusted.
++#
++# Canonical suite (main staging OLD + v2 backup + archives): 30 checks.
++#
++# Usage: ./verify-plan-b.sh [--repo DIR] [--staging DIR] [--backup-dir DIR]
++#                           [--include-negative] [--negative-staging DIR]
++#                           [--no-archives]
++set -euo pipefail
++HERE=$(cd "$(dirname "$0")" && pwd -P)
++. "$HERE/parakeet-pins.env"
++. "$HERE/plans-lib.sh"
++
++REPO=$REPO_ROOT
++STAGING=$STAGING_DIR
++BACKUP_DIR=""
++INCLUDE_NEGATIVE=0
++NEGATIVE_STAGING="$NEGATIVE_STAGING_DIR"
++WITH_ARCHIVES=1
++
++while [ $# -gt 0 ]; do
++  case "$1" in
++    --repo) REPO=$2; shift 2 ;;
++    --staging) STAGING=$2; shift 2 ;;
++    --backup-dir) BACKUP_DIR=$2; shift 2 ;;
++    --include-negative) INCLUDE_NEGATIVE=1; shift ;;
++    --negative-staging) NEGATIVE_STAGING=$2; shift 2 ;;
++    --no-archives) WITH_ARCHIVES=0; shift ;;
++    -h|--help) sed -n '2,22p' "$0"; exit 2 ;;
++    *) die "unknown argument: $1" ;;
++  esac
++done
++
++require_cmd shasum
++require_cmd grep
++
++REPO=$(repo_dir "$REPO")
++STAGING=$(cd "$STAGING" 2>/dev/null && pwd -P) || STAGING=$STAGING
++
++log "Verifying Plan B (OLD staged assets restored, old pins) in $REPO"
++
++# ---------------------------------------------------------------------------
++# Backup layout helpers local to this verifier.
++backup_target_rows() { # -> id<TAB>path rows (legacy: single row t1 + STAGING)
++  local b=$1 layout
++  layout=$(backup_layout "$b")
++  if [ "$layout" = v2 ]; then
++    backup_read_targets "$b"
++  elif [ "$layout" = legacy ]; then
++    printf 't1\t%s\n' "$STAGING"
++  fi
++}
++
++backup_records_staging() { # backup-dir -> 0 when a recorded target path == STAGING
++  local b=$1 tid path pre
++  if [ "$(backup_layout "$b")" = legacy ]; then return 0; fi
++  while IFS=$'\t' read -r tid path pre; do
++    [ -n "$tid" ] || continue
++    if [ "$path" = "$STAGING" ]; then return 0; fi
++  done <<EOF
++$(backup_target_rows "$b")
++EOF
++  return 1
++}
++
++backup_target_for_negative() { # backup-dir -> path of the non-staging target (empty when absent)
++  local b=$1 tid path pre found=""
++  while IFS=$'\t' read -r tid path pre; do
++    [ -n "$tid" ] || continue
++    if [ "$path" != "$STAGING" ]; then found=$path; fi
++  done <<EOF
++$(backup_target_rows "$b")
++EOF
++  echo "$found"
++}
++
++check_backup_file() { # display-name file expected-sha expected-size
++  local disp=$1 f=$2 esha=$3 esize=$4 ok=1 seen=0 rows tid path pre0 tdir manifest entry pre size sha
++  rows=$(backup_target_rows "$BACKUP_DIR")
++  while IFS=$'\t' read -r tid path pre0; do
++    [ -n "$tid" ] || continue
++    if [ "$(backup_layout "$BACKUP_DIR")" = v2 ]; then
++      tdir="$BACKUP_DIR/targets/$tid"
++    else
++      tdir="$BACKUP_DIR"
++    fi
++    manifest="$tdir/$BACKUP_TARGET_MANIFEST"
++    [ -f "$manifest" ] || { ok=0; continue; }
++    entry=$(awk -F'\t' -v want="$f" '!/^#/ && $1==want {print; exit}' "$manifest" 2>/dev/null || true)
++    [ -n "$entry" ] || continue
++    seen=1
++    if [ "$(backup_layout "$BACKUP_DIR")" = v2 ]; then
++      pre=$(printf '%s' "$entry" | cut -f2)
++      size=$(printf '%s' "$entry" | cut -f3)
++      sha=$(printf '%s' "$entry" | cut -f4)
++      [ "$pre" = missing ] && continue
++    else
++      size=$(printf '%s' "$entry" | cut -f2)
++      sha=$(printf '%s' "$entry" | cut -f3)
++    fi
++    if [ "$sha" != "$esha" ] || [ "$size" != "$esize" ]; then ok=0; fi
++    if [ ! -f "$tdir/$f" ]; then ok=0; continue; fi
++    if [ "$(sha256_file "$tdir/$f")" != "$esha" ]; then ok=0; fi
++    if [ "$(file_size "$tdir/$f")" != "$esize" ]; then ok=0; fi
++  done <<EOF
++$rows
++EOF
++  if [ "$seen" = 0 ]; then
++    # tokens.txt is byte-identical in both states, so it is never replaced and
++    # needs no backup; every other canonical file must be recorded.
++    if [ "$f" = tokens.txt ]; then
++      pass "backup $disp (shared bytes; no replacement needed)"
++    else
++      fail "backup $disp (no manifest entry recorded)"
++    fi
++  elif [ "$ok" = 1 ]; then
++    pass "backup $disp (manifest + bytes = canonical NEW)"
++  else
++    fail "backup $disp (manifest or bytes do not match canonical NEW)"
++  fi
++}
++
++check_backup_manifests() { # combined: every recorded target manifest is exact
++  local rows tid path pre detail ok=1
++  rows=$(backup_target_rows "$BACKUP_DIR")
++  while IFS=$'\t' read -r tid path pre; do
++    [ -n "$tid" ] || continue
++    if ! detail=$(backup_check_manifest "$BACKUP_DIR" "$tid" 2>&1); then
++      ok=0
++      printf '%s\n' "$detail" | sed 's/^/      /'
++    fi
++  done <<EOF
++$rows
++EOF
++  if [ "$ok" = 1 ]; then
++    pass "backup manifests cover exactly the pre-Plan-B NEW bytes"
++  else
++    fail "backup manifests inconsistent (stale/tampered or incomplete)"
++  fi
++}
++# ---------------------------------------------------------------------------
++
++# 1. Pins must remain OLD.
++check_eq "pin state is OLD" old "$(pins_state "$REPO")"
++check_eq "MODEL_VERSION sha256-1 present" 1 "$(count_in_pins "$REPO" "$OLD_MODEL_VERSION")"
++check_eq "MODEL_VERSION sha256-2 absent" 0 "$(count_in_pins "$REPO" "$NEW_MODEL_VERSION")"
++check_eq "new archive digest absent from pins" 0 "$(count_in_pins "$REPO" "$NEW_ARCHIVE_SHA256")"
++check_eq "new encoder digest absent from pins" 0 "$(count_in_pins "$REPO" "$NEW_ENCODER_SHA256")"
++check_eq "new decoder digest absent from pins" 0 "$(count_in_pins "$REPO" "$NEW_DECODER_SHA256")"
++check_eq "new joiner digest absent from pins" 0 "$(count_in_pins "$REPO" "$NEW_JOINER_SHA256")"
++
++# 2. Main staging must be OLD bytes matching old pins exactly.
++check_eq "staged model state is OLD" old "$(staged_class "$STAGING")"
++for f in $MODEL_FILES; do
++  check_file "staged file present: $f" "$STAGING/$f"
++done
++check_eq "staged encoder size" "$OLD_ENCODER_SIZE" "$(file_size "$STAGING/encoder.int8.onnx")"
++check_eq "staged encoder sha256" "$OLD_ENCODER_SHA256" "$(sha256_file "$STAGING/encoder.int8.onnx")"
++check_eq "staged decoder size" "$OLD_DECODER_SIZE" "$(file_size "$STAGING/decoder.int8.onnx")"
++check_eq "staged decoder sha256" "$OLD_DECODER_SHA256" "$(sha256_file "$STAGING/decoder.int8.onnx")"
++check_eq "staged joiner size" "$OLD_JOINER_SIZE" "$(file_size "$STAGING/joiner.int8.onnx")"
++check_eq "staged joiner sha256" "$OLD_JOINER_SHA256" "$(sha256_file "$STAGING/joiner.int8.onnx")"
++check_eq "staged tokens size" "$OLD_TOKENS_SIZE" "$(file_size "$STAGING/tokens.txt")"
++check_eq "staged tokens sha256 (unchanged bytes)" "$OLD_TOKENS_SHA256" "$(sha256_file "$STAGING/tokens.txt")"
++
++# 3. Negative worktree when requested: must be OLD and recorded in the backup.
++if [ "$INCLUDE_NEGATIVE" = 1 ]; then
++  NEG_PATH=$NEGATIVE_STAGING
++  if [ -n "$BACKUP_DIR" ] && [ "$(backup_layout "$BACKUP_DIR")" = v2 ]; then
++    REC=$(backup_target_for_negative "$BACKUP_DIR")
++    if [ -n "$REC" ]; then NEG_PATH=$REC; else
++      warn "backup does not record a second (negative) target"
++      NEG_PATH="$NEGATIVE_STAGING/.missing-backup-target"
++    fi
++  fi
++  check_eq "negative target is OLD" old "$(staged_class "$NEG_PATH")"
++fi
++
++# 4. Pre-Plan-B bytes must be preserved for reversibility (6 checks).
++if [ -n "$BACKUP_DIR" ]; then
++  if [ ! -f "$BACKUP_DIR/$BACKUP_PROVENANCE_FILE" ]; then
++    fail "backup provenance present and consistent (missing: $BACKUP_DIR/$BACKUP_PROVENANCE_FILE)"
++  elif detail=$(backup_check_provenance "$BACKUP_DIR" 2>&1); then
++    if backup_records_staging "$BACKUP_DIR"; then
++      pass "backup provenance present and records the staging target(s) + manifest hashes"
++    else
++      fail "backup provenance does not record this staging target ($STAGING)"
++    fi
++  else
++    fail "backup provenance inconsistent (stale/tampered or wrong layout)"
++    printf '%s\n' "$detail" | sed 's/^/      /'
++  fi
++  check_backup_file "encoder (NEW)" encoder.int8.onnx "$NEW_ENCODER_SHA256" "$NEW_ENCODER_SIZE"
++  check_backup_file "decoder (NEW)" decoder.int8.onnx "$NEW_DECODER_SHA256" "$NEW_DECODER_SIZE"
++  check_backup_file "joiner (NEW)" joiner.int8.onnx "$NEW_JOINER_SHA256" "$NEW_JOINER_SIZE"
++  check_backup_file "tokens (NEW, shared bytes)" tokens.txt "$NEW_TOKENS_SHA256" "$NEW_TOKENS_SIZE"
++  check_backup_manifests
++fi
++
++# 5. Archive evidence.
++if [ "$WITH_ARCHIVES" = 1 ]; then
++  check_archives
++fi
++
++echo
++echo "Plan B state: pins OLD + staged OLD (consistent with ParakeetModelAssets,"
++echo "ParakeetModelAssetsTest, verifyParakeetAssets expectations)."
++echo "Caveat: old bytes are only reproducible from the preserved old archive;"
++echo "the upstream URL now serves the new archive, so fetch cannot recreate them."
++summary
+-- 
+2.50.1 (Apple Git-155)
+

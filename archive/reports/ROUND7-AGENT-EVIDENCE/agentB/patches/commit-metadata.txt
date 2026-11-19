@@ -1,0 +1,35 @@
+commit a076df3f1366de83e9607dad697f01fe088cd1ff
+Author:     Agent B (round 7) <agent-b@round7.local>
+AuthorDate: Thu Nov 19 22:04:56 2026 +0000
+Commit:     Agent B (round 7) <agent-b@round7.local>
+CommitDate: Thu Nov 19 22:05:55 2026 +0000
+
+    tools(plan-remediation): fix Plan A/B rollback scripts (A1-A4, B1-B3) with regression suites
+    
+    Remediation of the Round 4 Plan A (pin adoption) / Plan B (old-asset restore)
+    kit, per the Round 5/6 review findings:
+    
+    Plan A:
+    - A1 linked-worktree-safe repo root resolution (git rev-parse --show-toplevel
+      instead of [ -d .git ]; applies at the repository root)
+    - A2 archive pre-gate before any write + transactional EXIT-trap rollback that
+      proves the six pin files byte-identical to pre-apply SHA-256 values
+    - A3 --allow-missing-staging threaded into verify-plan-a (42/0 mode)
+    - A4 refresh-evidence-manifest.sh: byte-regenerated, complete-coverage,
+      self-entry-free evidence manifests (corrected round-4 manifest in evidence)
+    
+    Plan B:
+    - B1 v2 multi-target backup layout (targets.tsv + per-target manifests) makes
+      --include-negative fully reversible and hash-verified
+    - B2 per-file all-or-nothing pre-stage/commit with manifest rollback and exact
+      undo of absent targets
+    - B3 alternate recovery sources: backup / extracted-new / NEW archive
+    - --negative-staging override so include-negative runs can target an isolated
+      worktree
+    
+    Tests: tools/plan-remediation/tests/ (main + linked worktree, positive/
+    negative modes, partial failure, repeated execution, stale manifests,
+    byte-identical before/after hashes) and the canonical 55-check Plan A /
+    30-check Plan B verifier suites.
+    
+    No production model/pin/AAR/archive change; no push/merge.

@@ -1,0 +1,9 @@
+Coordinator verification (2026-11-19, T5)
+- repo HEAD 45d1274, clean, 44 linked worktrees; r7 branches local-only (0 remote r7 refs).
+- r7-pr80 branch r7/pr80-v21 @ e09c34c clean; r7-plans branch r7/plans @ a076df3 clean; r7-pin @ 9002641 with untracked drafts only.
+- Independent rerun on e09c34c: typecheck 0, build 0, unit 32 files/414 passed + 1 skipped, Playwright E2E 154 passed/0 failed.
+- Plan A/B deliverable SHA256SUMS verified (all OK).
+- Preserved Parakeet archive SHA-256 5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf; HF revision 2bda32ec encoder hash acfc2b44... matches old pin.
+- Production staged model files remain the pre-existing NEW bytes (encoder 1afbe69c..., decoder 0222a861..., joiner cbd02f36...); pins unchanged; no production file edited.
+- PR #71 remote 049b484, PR #74 remote 772cc94 unchanged; no pushes this round.
+- Workspace free space after round: 32 GiB.

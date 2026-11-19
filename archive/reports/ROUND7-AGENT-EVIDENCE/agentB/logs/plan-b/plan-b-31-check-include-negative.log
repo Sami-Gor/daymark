@@ -1,0 +1,39 @@
+[*] Verifying Plan B (OLD staged assets restored, old pins) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/repo
+PASS  pin state is OLD
+PASS  MODEL_VERSION sha256-1 present
+PASS  MODEL_VERSION sha256-2 absent
+PASS  new archive digest absent from pins
+PASS  new encoder digest absent from pins
+PASS  new decoder digest absent from pins
+PASS  new joiner digest absent from pins
+PASS  staged model state is OLD
+PASS  staged file present: encoder.int8.onnx
+PASS  staged file present: decoder.int8.onnx
+PASS  staged file present: joiner.int8.onnx
+PASS  staged file present: tokens.txt
+PASS  staged encoder size
+PASS  staged encoder sha256
+PASS  staged decoder size
+PASS  staged decoder sha256
+PASS  staged joiner size
+PASS  staged joiner sha256
+PASS  staged tokens size
+PASS  staged tokens sha256 (unchanged bytes)
+PASS  negative target is OLD
+PASS  backup provenance present and records the staging target(s) + manifest hashes
+PASS  backup encoder (NEW) (manifest + bytes = canonical NEW)
+PASS  backup decoder (NEW) (manifest + bytes = canonical NEW)
+PASS  backup joiner (NEW) (manifest + bytes = canonical NEW)
+PASS  backup tokens (NEW, shared bytes) (shared bytes; no replacement needed)
+PASS  backup manifests cover exactly the pre-Plan-B NEW bytes
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+
+Plan B state: pins OLD + staged OLD (consistent with ParakeetModelAssets,
+ParakeetModelAssetsTest, verifyParakeetAssets expectations).
+Caveat: old bytes are only reproducible from the preserved old archive;
+the upstream URL now serves the new archive, so fetch cannot recreate them.
+----------------------------------------
+checks passed: 31   failed: 0

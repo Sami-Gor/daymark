@@ -1,0 +1,36 @@
+# Strategy-1 draft functional tests (fake repo roots on T5)
+utc=2026-11-19T21:51:45Z
+patch=/Volumes/DaymarkWorkspace/Daymark/archive/reports/ROUND7-AGENT-EVIDENCE/agentC/drafts/fetch-parakeet-assets.controlled-source.patch
+patch_sha256=afaa849323c2f5c625ecf4abb6d7c6b6f180c7127d162b21c43990fa78503467
+
+## Test 1: PARAKEET_ARCHIVE_URL points at a mirror copy (local HTTP) -> verified install
+  exit=0
+  MATCH encoder.int8.onnx
+  MATCH decoder.int8.onnx
+  MATCH joiner.int8.onnx
+  MATCH tokens.txt
+  assets_ok=0
+
+## Test 2: PARAKEET_ARCHIVE_URL wrong (404) -> fail closed, no fallback
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/test-strategy1-draft.sh: line 85: 37220 Terminated: 15          python3 -m http.server 18766 --bind 127.0.0.1 --directory "$PRES" > "$S/http.log" 2>&1
+  exit=7
+  downloading the Parakeet TDT 0.6B v3 int8 model...
+  assets_dir_exists=no
+
+## Test 3: no override -> committed placeholder URL (not yet published) -> fail closed
+  exit=56
+  downloading the Parakeet TDT 0.6B v3 int8 model...
+
+## Test 4: patch keeps every digest unchanged
+  base_digest_count= 5
+  patched_digest_count= 5
+  unchanged= True
+
+# END
+
+## Correction / clarification (appended after review)
+- Test 2 above (first run) exited 7 because the local test server had already been stopped; that is still an unreachable-source case and it failed closed with no assets. A corrected run with the server up and a 404 path is recorded here:
+  corrected exit=22 (curl HTTP 404), assets_dir_exists=no, log follows:
+    downloading the Parakeet TDT 0.6B v3 int8 model...
+- Test 3 (no override, committed placeholder URL not yet published) exited 56 (curl receive failure via the GitHub redirect); non-zero, no assets installed, fail closed as intended.
+- Test 4 confirmed all five pinned digests are byte-identical between the production script and the patched copy.

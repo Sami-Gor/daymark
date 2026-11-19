@@ -1,0 +1,182 @@
+{
+  "task": {
+    "id": "ROUND7-AGENT-C",
+    "title": "Parakeet pin strategies: immutable mirror vs fixed HF revision",
+    "agent": "r7-c-parakeet",
+    "parent": "lead",
+    "generated_utc": "2026-11-19T21:51:12.838Z",
+    "baseline_worktree": "/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pin",
+    "baseline_head": "9002641a7faede2a16434b12e7eeaa94e295a0aa",
+    "baseline_branch": "r7/pin",
+    "production_changes": false,
+    "pushes": false
+  },
+  "pin_unchanged": {
+    "archive_sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf",
+    "model_version": "parakeet-tdt-0.6b-v3-int8-sha256-1",
+    "repository_files_modified": [],
+    "untracked_draft_dir": "android/kokoro-poc/scripts/drafts-agent-c/"
+  },
+  "strategy1_immutable_mirror": {
+    "archive_path": "/Volumes/DaymarkWorkspace/Daymark/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+    "archive_size": 487170055,
+    "archive_sha256_computed": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf",
+    "archive_sha256_matches_pin": true,
+    "member_count": 10,
+    "file_member_count": 8,
+    "member_hashes_match_pins": true,
+    "t5backup_crosscheck": {
+      "path": "/Volumes/T5Backup/Daymark/01-stt-evaluation/models/parakeet-v3/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+      "sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf",
+      "cmp": "IDENTICAL",
+      "extracted_files_match_pins": true
+    },
+    "provenance_chain": [
+      "T5Backup source (mtime 2026-10-19T15:53:06+0100)",
+      "pres-1-copy cp -p to Desktop/pr54-work, verified sha256+cmp, 2026-11-14T14:27Z",
+      "final migration to archive/assets/parakeet-preservation, 2026-11-17T19:16:55Z, manifest OK",
+      "Round 7 Agent C re-verified 2026-11-19"
+    ],
+    "current_ci_state": {
+      "result": "red / fail-closed",
+      "reason": "upstream serves replacement bytes 1495e91b...; pinned digest mismatches",
+      "evidence": "evidence/26-current-fetch-failclosed-T5TEMP.log"
+    },
+    "controlled_source_url_placeholder": "https://github.com/Sami-Gor/daymark/releases/download/<release-tag>/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+    "draft_patch": {
+      "path": "drafts/fetch-parakeet-assets.controlled-source.patch",
+      "sha256": "afaa849323c2f5c625ecf4abb6d7c6b6f180c7127d162b21c43990fa78503467",
+      "git_apply_check": "passes",
+      "applied": false
+    },
+    "sha256sums_draft": {
+      "path": "drafts/SHA256SUMS.parakeet",
+      "sha256": "bb7bbbca8d5dfbb275d4c00bd4fb89fde4d7e888c1efbcea088e51148676c621",
+      "lines": 9,
+      "verified": "shasum -a 256 -c: all OK"
+    },
+    "owner_actions_required": [
+      "enable immutable releases on Sami-Gor/daymark (currently enabled:false, enforced_by_owner:false)",
+      "create+upload immutable release asset with exact preserved bytes + SHA256SUMS.parakeet",
+      "update controlled URL in fetch script (draft patch), keep all digests and MODEL_VERSION",
+      "update THIRD-PARTY-NOTICES / reproducible-build-guide URL text (no digest change)"
+    ],
+    "functional_tests": {
+      "test1_mirror_url_via_env_override": "exit 0, 4/4 hashes match",
+      "test2_wrong_or_unreachable_url": "exit 22 (HTTP 404) / exit 7 (connection refused) - no assets installed",
+      "test3_unpublished_placeholder_url": "exit 56 - no assets installed (fail closed until owner publishes the release)",
+      "test4_pinned_digests_unchanged": "all five digest constants byte-identical between production script and patched copy",
+      "evidence": "evidence/34-strategy1-draft-functional-tests.log"
+    }
+  },
+  "strategy2_hf_fixed_revision": {
+    "repo": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+    "revision": "2bda32ec70b097a55adaa07d9a7173915b43cc78",
+    "revision_commit_date": "2025-08-16T09:29:07.000Z",
+    "revision_exists": true,
+    "repo_main_now": "ed5d745623472f97cfc2e6c2916ee248798fc5a8",
+    "repo_main_commit_date": "2026-11-07T05:50:33.000Z",
+    "tags": [],
+    "downloaded_to": "/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/hf",
+    "files": [
+      {
+        "name": "encoder.int8.onnx",
+        "size": 652184281,
+        "sha256": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+        "matches_pin": true,
+        "hf_lfs_oid": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"
+      },
+      {
+        "name": "decoder.int8.onnx",
+        "size": 11845275,
+        "sha256": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+        "matches_pin": true,
+        "hf_lfs_oid": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e"
+      },
+      {
+        "name": "joiner.int8.onnx",
+        "size": 6355277,
+        "sha256": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+        "matches_pin": true,
+        "hf_lfs_oid": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3"
+      },
+      {
+        "name": "tokens.txt",
+        "size": 93939,
+        "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+        "matches_pin": true,
+        "hf_lfs_oid": null
+      }
+    ],
+    "resumable_download_tested": {
+      "file": "decoder.int8.onnx",
+      "interrupted_at_bytes": 66506,
+      "resume_http_status": 206,
+      "final_sha256_matches": true,
+      "evidence": "evidence/24-hf-resume-test.log"
+    },
+    "fail_closed_behaviour": "per-file SHA-256 check each; no branch/tag/main fallback; staging before install; non-zero exit and no assets on failure",
+    "code_change_required": "yes - production fetch-parakeet-assets.sh pins an archive (ARCHIVE_SHA256) and extracts it; per-file fetch is not supported",
+    "draft_patch": {
+      "path": "drafts/fetch-parakeet-assets.hf-fallback.patch",
+      "sha256": "8432e319e29a7b3950224096de1722eb4f92a2ac0919912a2bb1020c3e68c211",
+      "full_script_sha256": "82a2c14e7dabcff4ea4f8cdb94978785f9ea0bd347c0f2703c8b0de78862d400",
+      "git_apply_check": "passes",
+      "applied": false
+    },
+    "functional_tests": {
+      "test1_fallback_success": "exit 0, 4/4 hashes match",
+      "test2_both_sources_fail": "exit 1, no assets installed",
+      "test3_archive_path": "exit 0, no fallback, 4/4 hashes match",
+      "test4_fallback_disabled": "exit 1, no fallback attempted",
+      "evidence": "evidence/29-draft-functional-tests.log"
+    },
+    "network_dependency": {
+      "hosts": [
+        "huggingface.co",
+        "us.aws.cdn.hf.co"
+      ],
+      "auth": "none (public)",
+      "egress_approx_bytes": 670000000,
+      "observed_speed": "~27 MB/s",
+      "notes": "third-party CDN, no SLA; API burst triggered WAF challenge pages (retried with backoff)"
+    }
+  },
+  "not_adopted": {
+    "upstream_replacement_archive": {
+      "size": 487211443,
+      "sha256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+      "source": "GitHub release asset id 719769366, re-uploaded 2026-11-07",
+      "file_hashes": {
+        "encoder": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+        "decoder": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+        "joiner": "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
+        "tokens": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+      }
+    },
+    "hf_main": {
+      "revision": "ed5d745623472f97cfc2e6c2916ee248798fc5a8",
+      "date": "2026-11-07T05:50:33Z"
+    },
+    "reason": "different model bytes, unvalidated on device; brief excludes them"
+  },
+  "recommendation_inputs": {
+    "preferred_primary": "strategy 1 - immutable Daymark-controlled release asset (owner action required; URL-only code change)",
+    "hf_role": "independent cross-check and emergency recovery source; optional fallback only; not a preferred permanent home",
+    "fallback_policy": "owner decision; if enabled, default off for release builds and log every use",
+    "model_version_bump_required": false,
+    "adoption_of_1495e91b_or_ed5d7456": "rejected"
+  },
+  "unresolved_owner_questions_file": "03-comparison-and-recommendation.md#5-unresolved-questions-owner-input-needed",
+  "deliverables": {
+    "docs": [
+      "README.md",
+      "01-immutable-mirror-strategy.md",
+      "02-hf-fixed-revision-strategy.md",
+      "03-comparison-and-recommendation.md"
+    ],
+    "drafts_dir": "drafts/",
+    "evidence_dir": "evidence/",
+    "r7_pin_drafts_dir": "/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pin/android/kokoro-poc/scripts/drafts-agent-c/"
+  }
+}

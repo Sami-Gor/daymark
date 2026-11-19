@@ -1,0 +1,6 @@
+$ pnpm -r --filter "./artifacts/**" --filter "./scripts" --if-present run typecheck
+Scope: 3 of 4 workspace projects
+artifacts/mockup-sandbox typecheck$ tsc -p tsconfig.json --noEmit
+artifacts/weather-app typecheck$ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit
+artifacts/mockup-sandbox typecheck: Done
+artifacts/weather-app typecheck: Done

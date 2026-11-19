@@ -1,0 +1,48 @@
+# Draft fallback functional tests (fake repo roots on T5)
+utc=2026-11-19T21:41:55Z
+draft=/Volumes/DaymarkWorkspace/Daymark/archive/reports/ROUND7-AGENT-EVIDENCE/agentC/drafts/fetch-parakeet-assets.hf-fallback.sh
+draft_sha256=82a2c14e7dabcff4ea4f8cdb94978785f9ea0bd347c0f2703c8b0de78862d400
+
+## Test 1: archive source unreachable -> pinned HF revision per-file fallback
+  exit=0
+  warning: primary archive unavailable or failed verification;
+  warning: falling back to fixed HF revision 2bda32ec70b097a55adaa07d9a7173915b43cc78 (per-file).
+  downloading fallback file encoder.int8.onnx from HF revision 2bda32ec70b097a55adaa07d9a7173915b43cc78...
+  downloading fallback file decoder.int8.onnx from HF revision 2bda32ec70b097a55adaa07d9a7173915b43cc78...
+  downloading fallback file joiner.int8.onnx from HF revision 2bda32ec70b097a55adaa07d9a7173915b43cc78...
+  downloading fallback file tokens.txt from HF revision 2bda32ec70b097a55adaa07d9a7173915b43cc78...
+  installed from fallback source: HF revision 2bda32ec70b097a55adaa07d9a7173915b43cc78
+  installed: /Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/draft-tests/t1/android/kokoro-poc/scripts/../../../artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet
+  installed assets for t1:
+    MATCH encoder.int8.onnx
+    MATCH decoder.int8.onnx
+    MATCH joiner.int8.onnx
+    MATCH tokens.txt
+  assets_ok=0
+
+## Test 2: archive source unreachable AND fallback network unreachable -> fail closed
+  exit=1
+  downloading fallback file encoder.int8.onnx from HF revision 2bda32ec70b097a55adaa07d9a7173915b43cc78...
+  curl: (7) Failed to connect to 127.0.0.1 port 1 after 0 ms: Couldn't connect to server
+  error: fallback download failed for encoder.int8.onnx (no further source is used)
+  assets_dir_exists=no
+
+## Test 3: primary archive source reachable (local HTTP mirror copy) -> archive path, no fallback
+  exit=0
+  fallback_warning_present=0
+  installed assets for t3:
+    MATCH encoder.int8.onnx
+    MATCH decoder.int8.onnx
+    MATCH joiner.int8.onnx
+    MATCH tokens.txt
+  assets_ok=0
+
+## Test 4: archive unreachable, PARAKEET_HF_FALLBACK=0 -> fail closed without fallback
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/test-fallback-draft.sh: line 31: 10158 Terminated: 15          python3 -m http.server 18765 --bind 127.0.0.1 --directory "$PRES" > "$S/httpserver.log" 2>&1
+  exit=1
+  curl: (6) Could not resolve host: invalid.invalid
+  error: the pinned archive could not be fetched or verified, and PARAKEET_HF_FALLBACK=0 forbids the fallback
+  fallback_attempted=0
+
+# END
+# note: the "Terminated: 15" line above is the test harness stopping its own local HTTP server after Test 3 (not a script failure).

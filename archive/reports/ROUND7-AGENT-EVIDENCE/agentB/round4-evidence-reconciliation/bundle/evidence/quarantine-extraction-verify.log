@@ -1,0 +1,168 @@
+== extracted-old ==
+extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx
+extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx
+extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx
+extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/de.wav
+extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/en.wav
+extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/es.wav
+extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/fr.wav
+extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt
+
+== hashes extracted-old ==
+d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d  extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt
+3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3  extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx
+179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e  extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx
+acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247  extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx
+
+== extracted-new ==
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/README.md
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/de.wav
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/en.wav
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/es.wav
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/fr.wav
+extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt
+
+== hashes extracted-new ==
+d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d  extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt
+cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98  extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx
+0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5  extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx
+1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479  extracted-new/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx
+
+== ARCHIVE-PROVENANCE.json ==
+{
+ "prepared_at_utc": "2026-11-18T02:41:36Z",
+ "task": "task-16 parakeet archive replacement verification",
+ "authority": "T5 /Volumes/DaymarkWorkspace/Daymark (no local clone used)",
+ "old_archive": {
+  "path": "/Volumes/DaymarkWorkspace/Daymark/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+  "size": 487170055,
+  "sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf",
+  "source": "preserved vetted copy (archive/assets/parakeet-preservation)",
+  "expected_size": 487170055,
+  "expected_sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+ },
+ "new_archive": {
+  "path": "/Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+  "size": 487211443,
+  "sha256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+  "source": "GitHub k2-fsa/sherpa-onnx release asset id 719769366 (asr-models)",
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+  "api": "https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/assets/719769366",
+  "api_digest": "sha256:1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+  "api_size": 487211443,
+  "download_command": "gh api repos/k2-fsa/sherpa-onnx/releases/assets/719769366 -H 'Accept: application/octet-stream' > <path>",
+  "expected_size": 487211443,
+  "expected_sha256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9"
+ },
+ "quarantine": "/Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118",
+ "artifacts": {
+  "members-old.tsv": "tar member metadata (name,type,size,mode,uid,gid,uname,gname,mtime,linkname)",
+  "members-new.tsv": "tar member metadata",
+  "manifest-old.tsv": "member sha256 + metadata",
+  "manifest-new.tsv": "member sha256 + metadata",
+  "member-diff.tsv": "added/removed/changed/unchanged member diff",
+  "manifest-old.json": "full member metadata + sha256 JSON",
+  "manifest-new.json": "full member metadata + sha256 JSON",
+  "member-diff.json": "member diff JSON",
+  "onnx-summary-both.json": "not produced (superseded by onnx-compare-*.json)",
+  "onnx-compare-encoder.json": "ONNX graph/initializer comparison (encoder)",
+  "onnx-compare-decoder.json": "ONNX graph/initializer comparison (decoder)",
+  "onnx-compare-joiner.json": "ONNX graph/initializer comparison (joiner)",
+  "init-hashes-*.json": "per-initializer sha256 lists",
+  "asset-719769366.metadata.json": "GitHub release-asset API metadata captured before download",
+  "extracted-old/": "old archive extracted (never executed)",
+  "extracted-new/": "new archive extracted (never executed)"
+ }
+}
+== VERIFICATION-SUMMARY.json ==
+{
+ "task": "task-16",
+ "verdict": "needs-owner-review",
+ "adoption_safe": false,
+ "adoption_conditional": true,
+ "old_archive": {
+  "path": "/Volumes/DaymarkWorkspace/Daymark/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+  "size": 487170055,
+  "sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+ },
+ "new_archive": {
+  "path": "/Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+  "size": 487211443,
+  "sha256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+  "github_asset_id": 719769366,
+  "api_digest": "sha256:1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9"
+ },
+ "member_diff": {
+  "added": 1,
+  "removed": 0,
+  "changed": 3,
+  "unchanged": 7,
+  "changed_members": [
+   "encoder.int8.onnx",
+   "decoder.int8.onnx",
+   "joiner.int8.onnx"
+  ],
+  "added_members": [
+   "README.md"
+  ],
+  "unchanged_application_members": [
+   "tokens.txt",
+   "test_wavs/*.wav"
+  ]
+ },
+ "new_member_sha256": {
+  "encoder.int8.onnx": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+  "decoder.int8.onnx": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+  "joiner.int8.onnx": "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
+  "tokens.txt": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+ },
+ "new_member_sizes": {
+  "encoder.int8.onnx": 652282294,
+  "decoder.int8.onnx": 11845274,
+  "joiner.int8.onnx": 6355277,
+  "tokens.txt": 93939
+ },
+ "model_analysis": {
+  "encoder": {
+   "nodes_old": 5654,
+   "nodes_new": 6118,
+   "init_bytes_identical": true,
+   "float_weights": "numerically unchanged (requantisation-only; rel diff <= 4.3e-7, max 1 quant step)"
+  },
+  "decoder": {
+   "nodes_old": 30,
+   "nodes_new": 30,
+   "float_weights": "embedding table requantised (different scale/zero point; max 1 quant step)"
+  },
+  "joiner": {
+   "nodes_old": 26,
+   "nodes_new": 26,
+   "float_weights": "byte-identical"
+  },
+  "tokens_identical": true,
+  "graph_inputs_outputs_identical": true,
+  "smoke_test_transcripts_identical": true
+ },
+ "pin_update_proposed_not_applied": {
+  "ARCHIVE_SHA256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+  "MODEL_VERSION": "parakeet-tdt-0.6b-v3-int8-sha256-2",
+  "files_to_edit": [
+   "android/kokoro-poc/scripts/fetch-parakeet-assets.sh",
+   "artifacts/weather-app/android/parakeet-assets/build.gradle",
+   "artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java",
+   "THIRD-PARTY-NOTICES.md",
+   "docs/release/reproducible-build-guide.md"
+  ]
+ },
+ "blockers": [
+  "owner sign-off",
+  "on-device evaluation re-run on new bytes with patched sherpa-onnx 1.13.8 AAR",
+  "coordinated pin update (working tree staged assets already new while pins are old)",
+  "CI fetch reproducibility after pin update",
+  "preserve old archive"
+ ],
+ "report": "/Volumes/DaymarkWorkspace/Daymark/archive/reports/PARAKEET-ARCHIVE-VERIFICATION-20261118.md"
+}

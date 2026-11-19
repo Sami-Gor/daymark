@@ -1,0 +1,32 @@
+# Live upstream GitHub release asset and download headers (read-only probes)
+utc=2026-11-19T21:38:19Z
+## asset API
+{
+ "id": 719769366,
+ "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+ "size": 487211443,
+ "digest": "sha256:1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+ "state": "uploaded",
+ "created_at": "2026-11-07T05:50:47Z",
+ "updated_at": "2026-11-07T05:51:03Z",
+ "download_count": 71037,
+ "browser_download_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
+}
+
+## release asr-models
+{
+ "id": 130628817,
+ "tag_name": "asr-models",
+ "immutable": false,
+ "published_at": "2023-11-21T09:42:36Z",
+ "created_at": "2023-11-20T04:33:06Z"
+}
+
+## HEAD of the URL pinned in fetch-parakeet-assets.sh
+HTTP/2 302 
+location: https://release-assets.githubusercontent.com/github-production-release-asset/531380835/81fc97f9-6fca-4165-8e1c-b4701c9fafd4?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-11-19T22%3A30%3A47Z&rscd=attachment%3B+filename%3Dsherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-11-19T21%3A29%3A53Z&ske=2026-11-19T22%3A30%3A47Z&sks=b&skv=2018-11-09&sig=Ii1UjGpxRRJWr8OE7%2B%2FkmvZehO3eLLiT36FgYMpGD7Q%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5NTEyNzc2MywibmJmIjoxNzk1MTI0MTYzLCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.13hKcDnHVbuKpSmfQMAQVhqclyCDcHwW0zfu-natmq0&response-content-disposition=attachment%3B%20filename%3Dsherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2&response-content-type=application%2Foctet-stream
+content-length: 0
+HTTP/2 200 
+last-modified: Sat, 07 Nov 2026 05:51:02 GMT
+etag: "0x8DF3C931B6863C5"
+content-length: 487211443

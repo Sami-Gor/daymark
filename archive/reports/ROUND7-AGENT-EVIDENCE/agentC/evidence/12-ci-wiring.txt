@@ -1,0 +1,35 @@
+# CI steps that fetch/verify the Parakeet model
+.github/workflows/ci.yml:22:      model_required: ${{ steps.guard.outputs.model_required }}
+.github/workflows/ci.yml:61:      # trust a bare model_required=false, and it preserves the exact
+.github/workflows/ci.yml:89:            appendFileSync(out, "model_required=" + String(result.model_required) + "\n");
+.github/workflows/ci.yml:169:    name: model-dependent
+.github/workflows/ci.yml:171:    if: needs.classify.outputs.model_required == 'true'
+.github/workflows/ci.yml:211:        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+.github/workflows/ci.yml:215:        run: ./gradlew --no-daemon :parakeet-assets:verifyParakeetAssets :app:assembleDebug :app:bundleDebug
+.github/workflows/ci.yml:229:          MODEL_REQUIRED: ${{ needs.classify.outputs.model_required }}
+.github/workflows/ci.yml:240:          echo "model-dependent result: $MODEL_RESULT"
+.github/workflows/ci.yml:274:              echo "::error::model validation was required but the model-dependent job was $MODEL_RESULT"
+.github/workflows/ci.yml:275:              echo "MODEL VALIDATION: FAIL - required model-dependent job was $MODEL_RESULT"
+.github/workflows/ci.yml:280:              echo "::error::model_required=false was not independently verified"
+.github/workflows/ci.yml:289:              echo "MODEL VALIDATION: FAIL - unexpected model-dependent execution"
+.github/workflows/ci.yml:310:              echo "::error::model_required=false reason_code is missing or unrecognized"
+.github/workflows/ci.yml:324:            echo "- model-dependent: $MODEL_RESULT"
+.github/workflows/android-ci.yml:18:      # The Gradle project, including daymark-voice/, parakeet-assets/ and
+.github/workflows/android-ci.yml:132:        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+scripts/ci/classify-model-dependency.mjs:21:  'model-dependent-path',
+scripts/ci/classify-model-dependency.mjs:38:  ['Parakeet asset pack', /^artifacts\/weather-app\/android\/parakeet-assets\//],
+scripts/ci/classify-model-dependency.mjs:101:    model_required: modelRequired,
+scripts/ci/classify-model-dependency.mjs:218:      'model-dependent-path',
+scripts/ci/classify-model-dependency.mjs:219:      'model-dependent path(s) changed: ' + summarize(modelPaths) + '; model validation is required',
+scripts/ci/classify-model-dependency.mjs:318:  if (classification.model_required === false) {
+scripts/ci/classify-model-dependency.mjs:321:        throw new Error('classifier exemption flag is inconsistent with model_required=false');
+scripts/ci/classify-model-dependency.mjs:327:        model_required: false,
+scripts/ci/classify-model-dependency.mjs:339:        model_required: false,
+scripts/ci/classify-model-dependency.mjs:346:    throw new Error('classifier model_required=false reason_code is missing, empty, or unrecognized');
+scripts/ci/classify-model-dependency.mjs:349:  if (classification.model_required === true) {
+scripts/ci/classify-model-dependency.mjs:357:      model_required: true,
+scripts/ci/classify-model-dependency.mjs:365:  throw new Error('classifier model_required is missing or not boolean');
+scripts/ci/classify-model-dependency.mjs:392:    appendFileSync(githubOutputPath, 'model_required=' + String(payload.model_required) + '\n');
+scripts/ci/classify-model-dependency.mjs:416:      model_required: true,
+scripts/ci/classify-model-dependency.mjs:436:      model_required: true,
+scripts/ci/classify-model-dependency.mjs:458:      model_required: true,

@@ -1,0 +1,6 @@
+0cc63e1ef6c341404d8cfb890b4f970c46d0ce8edbeea3d2b9f77a451b3b758a  android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+25c1a5fe721f15ba5609d9281b69305998a585276d66d8b0dfdc544386c9f0b2  artifacts/weather-app/android/parakeet-assets/build.gradle
+9c7dd88bfcf4dbb2978140bdddab48b4d85020dbb637ae172eb80e1b01188acb  artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
+6ddd6c373c7808458c94866e410563e67048995f1dcef34f7d04e02838e79019  artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
+1651f7110eee83c331de659c37b56082ff6ab99c5fd6661f6cb2f2387b907c2b  THIRD-PARTY-NOTICES.md
+a89ed582d279ec65e5b2ba7fe3e242ac38987e383f802557b4a2aef4d9bd31a5  docs/release/reproducible-build-guide.md

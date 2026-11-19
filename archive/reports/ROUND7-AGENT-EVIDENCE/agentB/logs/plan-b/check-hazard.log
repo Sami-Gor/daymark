@@ -1,0 +1,31 @@
+== Plan state ==
+repo            /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/repo
+staging         /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage
+pins_state      old
+staged_state    new
+overall_state   hazard-staged-new-pinned-old
+
+== pin literal counts (six files, exact expected values) ==
+new_archive=0
+new_encoder=0
+new_decoder=0
+new_joiner=0
+new_model_version=0
+old_archive=4
+old_encoder=5
+old_decoder=5
+old_joiner=5
+old_model_version=1
+tokens=5
+new_encoder_size=0
+new_decoder_size=0
+old_encoder_size=2
+old_decoder_size=2
+
+== staged files ==
+encoder.int8.onnx 652282294 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479 new
+decoder.int8.onnx 11845274 0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5 new
+joiner.int8.onnx 6355277 cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98 new
+tokens.txt 93939 d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d shared
+
+RESULT: state matches expectation (mixed)

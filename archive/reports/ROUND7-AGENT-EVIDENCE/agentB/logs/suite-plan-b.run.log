@@ -1,0 +1,94 @@
+T-INFO  kit: /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-plans/tools/plan-remediation
+T-INFO  scratch: /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b
+T-PASS  all plan/remediation scripts + pins env parse (bash -n)
+T-PASS  B1: targets.tsv target recording present in apply and restore
+T-PASS  B1: restore-staged-backup.sh supports --include-negative
+T-PASS  Plan B dry-run on NEW staging
+T-PASS  dry-run reports DRY-RUN OK
+T-PASS  dry-run leaves staged bytes byte-identical
+T-PASS  Plan B apply: backup NEW then restore OLD
+T-PASS  apply auto-verify reports 30/0
+T-PASS  applied staging bytes equal the canonical OLD set
+T-PASS  explicit verify-plan-b run
+T-PASS  canonical Plan B suite (main staging + backup + archives) = 30 checks (30 passed / 0 failed)
+T-PASS  check-state classifies scratch Plan B as plan-b
+T-PASS  B1: targets.tsv records exactly one target for a main-only run
+T-PASS  B1: targets.tsv records the staging path
+T-PASS  B1: backup preserves the 3 replaced NEW files (tokens shared -> not copied)
+T-PASS  B1: backup encoder bytes = canonical NEW
+T-PASS  B1: backup decoder bytes = canonical NEW
+T-PASS  B1: backup joiner bytes = canonical NEW
+T-PASS  restore dry-run on OLD staging
+T-PASS  restore dry-run reports DRY-RUN OK
+T-PASS  restore dry-run leaves bytes unchanged
+T-PASS  restore --apply returns the NEW bytes
+T-PASS  byte-identical before/after apply+restore cycle
+T-PASS  check-state after restore classifies the known hazard
+T-PASS  stale/tampered backup manifest fails verify-plan-b
+T-PASS  stale manifest reason reported
+T-PASS  stale/tampered backup manifest refused by restore
+T-PASS  restore refuses stale backup
+T-PASS  tampered backup bytes fail verify-plan-b
+T-PASS  tampered byte reason reported
+T-PASS  tampered backup bytes refused by restore
+T-PASS  stale targets.tsv fails verify-plan-b
+T-PASS  targets mismatch reported
+T-PASS  second apply on OLD staging refused without --idempotent
+T-PASS  refused second apply creates no backup dir
+T-PASS  repeat: fresh Plan B apply after restore
+T-PASS  idempotent dry-run on already-OLD staging
+T-PASS  idempotent --apply verifies only and writes nothing
+T-PASS  idempotent --apply creates no backup dir
+T-PASS  idempotent --apply leaves staged bytes byte-identical
+T-PASS  B3: restore from extracted-new source
+T-PASS  B3: extracted-new restore returns canonical NEW bytes
+T-PASS  B3: restore from NEW archive source
+T-PASS  B3: archive restore returns canonical NEW bytes
+T-PASS  B3: restore from backup source (default)
+T-PASS  B3: backup restore returns canonical NEW bytes
+T-PASS  B1: apply --include-negative to main + negative targets
+T-PASS  include-negative auto-verify reports 31/0
+T-PASS  B1: verify-plan-b --include-negative
+T-PASS  B1: include-negative verifier = 31 checks (31 passed / 0 failed)
+T-PASS  B1: targets.tsv records both targets
+T-PASS  B1: targets.tsv records the main target
+T-FAIL  B1: targets.tsv records the negative target (pattern '/Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage-neg' not in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-negative/targets.tsv)
+T-PASS  B1: target t1 backup holds its 3 replaced files
+T-PASS  B1: target t2 backup holds its 3 replaced files (no namespace collision)
+T-FAIL  B1: negative target staged bytes are now canonical OLD (byte sets differ)
+    1,3c1,3
+    < acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247  encoder.int8.onnx
+    < 179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e  decoder.int8.onnx
+    < 3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3  joiner.int8.onnx
+    ---
+    > 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479  encoder.int8.onnx
+    > 0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5  decoder.int8.onnx
+    > cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98  joiner.int8.onnx
+T-PASS  B1: restore without --include-negative refuses a two-target backup
+T-PASS  B1: refusal explains --include-negative
+T-PASS  B1: restore --include-negative --apply reverses both targets
+T-PASS  B1: main target byte-identical after include-negative cycle
+T-PASS  B1: negative target byte-identical after include-negative cycle
+T-PASS  B2: apply into an absent staging dir (fresh checkout)
+T-PASS  B2: verify an installed-from-absent target
+T-PASS  B2: missing-target verify = 30 checks (30 passed / 0 failed)
+T-PASS  B2: absent target was populated with the 4 OLD files
+T-PASS  B2: restore removes files that were absent before Plan B
+T-PASS  B2: absent pre-state restored exactly (no model files remain)
+T-PASS  B2: injected rename failure aborts the install
+T-PASS  B2: injected failure was seen by the script
+T-PASS  B2: partial failure leaves staged bytes byte-identical
+T-PASS  B2: partial failure discards the just-created backup dir
+T-PASS  B2: no pre-stage temp files leaked
+T-PASS  B2: recovery apply after partial failure succeeds
+T-PASS  B2: verify after recovery apply
+T-PASS  B2: recovery verify = 30 checks (30 passed / 0 failed)
+T-PASS  Plan B dry-run with --repo pointing at a linked worktree
+T-PASS  linked-worktree Plan B dry-run OK
+T-PASS  production NEW extracted bytes unchanged by suite
+T-PASS  production OLD extracted bytes unchanged by suite
+T-PASS  preserved OLD/NEW archives unchanged by suite
+T-PASS  production staged model assets unchanged by suite
+T-PASS  production negative-worktree staged assets unchanged by suite
+
+SUITE RESULT (plan-b): pass=80 fail=2

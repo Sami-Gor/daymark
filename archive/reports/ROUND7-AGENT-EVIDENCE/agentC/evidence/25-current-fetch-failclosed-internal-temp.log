@@ -1,0 +1,5 @@
+=== current production fetch-parakeet-assets.sh against live upstream, TMPDIR=/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/tmp ===
+2026-11-19T21:33:38Z
+downloading the Parakeet TDT 0.6B v3 int8 model...
+checksum mismatch for /var/folders/r6/l7sx7nmx33sfvyjzrh5d4snr0000gn/T/tmp.3UTADEhVqP/model.tar.bz2: 1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9 != 5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf
+EXIT=1

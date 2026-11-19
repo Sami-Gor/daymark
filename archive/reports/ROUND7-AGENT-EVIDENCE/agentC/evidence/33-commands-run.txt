@@ -1,0 +1,63 @@
+# Key commands run by Round 7 Agent C (2026-11-19, UTC)
+# Output for each is in the evidence file named. Read-only unless noted.
+
+## Setup / scope
+- pwd; df -h /Volumes/DaymarkWorkspace
+- git -C /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pin status --short --branch
+- git -C ... rev-parse HEAD   -> 9002641a7faede2a16434b12e7eeaa94e295a0aa (branch r7/pin)
+- mkdir -p /Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/{mirror,hf,...}   (T5 scratch)
+- mkdir -p .../ROUND7-AGENT-EVIDENCE/agentC/{evidence,drafts}
+
+## Strategy 1 - preserved archive
+- stat -f '...' <archive>; xattr -l <archive>; head -c 3 <archive> | xxd        -> 01-archive-stat.txt
+- shasum -a 256 <archive>                                                       -> 02-archive-sha256.txt
+- tar -tvjf <archive>; tar -tjf <archive> | wc -l                               -> 03-archive-members.txt
+- tar -xjf <archive> -C /Volumes/.../parakeet/mirror; shasum -a 256 <4 files + wavs> -> 04-member-hashes.txt
+- stat -f '%N size=%z ...' <extracted files>                                    -> 06-extracted-tree.txt
+- bash drafts/verify-parakeet-mirror.sh                                         -> 05-mirror-verification-run.log (PASS)
+- sed -n ... pres-1-copy/report.md; grep parakeet-preservation final-migration log; cat quarantine ARCHIVE-PROVENANCE.json -> 07-provenance-chain.txt
+- shasum -a 256 /Volumes/T5Backup/.../sherpa-onnx-...tar.bz2; cmp -s source destination; shasum extracted old-model dir -> 08-t5backup-crosscheck.txt
+- curl api.github.com/repos/k2-fsa/sherpa-onnx/releases/assets/719769366; releases/tags/asr-models; curl -sSIL pinned URL -> 09-upstream-state.txt
+- shasum -a 256 archive/historical-work/recovered/model.tar.bz2                  -> 10-replacement-archive.txt
+- git rev-parse HEAD; grep -rn '<all digests>|MODEL_VERSION'                    -> 11-pin-locations.txt
+- grep -n 'fetch-parakeet|parakeet-assets|model_required|verifyParakeetAssets' .github/workflows/*.yml scripts/ci/classify-model-dependency.mjs -> 12-ci-wiring.txt
+- gh api repos/Sami-Gor/daymark/immutable-releases; gh api repos/Sami-Gor/daymark/releases; curl api repo -> 13-hosting-state.txt
+- sed -n '26,42p' THIRD-PARTY-NOTICES.md; curl huggingface.co/api/models/nvidia/parakeet-tdt-0.6b-v3 -> 14-licence.txt
+- gh release download v2.0.0 -R Sami-Gor/daymark -p SHA256SUMS -D <T5 scratch>  -> 28-release-v2.0.0-SHA256SUMS.txt
+- stat known archive candidates (archive/, quarantine/, T5Backup)              -> 31-archive-copies.txt
+
+## Strategy 2 - Hugging Face fixed revision
+- curl -sS 'https://huggingface.co/api/models/<repo>/revision/2bda32ec...'      -> 17-hf-api-revision-2bda32ec.json
+- curl -sS '.../api/models/<repo>/tree/2bda32ec...'                             -> 18-hf-api-tree-2bda32ec.json
+- curl -sS '.../api/models/<repo>/refs'                                         -> 19-hf-api-refs.json
+- curl -sS '.../api/models/<repo>/commits/main'                                 -> 20-hf-api-commits-main.json
+- bash evidence/collect-hf-api.sh  (retry+backoff after WAF HTML responses)     -> 16-20 JSON
+- curl -sSIL '<resolve>/<rev>/<file>' (HEAD at pinned rev and at main)          -> 21-hf-resolve-headers.txt
+- for f in 4 files: curl -L --fail --retry 5 --retry-delay 3 -C - -o hf/$f '<base>/$f' -> 15-hf-fetch.log
+- shasum -a 256 hf/{encoder,decoder,joiner,tokens}                              -> 22-hf-file-hashes.txt
+- python3 compare fetched hashes to pins + LFS oid table                        -> 23-hf-identity-comparison.txt
+- bash evidence/24-hf-resume-test.sh (--max-time 1 interrupt; -C - resume)      -> 24-hf-resume-test.log
+
+## Current CI failure mode (fail closed)
+- (first run, unmodified script) bash android/kokoro-poc/scripts/fetch-parakeet-assets.sh -> 25-current-fetch-failclosed-internal-temp.log
+- (clean run, temp location pinned to T5) PARAKEET_TEST_WORK=<T5> bash 15b copy     -> 26-current-fetch-failclosed-T5TEMP.log
+
+## Draft patches / manifests / tests
+- diff -u production fetch-parakeet-assets.sh vs controlled-source variant     -> drafts/fetch-parakeet-assets.controlled-source.patch (git apply --check passes)
+- diff -u production vs HF-fallback variant                                    -> drafts/fetch-parakeet-assets.hf-fallback.patch (git apply --check passes)
+- bash -n drafts/fetch-parakeet-assets.hf-fallback.sh                          -> syntax OK
+- bash T5 scratch test-fallback-draft.sh (fake repo roots, T5)                 -> 29-draft-functional-tests.log (4/4 expected outcomes)
+- shasum -a 256 -c drafts/SHA256SUMS.parakeet  (archive symlink + extracted tree symlink) -> all 9 lines OK
+- cp drafts/* r7-pin/android/kokoro-poc/scripts/drafts-agent-c/; cmp each; shasum -a 256 -> 30-draft-files.txt
+- git -C r7-pin status --short --branch; git -C r7-pin diff --stat              -> only untracked drafts-agent-c/; no tracked diff
+
+## Final state
+- No upload, no push, no commit, no production file edit.
+- git diff in r7/pin @ 9002641: empty. Only untracked: android/kokoro-poc/scripts/drafts-agent-c/
+
+## Strategy-1 draft functional tests (fake repo roots on T5)
+- cp production fetch-parakeet-assets.sh -> fake repo; git apply controlled-source patch; pin WORK to T5
+- PARAKEET_ARCHIVE_URL=<local HTTP mirror of preserved archive> -> exit 0, 4/4 hashes -> 34-strategy1-draft-functional-tests.log
+- PARAKEET_ARCHIVE_URL=<missing file, HTTP 404> -> exit 22, no assets installed
+- no override -> committed placeholder release URL (not yet published) -> exit 56, no assets installed
+- digest constants compared before/after patch: all five unchanged

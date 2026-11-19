@@ -1,0 +1,59 @@
+T-INFO  kit: /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-plans/tools/plan-remediation
+T-INFO  scratch: /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a
+T-PASS  all plan/remediation scripts + pins env parse (bash -n)
+T-PASS  A1: apply-plan-a.sh no longer assumes .git is a directory
+T-PASS  A1: repo root is resolved with git rev-parse --show-toplevel
+T-PASS  A2: apply-plan-a.sh has an archive pre-gate before writing
+T-PASS  A1 fixture: linked worktree has a .git file (not a directory)
+T-PASS  baseline scratch repo pins are OLD (pins OLD)
+T-PASS  main-worktree: Plan A apply + auto-verify
+T-PASS  main-worktree: root resolution logged
+T-PASS  main-worktree: apply log shows 55/0 verification
+T-PASS  main-worktree: explicit verify-plan-a run
+T-PASS  canonical Plan A suite (staging NEW) = 55 checks (55 passed / 0 failed)
+T-PASS  post-Plan-A pin-file hashes match the reviewed expected set
+T-PASS  check-state classifies patched main worktree as plan-a
+T-PASS  repeated apply is refused (pins already NEW)
+T-PASS  plan-a-revert.patch applies to the patched tree
+T-PASS  revert patch leaves a clean working tree
+T-PASS  revert patch restores the six pin files byte-identically
+T-PASS  repeat: apply again (repeated execution)
+T-PASS  repeat: reverse with git apply -R
+T-PASS  git apply -R restores the six pin files byte-identically
+T-PASS  linked-worktree: Plan A apply + auto-verify (A1 fix)
+T-PASS  linked-worktree: git root resolution logged
+T-PASS  linked-worktree: verify-plan-a
+T-PASS  linked-worktree Plan A verifier = 55 checks (55 passed / 0 failed)
+T-PASS  linked-worktree: revert patch
+T-PASS  linked-worktree revert is byte-identical
+T-PASS  linked-worktree: refuses OLD staging (Plan A needs NEW bytes)
+T-PASS  dry-run on linked worktree
+T-PASS  dry-run leaves pin files byte-identical
+T-PASS  A3: apply with --allow-missing-staging succeeds
+T-PASS  A3: verifier reports the 42-check missing-staging mode
+T-PASS  A3: missing staging is still refused without the flag
+T-PASS  A3: revert after missing-staging apply
+T-PASS  A3: revert after missing-staging apply is byte-identical
+T-PASS  A2: failed post-verify is detected
+T-PASS  A2: rollback message present
+T-PASS  A2: failed post-verify leaves no tracked changes
+T-PASS  A2: failed post-verify restores byte-identical pin files
+T-PASS  A2: no temp pre-hash files leaked into scratch repo
+T-PASS  A2: bad old archive aborts the apply
+T-PASS  A2: archive pre-gate error names the pre-gate
+T-PASS  A2: archive pre-gate aborts before touching the tree
+T-PASS  A2: archive pre-gate leaves byte-identical pin files
+T-PASS  A4: refresh-evidence-manifest --write
+T-PASS  A4: fresh manifest verifies with --check
+T-PASS  A4: stale manifest detected after a byte changes
+T-PASS  A4: manifest regenerated after change
+T-PASS  A4: manifest missing an added file is detected
+T-PASS  A4: manifest regenerated after file addition
+T-PASS  A4: self-listing manifest is detected as stale
+T-PASS  A4: manifest regenerated cleanly after self-entry
+T-PASS  A4: final manifest is current
+T-PASS  production NEW extracted bytes unchanged by suite
+T-PASS  production OLD extracted bytes unchanged by suite
+T-PASS  preserved OLD/NEW archives unchanged by suite
+
+SUITE RESULT (plan-a): pass=55 fail=0

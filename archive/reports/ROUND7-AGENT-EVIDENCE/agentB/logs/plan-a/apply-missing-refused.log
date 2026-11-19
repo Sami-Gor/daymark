@@ -1,0 +1,16 @@
+[*] repository root /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-a/wt-linked
+[*] Plan A preflight (mode: APPLY)
+WARN:  HEAD c77b6f6e17dd1f57cc9640c041b84530c2cb8e08 differs from planning baseline 45d12748679fa67723e6a5b2d997eb7711f05c43 (allowed)
+PASS  Plan A patch present
+error: patch failed: android/kokoro-poc/scripts/fetch-parakeet-assets.sh:18
+error: android/kokoro-poc/scripts/fetch-parakeet-assets.sh: patch does not apply
+error: patch failed: artifacts/weather-app/android/parakeet-assets/build.gradle:36
+error: artifacts/weather-app/android/parakeet-assets/build.gradle: patch does not apply
+error: patch failed: artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java:26
+error: artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java: patch does not apply
+error: patch failed: artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java:115
+error: artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java: patch does not apply
+error: patch failed: THIRD-PARTY-NOTICES.md:9
+error: THIRD-PARTY-NOTICES.md: patch does not apply
+error: patch failed: docs/release/reproducible-build-guide.md:205
+error: docs/release/reproducible-build-guide.md: patch does not apply

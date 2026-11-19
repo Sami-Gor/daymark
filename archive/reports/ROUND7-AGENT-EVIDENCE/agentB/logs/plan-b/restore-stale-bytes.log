@@ -1,0 +1,4 @@
+[*] Reverse Plan B preflight (mode: DRY-RUN, source: backup)
+      encoder.int8.onnx backup size mismatch
+      encoder.int8.onnx backup sha256 mismatch (stale/tampered backup)
+ERROR: backup is stale/tampered/incomplete; refusing to restore from it

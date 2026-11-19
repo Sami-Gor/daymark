@@ -1,0 +1,106 @@
+# Provenance chain for archive/assets/parakeet-preservation (excerpts from existing records)
+
+## A. pres-1-copy report: T5 source -> Desktop copy, 2026-11-14
+- Mutations performed: only `mkdir -p /Users/m1/Desktop/pr54-work/parakeet-preservation` and one `cp -p` of the archive into it, plus this report directory/file. Nothing on T5 was created, modified, renamed, moved or deleted; nothing was extracted, uploaded, committed or pushed.
+
+## 1. Source (T5)
+
+- Path: `/Volumes/T5Backup/Daymark/01-stt-evaluation/models/parakeet-v3/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2`
+- Size: **487,170,055 bytes** (matches expected 487,170,055)
+- SHA-256: **`5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`** (matches expected)
+- mtime: 2026-10-19T15:53:06+0100; atime: 2026-10-20T21:24:24+0100; ctime: 2026-10-19T15:53:06+0100
+- mode: `-rwx------` (0700), uid 501 / gid 20, blocks 951552, xattr: com.apple.provenance
+- Readability: yes — magic bytes `42 5a 68 39` (`BZh9`) confirm a bzip2 stream.
+
+## 2. T5 mount verification
+
+- `diskutil list` → `/dev/disk4 (external, physical)`, 500.1 GB; `disk4s2` "Microsoft Basic Data **T5Backup**" 499.9 GB.
+- Byte-level confirmation: `cmp -s "$SRC" "$DEST"` → **IDENTICAL** (2026-11-14T14:27:32Z → 14:27:35Z).
+- Readability smoke test: `dd if="$DEST" of=/dev/null bs=1m count=4` → 4,194,304 bytes read, no errors.
+- SHA-256 lines (machine-readable):
+  ```
+  5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf  /Volumes/T5Backup/Daymark/01-stt-evaluation/models/parakeet-v3/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+  5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf  /Users/m1/Desktop/pr54-work/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+  ```
+
+## 6. T5 source re-verification after copy
+
+- Re-check at 2026-11-14T14:27:24Z (post-copy), `shasum -a 256` (real 2.39s):
+  - size **487,170,055** bytes (unchanged), mtime **2026-10-19T15:53:06+0100** (unchanged), ctime 2026-10-19T15:53:06+0100 (unchanged), mode `-rwx------` (unchanged)
+  - SHA-256 **`5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`** (unchanged)
+  - Directory listing unchanged: `._sherpa-onnx-...` (4096), `._...tar.bz2` (4096), extracted `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/` dir, and the archive.
+- No new files, no renames, no deletions, no writes on the T5 volume; pre-existing sibling AppleDouble files are untouched.
+
+## 7. Timelines / elapsed
+
+## 9. Exact commands used
+
+```sh
+diskutil list
+df -h
+diskutil info /Volumes/T5Backup
+stat -f 'name=%N size=%z blocks=%b mtime=%Sm atime=%Sa ctime=%Sc mode=%Sp uid=%u gid=%g' -t '%Y-%m-%dT%H:%M:%S%z' <SRC>
+ls -la /Volumes/T5Backup/Daymark/01-stt-evaluation/models/parakeet-v3/
+head -c 32 <SRC> | xxd
+df -h /Users/m1/Desktop ; df -k /Users/m1/Desktop
+/usr/bin/time -p shasum -a 256 <SRC>
+mkdir -p /Users/m1/Desktop/pr54-work/parakeet-preservation
+/usr/bin/time -p cp -p <SRC> <DEST>
+stat -f 'name=%N size=%z blocks=%b mtime=%Sm atime=%Sa ctime=%Sc mode=%Sp uid=%u gid=%g' -t '%Y-%m-%dT%H:%M:%S%z' <DEST>
+/usr/bin/time -p shasum -a 256 <DEST>
+cmp -s <SRC> <DEST> && echo IDENTICAL
+/usr/bin/time -p shasum -a 256 <SRC>   # post-copy re-verify
+dd if=<DEST> of=/dev/null bs=1m count=4
+ls -lO <SRC> ; ls -lO <DEST> ; xattr -l <SRC> ; xattr -l <DEST>
+```
+
+## B. final migration log: Desktop copy -> archive/assets, 2026-11-17
+48:[19:16:55] copy [20] parakeet-preservation -> archive/assets/parakeet-preservation (465M)
+49:[19:17:03] verified parakeet-preservation: files=1 symlinks=0 manifest=OK
+
+## C. quarantine provenance: old vs replacement archive identity
+{
+ "prepared_at_utc": "2026-11-18T02:41:36Z",
+ "task": "task-16 parakeet archive replacement verification",
+ "authority": "T5 /Volumes/DaymarkWorkspace/Daymark (no local clone used)",
+ "old_archive": {
+  "path": "/Volumes/DaymarkWorkspace/Daymark/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+  "size": 487170055,
+  "sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf",
+  "source": "preserved vetted copy (archive/assets/parakeet-preservation)",
+  "expected_size": 487170055,
+  "expected_sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+ },
+ "new_archive": {
+  "path": "/Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+  "size": 487211443,
+  "sha256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+  "source": "GitHub k2-fsa/sherpa-onnx release asset id 719769366 (asr-models)",
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+  "api": "https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/assets/719769366",
+  "api_digest": "sha256:1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+  "api_size": 487211443,
+  "download_command": "gh api repos/k2-fsa/sherpa-onnx/releases/assets/719769366 -H 'Accept: application/octet-stream' > <path>",
+  "expected_size": 487211443,
+  "expected_sha256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9"
+ },
+ "quarantine": "/Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118",
+ "artifacts": {
+  "members-old.tsv": "tar member metadata (name,type,size,mode,uid,gid,uname,gname,mtime,linkname)",
+  "members-new.tsv": "tar member metadata",
+  "manifest-old.tsv": "member sha256 + metadata",
+  "manifest-new.tsv": "member sha256 + metadata",
+  "member-diff.tsv": "added/removed/changed/unchanged member diff",
+  "manifest-old.json": "full member metadata + sha256 JSON",
+  "manifest-new.json": "full member metadata + sha256 JSON",
+  "member-diff.json": "member diff JSON",
+  "onnx-summary-both.json": "not produced (superseded by onnx-compare-*.json)",
+  "onnx-compare-encoder.json": "ONNX graph/initializer comparison (encoder)",
+  "onnx-compare-decoder.json": "ONNX graph/initializer comparison (decoder)",
+  "onnx-compare-joiner.json": "ONNX graph/initializer comparison (joiner)",
+  "init-hashes-*.json": "per-initializer sha256 lists",
+  "asset-719769366.metadata.json": "GitHub release-asset API metadata captured before download",
+  "extracted-old/": "old archive extracted (never executed)",
+  "extracted-new/": "new archive extracted (never executed)"
+ }
+}

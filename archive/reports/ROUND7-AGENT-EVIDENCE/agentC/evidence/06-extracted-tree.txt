@@ -1,0 +1,9 @@
+# extracted tree (T5 scratch)
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/mirror/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt size=93939 mode=-rw-r--r-- mtime=2025-08-16T10:28:03+0100
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/mirror/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx size=6355277 mode=-rw-r--r-- mtime=2025-08-16T10:28:03+0100
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/mirror/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx size=11845275 mode=-rw-r--r-- mtime=2025-08-16T10:28:03+0100
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/mirror/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx size=652184281 mode=-rw-r--r-- mtime=2025-08-16T10:28:03+0100
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/mirror/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/en.wav size=184608 mode=-rw-r--r-- mtime=2025-08-16T10:28:03+0100
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/mirror/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/fr.wav size=219180 mode=-rw-r--r-- mtime=2025-08-16T10:28:03+0100
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/mirror/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/es.wav size=235052 mode=-rw-r--r-- mtime=2025-08-16T10:28:03+0100
+/Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/mirror/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/de.wav size=121388 mode=-rw-r--r-- mtime=2025-08-16T10:28:03+0100

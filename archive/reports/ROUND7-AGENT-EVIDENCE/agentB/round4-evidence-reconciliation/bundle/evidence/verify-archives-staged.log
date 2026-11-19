@@ -1,0 +1,11 @@
+ARCHIVE old 487170055 5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf members 10
+ARCHIVE new 487211443 1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9 members 11
+STAGED /Volumes/DaymarkWorkspace/Daymark/repositories/daymark/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet encoder.int8.onnx 652282294 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479
+STAGED /Volumes/DaymarkWorkspace/Daymark/repositories/daymark/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet decoder.int8.onnx 11845274 0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5
+STAGED /Volumes/DaymarkWorkspace/Daymark/repositories/daymark/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet joiner.int8.onnx 6355277 cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98
+STAGED /Volumes/DaymarkWorkspace/Daymark/repositories/daymark/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet tokens.txt 93939 d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d
+STAGED /Volumes/DaymarkWorkspace/Daymark/worktrees/negative/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet encoder.int8.onnx 652282294 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479
+STAGED /Volumes/DaymarkWorkspace/Daymark/worktrees/negative/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet decoder.int8.onnx 11845274 0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5
+STAGED /Volumes/DaymarkWorkspace/Daymark/worktrees/negative/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet joiner.int8.onnx 6355277 cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98
+STAGED /Volumes/DaymarkWorkspace/Daymark/worktrees/negative/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet tokens.txt 93939 d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d
+DONE

@@ -1,0 +1,28 @@
+[*] Reverse Plan B preflight (mode: APPLY, source: extracted-new)
+[*] backup provenance, targets and per-target manifests verified
+[*] targets: 1 (main /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage)
+PASS  recovery source encoder.int8.onnx size
+PASS  recovery source encoder.int8.onnx sha256
+PASS  recovery source decoder.int8.onnx size
+PASS  recovery source decoder.int8.onnx sha256
+PASS  recovery source joiner.int8.onnx size
+PASS  recovery source joiner.int8.onnx sha256
+PASS  recovery source tokens.txt size
+PASS  recovery source tokens.txt sha256
+
+== Planned reverse-Plan-B change ==
+backup dir    /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-repeat
+source        extracted-new
+mode          APPLY
+target        t1 /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage (state old)
+actions       4 write/remove, 0 skip
+
+[*] pre-staged and hash-verified every replacement; destination bytes saved for rollback
+[*]   restored encoder.int8.onnx
+[*]   restored decoder.int8.onnx
+[*]   restored joiner.int8.onnx
+
+OK: staged bytes restored from source 'extracted-new' for 1 target(s).
+Backup retained at /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-repeat (can be removed once Plan A pins are applied and the
+old archive is preserved; keep it until the owner-gated window closes).
+State: staged NEW (hazard with OLD pins; run apply-plan-a.sh under an approved window).

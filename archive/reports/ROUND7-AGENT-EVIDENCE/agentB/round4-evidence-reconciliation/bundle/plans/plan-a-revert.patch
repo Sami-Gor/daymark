@@ -1,0 +1,123 @@
+--- a/android/kokoro-poc/scripts/fetch-parakeet-assets.sh
++++ b/android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+@@ -18,11 +18,11 @@
+ ASSETS="$REPO/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet"
+ 
+ ARCHIVE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
+-ARCHIVE_SHA256="1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9"
++ARCHIVE_SHA256="5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+ 
+-ENCODER_SHA256="1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479"
+-DECODER_SHA256="0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5"
+-JOINER_SHA256="cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98"
++ENCODER_SHA256="acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"
++DECODER_SHA256="179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e"
++JOINER_SHA256="3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3"
+ TOKENS_SHA256="d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+ 
+ WORK="$(mktemp -d)"
+--- a/artifacts/weather-app/android/parakeet-assets/build.gradle
++++ b/artifacts/weather-app/android/parakeet-assets/build.gradle
+@@ -36,9 +36,9 @@
+ // android/kokoro-poc/scripts/fetch-parakeet-assets.sh. The same values are
+ // compiled into the app, where they are checked again before the model loads.
+ def modelSha256 = [
+-    "encoder.int8.onnx": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+-    "decoder.int8.onnx": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+-    "joiner.int8.onnx":  "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
++    "encoder.int8.onnx": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
++    "decoder.int8.onnx": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
++    "joiner.int8.onnx":  "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+     "tokens.txt":        "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+ ]
+ 
+--- a/artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
++++ b/artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
+@@ -26,8 +26,8 @@
+ 
+     /** Exact byte lengths; a truncated or partial copy must be treated as corrupt. */
+     public static final long[] MODEL_FILE_SIZES = {
+-        652282294L,
+-        11845274L,
++        652184281L,
++        11845275L,
+         6355277L,
+         93939L,
+     };
+@@ -42,9 +42,9 @@
+      * authority for what may be loaded.
+      */
+     public static final String[] MODEL_FILE_SHA256 = {
+-        "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+-        "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+-        "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
++        "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
++        "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
++        "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+         "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+     };
+ 
+@@ -55,7 +55,7 @@
+      * written for a different identifier is treated as stale and the model is
+      * re-hashed before it may be used.
+      */
+-    public static final String MODEL_VERSION = "parakeet-tdt-0.6b-v3-int8-sha256-2";
++    public static final String MODEL_VERSION = "parakeet-tdt-0.6b-v3-int8-sha256-1";
+ 
+     /** Directory inside the app's private files directory the model is materialised into. */
+     public static final String MODEL_DIRECTORY = "parakeet-v3-model";
+--- a/artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
++++ b/artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
+@@ -115,7 +115,7 @@
+ 
+     @Test
+     public void modelFileSizesMatchPinnedValues() {
+-        long[] expected = {652282294L, 11845274L, 6355277L, 93939L};
++        long[] expected = {652184281L, 11845275L, 6355277L, 93939L};
+         assertEquals(expected.length, ParakeetModelAssets.MODEL_FILE_SIZES.length);
+         for (int i = 0; i < expected.length; i++) {
+             assertEquals(expected[i], ParakeetModelAssets.MODEL_FILE_SIZES[i]);
+--- a/THIRD-PARTY-NOTICES.md
++++ b/THIRD-PARTY-NOTICES.md
+@@ -9,7 +9,7 @@
+ 
+ | Component | Version | Licence | Redistributed in | Notes |
+ |---|---|---|---|---|
+-| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
++| [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2), archive SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
+ | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (Android AAR) | 1.13.8 | **Apache-2.0** | V2 candidate (Android) | Fetched at build time by `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` from the [v1.13.8 release](https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar), SHA-256 `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96`. Contains the sherpa-onnx JNI libraries and, in turn, the ONNX Runtime libraries below. |
+ | [ONNX Runtime](https://github.com/microsoft/onnxruntime) (bundled in the sherpa-onnx AAR) | 1.18.1 (as shipped in the AAR) | **MIT** | V2 candidate (Android) | `libonnxruntime.so` and the sherpa JNI libraries, arm64-v8a only. |
+ | [pguso/kokoro](https://github.com/pguso/kokoro) runtime | `kokoro-en` 0.1.5, commit `b42bd5cf915163607cb51984cabf273dcf09755e` | Apache-2.0 | v1.0.0 and V2 candidate | `android/kokoro-poc/README.md` has the full build and licence matrix. |
+@@ -46,10 +46,10 @@
+ 
+ | Artefact | SHA-256 |
+ |---|---|
+-| `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9` |
+-| `encoder.int8.onnx` | `1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479` |
+-| `decoder.int8.onnx` | `0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5` |
+-| `joiner.int8.onnx` | `cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98` |
++| `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
++| `encoder.int8.onnx` | `acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247` |
++| `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
++| `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
+ | `tokens.txt` | `d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d` |
+ | `sherpa-onnx-1.13.8.aar` | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
+ | `model_quantized.onnx` (Kokoro) | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
+--- a/docs/release/reproducible-build-guide.md
++++ b/docs/release/reproducible-build-guide.md
+@@ -205,11 +205,11 @@
+ | Kokoro model | `onnx/model_quantized.onnx` | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
+ | Kokoro voice | `bm_fable.bin` | `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1` |
+ | sherpa-onnx | 1.13.8 AAR | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
+-| Parakeet encoder | `encoder.int8.onnx` | `1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479` |
+-| Parakeet decoder | `decoder.int8.onnx` | `0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5` |
+-| Parakeet joiner | `joiner.int8.onnx` | `cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98` |
++| Parakeet encoder | `encoder.int8.onnx` | `acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247` |
++| Parakeet decoder | `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
++| Parakeet joiner | `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
+ | Parakeet tokens | `tokens.txt` | `d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d` |
+-| Parakeet archive | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9` |
++| Parakeet archive | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
+ 
+ The NDK's `libc++_shared.so` used by the Kokoro build was
+ `0c52cfab2df0d957d8b346a2bdc5ae8d71feca2591924d77e1cd724d5bf74352`

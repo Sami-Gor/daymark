@@ -1,0 +1,63 @@
+== HEAD ==
+45d12748679fa67723e6a5b2d997eb7711f05c43
+       0
+
+== refs count ==
+     119
+
+== worktrees ==
+      19
+
+== pin file sha256 at HEAD ==
+ec2a83efe354de40a7aba4b9c36c52307ff3d0f3dfe2aeb7e0888ed5a8ee16b8  android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+f4f2846559b04ec971b7c75ef7d35871c252ece378a53abbe3d85fa9a8cbca28  artifacts/weather-app/android/parakeet-assets/build.gradle
+acd2525099a17958330ffa4452a79b5d40c8a41368d67364c9d5d8d453146609  artifacts/weather-app/android/daymark-voice/src/main/java/io/github/sami_gor/daymark/voice/ParakeetModelAssets.java
+272bedea2c3945a92616cdd9f1808ff6083e18db91d1d6dc59f42454463ce467  artifacts/weather-app/android/daymark-voice/src/test/java/io/github/sami_gor/daymark/voice/ParakeetModelAssetsTest.java
+48ace6e4d4c3a1b066c438c5290e49b16cad0e6a7bc946d48a6bd796ef10b39c  THIRD-PARTY-NOTICES.md
+ee08c794c9dfef30845db77925cf63e0dcecac3752f5a030ac4340323f104da9  docs/release/reproducible-build-guide.md
+
+== git grep OLD values at HEAD (count by value) ==
+5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf files=3
+acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247 files=5
+179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e files=5
+3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3 files=5
+d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d files=5
+
+== git grep NEW values at HEAD ==
+1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9 files=0
+1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479 files=0
+0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5 files=0
+cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98 files=0
+
+== git log --all -S NEW values ==
+1495e91b commits=0
+1afbe69c commits=0
+0222a861 commits=0
+cbd02f36 commits=0
+652282294 commits=0
+11845274 commits=0
+487211443 commits=0
+
+== all refs: new digest presence ==
+ref new-digest scan done (0 hits expected)
+
+== working trees: new digests in 6 pin files ==
+WT daymark new_hits=0
+WT f15-followup new_hits=0
+WT f15-work new_hits=0
+WT n1-work new_hits=0
+WT n3-work new_hits=0
+WT n4-work new_hits=0
+WT n5-work new_hits=0
+WT negative new_hits=0
+WT remediation-mirror new_hits=0
+WT remediation-n4 new_hits=0
+WT review-f2 new_hits=0
+WT review-n3 new_hits=0
+WT review-n4 new_hits=0
+WT round3-docs new_hits=0
+WT round3-integration new_hits=0
+WT round3-native new_hits=0
+WT round4-android-harness new_hits=0
+WT round4-integration new_hits=0
+WT round4-main-integration new_hits=0

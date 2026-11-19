@@ -1,0 +1,11 @@
+[*] collecting git state
+[*] collecting deliverable patch + commit
+[*] regenerating deliverable SHA256SUMS
+[*] hashing production staged assets + archives (read-only)
+[*] collecting test logs
+[*] collecting hash snapshots
+[*] collecting backup-layout evidence
+[*] building corrected round-4 evidence bundle (originals untouched)
+[*] computing stale-entry analysis of the original manifest
+[*] capturing environment
+[*] done

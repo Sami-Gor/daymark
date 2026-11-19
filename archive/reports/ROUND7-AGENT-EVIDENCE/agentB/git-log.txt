@@ -1,0 +1,5 @@
+a076df3 tools(plan-remediation): fix Plan A/B rollback scripts (A1-A4, B1-B3) with regression suites
+9002641 Merge pull request #78 from Sami-Gor/infra/ci-model-dependency-separation
+48a4bfc ci: separate model-dependent validation from core checks
+d6c85ea Merge pull request #54 from Sami-Gor/fix/cve-2026-108954-sherpa
+72e2d21 fix(android): measure speech endpoint in sample frames

@@ -1,0 +1,17 @@
+# Known copies of the Parakeet archive (explicit candidate check, 2026-11-19)
+utc=2026-11-19T21:50:24Z
+# A full-volume size scan was attempted and abandoned (too slow under concurrent load).
+# This checks the known candidate locations instead.
+
+size=487170055 mtime=2026-10-19T15:53:06+0100 /Volumes/DaymarkWorkspace/Daymark/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+size=487211443 mtime=2026-11-11T15:13:16+0000 /Volumes/DaymarkWorkspace/Daymark/archive/historical-work/recovered/model.tar.bz2
+size=487211443 mtime=2026-11-18T02:29:48+0000 /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+size=487170055 mtime=2026-10-19T15:53:06+0100 /Volumes/T5Backup/Daymark/01-stt-evaluation/models/parakeet-v3/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+
+# Non-archive old-model locations (extracted directories, not archives):
+DIR /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+DIR /Volumes/T5Backup/Daymark/01-stt-evaluation/models/parakeet-v3/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+
+# Conclusion: one copy of the pinned archive on DaymarkWorkspace (archive/assets/parakeet-preservation),
+# one byte-identical copy on the separate T5Backup volume, and the replacement archive
+# (487,211,443 B) in archive/historical-work/recovered and quarantine/parakeet-20261118.

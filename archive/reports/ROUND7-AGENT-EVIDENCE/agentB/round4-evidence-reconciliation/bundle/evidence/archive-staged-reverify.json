@@ -1,0 +1,208 @@
+{
+  "archives": {
+    "new": {
+      "members": [
+        {
+          "declared_size": 0,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+          "type": "dir"
+        },
+        {
+          "declared_size": 93939,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt",
+          "read_size": 93939,
+          "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+          "type": "file"
+        },
+        {
+          "declared_size": 4905,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/README.md",
+          "read_size": 4905,
+          "sha256": "701a3375e3fe77308d280c673d34146162d2f1602b44f97d99086e3f537a1119",
+          "type": "file"
+        },
+        {
+          "declared_size": 6355277,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx",
+          "read_size": 6355277,
+          "sha256": "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
+          "type": "file"
+        },
+        {
+          "declared_size": 11845274,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx",
+          "read_size": 11845274,
+          "sha256": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+          "type": "file"
+        },
+        {
+          "declared_size": 652282294,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx",
+          "read_size": 652282294,
+          "sha256": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+          "type": "file"
+        },
+        {
+          "declared_size": 0,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs",
+          "type": "dir"
+        },
+        {
+          "declared_size": 184608,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/en.wav",
+          "read_size": 184608,
+          "sha256": "148b936b43ce7c546a866e64da059f0458aee2d65e617f16e9d94f06e8d99ed6",
+          "type": "file"
+        },
+        {
+          "declared_size": 219180,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/fr.wav",
+          "read_size": 219180,
+          "sha256": "b59be4349b92d344fb903677165eaf4694025d1ab119c608726ecbcb3164b528",
+          "type": "file"
+        },
+        {
+          "declared_size": 235052,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/es.wav",
+          "read_size": 235052,
+          "sha256": "49fd2cfa4b62db7068143c582b35de9d31ec2733495ece3611105131d21de06c",
+          "type": "file"
+        },
+        {
+          "declared_size": 121388,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/de.wav",
+          "read_size": 121388,
+          "sha256": "36d3c4845b9808a1656a2a2e92d884590e2db94389e6fe559643291ae0cd3710",
+          "type": "file"
+        }
+      ],
+      "mode": "0o644",
+      "mtime": 1794968988,
+      "path": "/Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+      "sha256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+      "size": 487211443
+    },
+    "old": {
+      "members": [
+        {
+          "declared_size": 0,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+          "type": "dir"
+        },
+        {
+          "declared_size": 93939,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt",
+          "read_size": 93939,
+          "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+          "type": "file"
+        },
+        {
+          "declared_size": 6355277,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx",
+          "read_size": 6355277,
+          "sha256": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+          "type": "file"
+        },
+        {
+          "declared_size": 11845275,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx",
+          "read_size": 11845275,
+          "sha256": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+          "type": "file"
+        },
+        {
+          "declared_size": 652184281,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx",
+          "read_size": 652184281,
+          "sha256": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+          "type": "file"
+        },
+        {
+          "declared_size": 0,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs",
+          "type": "dir"
+        },
+        {
+          "declared_size": 184608,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/en.wav",
+          "read_size": 184608,
+          "sha256": "148b936b43ce7c546a866e64da059f0458aee2d65e617f16e9d94f06e8d99ed6",
+          "type": "file"
+        },
+        {
+          "declared_size": 219180,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/fr.wav",
+          "read_size": 219180,
+          "sha256": "b59be4349b92d344fb903677165eaf4694025d1ab119c608726ecbcb3164b528",
+          "type": "file"
+        },
+        {
+          "declared_size": 235052,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/es.wav",
+          "read_size": 235052,
+          "sha256": "49fd2cfa4b62db7068143c582b35de9d31ec2733495ece3611105131d21de06c",
+          "type": "file"
+        },
+        {
+          "declared_size": 121388,
+          "name": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/de.wav",
+          "read_size": 121388,
+          "sha256": "36d3c4845b9808a1656a2a2e92d884590e2db94389e6fe559643291ae0cd3710",
+          "type": "file"
+        }
+      ],
+      "mode": "0o700",
+      "mtime": 1792421586,
+      "path": "/Volumes/DaymarkWorkspace/Daymark/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+      "sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf",
+      "size": 487170055
+    }
+  },
+  "generated_at": "2026-11-18T04:11:30Z",
+  "staged": {
+    "/Volumes/DaymarkWorkspace/Daymark/repositories/daymark/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet": {
+      "decoder.int8.onnx": {
+        "mtime": 1794410042,
+        "sha256": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+        "size": 11845274
+      },
+      "encoder.int8.onnx": {
+        "mtime": 1794410042,
+        "sha256": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+        "size": 652282294
+      },
+      "joiner.int8.onnx": {
+        "mtime": 1794410042,
+        "sha256": "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
+        "size": 6355277
+      },
+      "tokens.txt": {
+        "mtime": 1794410042,
+        "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+        "size": 93939
+      }
+    },
+    "/Volumes/DaymarkWorkspace/Daymark/worktrees/negative/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet": {
+      "decoder.int8.onnx": {
+        "mtime": 1794410160,
+        "sha256": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5",
+        "size": 11845274
+      },
+      "encoder.int8.onnx": {
+        "mtime": 1794410161,
+        "sha256": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479",
+        "size": 652282294
+      },
+      "joiner.int8.onnx": {
+        "mtime": 1794410161,
+        "sha256": "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98",
+        "size": 6355277
+      },
+      "tokens.txt": {
+        "mtime": 1794410161,
+        "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+        "size": 93939
+      }
+    }
+  }
+}

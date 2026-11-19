@@ -1,0 +1,26 @@
+[*] Plan B preflight (mode: DRY-RUN)
+[*] pin state is OLD (MODEL_VERSION sha256-1, all old digests) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/wt
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+[*] archives verified (OLD preserved + NEW quarantine)
+PASS  old source encoder size
+PASS  old source encoder sha256
+PASS  old source decoder size
+PASS  old source decoder sha256
+PASS  old source joiner size
+PASS  old source joiner sha256
+PASS  old source tokens size
+PASS  old source tokens sha256
+[*] old source verified: /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+
+== Planned Plan B change ==
+source        /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+mode          DRY-RUN
+target        t1 /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage (pre-state new)
+files         encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt (replace=3 install=0 skip=1)
+backup dir    /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-linked
+
+DRY-RUN OK: old source verified, targets classified, no files were written.
+Re-run with --apply to back up current bytes and restore the OLD staged bytes.

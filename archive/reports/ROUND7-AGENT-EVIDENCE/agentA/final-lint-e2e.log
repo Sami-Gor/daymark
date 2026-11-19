@@ -1,0 +1,1 @@
+$ eslint tests/e2e --max-warnings=0

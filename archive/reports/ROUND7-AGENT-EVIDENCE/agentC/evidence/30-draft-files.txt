@@ -1,0 +1,19 @@
+# Draft files delivered under r7/pin (untracked; NOT applied)
+utc=2026-11-19T21:50:33Z
+worktree=/Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pin
+worktree_head=9002641a7faede2a16434b12e7eeaa94e295a0aa
+
+## SHA-256 (evidence draft = canonical; r7/pin copies verified identical)
+1f90d171450433f33fffa1f5e7332ad98b456d4b68790fab3f2d25c3c6382a3f  README.md
+afaa849323c2f5c625ecf4abb6d7c6b6f180c7127d162b21c43990fa78503467  fetch-parakeet-assets.controlled-source.patch
+8432e319e29a7b3950224096de1722eb4f92a2ac0919912a2bb1020c3e68c211  fetch-parakeet-assets.hf-fallback.patch
+82a2c14e7dabcff4ea4f8cdb94978785f9ea0bd347c0f2703c8b0de78862d400  fetch-parakeet-assets.hf-fallback.sh
+bb7bbbca8d5dfbb275d4c00bd4fb89fde4d7e888c1efbcea088e51148676c621  SHA256SUMS.parakeet
+5bbbb96c9bf6f7b04d1162a57605ad766e5d33c8c8e6edbbed21056c4e698377  verify-parakeet-mirror.sh
+74ea8e55250f1fbe7e2c85224fb533f5f7166239d2a894f8da978421d7eaddcc  fetch-hf-pinned-revision.sh
+
+## r7/pin working tree state
+## r7/pin...origin/release/v2-candidate
+?? android/kokoro-poc/scripts/drafts-agent-c/
+## tracked diff (must be empty - no production change)
+(end)

@@ -1,0 +1,34 @@
+# DRAFT PATCH - NOT APPLIED (Round 7 Agent C, strategy 1: Daymark-controlled archive source)
+# Apply from the repository root with: git apply <this file>
+
+--- a/android/kokoro-poc/scripts/fetch-parakeet-assets.sh
++++ b/android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+@@ -11,13 +11,27 @@
+ # Both the archive and every extracted file are verified against pinned
+ # SHA-256 values, so a corrupted or substituted download fails the build
+ # rather than shipping.
++#
++# SOURCE POLICY: the archive is fetched from a Daymark-controlled release
++# asset, not from the upstream release. Upstream replaced the pinned asset
++# on 2026-11-07 (same name, different bytes); its URL is kept below only as
++# provenance and is never fetched. PARAKEET_ARCHIVE_URL may point at an
++# approved mirror only; the SHA-256 pin is unchanged and always wins.
+ set -euo pipefail
+ 
+ HERE="$(cd "$(dirname "$0")" && pwd)"
+ REPO="$HERE/../../.."
+ ASSETS="$REPO/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet"
+ 
+-ARCHIVE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
++# Historical provenance only: the upstream asr-models release asset was
++# replaced on 2026-11-07 and no longer serves the pinned bytes. Never fetch it.
++UPSTREAM_ARCHIVE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
++
++# Approved controlled storage for the pinned archive. OWNER ACTION REQUIRED:
++# create the immutable release asset, then replace this placeholder URL.
++# The pinned SHA-256 below is unchanged, so a wrong or substituted URL fails closed.
++CONTROLLED_ARCHIVE_URL="https://github.com/Sami-Gor/daymark/releases/download/parakeet-tdt-0.6b-v3-int8-v1/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
++ARCHIVE_URL="${PARAKEET_ARCHIVE_URL:-$CONTROLLED_ARCHIVE_URL}"
+ ARCHIVE_SHA256="5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+ 
+ ENCODER_SHA256="acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"

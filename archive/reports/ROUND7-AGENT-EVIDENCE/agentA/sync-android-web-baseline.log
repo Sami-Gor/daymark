@@ -1,0 +1,31 @@
+$ pnpm run build && pnpm exec cap copy android && pnpm run verify:android-web-assets
+$ vite build --config vite.config.ts
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 1843 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/public/index.html                                       2.11 kB │ gzip:   0.77 kB
+dist/public/assets/locality.worker-CEmdYeMH.js               2.33 kB
+dist/public/assets/dm-mono-latin-400-5TJO7pqc.woff2          8.68 kB
+dist/public/assets/dm-mono-latin-500-CO0PTrKB.woff2          8.72 kB
+dist/public/assets/plus-jakarta-sans-latin-B2KjpZfh.woff2   27.27 kB
+dist/public/assets/fraunces-latin-BOz5zopO.woff2            67.38 kB
+dist/public/assets/index-CIlMOAdv.css                       75.89 kB │ gzip:  14.92 kB
+dist/public/assets/web-k8wJZHoh.js                           0.31 kB │ gzip:   0.22 kB
+dist/public/assets/web-CNuwcZ72.js                           0.84 kB │ gzip:   0.40 kB
+dist/public/assets/index-C7S1IDwp.js                       552.99 kB │ gzip: 167.81 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 418ms
+✔ Copying web assets from public to android/app/src/main/assets/public in 34.77ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 422.42μs
+✔ copy android in 49.92ms
+$ node scripts/verify-android-web-assets.mjs
+PASS: 27 web files match the Android copy (29 Android files; allowed Capacitor extras: cordova.js, cordova_plugins.js).
+dist: /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/dist/public
+android: /Volumes/DaymarkWorkspace/Daymark/worktrees/r7-pr80/artifacts/weather-app/android/app/src/main/assets/public

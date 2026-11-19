@@ -1,0 +1,14 @@
+# stat of the preserved archive
+utc=2026-11-19T21:36:36Z
+path=/Volumes/DaymarkWorkspace/Daymark/archive/assets/parakeet-preservation/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+size=487170055 bytes
+blocks=951512
+mtime=2026-10-19T15:53:06+0100
+birth=2026-10-19T15:53:06+0100
+ctime=2026-11-17T19:16:59+0000
+mode=-rwx------
+uid=501 gid=20
+xattr:
+com.apple.provenance: 
+magic:
+00000000: 425a 68                                  BZh

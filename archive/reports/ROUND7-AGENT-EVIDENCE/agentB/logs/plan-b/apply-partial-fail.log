@@ -1,0 +1,33 @@
+[*] Plan B preflight (mode: APPLY)
+[*] pin state is OLD (MODEL_VERSION sha256-1, all old digests) in /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/repo
+PASS  old archive size
+PASS  old archive sha256
+PASS  new archive size
+PASS  new archive sha256
+[*] archives verified (OLD preserved + NEW quarantine)
+PASS  old source encoder size
+PASS  old source encoder sha256
+PASS  old source decoder size
+PASS  old source decoder sha256
+PASS  old source joiner size
+PASS  old source joiner sha256
+PASS  old source tokens size
+PASS  old source tokens sha256
+[*] old source verified: /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+
+== Planned Plan B change ==
+source        /Volumes/DaymarkWorkspace/Daymark/quarantine/parakeet-20261118/extracted-old/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+mode          APPLY
+target        t1 /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage (pre-state new)
+files         encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt (replace=3 install=0 skip=1)
+backup dir    /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-partial-fail
+
+[*] backup dir: /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/backup-partial-fail
+[*] backup verified: 3 NEW file(s) preserved, 0 absent file(s) recorded
+[*] pre-staged 3+0 OLD file(s) and verified every temp copy
+mv: injected failure (test shim, invocation 2)
+WARN:  rename failed: /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage/.plan-b-tmp.20261119T221702Z.92423.decoder.int8.onnx -> /Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/stage/decoder.int8.onnx
+WARN:  transactional rollback: restoring pre-Plan-B staged bytes for every target
+[*] rollback complete: targets restored to their pre-apply bytes
+[*] discarded the backup directory created by this failed run (no target was changed)
+ERROR: install commit failed for decoder.int8.onnx; targets were rolled back where possible

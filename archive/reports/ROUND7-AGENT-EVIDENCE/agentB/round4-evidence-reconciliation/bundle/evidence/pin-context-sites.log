@@ -1,0 +1,30 @@
+== P14 .gitignore ==
+102:parakeet-assets/src/main/assets/parakeet/
+
+== P15/P16/P17 workflows ==
+.github/workflows/android-ci.yml:132:        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+.github/workflows/ci.yml:211:        run: android/kokoro-poc/scripts/fetch-parakeet-assets.sh
+.github/workflows/ci.yml:215:        run: ./gradlew --no-daemon :parakeet-assets:verifyParakeetAssets :app:assembleDebug :app:bundleDebug
+
+== P18 classifier ==
+38:  ['Parakeet asset pack', /^artifacts\/weather-app\/android\/parakeet-assets\//],
+
+== P19 archive manifests ==
+-rw-r--r--@ 1 m1  staff  119 Nov 17 19:17 /Volumes/DaymarkWorkspace/Daymark/archive/manifests/parakeet-preservation.dst.sha256
+-rw-r--r--@ 1 m1  staff  119 Nov 17 19:17 /Volumes/DaymarkWorkspace/Daymark/archive/manifests/parakeet-preservation.src.sha256
+5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf  ./sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+
+== P20 manifests/negative.sha256 lines 316-319 ==
+0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5  ./artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet/decoder.int8.onnx
+1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479  ./artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet/encoder.int8.onnx
+cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98  ./artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet/joiner.int8.onnx
+d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d  ./artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet/tokens.txt
+
+== staged bytes on disk ==
+total 1309728
+drwxr-xr-x@ 6 m1  staff        192 Nov 11 15:14 .
+drwxr-xr-x@ 3 m1  staff         96 Nov 11 15:14 ..
+-rw-r--r--@ 1 m1  staff   11845274 Nov 11 15:14 decoder.int8.onnx
+-rw-r--r--@ 1 m1  staff  652282294 Nov 11 15:14 encoder.int8.onnx
+-rw-r--r--@ 1 m1  staff    6355277 Nov 11 15:14 joiner.int8.onnx
+-rw-r--r--@ 1 m1  staff      93939 Nov 11 15:14 tokens.txt

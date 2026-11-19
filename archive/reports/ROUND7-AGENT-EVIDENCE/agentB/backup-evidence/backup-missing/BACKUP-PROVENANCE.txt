@@ -1,0 +1,10 @@
+# Plan B staged-asset backup (v2 multi-target)
+created_utc=20261119T221619Z
+source_repo=/Volumes/DaymarkWorkspace/Daymark/cache/round7/plans/test-run/plan-b/repo
+plan_script=apply-plan-b.sh
+old_archive_sha256=5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf
+new_archive_sha256=1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9
+format_version=2
+target_count=1
+targets_tsv_sha256=41cfef87faa96b91f399ee1792a750757f7be6a924a56672d53db2abccc53665
+manifest_sha256_t1=7c52f76d81a3494001f777a0363c5b1978faf68f37091039a5aea6d6a046c348

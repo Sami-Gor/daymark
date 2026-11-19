@@ -1,0 +1,104 @@
+=== HF pinned-revision fetch ===
+repo=csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+revision=2bda32ec70b097a55adaa07d9a7173915b43cc78
+start_utc=2026-11-19T21:30:29Z
+
+=== encoder.int8.onnx ===
+-- HEAD headers --
+HTTP/2 302 
+content-type: text/plain; charset=utf-8
+content-length: 1042
+location: https://us.aws.cdn.hf.co/xet-bridge-us/68a033194fecdee6cf8c83aa/bccb26a4af13b8167e24a8d2b031cc2aacb31fe041dfc9a14741e80aa07a3287?response-content-disposition=inline%3B+filename*%3DUTF-8%27%27encoder.int8.onnx%3B+filename%3D%22encoder.int8.onnx%22%3B&user_id=public&X-Xet-Cas-Uid=public&xip=itGIktM-gm0&Expires=1795127429&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5hd3MuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjhhMDMzMTk0ZmVjZGVlNmNmOGM4M2FhL2JjY2IyNmE0YWYxM2I4MTY3ZTI0YThkMmIwMzFjYzJhYWNiMzFmZTA0MWRmYzlhMTQ3NDFlODBhYTA3YTMyODdcXD9yZXNwb25zZS1jb250ZW50LWRpc3Bvc2l0aW9uPWlubGluZSUzQitmaWxlbmFtZSUyQSUzRFVURi04JTI3JTI3ZW5jb2Rlci5pbnQ4Lm9ubnglM0IrZmlsZW5hbWUlM0QlMjJlbmNvZGVyLmludDgub25ueCUyMiUzQiZ1c2VyX2lkPXB1YmxpYyZYLVhldC1DYXMtVWlkPXB1YmxpYyZ4aXA9aXRHSWt0TS1nbTAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkVwb2NoVGltZSI6MTc5NTEyNzQyOX19fV19&Signature=MEYCIQCT659JdD8UkacaFvlirmBXEJkm%7Eqej6W-sKACkcDLixAIhAOputPa6Vw6IdZ6WRD1TqPEg%7E23bsH9ZYx27b2CwIf8t&Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F&Hash-Algorithm=SHA256
+x-linked-size: 652184281
+x-linked-etag: "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"
+HTTP/2 200 
+content-type: application/octet-stream
+etag: "bccb26a4af13b8167e24a8d2b031cc2aacb31fe041dfc9a14741e80aa07a3287"
+content-length: 652184281
+-- GET (resumable) --
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  1042  100  1042    0     0   6182      0 --:--:-- --:--:-- --:--:--  6202
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  3  621M    3 24.3M    0     0  19.3M      0  0:00:32  0:00:01  0:00:31 24.6M  8  621M    8 53.3M    0     0  23.6M      0  0:00:26  0:00:02  0:00:24 26.8M 13  621M   13 82.7M    0     0  24.9M      0  0:00:24  0:00:03  0:00:21 27.2M 17  621M   17  109M    0     0  25.4M      0  0:00:24  0:00:04  0:00:20 27.1M 22  621M   22  139M    0     0  26.5M      0  0:00:23  0:00:05  0:00:18 28.0M 27  621M   27  169M    0     0  27.0M      0  0:00:23  0:00:06  0:00:17 28.9M 32  621M   32  199M    0     0  27.4M      0  0:00:22  0:00:07  0:00:15 29.2M 36  621M   36  227M    0     0  27.5M      0  0:00:22  0:00:08  0:00:14 29.3M 40  621M   40  254M    0     0  27.5M      0  0:00:22  0:00:09  0:00:13 29.3M 44  621M   44  278M    0     0  27.1M      0  0:00:22  0:00:10  0:00:12 27.7M 47  621M   47  294M    0     0  26.1M      0  0:00:23  0:00:11  0:00:12 24.9M 50  621M   50  313M    0     0  25.5M      0  0:00:24  0:00:12  0:00:12 22.7M 55  621M   55  342M    0     0  25.8M      0  0:00:24  0:00:13  0:00:11 22.9M 59  621M   59  371M    0     0  26.0M      0  0:00:23  0:00:14  0:00:09 23.3M 64  621M   64  400M    0     0  26.2M      0  0:00:23  0:00:15  0:00:08 24.3M 68  621M   68  428M    0     0  26.3M      0  0:00:23  0:00:16  0:00:07 26.8M 73  621M   73  457M    0     0  26.5M      0  0:00:23  0:00:17  0:00:06 28.9M 78  621M   78  486M    0     0  26.6M      0  0:00:23  0:00:18  0:00:05 28.7M 82  621M   82  515M    0     0  26.7M      0  0:00:23  0:00:19  0:00:04 28.6M 87  621M   87  544M    0     0  26.8M      0  0:00:23  0:00:20  0:00:03 28.8M 92  621M   92  573M    0     0  26.9M      0  0:00:23  0:00:21  0:00:02 29.0M 95  621M   95  596M    0     0  26.8M      0  0:00:23  0:00:22  0:00:01 27.8M100  621M  100  621M    0     0  26.7M      0  0:00:23  0:00:23 --:--:-- 27.1M
+http_code=200 bytes=652184281 time=23.242848s speed=28059568B/s effective_url=https://us.aws.cdn.hf.co/xet-bridge-us/68a033194fecdee6cf8c83aa/bccb26a4af13b8167e24a8d2b031cc2aacb31fe041dfc9a14741e80aa07a3287?response-content-disposition=inline%3B+filename*%3DUTF-8%27%27encoder.int8.onnx%3B+filename%3D%22encoder.int8.onnx%22%3B&user_id=public&xip=itGIktM-gm0&X-Xet-Cas-Uid=public&Expires=1795127429&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5hd3MuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjhhMDMzMTk0ZmVjZGVlNmNmOGM4M2FhL2JjY2IyNmE0YWYxM2I4MTY3ZTI0YThkMmIwMzFjYzJhYWNiMzFmZTA0MWRmYzlhMTQ3NDFlODBhYTA3YTMyODdcXD9yZXNwb25zZS1jb250ZW50LWRpc3Bvc2l0aW9uPWlubGluZSUzQitmaWxlbmFtZSUyQSUzRFVURi04JTI3JTI3ZW5jb2Rlci5pbnQ4Lm9ubnglM0IrZmlsZW5hbWUlM0QlMjJlbmNvZGVyLmludDgub25ueCUyMiUzQiZ1c2VyX2lkPXB1YmxpYyZ4aXA9aXRHSWt0TS1nbTAmWC1YZXQtQ2FzLVVpZD1wdWJsaWMiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkVwb2NoVGltZSI6MTc5NTEyNzQyOX19fV19&Signature=MEUCIHasJhWXlmzJl5W3BOGveHGNNbvK9GRHTSRtEWF%7ER-K2AiEAo5TM1M57WQF7CxSAh3OuP9x5jN14%7ESgkjhzJDHAw9N8_&Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F&Hash-Algorithm=SHA256
+curl_exit=0
+-- size/hash --
+size=652184281 bytes
+acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247  /Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/hf/encoder.int8.onnx
+
+=== decoder.int8.onnx ===
+-- HEAD headers --
+HTTP/2 302 
+content-type: text/plain; charset=utf-8
+content-length: 1040
+location: https://us.aws.cdn.hf.co/xet-bridge-us/68a033194fecdee6cf8c83aa/00f1e19c841962a41b9e5f273b4e19ee11321ad3fb2dcae3910c3357a3cb26ab?user_id=public&response-content-disposition=inline%3B+filename*%3DUTF-8%27%27decoder.int8.onnx%3B+filename%3D%22decoder.int8.onnx%22%3B&xip=itGIktM-gm0&X-Xet-Cas-Uid=public&Expires=1795127457&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5hd3MuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjhhMDMzMTk0ZmVjZGVlNmNmOGM4M2FhLzAwZjFlMTljODQxOTYyYTQxYjllNWYyNzNiNGUxOWVlMTEzMjFhZDNmYjJkY2FlMzkxMGMzMzU3YTNjYjI2YWJcXD91c2VyX2lkPXB1YmxpYyZyZXNwb25zZS1jb250ZW50LWRpc3Bvc2l0aW9uPWlubGluZSUzQitmaWxlbmFtZSUyQSUzRFVURi04JTI3JTI3ZGVjb2Rlci5pbnQ4Lm9ubnglM0IrZmlsZW5hbWUlM0QlMjJkZWNvZGVyLmludDgub25ueCUyMiUzQiZ4aXA9aXRHSWt0TS1nbTAmWC1YZXQtQ2FzLVVpZD1wdWJsaWMiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkVwb2NoVGltZSI6MTc5NTEyNzQ1N319fV19&Signature=MEUCIQC8tEdyjGVtHlsGUMP0bLH4tj%7EJodpTfx92Ts7vGFyNkwIgHgMR-UDHVWswVpJIuYaCl3TPldVLFAhAl7U2GA0lFHc_&Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F&Hash-Algorithm=SHA256
+x-linked-size: 11845275
+x-linked-etag: "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e"
+HTTP/2 200 
+content-type: application/octet-stream
+etag: "00f1e19c841962a41b9e5f273b4e19ee11321ad3fb2dcae3910c3357a3cb26ab"
+content-length: 11845275
+-- GET (resumable) --
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  1040  100  1040    0     0   7191      0 --:--:-- --:--:-- --:--:--  7222
+ 20 11.2M   20 2418k    0     0  5549k      0  0:00:02 --:--:--  0:00:02 5549k100 11.2M  100 11.2M    0     0  15.4M      0 --:--:-- --:--:-- --:--:-- 30.2M
+http_code=200 bytes=11845275 time=0.731567s speed=16191647B/s effective_url=https://us.aws.cdn.hf.co/xet-bridge-us/68a033194fecdee6cf8c83aa/00f1e19c841962a41b9e5f273b4e19ee11321ad3fb2dcae3910c3357a3cb26ab?X-Xet-Cas-Uid=public&xip=itGIktM-gm0&user_id=public&response-content-disposition=inline%3B+filename*%3DUTF-8%27%27decoder.int8.onnx%3B+filename%3D%22decoder.int8.onnx%22%3B&Expires=1795127457&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5hd3MuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjhhMDMzMTk0ZmVjZGVlNmNmOGM4M2FhLzAwZjFlMTljODQxOTYyYTQxYjllNWYyNzNiNGUxOWVlMTEzMjFhZDNmYjJkY2FlMzkxMGMzMzU3YTNjYjI2YWJcXD9YLVhldC1DYXMtVWlkPXB1YmxpYyZ4aXA9aXRHSWt0TS1nbTAmdXNlcl9pZD1wdWJsaWMmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj1pbmxpbmUlM0IrZmlsZW5hbWUlMkElM0RVVEYtOCUyNyUyN2RlY29kZXIuaW50OC5vbm54JTNCK2ZpbGVuYW1lJTNEJTIyZGVjb2Rlci5pbnQ4Lm9ubnglMjIlM0IiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkVwb2NoVGltZSI6MTc5NTEyNzQ1N319fV19&Signature=MEQCIDbFRc0I0v87ZRS75maa76OiU-TDp9QSoE1BbhgGJ4WjAiBcFQo2wHGRutcamycIz040lQ8NlW9ojT1wwZtDcv%7E7zg__&Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F&Hash-Algorithm=SHA256
+curl_exit=0
+-- size/hash --
+size=11845275 bytes
+179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e  /Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/hf/decoder.int8.onnx
+
+=== joiner.int8.onnx ===
+-- HEAD headers --
+HTTP/2 302 
+content-type: text/plain; charset=utf-8
+content-length: 1042
+location: https://us.aws.cdn.hf.co/xet-bridge-us/68a033194fecdee6cf8c83aa/51e71f37409c3782684ea0cf5bfdc0a49a5bc2342e6a0730d5790e6c3c560f4c?xip=itGIktM-gm0&X-Xet-Cas-Uid=public&user_id=public&response-content-disposition=inline%3B+filename*%3DUTF-8%27%27joiner.int8.onnx%3B+filename%3D%22joiner.int8.onnx%22%3B&Expires=1795127458&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5hd3MuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjhhMDMzMTk0ZmVjZGVlNmNmOGM4M2FhLzUxZTcxZjM3NDA5YzM3ODI2ODRlYTBjZjViZmRjMGE0OWE1YmMyMzQyZTZhMDczMGQ1NzkwZTZjM2M1NjBmNGNcXD94aXA9aXRHSWt0TS1nbTAmWC1YZXQtQ2FzLVVpZD1wdWJsaWMmdXNlcl9pZD1wdWJsaWMmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj1pbmxpbmUlM0IrZmlsZW5hbWUlMkElM0RVVEYtOCUyNyUyN2pvaW5lci5pbnQ4Lm9ubnglM0IrZmlsZW5hbWUlM0QlMjJqb2luZXIuaW50OC5vbm54JTIyJTNCIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTUxMjc0NTh9fX1dfQ__&Signature=MEYCIQDGrTtRf5bAIRiO7k4DdeLI87eFDU1u%7EdIx%7EAucBdTrRgIhAO28hel0BpnKUYW38phcJI1tmm%7ECDzD-rhM9FWsbNGXr&Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F&Hash-Algorithm=SHA256
+x-linked-size: 6355277
+x-linked-etag: "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3"
+HTTP/2 200 
+content-type: application/octet-stream
+etag: "51e71f37409c3782684ea0cf5bfdc0a49a5bc2342e6a0730d5790e6c3c560f4c"
+content-length: 6355277
+-- GET (resumable) --
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  1036  100  1036    0     0   6321      0 --:--:-- --:--:-- --:--:--  6355
+  3 6206k    3  238k    0     0   693k      0  0:00:08 --:--:--  0:00:08  693k100 6206k  100 6206k    0     0   9.9M      0 --:--:-- --:--:-- --:--:-- 21.9M
+http_code=200 bytes=6355277 time=0.608972s speed=10436074B/s effective_url=https://us.aws.cdn.hf.co/xet-bridge-us/68a033194fecdee6cf8c83aa/51e71f37409c3782684ea0cf5bfdc0a49a5bc2342e6a0730d5790e6c3c560f4c?response-content-disposition=inline%3B+filename*%3DUTF-8%27%27joiner.int8.onnx%3B+filename%3D%22joiner.int8.onnx%22%3B&X-Xet-Cas-Uid=public&user_id=public&xip=itGIktM-gm0&Expires=1795127458&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5hd3MuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjhhMDMzMTk0ZmVjZGVlNmNmOGM4M2FhLzUxZTcxZjM3NDA5YzM3ODI2ODRlYTBjZjViZmRjMGE0OWE1YmMyMzQyZTZhMDczMGQ1NzkwZTZjM2M1NjBmNGNcXD9yZXNwb25zZS1jb250ZW50LWRpc3Bvc2l0aW9uPWlubGluZSUzQitmaWxlbmFtZSUyQSUzRFVURi04JTI3JTI3am9pbmVyLmludDgub25ueCUzQitmaWxlbmFtZSUzRCUyMmpvaW5lci5pbnQ4Lm9ubnglMjIlM0ImWC1YZXQtQ2FzLVVpZD1wdWJsaWMmdXNlcl9pZD1wdWJsaWMmeGlwPWl0R0lrdE0tZ20wIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTUxMjc0NTh9fX1dfQ__&Signature=MEYCIQDtNrHgbqL7lULsiMIAEY5xY9umJUm2zL0ERliaR6NtlQIhAJdNZNxCOWMttIF0iamL4VH76-8J27Hyc1HxsEv0CBQr&Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F&Hash-Algorithm=SHA256
+curl_exit=0
+-- size/hash --
+size=6355277 bytes
+3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3  /Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/hf/joiner.int8.onnx
+
+=== tokens.txt ===
+-- HEAD headers --
+HTTP/2 307 
+content-type: text/plain; charset=utf-8
+content-length: 344
+location: /api/resolve-cache/models/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt?%2Fcsukuangfj%2Fsherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8%2Fresolve%2F2bda32ec70b097a55adaa07d9a7173915b43cc78%2Ftokens.txt=&etag=%22fc43e1c723e262df60b70e1919614417162d1fe2%22
+x-linked-size: 93939
+x-linked-etag: "fc43e1c723e262df60b70e1919614417162d1fe2"
+HTTP/2 200 
+content-type: text/plain; charset=utf-8
+content-length: 93939
+etag: "fc43e1c723e262df60b70e1919614417162d1fe2"
+-- GET (resumable) --
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   344  100   344    0     0   2211      0 --:--:-- --:--:-- --:--:--  2219
+100 93939  100 93939    0     0   436k      0 --:--:-- --:--:-- --:--:--  436k
+http_code=200 bytes=93939 time=0.210228s speed=446843B/s effective_url=https://huggingface.co/api/resolve-cache/models/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt?%2Fcsukuangfj%2Fsherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8%2Fresolve%2F2bda32ec70b097a55adaa07d9a7173915b43cc78%2Ftokens.txt=&etag=%22fc43e1c723e262df60b70e1919614417162d1fe2%22
+curl_exit=0
+-- size/hash --
+size=93939 bytes
+d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d  /Volumes/DaymarkWorkspace/Daymark/cache/round7/parakeet/hf/tokens.txt
+
+end_utc=2026-11-19T21:30:59Z
+=== summary ===
+acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247  encoder.int8.onnx
+179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e  decoder.int8.onnx
+3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3  joiner.int8.onnx
+d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d  tokens.txt
+EXIT=0
