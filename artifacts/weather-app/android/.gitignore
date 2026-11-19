@@ -95,6 +95,12 @@ capacitor-cordova-android-plugins
 # Copied web assets
 app/src/main/assets/public
 
+# Parakeet TDT 0.6B v3 int8 model, fetched by
+# android/kokoro-poc/scripts/fetch-parakeet-assets.sh and delivered as a Play
+# asset pack. The weights are a third-party redistribution (CC BY 4.0) and are
+# not committed; the pack's build file is.
+parakeet-assets/src/main/assets/parakeet/
+
 # Generated Config files
 app/src/main/assets/capacitor.config.json
 app/src/main/assets/capacitor.plugins.json

@@ -3,9 +3,14 @@ import { createRoot } from 'react-dom/client';
 
 import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { installSafeConsole } from '@/lib/safe-console';
 import { LocaleProvider } from '@/hooks/use-locale';
 
 import './index.css';
+
+// Redact recognition payloads before anything can reach the platform console
+// (Capacitor mirrors plugin listener results into the WebView console).
+installSafeConsole();
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.

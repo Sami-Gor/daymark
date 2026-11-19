@@ -84,6 +84,7 @@ const WeatherResponseSchema = z
         uv_index: nullableNumber,
         wind_speed_10m: nullableNumber,
         wind_gusts_10m: nullableNumber,
+        wind_direction_10m: nullableNumber,
         rain: nullableNumber,
         showers: nullableNumber,
         snowfall: nullableNumber,
@@ -171,6 +172,14 @@ const MICRO_CLIMATE_CACHE_MS = 15 * 60 * 1000;
  * failures surface through the normal friendly error/fallback paths.
  */
 const FETCH_TIMEOUT_MS = 10_000;
+/** Hard ceiling for an API response body: 4 MiB. */
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+const MAX_RESPONSE_CHARS = MAX_RESPONSE_BYTES;
+/** Ceiling for any array in an API response (7 days of hourly data is 168). */
+const MAX_ARRAY_ITEMS = 10_000;
+/** Ceiling for an object's own keys (the real payload uses far fewer). */
+const MAX_OBJECT_KEYS = 512;
+const MAX_SHAPE_DEPTH = 12;
 
 /*
  * Typed fetch failures so the UI can show localized Daymark copy instead of
@@ -198,6 +207,30 @@ function isTimeoutError(error: unknown): boolean {
   );
 }
 
+/**
+ * Rejects pathological payload shapes before zod validates them.
+ *
+ * <p>zod 3 accumulates one issue per failing array element, so a very large
+ * array in an untrusted response can exhaust memory (CVE-2023-54404). The
+ * response is still validated by the schema; this guard only bounds the input
+ * size so a hostile payload fails as malformed instead of allocating without
+ * limit.
+ */
+export function assertBoundedPayload(value: unknown, depth = 0): void {
+  if (depth > MAX_SHAPE_DEPTH) throw new Error('payload-too-deep');
+  if (Array.isArray(value)) {
+    if (value.length > MAX_ARRAY_ITEMS) throw new Error('array-too-long');
+    for (const item of value) assertBoundedPayload(item, depth + 1);
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record);
+    if (keys.length > MAX_OBJECT_KEYS) throw new Error('object-too-wide');
+    for (const key of keys) assertBoundedPayload(record[key], depth + 1);
+  }
+}
+
 async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {
@@ -216,13 +249,30 @@ async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSigna
     if (import.meta.env.DEV) console.warn('weather: HTTP', response.status, response.url);
     throw new WeatherFetchError('http', "Weather data isn't available right now. Try again shortly.");
   }
+  // Bound untrusted input before JSON.parse/zod. A hostile or corrupted
+  // response must fail as "malformed", not allocate without limit: zod can
+  // accumulate one issue per failing array element (CVE-2023-54404).
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+    throw new WeatherFetchError('malformed', 'Weather service sent a response we could not read.');
+  }
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    throw new WeatherFetchError('malformed', 'Weather service sent a response we could not read.');
+  }
+  if (text.length > MAX_RESPONSE_CHARS) {
+    throw new WeatherFetchError('malformed', 'Weather service sent a response we could not read.');
+  }
   let data: unknown;
   try {
-    data = await response.json();
+    data = JSON.parse(text);
   } catch {
     throw new WeatherFetchError('malformed', 'Weather service sent a response we could not read.');
   }
   try {
+    assertBoundedPayload(data);
     return schema.parse(data);
   } catch {
     throw new WeatherFetchError('malformed', 'Weather service sent data in an unexpected shape.');

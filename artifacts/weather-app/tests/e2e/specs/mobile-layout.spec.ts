@@ -6,8 +6,8 @@ import { WINDY_FORECAST } from '../support/test-data';
  * hero actions and the search results panel at narrow phone widths.
  *
  * The canonical mocks are installed automatically by the `api` fixture; tests
- * that need alerts use the windy forecast override. Speech stubs are requested
- * through the `speech` fixture so the voice controls render before navigation.
+ * that need alerts use the windy forecast override. V2 voice is Android-native
+ * only, so the web build has no voice controls to measure.
  */
 
 test.describe('mobile touch targets and legibility', () => {
@@ -18,9 +18,7 @@ test.describe('mobile touch targets and legibility', () => {
     expect(box!.height, `${selector} height`).toBeGreaterThanOrEqual(min - 0.5);
   }
 
-  test('key mobile controls meet the ~40px target at 390px and 320px', async ({ page, dashboard, speech }) => {
-    // Requesting `speech` installs the playback and recognition stubs before navigation.
-    void speech;
+  test('key mobile controls meet the ~40px target at 390px and 320px', async ({ page, dashboard }) => {
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       await dashboard.goto('/');
@@ -29,8 +27,7 @@ test.describe('mobile touch targets and legibility', () => {
         '.icon-button',
         '.location-search-field',
         '[data-testid="button-refresh-location"]',
-        '[data-testid="button-hear-today"]',
-        '[data-testid="button-ask-daymark"]',
+        '[data-testid="button-use-location"]',
       ]) {
         await expectMinHeight(page, selector, 40);
       }
@@ -41,8 +38,7 @@ test.describe('mobile touch targets and legibility', () => {
     }
   });
 
-  test('alert disclaimer, severity and voice privacy note are at least 11px', async ({ page, api, speech, voice }) => {
-    void speech;
+  test('alert disclaimer, severity and web demo note are at least 11px', async ({ page, api }) => {
     await api.forecast(WINDY_FORECAST);
     await page.goto('/');
 
@@ -55,8 +51,8 @@ test.describe('mobile touch targets and legibility', () => {
     const severitySize = await page.locator('.alert-severity').first().evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
     expect(severitySize, 'alert severity font size').toBeGreaterThanOrEqual(11);
 
-    const privacySize = await voice.askPrivacy.evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
-    expect(privacySize, 'voice privacy note font size').toBeGreaterThanOrEqual(11);
+    const demoNoteSize = await page.getByTestId('web-demo-note').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+    expect(demoNoteSize, 'web demo note font size').toBeGreaterThanOrEqual(11);
   });
 
   test('search options are tappable and remain keyboard-selectable', async ({ page, api, search, dashboard }) => {
@@ -132,16 +128,18 @@ test.describe('mobile viewport layout', () => {
     expect(sizes[1]).toBeLessThanOrEqual(sizes[2]);
   });
 
-  test('hero actions meet 44px and never clip their labels in EN/FR/ES', async ({ page, dashboard, speech }) => {
-    void speech;
+  test('hero actions meet 44px and never clip their labels in EN/FR/ES', async ({ page, dashboard }) => {
     await page.setViewportSize({ width: 320, height: 800 });
     await dashboard.goto('/');
     await expect(dashboard.currentCity).toBeVisible();
     for (const locale of ['en', 'fr', 'es'] as const) {
       await dashboard.setLanguage(locale);
+      // The web hero keeps the "Use my location" action; the Android-only voice
+      // buttons are absent, so they are asserted hidden rather than measured.
+      await dashboard.expectVoiceControlsHidden();
       const buttons = page.locator('.today-hero .local-button');
       const count = await buttons.count();
-      expect(count, `${locale} action count`).toBeGreaterThanOrEqual(3);
+      expect(count, `${locale} web action count`).toBeGreaterThanOrEqual(1);
       for (let index = 0; index < count; index += 1) {
         const button = buttons.nth(index);
         const box = await button.boundingBox();

@@ -3,8 +3,9 @@ import { CANONICAL_FORECAST } from '../support/test-data';
 
 /*
  * The Today hero day cue: a single emoji cue (sun, rain, mixed or neutral) with
- * an accessible label, no explanatory advice cards, and the narration control
- * beneath it. Custom forecasts are registered through the `api` fixture before
+ * an accessible label, no explanatory advice cards, and no web narration control
+ * (V2 voice is Android-native only). Custom forecasts are registered through
+ * the `api` fixture before
  * navigation so the cue logic is exercised with wet, mixed and neutral days.
  *
  * The canonical mocks are installed automatically; overrides below are
@@ -38,9 +39,7 @@ test.describe('day cue hero', () => {
     },
   };
 
-  test('shows one visual cue with no explanatory text and Hear today underneath', async ({ page, dashboard, voice, speech }) => {
-    // Requesting `speech` installs the playback stub before navigation.
-    void speech;
+  test('shows one visual cue with no explanatory text and no web narration control', async ({ page, dashboard }) => {
     await dashboard.open();
 
     await expect(dashboard.dayCue).toBeVisible();
@@ -49,11 +48,14 @@ test.describe('day cue hero', () => {
     const hero = page.locator('.today-hero');
     await expect(hero).not.toContainText('Sunglasses');
     await expect(hero).not.toContainText('Umbrella?');
+    // The cue is inside the hero, and the Android-only voice controls are absent
+    // from the web build (V2 voice is Android-native only).
     const cueBox = await dashboard.dayCue.boundingBox();
-    const hearBox = await voice.hearTodayButton.boundingBox();
-    expect(hearBox!.y).toBeGreaterThan(cueBox!.y);
-    await expect(voice.hearTodayButton).toBeVisible();
-    await expect(voice.hearTodayButton).toHaveText(/Hear today/);
+    const heroBox = await hero.boundingBox();
+    expect(cueBox!.y).toBeGreaterThanOrEqual(heroBox!.y);
+    expect(cueBox!.y).toBeLessThanOrEqual(heroBox!.y + heroBox!.height);
+    await dashboard.expectVoiceControlsHidden();
+    await expect(hero).not.toContainText('Hear today');
   });
 
   test('renders the rain cue for a wet day', async ({ api, dashboard }) => {

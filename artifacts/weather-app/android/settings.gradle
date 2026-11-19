@@ -5,4 +5,7 @@ project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor
 include ':daymark-voice'
 project(':daymark-voice').projectDir = new File('./daymark-voice/')
 
+include ':parakeet-assets'
+project(':parakeet-assets').projectDir = new File('./parakeet-assets/')
+
 apply from: 'capacitor.settings.gradle'

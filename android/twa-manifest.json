@@ -31,7 +31,7 @@
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://daymark-weather.pages.dev/",
-  "minSdkVersion": 23,
+  "minSdkVersion": 24,
   "orientation": "default",
   "fingerprints": [
     {

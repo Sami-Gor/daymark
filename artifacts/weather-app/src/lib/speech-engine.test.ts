@@ -11,52 +11,32 @@ describe('selectSpeechEngine', () => {
     expect(selection.reason).toBe('native-english');
   });
 
-  it('falls back to the browser when the native engine is unavailable', () => {
+  it('returns unavailable, not browser speech, when native Kokoro is unavailable', () => {
     const selection = selectSpeechEngine({ ...android, lang: 'en', nativeAvailable: false });
-    expect(selection.engine).toBe('browser');
+    expect(selection.engine).toBe('unavailable');
     expect(selection.reason).toBe('native-unavailable');
   });
 
-  it('keeps French on the browser path', () => {
+  it('reports French as unavailable in V2', () => {
     const selection = selectSpeechEngine({ ...android, lang: 'fr-FR', nativeAvailable: true });
-    expect(selection.engine).toBe('browser');
-    expect(selection.reason).toBe('non-english');
+    expect(selection.engine).toBe('unavailable');
+    expect(selection.reason).toBe('non-english-unavailable');
   });
 
-  it('keeps Spanish on the browser path', () => {
+  it('reports Spanish as unavailable in V2', () => {
     const selection = selectSpeechEngine({ ...android, lang: 'es-ES', nativeAvailable: true });
-    expect(selection.engine).toBe('browser');
-    expect(selection.reason).toBe('non-english');
+    expect(selection.engine).toBe('unavailable');
+    expect(selection.reason).toBe('non-english-unavailable');
   });
 
-  it('falls back to the browser after a native initialization failure', () => {
-    const selection = selectSpeechEngine({ ...android, lang: 'en-GB', nativeAvailable: false });
-    expect(selection.engine).toBe('browser');
+  it('has no web or iOS narration path', () => {
+    expect(selectSpeechEngine({ isNativePlatform: false, platform: 'web', lang: 'en-GB', nativeAvailable: true }))
+      .toEqual({ engine: 'unavailable', reason: 'not-android' });
+    expect(selectSpeechEngine({ isNativePlatform: true, platform: 'ios', lang: 'en-GB', nativeAvailable: true }))
+      .toEqual({ engine: 'unavailable', reason: 'not-android' });
   });
 
-  it('uses the browser on web and desktop', () => {
-    const selection = selectSpeechEngine({
-      isNativePlatform: false,
-      platform: 'web',
-      lang: 'en-GB',
-      nativeAvailable: true,
-    });
-    expect(selection.engine).toBe('browser');
-    expect(selection.reason).toBe('not-native');
-  });
-
-  it('uses the browser on iOS until a native implementation exists', () => {
-    const selection = selectSpeechEngine({
-      isNativePlatform: true,
-      platform: 'ios',
-      lang: 'en-GB',
-      nativeAvailable: true,
-    });
-    expect(selection.engine).toBe('browser');
-    expect(selection.reason).toBe('platform-not-android');
-  });
-
-  it('treats missing or non-English locales as browser speech', () => {
+  it('treats missing or non-English locales as unavailable', () => {
     expect(isEnglish(undefined)).toBe(false);
     expect(isEnglish('de-DE')).toBe(false);
     expect(isEnglish('EN-us')).toBe(true);

@@ -98,23 +98,20 @@ test.describe('hostile input is rendered inert (XSS)', () => {
     expect(await page.evaluate(() => (window as unknown as { __xss: number }).__xss)).toBe(0);
   });
 
-  test('renders a malicious speech transcript as inert text', async ({ page, speech, voice }) => {
+  test('exposes no transcript sink on the web demo', async ({ page, dashboard }) => {
     await page.addInitScript(() => {
       (window as unknown as { __xss: number }).__xss = 0;
       window.alert = () => {
         (window as unknown as { __xss: number }).__xss = 1;
       };
     });
-    await page.goto('/');
+    await dashboard.open();
 
-    await voice.toggleListening();
-    await speech.emitResult('<img src=x onerror="window.__xss=1">');
-    await speech.emitRecognitionEnd();
-
-    // The displayed question is the normalized transcript (no markup characters).
-    await expect(voice.askQuestion).toContainText('img src x onerror');
-    expect(await voice.askQuestion.evaluate((element) => element.textContent ?? '')).not.toContain('<');
-    await expect(voice.askAnswer).toContainText('I can help');
+    // V2 voice is Android-native only, so no recognition or transcript DOM
+    // exists in the web build: hostile speech content has no sink to reach.
+    // The Android transcript sink is normalized in weather-intents.test.ts.
+    await expect(page.locator('[data-testid^="ask-"]')).toHaveCount(0);
+    await dashboard.expectVoiceControlsHidden();
     expect(await page.locator('img[src="x"]').count()).toBe(0);
     expect(await page.evaluate(() => (window as unknown as { __xss: number }).__xss)).toBe(0);
   });

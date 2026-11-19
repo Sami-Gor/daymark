@@ -18,6 +18,22 @@ kokoro-en = { path = "../.build/kokoro-src", default-features = false, features 
 
 [profile.release]
 lto = true
-strip = true
+# Native debug metadata.
+#
+# The Android Gradle plugin extracts it with "llvm-objcopy --only-keep-debug",
+# which operates on DWARF sections. Rust's release profile defaults to
+# "debug = false", so no DWARF is ever generated and objcopy fails with
+# "the native debug metadata has already been stripped" - leaving the App
+# Bundle without the native debug symbols Google Play needs to symbolicate
+# native crashes and ANRs.
+#
+# "debug = 1" generates the limited DWARF (function and line information)
+# that the SYMBOL_TABLE level needs, and "strip = none" keeps it in the
+# library so AGP can extract it. AGP strips the packaged copy itself, so the
+# size of the shipped AAB is unaffected; only the separate symbol table grows.
+# The alternative would be FULL for file-and-line detail, which the
+# SYMBOL_TABLE level does not use.
+debug = 1
+strip = "none"
 panic = "abort"
 codegen-units = 1

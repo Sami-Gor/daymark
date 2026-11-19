@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Downloads the pinned Kokoro POC assets (quantized model + single British male
-# voice) into the Android app. Build-time only; the app itself never downloads.
+# voice) into the Android app. Build-time only; the app itself never downloads
+# the model or voice (weather and place-search requests are separate).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"

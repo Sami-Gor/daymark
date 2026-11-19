@@ -221,6 +221,7 @@
 .day-cue-emoji { font-size: clamp(64px, 19vw, 88px); line-height: 1; animation: cue-in .3s ease-out both; }
 .day-cue-emoji-trail { animation-delay: .1s; }
 @keyframes cue-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+.voice-error, .voice-unavailable { margin: 2px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.45; text-align: center; }
 .day-cue-action { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 18px; min-height: 46px; }
 .day-cue-action .primary-speak { margin-top: 0; min-height: 46px; padding: 11px 22px; font-size: 13px; }
 .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 15px; }
@@ -436,6 +437,7 @@
 .refresh-retry { padding: 7px 12px; border: 0; border-radius: 999px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); font-size: 11px; font-weight: 700; }
 .refresh-retry:focus-visible { outline: 2px solid hsl(var(--secondary) / .8); outline-offset: 2px; }
 
+.web-demo-note { margin: 26px 0 0; padding: 12px 14px; border-radius: var(--radius); color: hsl(var(--muted-foreground)); background: hsl(var(--card) / .55); font-size: 11px; line-height: 1.5; }
 .footer-note { display: flex; justify-content: space-between; gap: 14px; margin-top: 45px; color: hsl(var(--muted-foreground)); font-family: var(--app-font-mono); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
 .footer-note a { color: hsl(var(--primary)); text-decoration: none; }
 .footer-links { display: flex; align-items: center; gap: 12px; }

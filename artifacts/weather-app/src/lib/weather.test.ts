@@ -147,6 +147,35 @@ describe('fetchWeather', () => {
     expect(result.daily?.time).toEqual(['2026-09-07']);
   });
 
+  it('rejects an array beyond the safety bound before zod walks it', async () => {
+    stubFetch((url) =>
+      json(
+        url.includes('air-quality')
+          ? validAir
+          : { hourly: { time: Array.from({ length: 10_001 }, (_, i) => `h${i}`) } },
+      ),
+    );
+    await expect(fetchWeather(PLACE)).rejects.toThrow(
+      'Weather service sent data in an unexpected shape.',
+    );
+  });
+
+  it('rejects a response whose declared body exceeds the size cap', async () => {
+    stubFetch((url) => {
+      if (url.includes('air-quality')) return json(validAir);
+      return new Response(JSON.stringify(validForecast), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(5 * 1024 * 1024),
+        },
+      });
+    });
+    await expect(fetchWeather(PLACE)).rejects.toThrow(
+      'Weather service sent a response we could not read.',
+    );
+  });
+
   it('ignores unknown fields from the API', async () => {
     stubFetch((url) =>
       json(

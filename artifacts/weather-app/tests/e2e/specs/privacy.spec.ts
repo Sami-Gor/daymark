@@ -25,20 +25,16 @@ test.describe('privacy-safe persisted storage', () => {
     expect(state.cookie).toBe('');
   });
 
-  test('does not persist location, search, transcript, weather or alert state', async ({ api, dashboard, page, search, speech, voice }) => {
+  test('does not persist location, search, weather or alert state', async ({ api, dashboard, page, search }) => {
     await api.locations();
     await dashboard.open();
     await expect(dashboard.currentTemperature).toBeVisible();
 
-    // Search + select a location.
+    // Search + select a location. V2 voice is Android-native only, so the web
+    // demo has no transcript (and no voice surface) to persist.
     await search.searchAndSelect('paris');
     await dashboard.expectCity('Paris');
-
-    // Voice interaction with a mocked transcript.
-    await voice.toggleListening();
-    await speech.emitResult('Will it rain later?');
-    await speech.emitRecognitionEnd();
-    await expect(voice.askAnswer).toBeVisible();
+    await dashboard.expectVoiceControlsHidden();
 
     // Language was never changed, so no localStorage entries at all are valid.
     const state = await page.evaluate(() => ({
@@ -119,10 +115,16 @@ test.describe('privacy policy pages', () => {
   });
 
   test('shows the confirmed operator and contact details in every language', async ({ privacy }) => {
+    // V2 policy wording names the operator as "Sami" in all three languages.
+    const operator = {
+      en: 'operated by Sami',
+      fr: 'exploité par Sami',
+      es: 'operado por Sami',
+    } as const;
     for (const policy of PRIVACY_POLICIES) {
       await privacy.goto(policy.path);
       const text = await privacy.text();
-      expect(text).toContain('Sami Belhadj');
+      expect(text).toContain(operator[policy.lang]);
       expect(text).toContain('skylinelabdev@gmail.com');
     }
   });

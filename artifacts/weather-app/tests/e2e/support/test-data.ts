@@ -227,21 +227,28 @@ export const PRIVACY_POLICIES = [
 
 export type PrivacyLang = (typeof PRIVACY_POLICIES)[number]['lang'];
 
+/*
+ * V2 policy wording (see src/pages/privacy*.tsx). These strings pin the
+ * statements the V2 policy actually makes: the 0.025-degree device-location
+ * grid, the Android-only voice path (the web/PWA demo has no voice surface)
+ * and the adult target audience. V1 wording (two-decimal rounding, browser
+ * speech input, a general audience) must not come back.
+ */
 export const PRIVACY_EXPECTATIONS = {
   en: {
-    location: 'rounded to two decimal places',
-    speech: 'does not record or store your voice audio or speech transcripts',
-    audience: 'general-audience weather utility',
+    location: '0.025-degree grid with a 0.025-degree minimum step',
+    speech: 'does not intentionally record or persist the audio or the resulting transcript',
+    audience: 'adults aged 18 and over',
   },
   fr: {
-    location: 'arrondies à deux décimales',
-    speech: 'n’enregistre ni ne conserve votre audio vocal ni vos transcriptions vocales',
-    audience: 'grand public',
+    location: 'grille de 0,025 degré avec un pas minimal de 0,025 degré',
+    speech: 'n’enregistre ni ne conserve intentionnellement l’audio ou la transcription',
+    audience: 'adultes âgés de 18 ans ou plus',
   },
   es: {
-    location: 'se redondean a dos decimales',
-    speech: 'no graba ni almacena tu audio de voz ni tus transcripciones',
-    audience: 'público general',
+    location: 'cuadrícula de 0,025 grados con un paso mínimo de 0,025 grados',
+    speech: 'no graba ni conserva intencionadamente el audio ni la transcripción',
+    audience: 'adultos de 18 años o más',
   },
 } as const;
 

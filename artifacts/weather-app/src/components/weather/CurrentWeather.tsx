@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Navigation, Square, Volume2 } from 'lucide-react';
 import { displayTemp, formatLocationDate, weatherCopy, type Place, type Unit, type WeatherPayload } from '@/lib/weather';
 import { DAYMARK_INTENTS, getIntentResponse } from '@/lib/weather-intents';
 import type { DayCueResult } from '@/lib/day-cue';
 import { SPEECH_LANGS } from '@/lib/i18n';
+import { isEnglish } from '@/lib/speech-engine';
 import { useDaymarkSpeech } from '@/hooks/use-daymark-speech';
 import { useLocale } from '@/hooks/use-locale';
 import { AskDaymark } from '@/components/weather/AskDaymark';
@@ -21,9 +23,11 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
   onSelectPlace: (place: Place) => void;
 }) {
   const { locale, t } = useLocale();
+  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   const current = weather.current ?? {};
   const currentCode = current.weather_code ?? 0;
   const speech = useDaymarkSpeech();
+  const narrationAvailableInLocale = isEnglish(locale);
   const stopSpeech = speech.stop;
   const previousLocale = useRef(locale);
   const briefing = useMemo(
@@ -54,7 +58,12 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
       <DayCueHero cue={dayCue} />
 
       <div className="day-cue-action">
-        {speech.supported && (
+        {isAndroidNative && !narrationAvailableInLocale && (
+          <p className="voice-unavailable" role="status" data-testid="voice-unavailable">
+            {t('voice.error.frenchSpanishUnavailable')}
+          </p>
+        )}
+        {isAndroidNative && narrationAvailableInLocale && speech.supported && (
           <button
             type="button"
             className="local-button primary-speak"
@@ -67,25 +76,33 @@ export function CurrentWeather({ place, weather, unit, dayCue, updatedLabel, isL
             {speech.isPreparing ? t('voice.preparing') : speech.isSpeaking ? t('voice.stop') : t('voice.hearToday')}
           </button>
         )}
-        {speech.isPreparing && (
+        {isAndroidNative && speech.isPreparing && (
           <span className="sr-only" role="status" aria-live="polite" data-testid="voice-preparing-status">{t('voice.preparing')}</span>
         )}
-        {speech.error && (
-          <p className="voice-error" role="alert" data-testid="voice-error">{t('voice.error.unavailable')}</p>
+        {isAndroidNative && speech.error && (
+          <p className="voice-error" role="alert" data-testid="voice-error">
+            {speech.errorCode === 'non-english-unavailable'
+              ? t('voice.error.frenchSpanishUnavailable')
+              : speech.errorCode === 'offline-voice-unavailable'
+                ? t('voice.error.offlineUnavailable')
+                : t('voice.error.unavailable')}
+          </p>
         )}
       </div>
 
       <div className="hero-actions">
         <LocationSearch onSelect={onSelectPlace} />
         <button type="button" className="local-button" onClick={onFindMe} data-testid="button-refresh-location"><Navigation size={13} />{isLocating ? t('current.findingYou') : t('current.useLocation')}</button>
-        <AskDaymark
-          weather={weather}
-          place={place}
-          unit={unit}
-          narrationActive={speech.isActive}
-          speak={speech.speak}
-          stopSpeech={stopSpeech}
-        />
+        {isAndroidNative && (
+          <AskDaymark
+            weather={weather}
+            place={place}
+            unit={unit}
+            narrationActive={speech.isActive}
+            speak={speech.speak}
+            stopSpeech={stopSpeech}
+          />
+        )}
       </div>
     </div>
   );

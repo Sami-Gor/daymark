@@ -2,12 +2,10 @@ import { test as base, expect } from '@playwright/test';
 import { createSeededRandom, resolveSeed, type RandomSource } from './rng';
 import { ApiMocks } from './mocks';
 import { BrowserLog, RequestLog } from './network';
-import { SpeechHarness } from './speech';
 import { GeolocationHarness } from './geolocation';
 import { DashboardPage } from '../pages/dashboard.page';
 import { WeatherSectionsPage } from '../pages/weather-sections.page';
 import { LocationSearchPage } from '../pages/location-search.page';
-import { VoiceControlsPage } from '../pages/voice-controls.page';
 import { WeatherAlertsPage } from '../pages/weather-alerts.page';
 import { PrivacyPolicyPage } from '../pages/privacy-policy.page';
 import { StorePromoPage } from '../pages/store-promo.page';
@@ -21,19 +19,16 @@ import { StorePromoPage } from '../pages/store-promo.page';
  *  - request and browser-console logs (requests, browserLog);
  *  - a per-test seeded RNG (seed, random) that is recorded on failure;
  *  - focused page objects for each area of the app;
- *  - speech and geolocation harnesses for the tests that need them.
+ *  - a geolocation harness for the tests that need it.
+ *
+ * The web/PWA build has no voice surface (V2 voice is Android-native only), so
+ * there is deliberately no browser speech harness: tests assert the voice
+ * controls are absent rather than stubbing an API the web app never uses.
  *
  * Playwright creates a fresh context and page per test, so storage, cookies and
  * route handlers never leak between tests. Do not add module-level mutable
  * state to specs: test-order independence is part of the contract.
  */
-
-export type DaymarkOptions = {
-  /** Make speechSynthesis.speak throw, to cover the narration error path. */
-  speechPlaybackFails: boolean;
-  /** Install the recognition stub; false models a browser without the API. */
-  speechRecognitionSupported: boolean;
-};
 
 export type DaymarkFixtures = {
   seed: number;
@@ -44,18 +39,13 @@ export type DaymarkFixtures = {
   dashboard: DashboardPage;
   sections: WeatherSectionsPage;
   search: LocationSearchPage;
-  voice: VoiceControlsPage;
   alerts: WeatherAlertsPage;
   privacy: PrivacyPolicyPage;
   promo: StorePromoPage;
   geo: GeolocationHarness;
-  speech: SpeechHarness;
 };
 
-export const test = base.extend<DaymarkFixtures & DaymarkOptions>({
-  speechPlaybackFails: [false, { option: true }],
-  speechRecognitionSupported: [true, { option: true }],
-
+export const test = base.extend<DaymarkFixtures>({
   // Deterministic per-test seed. Recorded as an annotation and attached to the
   // report when the test fails. The seed is derived from the test's title path
   // (or from DAYMARK_E2E_SEED when that is set), so simply rerunning the test
@@ -118,9 +108,6 @@ export const test = base.extend<DaymarkFixtures & DaymarkOptions>({
   search: async ({ page }, use) => {
     await use(new LocationSearchPage(page));
   },
-  voice: async ({ page }, use) => {
-    await use(new VoiceControlsPage(page));
-  },
   alerts: async ({ page }, use) => {
     await use(new WeatherAlertsPage(page));
   },
@@ -132,13 +119,6 @@ export const test = base.extend<DaymarkFixtures & DaymarkOptions>({
   },
   geo: async ({ page }, use) => {
     await use(new GeolocationHarness(page));
-  },
-
-  speech: async ({ page, speechPlaybackFails, speechRecognitionSupported }, use) => {
-    const speech = new SpeechHarness(page);
-    await speech.installPlayback({ failOnSpeak: speechPlaybackFails });
-    await speech.installRecognition(speechRecognitionSupported);
-    await use(speech);
   },
 });
 

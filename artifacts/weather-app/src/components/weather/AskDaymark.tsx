@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Mic, Square } from 'lucide-react';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useLocale } from '@/hooks/use-locale';
-import { getIntentResponse, normalizeTranscript, resolveIntentTranscript } from '@/lib/weather-intents';
+import { getCombinedIntentResponse, getIntentResponse, normalizeTranscript, resolveIntentTranscripts } from '@/lib/weather-intents';
 import { SPEECH_LANGS } from '@/lib/i18n';
 import type { Place, Unit, WeatherPayload } from '@/lib/weather';
 
@@ -11,9 +12,10 @@ type Exchange = { question: string; answer: string };
 /*
  * "Ask Daymark" microphone control (localized).
  *
- * Pipeline: SpeechRecognition adapter -> normalized transcript ->
- * deterministic intent resolver -> getIntentResponse(...) -> visible answer
- * (and optional spoken reply through the shared playback controller).
+ * Pipeline: recognition adapter (Parakeet on Android, browser elsewhere) ->
+ * normalized transcript -> deterministic intent resolver ->
+ * getIntentResponse(...) -> visible answer (and optional spoken reply through
+ * the shared playback controller).
  *
  * Only the latest exchange is kept in state — no history, no storage, no logs.
  */
@@ -46,7 +48,15 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
     speak(text, SPEECH_LANGS[locale]);
   }, [recognition.isListening, speak, locale]);
 
-  if (!recognition.supported) return null;
+  if (!recognition.supportResolved) return null;
+  if (!recognition.supported) {
+    if (!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android')) return null;
+    return (
+      <p className="ask-error" role="status" data-testid="ask-unavailable">
+        {t('ask.error.offlineUnavailable')}
+      </p>
+    );
+  }
 
   const ask = () => {
     stopSpeech(); // never compete with the "Hear today" playback
@@ -57,12 +67,15 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
       locale,
       onTranscript: (transcript) => {
         const question = normalizeTranscript(transcript);
-        const intent = resolveIntentTranscript(question);
-        if (!intent) {
+        const intents = resolveIntentTranscripts(question);
+        if (!intents.length) {
           setExchange({ question, answer: t('ask.unknown') });
           return;
         }
-        const response = getIntentResponse(intent, weather, { locationName: place.name, unit, locale });
+        const context = { locationName: place.name, unit, locale };
+        const response = intents.length > 1
+          ? getCombinedIntentResponse(intents, weather, context)
+          : getIntentResponse(intents[0], weather, context);
         setExchange({ question, answer: response.spokenText });
         pendingSpoken.current = response.spokenText;
       },
@@ -84,7 +97,7 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
         {listening ? <Square size={11} /> : <Mic size={13} />}
         {listening ? t('ask.stop') : t('ask.button')}
       </button>
-      <p className="ask-privacy" data-testid="ask-privacy">{t('ask.privacyNote')}</p>
+      <p className="ask-privacy" data-testid="ask-privacy">{Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' ? t('ask.privacyNoteAndroid') : t('ask.privacyNote')}</p>
       <span className="sr-only" role="status" aria-live="polite">
         {listening ? t('ask.srListening') : ''}
       </span>

@@ -1,0 +1,16 @@
+diff --git a/capacitor/src/main/java/com/getcapacitor/BridgeWebChromeClient.java b/capacitor/src/main/java/com/getcapacitor/BridgeWebChromeClient.java
+index 34fa2d8341379b6d5cc03ec23263cc0a1785b7b6..dc2bb0eed867e3fc6e8ea42a28d1cfa660e20d08 100644
+--- a/capacitor/src/main/java/com/getcapacitor/BridgeWebChromeClient.java
++++ b/capacitor/src/main/java/com/getcapacitor/BridgeWebChromeClient.java
+@@ -254,10 +254,7 @@ public class BridgeWebChromeClient extends WebChromeClient {
+                     callback.invoke(origin, true, false);
+                 } else {
+                     final String[] coarsePermission = { Manifest.permission.ACCESS_COARSE_LOCATION };
+-                    if (
+-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+-                        PermissionHelper.hasPermissions(bridge.getContext(), coarsePermission)
+-                    ) {
++                    if (PermissionHelper.hasPermissions(bridge.getContext(), coarsePermission)) {
+                         callback.invoke(origin, true, false);
+                     } else {
+                         callback.invoke(origin, false, false);

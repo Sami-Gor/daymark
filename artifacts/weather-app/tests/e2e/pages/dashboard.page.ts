@@ -4,8 +4,10 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * Top-level page: brand/header controls, the Today hero, weather error/loading
  * states and page-level layout helpers.
  *
- * Data sections live in WeatherSectionsPage, search in LocationSearchPage and
- * voice in VoiceControlsPage so each object stays focused.
+ * Data sections live in WeatherSectionsPage and search in LocationSearchPage so
+ * each object stays focused. V2 voice is Android-native only, so the web build
+ * has no voice controls; their (absent) test ids are exposed here so specs can
+ * pin that the web demo never renders the Android-only surface.
  */
 export class DashboardPage {
   readonly page: Page;
@@ -30,7 +32,15 @@ export class DashboardPage {
   readonly refreshError: Locator;
   readonly refreshRetryButton: Locator;
   readonly refreshIndicator: Locator;
-  readonly toast: Locator;
+  readonly locationNotice: Locator;
+  readonly locationNoticeRetry: Locator;
+
+  /** Web/PWA demo note: V2 voice is Android-native only. */
+  readonly webDemoNote: Locator;
+  /** Android-only voice controls; expected to have count 0 on the web build. */
+  readonly hearTodayButton: Locator;
+  readonly askButton: Locator;
+  readonly askPrivacy: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -54,7 +64,14 @@ export class DashboardPage {
     this.refreshError = page.getByTestId('refresh-error');
     this.refreshRetryButton = page.getByTestId('button-refresh-retry');
     this.refreshIndicator = page.getByTestId('refresh-indicator');
-    this.toast = page.getByTestId('toast');
+    // V2 shows location failures inline next to the hero instead of as a toast.
+    this.locationNotice = page.getByTestId('location-notice');
+    this.locationNoticeRetry = page.getByTestId('button-location-retry');
+
+    this.webDemoNote = page.getByTestId('web-demo-note');
+    this.hearTodayButton = page.getByTestId('button-hear-today');
+    this.askButton = page.getByTestId('button-ask-daymark');
+    this.askPrivacy = page.getByTestId('ask-privacy');
   }
 
   async goto(path = '/'): Promise<void> {
@@ -108,6 +125,13 @@ export class DashboardPage {
 
   async openPrivacyPolicy(): Promise<void> {
     await this.privacyLink.click();
+  }
+
+  /** Assert the Android-only voice surface is absent from the web build. */
+  async expectVoiceControlsHidden(): Promise<void> {
+    await expect(this.hearTodayButton).toHaveCount(0);
+    await expect(this.askButton).toHaveCount(0);
+    await expect(this.askPrivacy).toHaveCount(0);
   }
 
   async horizontalOverflow(): Promise<number> {

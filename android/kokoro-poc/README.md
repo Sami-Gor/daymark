@@ -49,7 +49,7 @@ narration voice; `bm_george` was the initial pick and is no longer bundled.
 ## Build
 
 ```bash
-# 1. assets (build-time download only; the app never downloads)
+# 1. assets (build-time download only; the app never downloads the model or voice)
 android/kokoro-poc/scripts/fetch-kokoro-assets.sh
 
 # 2. native library (clones the pinned crate into .build/, cross-compiles with the NDK)
@@ -193,7 +193,7 @@ work, not part of this pass.
 the remaining open question is the per-voice training-data provenance of
 `bm_fable`, which upstream does not document.
 
-## Comparison with the Sherpa POC (`poc/local-tts`)
+## Comparison with the Sherpa POC (`poc/local-tts` — a local, unpublished branch; the figures below come from local notes and are not reproducible from a fresh clone)
 
 | | Sherpa POC | Kokoro POC |
 |---|---|---|
