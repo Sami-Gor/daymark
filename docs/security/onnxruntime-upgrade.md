@@ -14,7 +14,7 @@ fixes, whether it stays compatible with Daymark's Android build and packaging,
 and what verification remains before any change is made.
 
 The recommendation is ONNX Runtime 1.28.3, or a later release that contains
-these fixes, such as 1.31.0. This document checks that statement against the
+these fixes, such as 1.31.0 (studied here) or 1.32.0 (newer; not studied here). This document checks that statement against the
 release notes and the commit history rather than assuming it, records the
 trade-offs, and records the local build and packaging study that was run.
 
@@ -41,7 +41,9 @@ do contain the fixes but have no published Android package; 1.31.1 has no
 memory-safety delta over 1.31.0 (only an OpenVINO/Python build fix and WASM
 test fixes) and no prebuilt Android package.
 
-## Public source verification (checked 2026-11-11)
+1.32.0 (2026-11-13) is now the newest release: it inherits the fixes through 1.31.1, has a Microsoft Maven AAR but no csukuangfj prebuilt Android package, and was not part of this study; 1.31.0 remains the newest release with the package the sherpa-onnx build script downloads.
+
+## Public source verification (checked 2026-11-11; release and telemetry facts re-checked 2026-11-19)
 
 These statements were checked against official, publicly accessible sources
 only.
@@ -51,7 +53,7 @@ only.
 | 1.28.3 released 2026-10-02 as a patch release with memory-safety and model-validation fixes | [v1.28.3 release notes](https://github.com/microsoft/onnxruntime/releases/tag/v1.28.3) | **public fact** (notes) |
 | 1.28.3 fixes include OOB reads (#32609, #32610, #32679, #32681) and a heap buffer overflow (#32611) | same release notes | **public fact** (notes) |
 | 1.31.0 released 2026-10-09 with broader model, graph and tensor validation, workspace-memory accounting (#31962, #32189) and a ConvTranspose shape-arithmetic overflow fix (#32661) | [v1.31.0 release notes](https://github.com/microsoft/onnxruntime/releases/tag/v1.31.0) | **public fact** (notes) |
-| Native builds default to 1DS telemetry in 1.31.0; it can be disabled with `--no_telemetry` (#32384) | same release notes | **public fact** (notes) |
+| 1DS telemetry is compiled into default POSIX/Android builds since 1.29 (#27379); the 1.31.0 notes extend the default statement to supported native builds (#32384), and it can be disabled with `--no_telemetry` | [v1.29.0](https://github.com/microsoft/onnxruntime/releases/tag/v1.29.0) and [v1.31.0](https://github.com/microsoft/onnxruntime/releases/tag/v1.31.0) notes; artifact check below | **public fact** (notes) + artifact check |
 | Each 1.28.3 fix is present in the 1.31.0 tag | Reproducible method: `git log v1.31.0 --grep=<PR>` and `git merge-base --is-ancestor` in a clone of [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) | **author-verified**; not stated by the 1.31.0 notes |
 | 1.31.0 builds and packages for Android arm64 with the same NDK but a newer CMake (4.4.5, LTO enabled); the release AAR must still be rebuilt with the pinned CMake 3.22.1 | Local development build (commands below); logs not committed | **local observation**, not upstream-tested |
 
@@ -79,14 +81,16 @@ third-party build of ONNX Runtime, not a Microsoft build. Microsoft's Maven
 | 1.30.1 | 2026-10-29 | **all 9** (cherry-pick `77e55fc6`) | **no** | notes list the full set |
 | **1.31.0** | 2026-10-09 | **all 9** (fix commits are on `main` and reachable from the tag) | **yes** | recommended; notes omit two entries |
 | 1.31.1 | 2026-10-26 | all 9 (inherits 1.31.0) | no (Microsoft Maven AAR exists) | build/test fixes only |
+| 1.32.0 | 2026-11-13 | all 9 (inherits 1.31.1; re-run the ancestry check) | no (Microsoft Maven AAR exists) | newest release; no csukuangfj prebuilt package; not in the local build study |
 
 Release notes: [1.28.3](https://github.com/microsoft/onnxruntime/releases/tag/v1.28.3),
 [1.30.1](https://github.com/microsoft/onnxruntime/releases/tag/v1.30.1),
 [1.31.0](https://github.com/microsoft/onnxruntime/releases/tag/v1.31.0),
-[1.31.1](https://github.com/microsoft/onnxruntime/releases/tag/v1.31.1).
+[1.31.1](https://github.com/microsoft/onnxruntime/releases/tag/v1.31.1),
+[1.32.0](https://github.com/microsoft/onnxruntime/releases/tag/v1.32.0).
 
 **Maven footnote.** Microsoft publishes `com.microsoft.onnxruntime:onnxruntime-android`
-on Maven Central for 1.28.0, 1.29.0, 1.30.0, 1.31.0 and 1.31.1, but not for
+on Maven Central for 1.28.0, 1.29.0, 1.30.0, 1.31.0, 1.31.1 and 1.32.0, but not for
 1.28.2, 1.28.3 or 1.30.1
 (<https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/maven-metadata.xml>).
 The Maven artifact and the csukuangfj prebuilt package are different builds;
@@ -178,9 +182,22 @@ the pinned CMake 3.22.1 profile before its digest is pinned.
 
 ## Telemetry: a trade-off to decide explicitly
 
-ONNX Runtime 1.31.0 changed a default: "Supported native builds now default to
-1DS telemetry ... telemetry can be disabled with `--no_telemetry`" (#32384), per
-the [v1.31.0 release notes](https://github.com/microsoft/onnxruntime/releases/tag/v1.31.0).
+ONNX Runtime's default POSIX/Android builds have included 1DS telemetry since
+1.29 (#27379): Microsoft's official 1.29.0/1.30.0 Android AARs and the
+csukuangfj 1.29.0/1.30.0 packages already contain the same `OneCollector`
+strings as 1.31.0 (checked 2026-11-19). The
+[v1.31.0 notes](https://github.com/microsoft/onnxruntime/releases/tag/v1.31.0)
+extend the documented default to "supported native builds" (#32384), which is
+the statement quoted here.
+
+Upstream, default-on telemetry became an active discussion after this document's
+check date: [issue #34322](https://github.com/microsoft/onnxruntime/issues/34322)
+(2026-11-16) asks for 1DS telemetry to be opt-in and back-ported to 1.29-1.32,
+and [PR #34323](https://github.com/microsoft/onnxruntime/pull/34323)
+(2026-11-16) makes it opt-in via `ORT_ENABLE_TELEMETRY` on `main`. No released
+version contains that change (1.32.0 is still the latest; 1.33.0 is in
+preparation), so the artifact findings below stand; re-check before the AAR
+rebuild.
 
 Daymark inspected the published 1.31.0 artifacts (downloaded from the public
 URLs above, then `unzip`/`strings`/`readelf`):
@@ -200,11 +217,14 @@ URLs above, then `unzip`/`strings`/`readelf`):
    published checksum): its `libonnxruntime.so` contains the same telemetry
    strings, and its `classes.jar` contains `ai/onnxruntime/telemetry/HttpClient`.
    Its manifest declares an `ai.onnxruntime.TelemetryInitializer` provider and
-   the `INTERNET` permission.
+   the `INTERNET` and `ACCESS_NETWORK_STATE` permissions.
 3. The 1.28.2 library (SHA-256
    `33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1`, the
    same bytes as the ONNX Runtime library inside the currently shipped AAR)
-   contains none of these strings.
+   contains none of these strings. Telemetry therefore arrived in the published
+   Android artifacts at 1.29, not 1.31.0: the same strings are present in the
+   official 1.29.0/1.30.0 AARs and the csukuangfj 1.29.0/1.30.0 packages
+   (checked 2026-11-19).
 
 The prebuilt csukuangfj package is a **third-party build** of ONNX Runtime, not
 a Microsoft build: the library embeds GitHub Actions build paths for the
@@ -291,7 +311,7 @@ cd android/SherpaOnnxAar && ./gradlew :sherpa_onnx:assembleRelease
 The following are proposals, not descriptions of existing automation:
 
 1. Add an ONNX Runtime version parameter next to the existing sherpa-onnx
-   version selection and pass it as `SHERPA_ONNX_ONNXRUNTIME_VERSION`; export
+   version selection introduced by the rebuild-automation change and pass it as `SHERPA_ONNX_ONNXRUNTIME_VERSION`; export
    `SHERPA_ONNX_ONNXRUNTIME_ROOT` to a cached, checksum-verified extraction of
    `onnxruntime-android-1.31.0.zip` so the build never depends on `wget`.
 2. Decide the telemetry posture in the pipeline: either build ONNX Runtime with
@@ -331,7 +351,7 @@ are observations, not CI-reproduced results.
   suite passed 24/24, so the change is build- and host-test verified, but not
   behaviour-verified on Android. Treat it as **TESTING REQUIRED** until those
   runs happen.
-- Telemetry is compiled into the published 1.31.0 Android binaries; the
+- Telemetry is compiled into the published Android binaries from 1.29 onward (verified here for 1.29.0, 1.30.0, 1.31.0 and 1.32.0); the
   "inert without the Java client" argument is a code-reading argument, not a
   network capture on a device.
 - Shipping 1.31.0 adds 3,128,984 bytes of ONNX Runtime (≈2.98 MiB / 3.13 MB)
@@ -339,6 +359,6 @@ are observations, not CI-reproduced results.
   release AAR should be built with the pinned CMake/NDK profile so its digest
   is reproducible.
 - No advisory for the 1.28.3 fixes was found in [OSV](https://osv.dev/) or the
-  [GitHub Advisory Database](https://github.com/advisories) (checked 2026-11-11);
+  [GitHub Advisory Database](https://github.com/advisories) (checked 2026-11-19);
   this is not an exhaustive search. The change is hardening rather than a
   response to a published advisory.
