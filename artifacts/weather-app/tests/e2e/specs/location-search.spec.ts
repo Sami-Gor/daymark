@@ -193,21 +193,18 @@ test.describe('location search', () => {
     await expect(search.results).not.toContainText('Paris');
   });
 
-  test('voice uses the selected location', async ({ api, dashboard, search, speech, voice }) => {
+  test('a selected location keeps the Android-only voice surface off the web', async ({ api, dashboard, search }) => {
     await api.locations();
     await dashboard.goto('/');
     await search.search('tokyo');
     await search.selectOption(0);
     await dashboard.expectCity('Tokyo');
+    await dashboard.expectTemperature('26°C');
 
-    await voice.startNarration();
-    const spoken = await speech.spoken();
-    expect(spoken[0]).toContain('in Tokyo');
-
-    await voice.toggleListening();
-    await speech.emitResult('When will it rain?');
-    await speech.emitRecognitionEnd();
-    await voice.expectAnswer('11 PM');
+    // Voice is Android-native only; changing place must not leak its controls
+    // (or the microphone disclosure) into the web build.
+    await dashboard.expectVoiceControlsHidden();
+    await expect(dashboard.webDemoNote).toBeVisible();
   });
 
   test('micro-climate is shown in the UK and hidden elsewhere', async ({ api, dashboard, search, sections }) => {

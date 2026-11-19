@@ -3,8 +3,9 @@ import { WINDY_FORECAST } from '../support/test-data';
 
 /*
  * Language switching across the interface: immediate copy updates, persistence
- * across reloads, per-location weather/locale handling, localized voice and
- * alert copy, and the narrow-viewport French layout.
+ * across reloads, per-location weather/locale handling, the localized web demo
+ * note (V2 voice is Android-native only) and alert copy, and the
+ * narrow-viewport French layout.
  */
 
 test.describe('multilingual interface', () => {
@@ -64,35 +65,24 @@ test.describe('multilingual interface', () => {
     expect(windowAfter).toMatch(/Protection solaire conseillée/);
   });
 
-  test('Hear today speaks the localized briefing', async ({ dashboard, speech, voice }) => {
+  test('localizes the web-only demo note in French', async ({ dashboard }) => {
     await dashboard.open();
     await dashboard.setLanguage('fr');
-    await voice.startNarration();
 
-    const spoken = await speech.spoken();
-    expect(spoken[0]).toContain('Il fait');
-    expect(spoken[0]).toContain('London');
+    await expect(dashboard.webDemoNote).toContainText('Démo web : météo uniquement.');
+    await expect(dashboard.webDemoNote).toContainText('Android');
+    // V2 voice is Android-native only; the localized web demo must not grow a
+    // voice surface in French either.
+    await dashboard.expectVoiceControlsHidden();
   });
 
-  test('Ask Daymark accepts a French phrase', async ({ dashboard, speech, voice }) => {
-    await dashboard.open();
-    await dashboard.setLanguage('fr');
-    await voice.toggleListening();
-    await speech.emitResult('Va-t-il pleuvoir ?');
-    await speech.emitRecognitionEnd();
-
-    await voice.expectQuestion('pleuvoir');
-    await voice.expectAnswer('pluie');
-  });
-
-  test('Ask Daymark accepts a Spanish phrase', async ({ dashboard, speech, voice }) => {
+  test('localizes the web-only demo note in Spanish', async ({ dashboard }) => {
     await dashboard.open();
     await dashboard.setLanguage('es');
-    await voice.toggleListening();
-    await speech.emitResult('¿Va a llover?');
-    await speech.emitRecognitionEnd();
 
-    await voice.expectAnswer('lluvia');
+    await expect(dashboard.webDemoNote).toContainText('Demo web: solo el tiempo.');
+    await expect(dashboard.webDemoNote).toContainText('Android');
+    await dashboard.expectVoiceControlsHidden();
   });
 
   test('alert UI translates', async ({ alerts, api, dashboard }) => {

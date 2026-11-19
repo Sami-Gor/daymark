@@ -40,21 +40,17 @@ test.describe('weather alerts', () => {
     await expect(alerts.alertTime('wind')).toHaveText(/5 PM–6 PM/);
   });
 
-  test('mentions the risk in the Hear today briefing', async ({ api, dashboard, speech, voice }) => {
+  test('keeps the Android-only voice surface off the web when an alert is active', async ({ api, dashboard }) => {
+    // The alert risk is narrated on Android and answerable through the Android
+    // intent layer; the web build shows the banner only. The Android intent
+    // coverage lives in weather-intents.test.ts, so here we pin that an active
+    // alert cannot leak the Android-only narration/microphone controls into the
+    // web/PWA demo.
     await api.forecast(WINDY_FORECAST);
     await dashboard.goto('/');
-    await voice.startNarration();
-    const spoken = await speech.spoken();
-    expect(spoken[0]).toContain('Strong winds expected');
-  });
-
-  test('answers an alert question through the intent layer', async ({ api, dashboard, speech, voice }) => {
-    await api.forecast(WINDY_FORECAST);
-    await dashboard.goto('/');
-    await voice.toggleListening();
-    await speech.emitResult('Are there any warnings?');
-    await speech.emitRecognitionEnd();
-    await voice.expectAnswer('Strong winds expected');
+    await expect(dashboard.currentTemperature).toBeVisible();
+    await dashboard.expectVoiceControlsHidden();
+    await expect(dashboard.webDemoNote).toBeVisible();
   });
 
   test('replaces the alert when the selected location changes', async ({ alerts, api, dashboard, search }) => {

@@ -78,8 +78,8 @@ test.describe('geolocation flow', () => {
 
     await dashboard.requestDeviceLocation();
     await geo.fail(3);
-    await expect(dashboard.toast).toContainText('took too long');
-    await expect(dashboard.toast).not.toContainText('Allow location access');
+    await expect(dashboard.locationNotice).toContainText('took too long');
+    await expect(dashboard.locationNotice).not.toContainText('Allow location access');
     await expect(dashboard.heroLocationButton).toHaveText('Use my location');
   });
 
@@ -90,8 +90,8 @@ test.describe('geolocation flow', () => {
 
     await dashboard.requestDeviceLocation();
     await geo.fail(2);
-    await expect(dashboard.toast).toContainText('determine your location');
-    await expect(dashboard.toast).not.toContainText('Allow location access');
+    await expect(dashboard.locationNotice).toContainText('determine your location');
+    await expect(dashboard.locationNotice).not.toContainText('Allow location access');
   });
 
   test('keeps the existing permission-denied message for code 1', async ({ dashboard, geo }) => {
@@ -101,7 +101,7 @@ test.describe('geolocation flow', () => {
 
     await dashboard.requestDeviceLocation();
     await geo.fail(1);
-    await expect(dashboard.toast).toContainText('Allow location access');
+    await expect(dashboard.locationNotice).toContainText('Allow location access');
   });
 
   test('requests mobile-friendly geolocation options', async ({ dashboard, geo }) => {
@@ -133,7 +133,7 @@ test.describe('geolocation flow', () => {
     await dashboard.expectReady();
 
     await dashboard.requestDeviceLocation();
-    await expect(dashboard.toast).toContainText('took too long');
+    await expect(dashboard.locationNotice).toContainText('took too long');
     await expect(dashboard.heroLocationButton).toHaveText('Use my location');
     await dashboard.expectCity('London');
   });
@@ -178,7 +178,7 @@ test.describe('geolocation flow', () => {
       await dashboard.requestDeviceLocation();
       await expect(dashboard.heroLocationButton).toHaveText('Finding you…');
       await geo.fail(code);
-      await expect(dashboard.toast).toBeVisible();
+      await expect(dashboard.locationNotice).toBeVisible();
       await expect(dashboard.heroLocationButton).toHaveText('Use my location');
     }
   });
@@ -202,36 +202,34 @@ test.describe('geolocation flow', () => {
     await expect(page.getByTestId('text-current-city')).toHaveText('Your location');
     const forecasts = pageRequests.forecast();
     expect(forecasts.length).toBeGreaterThan(0);
+    // V2 snaps device fixes to a 0.025-degree on-device grid: the London fix
+    // 51.5074567/-0.12789012 becomes exactly 51.5/-0.125 (not the V1
+    // two-decimal rounding of 51.51/-0.13), and the raw fix is never sent.
     for (const url of forecasts) {
-      expect(url).toContain('latitude=51.51');
-      expect(url).toContain('longitude=-0.13');
+      const params = new URL(url).searchParams;
+      expect(params.get('latitude'), 'device latitude on the 0.025-degree grid').toBe('51.5');
+      expect(params.get('longitude'), 'device longitude on the 0.025-degree grid').toBe('-0.125');
       expect(url).not.toContain('5074567');
+      expect(url).not.toContain('12789012');
     }
     expect(pageRequests.geocoding()).toEqual([]);
     await context.close();
   });
 
-  test('denied geolocation shows a toast and keeps the loaded weather', async ({ browser }) => {
+  test('denied geolocation shows an inline notice and keeps the loaded weather', async ({ browser }) => {
     const context = await browser.newContext({ permissions: [] });
     const page = await context.newPage();
     const api = new ApiMocks(page);
     await api.installDefaults();
     await page.goto('/');
     await expect(page.getByTestId('text-current-city')).toHaveText('London');
-    // The click can be swallowed by the loading→content swap, so retry until
-    // the toast appears. On a denied context no second prompt is shown.
-    let toastShown = false;
-    const caught: string[] = [];
-    for (let attempt = 0; attempt < 3 && !toastShown; attempt++) {
-      await page.getByTestId('button-refresh-location').click();
-      try {
-        await expect(page.getByTestId('toast')).toContainText('Location unavailable', { timeout: 2000 });
-        toastShown = true;
-      } catch (e) {
-        caught.push(String(e).slice(0, 200));
-      }
-    }
-    if (!toastShown) throw new Error('toast never appeared; caught: ' + JSON.stringify(caught, null, 2));
+
+    // A denied permission rejects getCurrentPosition with code 1. V2 surfaces
+    // location failures inline next to the hero (not as a toast) and keeps the
+    // already-loaded weather on screen.
+    await page.getByTestId('button-refresh-location').click();
+    await expect(page.getByTestId('location-notice')).toContainText('Allow location access');
+    await expect(page.getByTestId('button-location-retry')).toBeVisible();
     await expect(page.getByTestId('text-current-temperature')).toHaveText('20°C');
     await context.close();
   });

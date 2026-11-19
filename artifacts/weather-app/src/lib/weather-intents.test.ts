@@ -470,6 +470,19 @@ describe('resolveIntentTranscript', () => {
     expect(normalizeTranscript('Air-Quality   NOW')).toBe('air quality now');
   });
 
+  it('strips hostile markup so a transcript can only render as inert text', () => {
+    // V2 voice is Android-native only, so the Ask Daymark panel is the sole
+    // transcript sink (the web/PWA has no voice surface). Normalization keeps
+    // only letters/digits/apostrophes/hyphens/spaces, which is what makes the
+    // rendered transcript inert; this replaces the former browser E2E check.
+    expect(normalizeTranscript('<img src=x onerror="window.__xss=1">'))
+      .toBe('img src x onerror window xss 1');
+    expect(normalizeTranscript('<script>alert(1)</script>')).toBe('script alert 1 script');
+    for (const hostile of ['<img src=x onerror=alert(1)>', 'javascript:alert(1)', '<b>rain</b>']) {
+      expect(normalizeTranscript(hostile)).not.toMatch(/[<>:"/]/);
+    }
+  });
+
   it.each([
     ["what's the weather today", 'daymark.today'],
     ['tell me about today', 'daymark.today'],

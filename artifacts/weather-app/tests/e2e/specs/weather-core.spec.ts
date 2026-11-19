@@ -110,37 +110,38 @@ test.describe('weather dashboard', () => {
 });
 
 test.describe('hero action hierarchy', () => {
-  test.beforeEach(async ({ dashboard, speech }) => {
-    // Requesting `speech` in the hook installs the stubs before navigation.
-    void speech;
+  test.beforeEach(async ({ dashboard }) => {
     await dashboard.open();
   });
 
-  test('keeps all four actions with Hear today under the cue and search first in the tools row', async ({ page, dashboard, voice, search }) => {
+  test('keeps the search and location actions with no web voice controls', async ({ page, dashboard, search }) => {
     await expect(search.input).toBeVisible();
     await expect(dashboard.heroLocationButton).toBeVisible();
-    await expect(voice.hearTodayButton).toBeVisible();
-    await expect(voice.askButton).toBeVisible();
+    await expect(dashboard.celsiusButton).toBeVisible();
+    await expect(dashboard.webDemoNote).toBeVisible();
+    // V2 voice is Android-native only: the web hero has no Hear today/Ask Daymark.
+    await dashboard.expectVoiceControlsHidden();
 
-    const cuePrecedesHearToday = await page.evaluate(() => {
+    const cuePrecedesSearch = await page.evaluate(() => {
       const cue = document.querySelector('[data-testid="day-cue"]');
-      const hear = document.querySelector('[data-testid="button-hear-today"]');
-      if (!cue || !hear) return false;
-      return (cue.compareDocumentPosition(hear) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      const searchInput = document.querySelector('[data-testid="input-location-search"]');
+      if (!cue || !searchInput) return false;
+      return (cue.compareDocumentPosition(searchInput) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
     });
-    expect(cuePrecedesHearToday).toBe(true);
+    expect(cuePrecedesSearch).toBe(true);
 
     const searchPrecedesTools = await page.evaluate(() => {
       const searchInput = document.querySelector('[data-testid="input-location-search"]');
-      const tools = ['button-refresh-location', 'button-ask-daymark']
-        .map((id) => document.querySelector(`[data-testid="${id}"]`));
-      if (!searchInput || tools.some((node) => !node)) return false;
-      return tools.every((node) => (searchInput.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+      // The hero tools row puts the search field before the "Use my location"
+      // action. (The topbar crosshair is a separate, earlier control.)
+      const locationAction = document.querySelector('[data-testid="button-refresh-location"]');
+      if (!searchInput || !locationAction) return false;
+      return (searchInput.compareDocumentPosition(locationAction) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
     });
     expect(searchPrecedesTools).toBe(true);
   });
 
-  test('keeps every hero control visible and unclipped at 320px', async ({ page, dashboard, voice, search }) => {
+  test('keeps every hero control visible and unclipped at 320px', async ({ page, dashboard, search }) => {
     await page.setViewportSize({ width: 320, height: 900 });
     // Re-navigate at the narrow viewport so the assertion sees the real layout.
     await dashboard.goto('/');
@@ -149,20 +150,19 @@ test.describe('hero action hierarchy', () => {
     expect(await dashboard.horizontalOverflow()).toBeLessThanOrEqual(0);
     await expect(search.input).toBeVisible();
     await expect(dashboard.heroLocationButton).toBeVisible();
-    await expect(voice.hearTodayButton).toBeVisible();
-    await expect(voice.askButton).toBeVisible();
-    await expect(voice.askPrivacy).toBeVisible();
+    await expect(dashboard.webDemoNote).toBeVisible();
+    await dashboard.expectVoiceControlsHidden();
   });
 
-  test('keeps localized hero labels visible in French and Spanish', async ({ dashboard, voice }) => {
+  test('keeps localized hero labels visible in French and Spanish', async ({ dashboard }) => {
     await dashboard.setLanguage('fr');
     await expect(dashboard.heroLocationButton).toHaveText(/Utiliser ma position/);
-    await expect(voice.hearTodayButton).toContainText(/Écouter/);
-    await expect(voice.askButton).toContainText(/Demander à Daymark/);
+    await expect(dashboard.webDemoNote).toContainText('Démo web');
+    await dashboard.expectVoiceControlsHidden();
 
     await dashboard.setLanguage('es');
     await expect(dashboard.heroLocationButton).toHaveText(/Usar mi ubicación/);
-    await expect(voice.hearTodayButton).toContainText(/Escuchar/);
-    await expect(voice.askButton).toContainText(/Preguntar a Daymark/);
+    await expect(dashboard.webDemoNote).toContainText('Demo web');
+    await dashboard.expectVoiceControlsHidden();
   });
 });

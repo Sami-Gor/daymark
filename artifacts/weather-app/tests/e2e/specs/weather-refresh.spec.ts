@@ -121,20 +121,21 @@ test.describe('non-destructive weather refresh', () => {
     await expect(dashboard.loadingLayout).toHaveCount(0);
   });
 
-  test('a successful location clears the previous location error toast', async ({ dashboard, geo }) => {
+  test('a successful location clears the previous inline location notice', async ({ dashboard, geo }) => {
     await geo.defer();
     await dashboard.goto('/');
     await expect(dashboard.currentTemperature).toBeVisible();
 
     await dashboard.requestDeviceLocation();
     await geo.fail(1);
-    await expect(dashboard.toast).toBeVisible();
+    await expect(dashboard.locationNotice).toContainText('Allow location access');
 
+    // A new attempt replaces the stale notice immediately.
     await dashboard.requestDeviceLocation();
-    await expect(dashboard.toast).toHaveCount(0);
+    await expect(dashboard.locationNotice).toHaveCount(0);
     await geo.resolve(51.5074567, -0.12789012);
     await dashboard.expectCity('Your location');
-    await expect(dashboard.toast).toHaveCount(0);
+    await expect(dashboard.locationNotice).toHaveCount(0);
   });
 
   test('both location controls refresh without a reload', async ({ api, dashboard, geo, page }) => {
