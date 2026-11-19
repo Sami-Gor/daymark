@@ -147,12 +147,13 @@ Release: package `io.github.sami_gor.daymark` (versionCode 1 / versionName 1.0.0
 
 ```bash
 pnpm --filter @workspace/weather-app run typecheck    # app source + Playwright tests
-pnpm --filter @workspace/weather-app run test         # Vitest unit suite (257 tests)
+pnpm --filter @workspace/weather-app run lint:e2e     # type-aware async safety for the e2e suite
+pnpm --filter @workspace/weather-app run test         # Vitest unit suite (266 tests)
 pnpm --filter @workspace/weather-app run build        # production build the e2e suite serves
 pnpm --filter @workspace/weather-app run test:e2e     # Playwright browser suite (164 tests in 19 spec files)
 ```
 
-The e2e suite runs in Chromium against a production build served by `vite preview`, with Open-Meteo traffic mocked. It covers first paint and failure paths, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), location search, the service worker, served security headers, voice input/output, severe-weather alerts, the English/French/Spanish interface, and seeded randomised/boundary data. See [docs/TESTING.md](docs/TESTING.md) for the newcomer guide and [docs/TESTING-ARCHITECTURE.md](docs/TESTING-ARCHITECTURE.md) for the page-object and fixture design.
+The e2e suite runs in Chromium against a production build served by `vite preview`, with Open-Meteo traffic mocked. It covers first paint and failure paths, responsive widths (320–1440), axe-core accessibility, geolocation privacy (including wire-level coordinate rounding), location search, the service worker, served security headers, voice input/output, severe-weather alerts, the English/French/Spanish interface, and seeded randomised/boundary data. Async safety is enforced by both a type-aware ESLint pass and a static invocation scanner. See [docs/TESTING.md](docs/TESTING.md) for the newcomer guide and [docs/TESTING-ARCHITECTURE.md](docs/TESTING-ARCHITECTURE.md) for the page-object, fixture and async-safety design.
 
 ## Security
 

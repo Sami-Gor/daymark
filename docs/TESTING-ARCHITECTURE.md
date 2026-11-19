@@ -10,7 +10,9 @@ and why. Commands and per-file counts live in
 The suite was one 2,867-line `tests/e2e/app.spec.ts` with 153 tests and locally
 duplicated stubs. It is now 19 feature-focused specs (164 tests) using a shared
 page-object layer and fixtures. The 11 extra tests are new randomised,
-boundary and invalid-input coverage.
+boundary and invalid-input coverage. The support layer now also carries three
+Vitest test files (30 tests): the seeded-RNG unit tests, the invocation scanner
+and the ESLint guard.
 
 The refactor implements six recommendations from the QA review:
 
@@ -20,15 +22,21 @@ The refactor implements six recommendations from the QA review:
 | 2 | Split the monolithic spec by feature | `tests/e2e/specs/*.spec.ts` (19 files); `app.spec.ts` removed |
 | 3 | Share setup instead of copy-pasted stubs | `support/fixtures.ts` auto fixtures + `support/{mocks,test-data,network,speech,geolocation}.ts`; spec-level `beforeEach` where navigation is common |
 | 4 | Replace vague suite names with descriptive ones | Renamed `describe` suites: old `functional` split into `weather dashboard` / `geolocation flow`; `clean card redesign` → `live weather cards`; `useful bits` → `weather details (humidity and dew point)`; `UV simplification` → `UV forecast and protection window`; `security headers (preview environment)` → `security headers (preview server)`, and similar renames in every spec |
-| 5 | Fix the missing `await` and prevent regressions | Fixed in `specs/weather-core.spec.ts`; static guard `support/awaits.test.ts` runs in the normal Vitest layer |
+| 5 | Fix the missing `await` and prevent regressions | Fixed in `specs/weather-core.spec.ts`; three complementary checks: invocation scanner `support/awaits.test.ts`, type-aware ESLint `eslint.config.mjs` → `lint:e2e`, and Playwright's runtime auto-retrying assertions |
 | 6 | Add seeded randomisation instead of fixed-only data | `support/rng.ts`, `support/test-data.ts`, `specs/randomised-data.spec.ts` |
+
+The async-safety follow-up additionally replaced fixed readiness sleeps with
+observable signals (`support/animations.ts`, `support/locality-worker.ts`),
+added the ESLint layer and reduced the remaining fixed waits to three
+deliberately bounded negative observation windows.
 
 ## Directory layout
 
 ```text
 artifacts/weather-app/
+├── eslint.config.mjs              # type-aware async-safety rules for tests/e2e
 ├── playwright.config.ts           # testDir tests/e2e, testMatch **/*.spec.ts, Chromium, preview server
-├── tsconfig.e2e.json              # type-check config for tests/e2e
+├── tsconfig.e2e.json              # type-check config for tests/e2e (also covers lint fixtures)
 ├── vitest.config.ts               # includes src/**/*.test.ts and tests/e2e/support/**/*.test.ts
 └── tests/e2e/
     ├── specs/                     # 19 *.spec.ts files — only Playwright collects these
@@ -59,6 +67,7 @@ artifacts/weather-app/
     │   ├── weather-alerts.page.ts
     │   ├── privacy-policy.page.ts
     │   └── store-promo.page.ts
+    ├── lint-fixtures/             # 7 invalid + 1 valid fixture, ESLint guard only
     └── support/                   # shared harnesses + Vitest unit tests
         ├── fixtures.ts            # exported test/expect and all fixtures
         ├── mocks.ts               # ApiMocks network stubs
@@ -67,13 +76,22 @@ artifacts/weather-app/
         ├── network.ts             # RequestLog, BrowserLog
         ├── speech.ts              # SpeechHarness
         ├── geolocation.ts         # GeolocationHarness
+        ├── animations.ts          # expectAnimationsSettled() for axe scans
+        ├── locality-worker.ts     # LocalityWorkerProbe for worker-result waits
         ├── rng.test.ts            # Vitest (14 tests)
-        └── awaits.test.ts         # Vitest (7 tests)
+        ├── awaits.test.ts         # Vitest (12 tests)
+        └── eslint-guard.test.ts   # Vitest (4 tests)
 ```
 
 `testMatch` is `**/*.spec.ts`, so support `.test.ts` files are invisible to
 Playwright and run under Vitest. `tsconfig.e2e.json` type-checks everything
 under `tests/e2e`; the package `typecheck` script runs it after the app config.
+`eslint.config.mjs` is the separate lint entry point: it is scoped to
+`tests/e2e/**/*.ts`, uses `tsconfig.e2e.json` as the parser project, ignores
+`tests/e2e/lint-fixtures/` for the CLI target, and enables only the two
+async-safety rules. The fixtures are still typechecked, and
+`support/eslint-guard.test.ts` lints them through the ESLint API with
+`ignore: false` to prove the rules fire.
 
 ## Page object model
 
@@ -237,34 +255,116 @@ The goal is variation between runs/tests **without** losing reproducibility:
 ranges, frozen fixtures) in the unit layer, so a change to the PRNG or seed
 policy fails fast without a browser.
 
-## Async-await guard
+## Async safety
 
-The original defect was an assertion with no invocation/await
-(`expect(...).toBeVisible;`), which silently never runs. Two layers prevent it
-returning:
+Playwright actions and assertions return promises. A dropped promise is not a
+compile error: depending on the shape it either skips the step or races the next
+one. The original QA finding was the worst shape — an un-invoked matcher
+reference (`expect(locator).toBeVisible;`) is a legal property access, so it
+never runs and no type-aware lint rule can see a promise to complain about.
+Three complementary layers now cover different parts of the problem.
 
-1. **The fix.** The corresponding test in `specs/weather-core.spec.ts` now uses
-   `await expect(dashboard.currentTemperature).toBeVisible()` with a comment
-   marking it as the regression guard.
-2. **The static guard.** `support/awaits.test.ts` parses `specs/` and `pages/`
-   and reports:
-   - un-awaited Playwright matchers (`toBeVisible`, `toHaveText`,
-     `toContainText`, `toHaveAttribute`, …), including matchers on the
-     following lines of a multiline `expect`;
-   - un-awaited `expect.poll`;
-   - un-awaited async page/context actions (`click`, `fill`, `goto`, `route`,
-     `evaluate`, …), while ignoring event subscriptions such as
-     `page.on('request', …)` and synchronous assertions on plain values.
+### Layer A — invocation-specific static scanner (Vitest)
 
-   It runs in the normal Vitest layer (`pnpm --filter @workspace/weather-app
-   run test`), so CI fails on a new violation. Its own six unit cases verify
-   the scanner against true and false positives; a seventh scans the real E2E
-   sources.
+`support/awaits.test.ts` scans the TypeScript sources under `specs/` and
+`pages/` and reports:
 
-Limits: it is a line-based heuristic, not a TypeScript type-aware checker. It
-does not scan `support/` and cannot prove the absence of every async mistake —
-but it catches the class of defect that prompted the recommendation, cheaply
-and with no extra tooling.
+- **un-invoked** Playwright matcher references (`toBeVisible` present but never
+  called) — the exact original defect;
+- un-awaited matcher calls, including multiline chains, `expect.soft` and
+  `expect.poll`;
+- un-awaited page/page-object actions (`click`, `fill`, `goto`, `route`,
+  `evaluate`, …), excluding synchronous event subscriptions such as
+  `page.on('request', …)`;
+- synchronous generic assertions (`toEqual`, `toHaveLength`, …) are ignored to
+  avoid false positives.
+
+It is 12 tests: 11 scanner cases (including a temp-directory file:line test) plus
+one full scan of the real E2E sources. It is a **line-based heuristic**, not a
+type checker: it does not scan `support/`, does not follow aliases across
+modules, and cannot prove the absence of every async mistake. Its value is that
+it is the only check that catches the un-invoked matcher shape.
+
+### Layer B — type-aware ESLint (`lint:e2e`)
+
+`eslint.config.mjs` runs `typescript-eslint` with parser project
+`tsconfig.e2e.json` and enables exactly two error rules:
+
+- `@typescript-eslint/no-floating-promises` with `ignoreVoid: false`, so
+  `void somePromise` cannot be used to dismiss an un-awaited step;
+- `@typescript-eslint/no-misused-promises`, catching async functions passed
+  where a synchronous callback is expected.
+
+Because it is type-aware, it covers the whole `tests/e2e` tree — specs, page
+objects and support helpers — including aliases and function signatures the
+line scanner cannot follow. The seven deliberately-invalid fixtures in
+`tests/e2e/lint-fixtures/` (plus one valid control) prove the rules fire;
+`support/eslint-guard.test.ts` runs the real config over them through the ESLint
+API and asserts the configured rule severities/options.
+
+Limits, stated plainly: this is **not comprehensive lint**. Only the two
+async-safety rules are enabled; the `@eslint/js`/`typescript-eslint`
+recommended baseline is installed but intentionally off because it surfaces
+pre-existing findings outside this change. It is scoped to `tests/e2e`, and it
+cannot detect the un-invoked matcher reference (not a promise) or a logical race
+with correctly awaited calls.
+
+### Layer C — runtime assertions and auto-retry
+
+Playwright's `expect(...)` matchers auto-wait/retry until the expectation holds
+or the 5 s assertion timeout expires. `expect.poll` and the purpose-built
+helpers (`expectAnimationsSettled`, `LocalityWorkerProbe.waitForResult`,
+`RequestLog.waitForHostname`) do the same for non-DOM state. This layer catches
+the real UI state at execution time and turns a missing readiness condition into
+a clear retry timeout instead of a race — but only for state a test actually
+asserts. It cannot notice an un-awaited call by itself, which is why layers A
+and B exist.
+
+| Layer | Catches | Does not catch |
+| --- | --- | --- |
+| A: invocation scanner (`awaits.test.ts`) | Un-invoked matcher references; dropped matcher/action calls in `specs/` and `pages/` | Aliased/module-level misuse in `support/`; type-level promise misuse; logic races |
+| B: type-aware ESLint (`lint:e2e`) | Floating promises (including `void`) and async-callback misuse across the `tests/e2e` tree (lint fixtures excluded from the CLI target) | Un-invoked matcher references; races between correctly awaited calls; anything outside `tests/e2e` |
+| C: Playwright runtime assertions | UI/state that never reaches the awaited condition (clear timeout) | An un-awaited call you never asserted on; comprehensive coverage of app state |
+
+Together they cover the original defect (A), the general dropped-promise class
+(B) and the runtime symptom (C). None of them is a proof of async correctness;
+they are three cheap checks at different points.
+
+### Remaining waits and the wait strategy
+
+The async-safety follow-up removed every fixed readiness sleep: animation
+settling now polls `document.getAnimations()` via `expectAnimationsSettled`,
+and locality lookups wait on the worker's own `{type:'result'}` message via
+`LocalityWorkerProbe`. The location-search pre-Tokyo wait polls the request log
+instead of sleeping.
+
+Three fixed waits remain, each a **bounded negative observation window** — the
+test asserts that something does *not* happen and there is no positive event to
+wait on. They are retained only because the delay is controlled by the test and
+the window comfortably covers it:
+
+| Spec | Window | Why it cannot be a positive wait |
+| --- | --- | --- |
+| `geolocation.spec.ts` | 500 ms | The stale device fix is silently ignored; the ignore path emits no completion event |
+| `location-search.spec.ts` | 600 ms | The older Paris response is aborted/stale; no event marks "it did not overwrite Tokyo" |
+| `randomised-data.spec.ts` | 500 ms | Asserting that no geocoding request/results appear for a <2-character query |
+
+Wait strategy rules:
+
+1. Prefer an auto-retrying assertion, `expect.poll`, a request-log/response
+   wait, a harness event or a controlled route delay.
+2. A controlled delay (`api.delayForecast`, `api.locality({delay})`, the
+   locations() Paris delay, `geo.timed()`) is a test input for timing
+   scenarios — not a substitute for waiting on state.
+3. A bounded negative window is allowed only when: the test proves absence, no
+   reliable signal exists, the delay is controlled, the window covers it with
+   margin, and a comment explains what would have happened if the app were
+   wrong.
+4. Never sleep because a page "might not be ready", never add an arbitrary wait
+   before an interaction, never use elapsed time instead of an available signal,
+   and never raise a timeout to push a flake through.
+5. Add any new wait to the inventory in
+   [TESTING-REFERENCE.md](TESTING-REFERENCE.md#fixed-wait-inventory).
 
 ## Extending the suite
 
@@ -280,15 +380,21 @@ To add a browser test:
 4. Use the seeded `random` only when realistic variation adds value; keep
    boundary/invalid cases explicit.
 5. Await every action and assertion, keep no module-level state, name the
-   `describe` after the behaviour.
-6. Check the inventory, then run the file, then typecheck:
+   `describe` after the behaviour, and wait on an observable signal rather than
+   a duration (see the wait strategy above).
+6. Check the inventory, run the file, then typecheck and lint:
 
    ```bash
    cd artifacts/weather-app
    pnpm exec playwright test specs/<file>.spec.ts --list
    pnpm exec playwright test specs/<file>.spec.ts
    pnpm --filter @workspace/weather-app run typecheck
+   pnpm --filter @workspace/weather-app run lint:e2e
    ```
+
+   The Vitest guards (`awaits.test.ts`, `eslint-guard.test.ts`) run as part of
+   `pnpm --filter @workspace/weather-app run test`. CI runs `lint:e2e` after
+   typecheck and before the build.
 
 7. If you add a support helper with logic, add a Vitest test beside it in
    `support/*.test.ts` — not a Playwright spec.

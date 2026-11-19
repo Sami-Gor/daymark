@@ -1,3 +1,4 @@
+import { expectAnimationsSettled } from '../support/animations';
 import { expect, test } from '../support/fixtures';
 
 /*
@@ -12,13 +13,17 @@ import { expect, test } from '../support/fixtures';
 test.describe('accessibility and zoom', () => {
   test('core a11y checks pass at desktop and mobile', async ({ page, dashboard }) => {
     const { AxeBuilder } = await import('@axe-core/playwright');
-    // Settle entrance animations before the colour scan.
+    // Reduced motion collapses the entrance animations to one 0.01 ms
+    // iteration; the retrying helper below then waits on the browser's own
+    // animation timeline (no running/pending animation) instead of sleeping a
+    // guessed interval before each colour scan.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await dashboard.open();
-    await page.waitForTimeout(300);
 
     for (const width of [1280, 375]) {
       await page.setViewportSize({ width, height: 900 });
+      // Resizing can start layout transitions, so settle before every scan.
+      await expectAnimationsSettled(page);
       const results = await new AxeBuilder({ page }).analyze();
       const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
       expect(serious).toEqual([]);

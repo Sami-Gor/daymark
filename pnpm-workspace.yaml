@@ -45,7 +45,7 @@ catalog:
   '@types/node': ^25.3.3
   '@types/react': ^19.2.0
   '@types/react-dom': ^19.2.0
-  '@vitejs/plugin-react': ^5.0.4
+  '@vitejs/plugin-react': ^6.3.0
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
   framer-motion: ^12.23.24
@@ -57,9 +57,9 @@ catalog:
   tailwind-merge: ^3.3.1
   tailwindcss: ^4.1.14
   tsx: ^4.21.0
-  vite: ^7.3.2
+  vite: ^8.3.8
   wouter: ^3.3.5
-  zod: ^3.25.76
+  zod: ^4.6.6
 
 autoInstallPeers: false
 

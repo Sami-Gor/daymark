@@ -1,3 +1,4 @@
+import { expectAnimationsSettled } from '../support/animations';
 import { expect, test } from '../support/fixtures';
 import {
   PARIS_FORECAST,
@@ -85,7 +86,10 @@ test.describe('weather alerts', () => {
     await alerts.expectAlert('wind');
     expect(await dashboard.horizontalOverflow()).toBeLessThanOrEqual(0);
     const { AxeBuilder } = await import('@axe-core/playwright');
-    await page.waitForTimeout(200);
+    // Reduced motion makes every animation a single 0.01 ms iteration; wait for
+    // the browser to report no running/pending animation (finished ones stay in
+    // document.getAnimations()) so axe measures final colours, not a blend.
+    await expectAnimationsSettled(page);
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
     expect(serious).toEqual([]);

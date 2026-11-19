@@ -68,7 +68,6 @@ export const test = base.extend<DaymarkFixtures & DaymarkOptions>({
       await use(seed);
       if (testInfo.status !== testInfo.expectedStatus) {
         const provenance = envSeed ? `derived from DAYMARK_E2E_SEED=${envSeed}` : 'derived from the test title';
-        // eslint-disable-next-line no-console
         console.log(`[daymark-e2e] RNG seed for "${testInfo.title}": ${seed} (${provenance})`);
         console.log('[daymark-e2e] Rerun this test with the same environment to reproduce the same data.');
         await testInfo.attach('random-seed', {
