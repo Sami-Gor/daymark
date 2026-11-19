@@ -1,0 +1,133 @@
+name: Android CI
+
+# `main` builds the web layer in the `CI` workflow but does not compile or
+# test the native Android modules, so a Java, resource or manifest regression
+# on the release branch would merge green.
+#
+# This is a separate workflow rather than extra steps in `CI` on purpose: `CI`
+# runs the `verify` job, which is the only required status check on the
+# protected `main` branch. Coupling the Android toolchain to `verify` would
+# let a runner-side SDK problem block every merge to the release branch. A
+# separate job reports the result without becoming a merge gate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      # The Gradle project, including daymark-voice/, parakeet-assets/ and
+      # every module and wrapper Gradle file.
+      - 'artifacts/weather-app/android/**'
+      - 'artifacts/weather-app/package.json'
+      - 'artifacts/weather-app/capacitor.config.ts'
+      - 'artifacts/weather-app/public/**'
+      # The native runtime and Parakeet model are fetched, not committed, so
+      # a change to a fetch script or its pinned URL/checksum must rebuild.
+      - 'android/kokoro-poc/scripts/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/android-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # SHA-pinned third-party action; b906aff is the v4 tag commit.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Capacitor 8's Android modules compile with Java 21.
+      - name: Set up Java for Android
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # `cap sync` reads the built web assets (webDir = dist/public), so the
+      # web build has to run first.
+      - name: Build web assets
+        run: pnpm --filter @workspace/weather-app run build
+        env:
+          PORT: 5173
+          BASE_PATH: /
+
+      # Generate the Capacitor-managed Android files that are not committed
+      # (including capacitor-cordova-android-plugins/cordova.variables.gradle).
+      - name: Sync Capacitor Android project
+        run: pnpm --filter @workspace/weather-app exec cap sync android
+
+      # The DaymarkVoice module compiles Parakeet speech recognition against
+      # the sherpa-onnx runtime, which it consumes as a local
+      # `files('libs/sherpa-onnx-*.aar')` dependency. The AAR is not committed,
+      # so it has to be on disk before Gradle configures the project; without
+      # it, `:app:checkDebugAarMetadata` fails deep in artifact resolution with
+      # a bare "No such file or directory" for the AAR.
+      #
+      # The fetch script is checksum-pinned and ships with the voice module.
+      # It exists only once the module does, so branches that predate it skip
+      # the download instead of failing the job.
+      - name: Fetch the sherpa-onnx runtime
+        run: |
+          script=android/kokoro-poc/scripts/fetch-sherpa-onnx.sh
+          if [ -f "$script" ]; then
+            "$script"
+          else
+            echo "::notice::$script is not on this branch; skipping the sherpa-onnx fetch."
+          fi
+
+      # Preflight for the failure above. Gradle reports a missing local AAR
+      # late and by path only, which reads as an obscure build break; fail here
+      # instead, naming the script that installs it, as soon as the module
+      # actually declares the runtime.
+      #
+      # The Parakeet *model* is deliberately not fetched in this job: it only
+      # compiles, unit-tests and lints, and the 0.6B int8 model would add
+      # hundreds of megabytes to every run. Release packaging must run
+      # android/kokoro-poc/scripts/fetch-parakeet-assets.sh before it builds an
+      # APK/AAB that ships speech recognition.
+      - name: Verify the sherpa-onnx runtime
+        run: |
+          module=artifacts/weather-app/android/daymark-voice
+          if ! grep -q "libs/sherpa-onnx-.*\.aar" "$module/build.gradle" 2>/dev/null; then
+            echo "::notice::$module does not declare the sherpa-onnx runtime on this branch; nothing to verify."
+            exit 0
+          fi
+          if ! compgen -G "$module/libs/sherpa-onnx-*.aar" >/dev/null; then
+            echo "error: $module declares the sherpa-onnx runtime but no AAR is installed." >&2
+            echo "       run android/kokoro-poc/scripts/fetch-sherpa-onnx.sh before Gradle." >&2
+            exit 1
+          fi
+          ls -l "$module"/libs/sherpa-onnx-*.aar
+
+      # The committed JVM unit tests guard the minimum-WebView gate that
+      # decides whether the WebView loads the bundle at all.
+      - name: Android unit tests
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:testDebugUnitTest
+
+      - name: Android debug build
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      # Android Lint. `warningsAsErrors` stays off: the project has warnings
+      # today, and the gate is there to catch new *errors*.
+      - name: Android lint
+        working-directory: artifacts/weather-app/android
+        run: ./gradlew --no-daemon :app:lintDebug
