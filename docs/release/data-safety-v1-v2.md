@@ -142,7 +142,7 @@ off-device request, not a Daymark-maintained search history.
 
 ### Local preferences and storage
 
-- Web/PWA and Android WebView: `daymark.locale` in localStorage.
+- Web/PWA and Android WebView: `daymark.locale` (language) and `daymark.unit` (`C`/`F` temperature unit) in localStorage.
 - Android: private `SharedPreferences` named `daymark.permissions` containing
   the boolean `microphone-requested`, used only to avoid repeating a microphone
   permission prompt.
@@ -202,7 +202,7 @@ removes a Daymark-operated recipient.
 | In-app search history — encryption in transit | **Yes for V2 requests** | Geocoding uses HTTPS. | Encryption | High for V2; global answer remains blocked by V1. |
 | Voice or sound recordings — V2-only | **No collected / No shared** | Parakeet is on-device; audio is in memory; no remote recognizer or system/browser speech path is registered. | On-device processing | Source/test evidence; no packet capture. |
 | Microphone permission | **Optional app permission** | `RECORD_AUDIO` only for explicit Ask Daymark. | Collection definition / Android permission | High. |
-| Local preferences | **Not a Data Safety collection** | `daymark.locale` and `daymark.permissions`/`microphone-requested` remain on-device. | Collection definition | High, subject to source tests. |
+| Local preferences | **Not a Data Safety collection** | `daymark.locale`, `daymark.unit` and `daymark.permissions`/`microphone-requested` remain on-device. | Collection definition | High, subject to source tests. |
 | IP address / network metadata | **No Daymark-selected data type; provider-receipt classification unresolved** | Open-Meteo receives source IP/URL metadata; the policy now discloses this. Daymark does not use IP to identify a user or derive location. | Data Safety IP-address FAQ | No Play data type can be justified from Daymark's own use. Because Play treats off-device transmission as collection, the provider-receipt classification still needs Play/legal resolution; do not guess one. |
 | Deletion request mechanism | **No dedicated mechanism** | No accounts or backend user record; no location/search history. Local storage can be cleared; Open-Meteo logs cannot be deleted by Daymark. | Deletion FAQ | Current implementation; policy must not imply provider deletion. |
 | Encryption in transit — global | **Not finalized** | V2 requests are HTTPS, but V1 remains distributed and its speech-provider transport is unknown. | Encryption; version-sum rule | Do not select global Yes until V1 is gone or provider transport is evidenced. |
@@ -310,7 +310,7 @@ distributed outside internal testing, plus V2. It is not a Console submission.
 | In-app search history | Typed query to Open-Meteo; no Daymark history. | Typed query to Open-Meteo; no Daymark history. | **Collected Yes; Shared Yes (provisional); Optional; App functionality; Not ephemeral.** |
 | Voice or sound recordings | Browser/WebView recognition and system/browser TTS; provider transport remains external. | Parakeet and Kokoro on-device; no system/browser/remote fallback; no transcript/audio persistence found. | **V1: Yes (conservative); V2: No collected; global: Yes while V1 is distributed.** |
 | IP / requested URL metadata | Provider receives transport metadata; no Daymark use for identification/location. | Same. | **Disclosed; no Daymark-selected Play data type; provider-receipt category remains a specific legal/Play classification question.** |
-| Local preferences / models | `daymark.locale`; no V2 permission flag in V1 source. | `daymark.locale`; `daymark.permissions`/`microphone-requested`; bundled models. | **Not a Data Safety collection.** |
+| Local preferences / models | `daymark.locale`; no V2 permission flag in V1 source. | `daymark.locale`, `daymark.unit`; `daymark.permissions`/`microphone-requested`; bundled models. | **Not a Data Safety collection.** |
 | Encryption in transit | Weather/search source uses HTTPS; V1 speech/TTS provider transport is not established. | V2 Open-Meteo requests use HTTPS. | **Yes for Daymark-controlled V2 requests; global Yes is not claimed while V1 speech transport is unverified.** |
 | Deletion | No account/history deletion mechanism; provider logs are outside Daymark control. | Same. | **No dedicated deletion mechanism; local clearing does not delete provider records.** |
 

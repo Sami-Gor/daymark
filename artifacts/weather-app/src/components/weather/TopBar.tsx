@@ -36,9 +36,9 @@ export function TopBar({ unit, onUnitChange, onFindMe, isLocating, isRefreshing 
             ))}
           </select>
         </label>
-        <div className="unit-switch" role="group" aria-label={t('topbar.unitLabel')}>
-          <button className={`unit-button${unit === 'celsius' ? ' active' : ''}`} onClick={() => onUnitChange('celsius')} aria-pressed={unit === 'celsius'} data-testid="button-unit-celsius">°C</button>
-          <button className={`unit-button${unit === 'fahrenheit' ? ' active' : ''}`} onClick={() => onUnitChange('fahrenheit')} aria-pressed={unit === 'fahrenheit'} data-testid="button-unit-fahrenheit">°F</button>
+        <div className="unit-switch">
+          <button className={`unit-button${unit === 'celsius' ? ' active' : ''}`} onClick={() => onUnitChange('celsius')} aria-label={t('topbar.unitCelsius')} aria-pressed={unit === 'celsius'} data-testid="button-unit-celsius">°C</button>
+          <button className={`unit-button${unit === 'fahrenheit' ? ' active' : ''}`} onClick={() => onUnitChange('fahrenheit')} aria-label={t('topbar.unitFahrenheit')} aria-pressed={unit === 'fahrenheit'} data-testid="button-unit-fahrenheit">°F</button>
         </div>
         <button className="icon-button" onClick={onFindMe} aria-label={t('topbar.useLocation')} title={t('topbar.useLocation')} data-testid="button-use-location">
           <LocateFixed size={17} className={isLocating ? 'animate-pulse' : ''} />

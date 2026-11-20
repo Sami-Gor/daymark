@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Droplets, Thermometer, type LucideIcon } from 'lucide-react';
-import { displayTemp, distanceKm, fetchMicroClimate, isMicroClimateSupported, signedDelta, type MicroClimatePayload, type Place, type Unit, type WeatherPayload } from '@/lib/weather';
+import { displayTempWithUnit, distanceKm, fetchMicroClimate, isMicroClimateSupported, signedDelta, type MicroClimatePayload, type Place, type Unit, type WeatherPayload } from '@/lib/weather';
 import { useLocale } from '@/hooks/use-locale';
 
 type ComparisonRow = {
@@ -59,8 +59,8 @@ export function MicroClimateForecast({ weather, place, unit }: { weather: Weathe
       id: 'temperature',
       icon: Thermometer,
       label: t('micro.temperature'),
-      forecast: displayTemp(regionalTemperature, unit),
-      model: displayTemp(modelTemperature, unit),
+      forecast: displayTempWithUnit(regionalTemperature, unit),
+      model: displayTempWithUnit(modelTemperature, unit),
       delta,
       deltaText: signedDelta(delta, unit === 'fahrenheit' ? '°F' : '°C', 1, locale),
       notable: Math.abs(delta) >= (unit === 'fahrenheit' ? 1.8 : 1),

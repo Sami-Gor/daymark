@@ -128,10 +128,11 @@ export default function PrivacyEs() {
       <h2>Información almacenada en tu dispositivo</h2>
       <p>
         Daymark guarda el código de idioma en el almacenamiento local con <code>daymark.locale</code>.
-        La app de Android también guarda un valor privado de estado en SharedPreferences con
+        También recuerda tu unidad de temperatura preferida (<code>C</code> o <code>F</code>) con
+        <code>daymark.unit</code>. La app de Android también guarda un valor privado de estado en SharedPreferences con
         <code>daymark.permissions</code>: el booleano <code>microphone-requested</code>, usado solo para
         evitar repetir una solicitud de permiso de micrófono después de haberla solicitado o de que
-        se haya denegado. Ninguno de esos
+        se haya denegado. Son preferencias de visualización y de estado de la app; ninguno de esos
         valores es un historial de ubicación, búsquedas, transcripciones ni del tiempo, y Daymark no
         conserva esos historiales. El service worker de la web/PWA guarda en caché los recursos de la
         aplicación, y la búsqueda de localidades usa Cache Storage para el conjunto de datos estático;
@@ -140,7 +141,7 @@ export default function PrivacyEs() {
       </p>
       <p>
         El código de la app Daymark no usa cookies, almacenamiento de sesión del navegador ni IndexedDB
-        para el estado del usuario. Puedes borrar la preferencia de idioma y las cachés de la aplicación borrando el
+        para el estado del usuario. Puedes borrar las preferencias de idioma y de unidad y las cachés de la aplicación borrando el
         almacenamiento de este sitio o aplicación en los ajustes de tu navegador o dispositivo. Borrar
         el almacenamiento local no elimina automáticamente los datos que ya conserven terceros como
         Open-Meteo.
@@ -207,7 +208,8 @@ export default function PrivacyEs() {
         <li>Denegar o revocar la ubicación en los ajustes del navegador o dispositivo.</li>
         <li>En Android, no usar Ask Daymark y prescindir del micrófono.</li>
         <li>Denegar o revocar el micrófono en cualquier momento.</li>
-        <li>Borrar la preferencia de idioma y las cachés de la aplicación en los ajustes.</li>
+        <li>Elegir Celsius o Fahrenheit para mostrar las temperaturas. La elección se guarda únicamente en el almacenamiento local de este navegador o aplicación con <code>daymark.unit</code>; los valores válidos son <code>C</code> y <code>F</code>, y se usa Celsius cuando no hay ningún valor válido guardado. No se envía a ningún servidor, no se sincroniza con ninguna cuenta y no se usa para telemetría.</li>
+        <li>Borrar las preferencias de idioma y de unidad y las cachés de la aplicación en los ajustes.</li>
       </ul>
 
       <h2>Cambios y contacto</h2>

@@ -410,6 +410,19 @@ export function displayTemp(value: number | null | undefined, unit: Unit): strin
   return `${Math.round(converted)}°`;
 }
 
+/** Temperature text with the active unit symbol, e.g. 18°C. Missing values remain an em dash. */
+export function displayTempWithUnit(value: number | null | undefined, unit: Unit): string {
+  const formatted = displayTemp(value, unit);
+  return formatted === '—' ? formatted : `${formatted}${unit === 'fahrenheit' ? 'F' : 'C'}`;
+}
+
+/** Full spoken/aria phrase for a temperature, e.g. 18 degrees Celsius. */
+export function temperaturePhrase(value: number | null | undefined, unit: Unit, locale: Locale = 'en'): string {
+  const formatted = displayTemp(value, unit);
+  if (formatted === '—') return formatted;
+  return `${formatted.slice(0, -1)} ${translate(locale, unit === 'fahrenheit' ? 'unit.degreesFahrenheit' : 'unit.degreesCelsius')}`;
+}
+
 export function calculateDewPointCelsius(temperatureC: number | null | undefined, humidity: number | null | undefined): number | undefined {
   if (temperatureC == null || humidity == null || Number.isNaN(temperatureC) || Number.isNaN(humidity)) return undefined;
   const b = 17.62;

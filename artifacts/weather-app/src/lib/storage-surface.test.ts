@@ -3,12 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { LOCALE_STORAGE_KEY } from './i18n';
+import { UNIT_STORAGE_KEY } from './unit-preference';
 
 /*
  * Regression guard for the persisted-storage surface.
  *
- * The web/PWA is allowed exactly one app-controlled localStorage key:
- * `daymark.locale` (a non-sensitive display preference) owned by lib/i18n.ts.
+ * The web/PWA is allowed exactly two app-controlled localStorage keys, both
+ * non-sensitive display preferences owned by dedicated modules:
+ *   - `daymark.locale`  (language)        — lib/i18n.ts
+ *   - `daymark.unit`    ('C' | 'F' unit)  — lib/unit-preference.ts
  * The Android voice module separately keeps one private app-state boolean
  * (`microphone-requested`) in SharedPreferences named `daymark.permissions`.
  * Location, search queries, transcripts, weather payloads and alert data must
@@ -19,6 +22,7 @@ import { LOCALE_STORAGE_KEY } from './i18n';
  * checked for the absence of user-state storage APIs here.
  */
 const APPROVED_LOCALE_KEY = 'daymark.locale';
+const APPROVED_UNIT_KEY = 'daymark.unit';
 const ANDROID_PERMISSION_PREFS = 'daymark.permissions';
 const ANDROID_PERMISSION_KEY = 'microphone-requested';
 const USER_STATE_APIS = ['sessionStorage', 'indexedDB', 'document.cookie', 'navigator.storage'];
@@ -43,18 +47,25 @@ function relative(file: string): string {
 }
 
 describe('persisted storage surface', () => {
-  it('approves only the locale preference as the web/PWA app-controlled localStorage key', () => {
+  it('approves only the locale and temperature-unit preferences as app-controlled localStorage keys', () => {
     expect(LOCALE_STORAGE_KEY).toBe(APPROVED_LOCALE_KEY);
+    expect(UNIT_STORAGE_KEY).toBe(APPROVED_UNIT_KEY);
     const owners = productionSourceFiles()
       .filter((file) => readFileSync(file, 'utf8').includes('localStorage'))
-      .map(relative);
-    // One owner only: a new module touching localStorage must fail this test.
-    expect(owners).toEqual(['src/lib/i18n.ts']);
+      .map(relative)
+      .sort();
+    // Exactly two reviewed owners: a new module touching localStorage must
+    // fail this test and be added here deliberately.
+    expect(owners).toEqual(['src/lib/i18n.ts', 'src/lib/unit-preference.ts']);
+    const keyConstantByOwner: Record<string, string> = {
+      'src/lib/i18n.ts': 'LOCALE_STORAGE_KEY',
+      'src/lib/unit-preference.ts': 'UNIT_STORAGE_KEY',
+    };
     for (const file of owners) {
       const source = readFileSync(path.join(projectRoot, file), 'utf8');
       // No raw literal keys — the approved constant must be used.
       expect(source).not.toMatch(/localStorage\.\w+\(\s*['"]/);
-      expect(source).toContain('LOCALE_STORAGE_KEY');
+      expect(source).toContain(keyConstantByOwner[file]);
     }
   });
 
