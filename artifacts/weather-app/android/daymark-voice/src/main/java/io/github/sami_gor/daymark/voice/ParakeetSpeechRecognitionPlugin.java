@@ -58,6 +58,10 @@ import java.util.function.Supplier;
  *       {@code error}), never a second one after a cancellation; the phase
  *       events ({@code started}, {@code captureEnd}) are dropped for a session
  *       that is no longer live;
+ *   <li>a decode refusal, a failed decode and an empty decode are distinct
+ *       terminal error codes ({@code model-rejected}, {@code decode-failed},
+ *       {@code empty-transcript}); none of them is reported as silence and
+ *       none of them delivers a transcript;
  *   <li>the capture device is created, read and released by one worker thread
  *       only, so a cancellation never releases a recorder under a blocked read;
  *   <li>the recogniser is never released while a decode may still be in
@@ -535,14 +539,50 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
                 return;
             }
 
-            final String text = engine.decode(samples.toArray(), SAMPLE_RATE);
-            samples.clear();
-
-            if (text == null || text.trim().isEmpty()) {
-                finishWithError(session, "no-speech");
+            final DecodeOutcome outcome;
+            try {
+                outcome = engine.decode(samples.toArray(), SAMPLE_RATE);
+            } catch (Throwable decodeFailure) {
+                // Defense in depth: the production adapter already turns a
+                // failed native call into DecodeOutcome.failed(). An Error or
+                // an adapter bug must still be a terminal decode failure — not
+                // silence, never a transcript and never a process exit.
+                samples.clear();
+                finishWithError(session, RecognitionErrorCodes.DECODE_FAILED);
                 return;
             }
-            finishWithResult(session, text.trim());
+            samples.clear();
+
+            if (outcome == null || outcome.status() == null) {
+                finishWithError(session, RecognitionErrorCodes.DECODE_FAILED);
+                return;
+            }
+            switch (outcome.status()) {
+                case DECODED: {
+                    final String transcript = outcome.text().trim();
+                    if (transcript.isEmpty()) {
+                        // A DECODED outcome must carry text. Never deliver an
+                        // empty transcript: surface the empty decode instead.
+                        finishWithError(session, RecognitionErrorCodes.EMPTY_TRANSCRIPT);
+                        return;
+                    }
+                    finishWithResult(session, transcript);
+                    return;
+                }
+                case EMPTY:
+                    // an empty decode after speech onset is a distinct
+                    // failure, not the "no speech" silence code.
+                    finishWithError(session, RecognitionErrorCodes.EMPTY_TRANSCRIPT);
+                    return;
+                case REFUSED:
+                    // a security refusal is its own explicit error.
+                    finishWithError(session, RecognitionErrorCodes.MODEL_REJECTED);
+                    return;
+                case FAILED:
+                default:
+                    finishWithError(session, RecognitionErrorCodes.DECODE_FAILED);
+                    return;
+            }
         } catch (SecurityException notAllowed) {
             finishWithError(session, "not-allowed");
         } catch (Throwable error) {
@@ -692,11 +732,24 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
         notifyListeners("result", event);
     }
 
-    void notifyError(int sessionId, String code) {
+    /**
+     * Builds the error payload shared by the bridge and the JVM tests.
+     *
+     * <p>{@code code} is the stable error code; {@code stage} is additive
+     * structured metadata that tells the web layer whether the capture,
+     * the decode or the model produced the failure. Existing consumers that
+     * only read {@code code} are unaffected.
+     */
+    static JSObject buildErrorEvent(int sessionId, String code) {
         JSObject event = new JSObject();
         event.put("sessionId", sessionId);
         event.put("code", code);
-        notifyListeners("error", event);
+        event.put("stage", RecognitionErrorCodes.stageOf(code).wireName());
+        return event;
+    }
+
+    void notifyError(int sessionId, String code) {
+        notifyListeners("error", buildErrorEvent(sessionId, code));
     }
 
     // ------------------------------------------------------------------
@@ -863,27 +916,65 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
     }
 
     /**
+     * The single place where a completed native decode becomes a structured
+     * outcome.
+     *
+     * <p>Package-private and static so the mapping can be unit-tested
+     * deterministically on the JVM, where the native runtime is unavailable.
+     * It is deliberately the only place that can turn an empty native result
+     * into a terminal outcome, so a refusal can never be delivered as a
+     * transcript.
+     *
+     * @param text    the native result text, possibly null/blank
+     * @param refused whether the native decoder reported a refusal
+     */
+    static DecodeOutcome classifyDecodedText(String text, boolean refused) {
+        final String transcript = text == null ? "" : text.trim();
+        if (!transcript.isEmpty()) {
+            return DecodeOutcome.decoded(transcript);
+        }
+        if (refused) {
+            return DecodeOutcome.refused(DecodeOutcome.DETAIL_NATIVE_REFUSAL);
+        }
+        return DecodeOutcome.empty();
+    }
+
+    /**
      * The production {@link UtteranceDecoder}: one sherpa stream per utterance,
      * decoded and read back exactly as before, released on every path.
      */
     private static final class SherpaUtteranceDecoder implements UtteranceDecoder {
         private final OfflineRecognizer engine;
+        private final NativeDecodeStatus nativeStatus;
         private final AtomicBoolean released = new AtomicBoolean(false);
 
         SherpaUtteranceDecoder(OfflineRecognizer engine) {
+            this(engine, NativeDecodeStatus.UNAVAILABLE);
+        }
+
+        /** Seam for a native status channel, when the shipped AAR has one. */
+        SherpaUtteranceDecoder(OfflineRecognizer engine, NativeDecodeStatus nativeStatus) {
             this.engine = engine;
+            this.nativeStatus = nativeStatus == null
+                    ? NativeDecodeStatus.UNAVAILABLE
+                    : nativeStatus;
         }
 
         @Override
-        public String decode(float[] samples, int sampleRate) {
+        public DecodeOutcome decode(float[] samples, int sampleRate) {
             OfflineStream stream = null;
             try {
                 // A fresh stream per utterance, as the evaluated configuration used.
                 stream = engine.createStream();
                 stream.acceptWaveform(samples, sampleRate);
                 engine.decode(stream);
-                String text = engine.getResult(stream).getText();
-                return text == null ? "" : text;
+                final String text = engine.getResult(stream).getText();
+                return classifyDecodedText(text, nativeStatus.refusedLastDecode());
+            } catch (RuntimeException nativeFailure) {
+                // A failed native decode is a terminal failure code, not an
+                // empty transcript and not silence. Exception text can carry
+                // paths or payload, so it is not propagated.
+                return DecodeOutcome.failed(DecodeOutcome.DETAIL_NATIVE_FAILURE);
             } finally {
                 if (stream != null) {
                     try {
