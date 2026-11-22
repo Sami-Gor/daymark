@@ -15,7 +15,17 @@ Specific place names, verbatim spoken prompts, recognised transcripts, audio rec
 - Network condition during the offline phone checks: Airplane mode on; Wi-Fi off
 - Selected model: Parakeet TDT 0.6B v3, int8
 - Runtime/configuration: sherpa-onnx offline transducer on CPU; 16 kHz audio, 80-dimensional features, greedy decoding, and a fresh recognition stream per utterance
-- Upstream model package: [sherpa-onnx Parakeet TDT 0.6B v3 int8 release archive](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2)
+- Model package: the evaluated pack is the tar archive pinned by SHA-256
+  `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`
+  (487,170,055 bytes) in `android/kokoro-poc/scripts/fetch-parakeet-assets.sh`.
+  The build is configured to fetch the preserved archive from the
+  Daymark-controlled mirror (or an approved `PARAKEET_ARCHIVE_URL` override; see
+  [the model retrieval policy](reproducible-build-guide.md#51-parakeet-model-retrieval-policy));
+  the upstream URL is not used. The
+  [sherpa-onnx release URL](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2)
+  is a mutable channel and was re-uploaded on 2026-11-07 to a different archive
+  (SHA-256 `1495e91b…`, 487,211,443 bytes). The pinned digest, not the URL,
+  identifies the evaluated package, and the build fails closed on a mismatch.
 
 ## Broader model evaluation overview
 
@@ -193,6 +203,82 @@ from the standalone model harness, not from the Daymark screen. The accuracy
 figures are a baseline for the engine, not evidence about the application, and
 the named-place weakness recorded below still stands.
 
+## Replacement-candidate evaluation (not adopted)
+
+The upstream re-upload described above was evaluated as a possible replacement
+for the pinned model pack. It is **not adopted**: the build still pins and
+verifies `5793d0fd…`, and no production configuration, model pin or AAR
+changed. The findings are evaluation evidence only; they do not approve the
+replacement and must not be read as a device or product claim.
+
+**Host parity (old vs new), shipped runtime family.** Both packs were decoded
+with the same sherpa-onnx 1.13.8 + ONNX Runtime 1.28.2 stack and the application
+recogniser configuration over a fixed 23-input corpus. Transcripts and token
+sequences were exactly equal on **20/23 inputs**; one out-of-contract 0-frame WAV
+failed identically on both packs, and two inputs differed. Later analysis
+qualified those two differences:
+
+- The native-rate Spanish clip loses two written accents (`qué` → `que`) in
+  the new pack. A controlled resampling matrix showed this is a feature-path
+  near-tie: band-limited resampling restores the accents for both packs, and the
+  16 kHz feed used in the first comparison came from a non-band-limited
+  resampler. It is not evidence of a model-wide regression.
+- Otherwise, in-contract short 16 kHz speech was stable: a separate numerical
+  comparison found **14/14** short clips token- and text-identical, the joiner
+  numerically identical, and encoder/decoder differences confined to
+  quantisation-scale drift. Outputs are **not bit-identical**: token timestamps
+  agreed on 525/540 tokens (the rest differed by one or two 80 ms frames), and
+  per-token log-probabilities drifted slightly. No "bit-identical output" claim
+  is made.
+
+**Long-form 30 s behaviour.** The one content-level difference in the 30 s
+multilingual tile is a **19-token insertion in the new pack** (a French clause
+restored; zero deletions and zero substitutions), with normal token confidence.
+Both packs retain only two of the four languages on that dense synthetic tile
+(the Spanish and German segments are dropped by both), so this is a shared
+long-stream limitation, not a replacement regression; separate single-language
+decodes recover the dropped segments. The fixture is synthetic and has no
+ground-truth transcript, so it yields no WER or quality claim.
+
+**Android harness — functional evidence only, not device parity.** A standalone
+old-vs-new `androidTest` harness links the shipped AAR by file and mirrors the
+production recogniser configuration. It has been built and executed on an
+**arm64-v8a API 30 emulator** (no physical device was attached), with both model
+packs re-verified by SHA-256 on the device before decoding. All 23 inputs were
+covered: 20/23 produced the same text/tokens (11 identical results and 9
+timing-only shifts of at most 0.16 s), 2 differed at text level (the Spanish
+accents and the low-level-noise clip), and 1 failed identically. This run is
+**emulator functional evidence only**: it is not Nothing A059P hardware
+latency, memory or thermal parity, its latency/PSS figures are unusable under
+host load, and the harness runner itself needs defect fixes before it can be
+reported green.
+
+**Native refusal-status candidate (separate from the model).** A proposed
+additive `OfflineStream.decodeStatus()` interface and a candidate AAR were
+built and host-tested (native assertions pass in normal and ASan builds) to
+expose the CVE-patch decoder refusals. The candidate AAR is **not certified,
+not installed and not the shipped AAR**; the shipped AAR `5300c913…` is
+unchanged, so current app behaviour is unchanged. Two semantics gaps were
+identified: generic decoders must also publish refusal status, and a refusal
+must be authoritative over partially decoded text. They are defined here as
+requirements and an apply-verified v2 patch plan only; the app mapping, AAR
+rebuild and on-device validation remain outstanding.
+
+**Recorded verification evidence (hosted, 2026-11-18).** PR #76 AAR integrity:
+**40/40** (run [44225171588](https://github.com/Sami-Gor/daymark/actions/runs/44225171588),
+head `57f55f5`). PR #81 native ASan gate: fixtures 48/48, patched **24/24**
+clean, unpatched **7/7** expected detections (run
+[44218944927](https://github.com/Sami-Gor/daymark/actions/runs/44218944927),
+head `36017e9`). N1: Android JVM **117/117** (`daymark-voice`) plus **7/7**
+(`app`), and Vitest **377 passed / 1 skipped** (run
+[44224095210](https://github.com/Sami-Gor/daymark/actions/runs/44224095210),
+`model-independent` job; the overall run is red only on the external
+Parakeet-checksum job).
+
+**Not claimed:** adoption of the replacement pack, physical-device or hardware
+parity, bit-identical outputs, improved accuracy or WER, or certification of the
+native candidate.
+
 ## Conclusion and next validation
 
 The 0.6B v3 model was the better of the two models on the small live-microphone comparison, with a slower decode time. The prerecorded corpus result was strong but is a separate test.
@@ -201,7 +287,7 @@ The selection of the 0.6B v3 model for the V2 integration rests on the paired li
 
 Before considering production use:
 
-1. Complete live microphone testing through the integrated V2 Daymark UI, while keeping airplane mode on and Wi-Fi off.
+1. Complete live microphone testing through the integrated V2 Daymark UI, while keeping airplane mode on and Wi-Fi off. The standalone old-vs-new model harness run on an emulator does not replace this integrated test.
 2. Check the integrated voice-input path, error/cancellation handling, and network behaviour on-device. Confirm that no audio or transcript is sent off-device or logged.
 3. Review the source diff and release/privacy implications. Do not infer production readiness from the standalone benchmark or known-WAV smoke test alone.
 4. Re-run the final test suite against the reviewed source and keep the V2 package isolated from the production package.

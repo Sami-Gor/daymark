@@ -323,6 +323,12 @@ microphone conflict during narration, lifecycle interruption, and failure copyâ€
 was not all covered in the recorded pass. This is optional extra coverage, not
 a requirement to repeat the successful core voice-input test.
 
+Model-level old-vs-new parity for a proposed replacement pack has also been
+checked on the host and, through a standalone harness, on an arm64 emulator.
+Those results are functional evidence only: they are not physical-device
+parity, they add no device latency or memory data, and they do not change the
+device-test status above. See [the Parakeet evaluation](parakeet-v3-android-phone-evaluation.md#replacement-candidate-evaluation-not-adopted).
+
 ## 7. Local TTS / Kokoro
 
 VERIFIED/READY:

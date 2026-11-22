@@ -204,12 +204,19 @@ the table is for the release record.
 | pguso/kokoro | `b42bd5cf915163607cb51984cabf273dcf09755e` | crate `kokoro-en` 0.1.5 |
 | Kokoro model | `onnx/model_quantized.onnx` | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
 | Kokoro voice | `bm_fable.bin` | `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1` |
-| sherpa-onnx | 1.13.8 AAR | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
+| sherpa-onnx | 1.13.8 AAR, rebuilt with the CVE-2026-108954 joiner-width patch | `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8` |
+| ONNX Runtime (bundled in that AAR) | 1.28.2 (`libonnxruntime.so`) | `33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1` |
 | Parakeet encoder | `encoder.int8.onnx` | `acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247` |
 | Parakeet decoder | `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
 | Parakeet joiner | `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
 | Parakeet tokens | `tokens.txt` | `d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d` |
 | Parakeet archive | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
+
+Treat the Parakeet archive pin as the identity of the redistributed model. The
+upstream release URL is mutable (re-uploaded on 2026-11-07 to different bytes),
+and `fetch-parakeet-assets.sh` fails closed on a SHA-256 mismatch instead of
+accepting the new archive. Replacing the pack requires re-verifying all four
+member files and updating every pin site, the notices and this table together.
 
 The NDK's `libc++_shared.so` used by the Kokoro build was
 `0c52cfab2df0d957d8b346a2bdc5ae8d71feca2591924d77e1cd724d5bf74352`
@@ -284,6 +291,11 @@ Notes:
 - `build-kokoro-android.sh` clones `pguso/kokoro` at the pinned commit into
   `android/kokoro-poc/.build/kokoro-src` (gitignored) and cross-compiles with
   the NDK. It requires `ANDROID_NDK_HOME`.
+- `fetch-sherpa-onnx.sh` does not download the upstream AAR. It verifies the
+  committed, patched `libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar`
+  against its SHA-256 pin and refuses the unpatched v1.13.8 release. An
+  optional `SHERPA_ONNX_PATCHED_AAR_URL` may point at an externally hosted copy
+  of the same reviewed artifact; the pin still has to match.
 - The web build must run **before** `cap sync`; otherwise the copied web
   assets are stale or absent. The explicit asset guard must then pass. Gradle
   also wires the same guard into `preBuild` and the debug/release asset-merge
@@ -449,8 +461,10 @@ hashes.
    Keep Gradle project caches and build directories on APFS; copy only final
    artifacts to exFAT.
 6. **Network is required.** The build fetches the Kokoro source and model,
-   Rust crates/ONNX Runtime, the sherpa AAR and Parakeet weights. An offline
-   build must pre-seed all of them with the hashes above.
+   Rust crates and their build-time ONNX Runtime download, and the Parakeet
+   weights. The patched sherpa AAR is committed and only verified locally (or
+   downloaded from an explicitly configured reviewed-artifact URL). An offline
+   build must pre-seed all fetched inputs with the hashes above.
 7. **Legacy wrapper mismatch.** The repository-root `android/` project is
    frozen TWA rollback material and uses Gradle 8.11.1. The production app is
    `artifacts/weather-app/android/` with Gradle 8.14.3. Use the production

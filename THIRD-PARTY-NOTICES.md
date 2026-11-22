@@ -5,13 +5,14 @@ third-party components listed below, each under its own licence. None of them
 is relicensed by the MIT licence.
 
 The table records what is redistributed in which build. The "V2 candidate"
-column is the `v2/privacy-hardened-voice` branch, which is **not released**.
+column is the current unreleased V2 candidate branch (`release/v2-candidate` at
+the time of writing).
 
 | Component | Version | Licence | Redistributed in | Notes |
 |---|---|---|---|---|
 | [Parakeet TDT 0.6B v3 (int8)](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model weights | 0.6B v3, int8 | **CC BY 4.0** | V2 candidate (Android) | `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt`. Fetched at build time by `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the Daymark-controlled immutable release asset `https://github.com/Sami-Gor/daymark/releases/download/parakeet-tdt-0.6b-v3-int8-v1/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` (placeholder URL; see [the model retrieval policy](docs/release/reproducible-build-guide.md#51-parakeet-model-retrieval-policy)), archive SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. The upstream release asset was replaced on 2026-11-07 with different bytes and is not used. **Int8 form:** the redistributed files are the pre-quantised int8 ONNX export published in the sherpa-onnx release, not a conversion performed by Daymark; Daymark redistributes them unmodified. Attribution and licence link below. |
-| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (Android AAR) | 1.13.8 | **Apache-2.0** | V2 candidate (Android) | Fetched at build time by `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` from the [v1.13.8 release](https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar), SHA-256 `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96`. Contains the sherpa-onnx JNI libraries and, in turn, the ONNX Runtime libraries below. |
-| [ONNX Runtime](https://github.com/microsoft/onnxruntime) (bundled in the sherpa-onnx AAR) | 1.18.1 (as shipped in the AAR) | **MIT** | V2 candidate (Android) | `libonnxruntime.so` and the sherpa JNI libraries, arm64-v8a only. |
+| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (Android AAR) | 1.13.8, locally rebuilt with the CVE-2026-108954 / GHSA-f5q5-vp8g-wh4x joiner-width patch | **Apache-2.0** | V2 candidate (Android) | Modified build (change indicated per Apache-2.0): rebuilt from v1.13.8 source commit `11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf` with `android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0001-joiner-width-validation.patch`. Tracked at `artifacts/weather-app/android/daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar`, SHA-256 `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8`; `android/kokoro-poc/scripts/fetch-sherpa-onnx.sh` verifies it and refuses the unpatched upstream AAR. Contains the sherpa-onnx JNI libraries and, in turn, the ONNX Runtime libraries below. Provenance: `artifacts/weather-app/android/daymark-voice/SHERPA-ONNX-PROVENANCE.md`. |
+| [ONNX Runtime](https://github.com/microsoft/onnxruntime) (bundled in the sherpa-onnx AAR) | 1.28.2 (as shipped in the rebuilt AAR) | **MIT** | V2 candidate (Android) | `libonnxruntime.so` (22,249,560 bytes, SHA-256 `33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1`) and the sherpa JNI libraries, arm64-v8a only. Runtime package: `csukuangfj/onnxruntime-libs` v1.28.2. |
 | [pguso/kokoro](https://github.com/pguso/kokoro) runtime | `kokoro-en` 0.1.5, commit `b42bd5cf915163607cb51984cabf273dcf09755e` | Apache-2.0 | v1.0.0 and V2 candidate | `android/kokoro-poc/README.md` has the full build and licence matrix. |
 | Kokoro model weights (`model_quantized.onnx`) | `kokoro-en` 0.1.5 | Apache-2.0 (upstream repository) | v1.0.0 and V2 candidate | SHA-256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478`. |
 | `bm_fable.bin` narration voice | — | Apache-2.0 (per the model repository) | v1.0.0 and V2 candidate | SHA-256 `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1`. Per-voice training-data provenance is not documented upstream; unresolved, low risk. |
@@ -42,7 +43,12 @@ attributed in the app's privacy pages.
 
 ## Verifying the redistributed files
 
-The build-time fetch scripts pin and verify every downloaded artefact:
+The build-time fetch and verification scripts pin every redistributed artefact.
+The upstream Parakeet model URL is a mutable release channel: it was re-uploaded
+on 2026-11-07 to a different archive, so the model fetch uses the preserved
+Daymark-controlled mirror (or an approved `PARAKEET_ARCHIVE_URL` override) and
+succeeds only when the pinned SHA-256 below matches; otherwise it fails closed.
+The pinned digest, not the URL, identifies the redistributed package:
 
 | Artefact | SHA-256 |
 |---|---|
@@ -51,6 +57,6 @@ The build-time fetch scripts pin and verify every downloaded artefact:
 | `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
 | `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
 | `tokens.txt` | `d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d` |
-| `sherpa-onnx-1.13.8.aar` | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
+| `sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar` | `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8` |
 | `model_quantized.onnx` (Kokoro) | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
 | `bm_fable.bin` | `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1` |
