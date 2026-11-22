@@ -531,7 +531,7 @@ summarises them.
 
 | Component | License | Redistributed | Notes |
 |---|---|---|---|
-| sherpa-onnx runtime and JNI | Apache-2.0 | V2 candidate asset | Licence notice retained in `THIRD-PARTY-NOTICES.md` |
+| sherpa-onnx runtime and JNI | Apache-2.0 | V2 candidate asset | Modified build: locally rebuilt v1.13.8 with the CVE-2026-108954 joiner-width patch (AAR SHA-256 `5300c913…`); licence notice and modification indication retained in `THIRD-PARTY-NOTICES.md` |
 | ONNX Runtime Android shared libraries (bundled inside the sherpa runtime) | MIT | V2 candidate asset | Copyright notice retained; distinct from the build-time `ort` link above |
 | Bundled ASR model weights (Parakeet TDT 0.6B v3 int8) | CC-BY-4.0 | V2 candidate asset | Attribution, licence link and an indication of the int8 quantisation in `THIRD-PARTY-NOTICES.md` |
 

@@ -122,7 +122,7 @@ be closed by the standalone results.
 | Reused | Notes |
 |---|---|
 | The model files and the evaluated configuration | Parakeet TDT 0.6B v3 int8, 16 kHz, 80-dimensional features, greedy decoding, CPU inference, a fresh stream per utterance. The evaluated configuration was kept unchanged. |
-| The sherpa-onnx 1.13.8 runtime | Obtained from the same upstream release; the archive is byte-identical to the copy the experiment used. |
+| The sherpa-onnx 1.13.8 runtime | The experiment used the upstream v1.13.8 release archive. The production candidate now ships the locally rebuilt, CVE-2026-108954-patched v1.13.8 AAR (`5300c913…`); the patch changes decoder validation, not the model or the evaluated decode configuration. |
 | The model and runtime checksums | Pinned in `android/kokoro-poc/scripts/fetch-parakeet-assets.sh` and `fetch-sherpa-onnx.sh`, and recorded in `THIRD-PARTY-NOTICES.md`. |
 
 ### What was changed, and why
