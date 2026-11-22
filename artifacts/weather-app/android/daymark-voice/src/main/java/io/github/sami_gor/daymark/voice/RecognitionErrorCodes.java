@@ -6,8 +6,9 @@ package io.github.sami_gor.daymark.voice;
  *
  * <p>Previously, an empty or failed decode was reported as {@code no-speech}, so
  * callers could not distinguish a failed decode from silence. The contract below keeps
- * the pre-existing codes for existing conditions and adds three codes that
- * were previously collapsed into {@code no-speech} or {@code unknown}:
+ * the pre-existing codes for existing conditions and adds four codes that
+ * were previously collapsed into {@code no-speech}, {@code unknown} or an
+ * assumed English session:
  *
  * <ul>
  *   <li>{@link #MODEL_REJECTED} — the native decoder refused the model / the
@@ -22,7 +23,9 @@ package io.github.sami_gor.daymark.voice;
  * </ul>
  *
  * <p>{@link #NO_SPEECH} keeps its old meaning: the endpoint detector never saw
- * speech, so no decode was attempted.
+ * speech, so no decode was attempted. {@link #UNSUPPORTED_LANGUAGE} is new and
+ * explicit: the selected interface language has no compatible bundled model,
+ * so the session fails before capture instead of transcribing another language.
  *
  * <p>Adding codes is backward compatible on the bridge: the web layer passes
  * unknown codes through to its generic failure copy, and existing codes are
@@ -50,6 +53,12 @@ final class RecognitionErrorCodes {
     static final String PERMISSION_BLOCKED = "permission-blocked";
     /** The recogniser is unavailable (released, model missing, runtime gone). */
     static final String OFFLINE_UNAVAILABLE = "offline-unavailable";
+    /**
+     * The selected interface language cannot be recognised by the bundled
+     * model. This is an explicit failure: recognition never silently runs a
+     * different language than the one the user selected.
+     */
+    static final String UNSUPPORTED_LANGUAGE = "unsupported-language";
     /** The session was cancelled or the activity went away. */
     static final String ABORTED = "aborted";
     /** A second session was requested while one is live. */
@@ -101,6 +110,7 @@ final class RecognitionErrorCodes {
             case DECODE_FAILED:
                 return Stage.DECODE;
             case OFFLINE_UNAVAILABLE:
+            case UNSUPPORTED_LANGUAGE:
                 return Stage.MODEL;
             case SESSION_BUSY:
             case INVALID_SESSION:

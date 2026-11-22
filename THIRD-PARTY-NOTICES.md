@@ -15,6 +15,8 @@ column is the `v2/privacy-hardened-voice` branch, which is **not released**.
 | [pguso/kokoro](https://github.com/pguso/kokoro) runtime | `kokoro-en` 0.1.5, commit `b42bd5cf915163607cb51984cabf273dcf09755e` | Apache-2.0 | v1.0.0 and V2 candidate | `android/kokoro-poc/README.md` has the full build and licence matrix. |
 | Kokoro model weights (`model_quantized.onnx`) | `kokoro-en` 0.1.5 | Apache-2.0 (upstream repository) | v1.0.0 and V2 candidate | SHA-256 `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478`. |
 | `bm_fable.bin` narration voice | — | Apache-2.0 (per the model repository) | v1.0.0 and V2 candidate | SHA-256 `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1`. Per-voice training-data provenance is not documented upstream; unresolved, low risk. |
+| `ff_siwis.bin` French narration voice | — | **CC BY 4.0** via the SIWIS corpus | Multilingual narration branch (this branch; not a production release) | SHA-256 `a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861`. Derived from the SIWIS corpus; attribution required (text below). Staged by `fetch-kokoro-assets.sh`; not present in the frozen production V2 build. |
+| `em_alex.bin` Spanish narration voice | — | **Apache-2.0** | Multilingual narration branch (this branch; not a production release) | SHA-256 `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95`. Exact `hexgrad/Kokoro-82M` voice style converted by `onnx-community/Kokoro-82M-v1.0-ONNX`; licence-copy and attribution conditions apply (text below). Not present in the frozen production V2 build. |
 | [espeak-ng](https://github.com/espeak-ng/espeak-ng) | — | GPL-3.0 | **not included** | Verified absent: the Kokoro build uses the lean configuration without bundled eSpeak. |
 | [Rust](https://www.rust-lang.org/) standard library and crates (`tokio`, `jni`, `log`, `android_logger`, `bincode`, `fancy-regex`, `regex`, `futures`, `pin-project`, `ndarray`, `num2words`, `unicode-segmentation`, `miette`, `language-tokenizer`) | see `android/kokoro-poc/README.md` | MIT / Apache-2.0 | v1.0.0 and V2 candidate | Compiled into the Kokoro native library. `language-tokenizer` is WTFPL-2.0 and ships its own licence file. |
 | [Fraunces](https://github.com/undercasetype/Fraunces), [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans), [DM Mono](https://github.com/googlefonts/dm-mono) | — | SIL Open Font License 1.1 | v1.0.0 and V2 candidate | Self-hosted; licence files in `artifacts/weather-app/src/fonts/LICENSE.md`. |
@@ -40,6 +42,37 @@ the redistributed weights are modified.
 The GeoNames locality dataset is redistributed under CC BY 4.0 and is
 attributed in the app's privacy pages.
 
+## Multilingual narration voice attribution
+
+`ff_siwis.bin` is the French voice style derived from the **SIWIS** corpus:
+
+> Voice style: **ff_siwis**. Source corpus: **The SIWIS French Speech
+> Synthesis Database** (2016) by Junichi Yamagishi, Pierre-Edouard Honnet,
+> Philip Garner and Alexandros Lazaridis, University of Edinburgh, School of
+> Informatics, The Centre for Speech Technology Research,
+> <https://doi.org/10.7488/ds/1705> (DataShare record
+> [10283/2353](https://datashare.ed.ac.uk/handle/10283/2353)), licensed under
+> the [Creative Commons Attribution 4.0 International
+> licence](https://creativecommons.org/licenses/by/4.0/). The voice style is
+> published by **hexgrad** in
+> [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) and converted to
+> ONNX `.bin` by
+> [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX).
+> Daymark redistributes the exact `.bin` file unmodified.
+
+`em_alex.bin` is the Spanish voice style published by **hexgrad** in the
+**Kokoro-82M** model repository and converted to ONNX `.bin` format by
+**onnx-community/Kokoro-82M-v1.0-ONNX**. The asset is distributed under the
+**Apache License 2.0** declared by both model repositories; the full licence
+text is in [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt). Daymark does
+not modify the voice bytes.
+
+> Kokoro-82M Spanish voice `em_alex` — published by
+> [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), converted to
+> ONNX `.bin` by
+> [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX).
+> Licensed under the Apache License 2.0.
+
 ## Verifying the redistributed files
 
 The build-time fetch scripts pin and verify every downloaded artefact:
@@ -54,3 +87,5 @@ The build-time fetch scripts pin and verify every downloaded artefact:
 | `sherpa-onnx-1.13.8.aar` | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
 | `model_quantized.onnx` (Kokoro) | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
 | `bm_fable.bin` | `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1` |
+| `ff_siwis.bin` | `a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861` |
+| `em_alex.bin` | `27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95` |

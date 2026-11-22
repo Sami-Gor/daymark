@@ -36,6 +36,8 @@ export type RecognitionErrorCode =
   | 'model-corrupt'
   | 'model-preparing'
   | 'runtime-unavailable'
+  /* language codes */
+  | 'unsupported-language'
   /* session codes */
   | 'session-busy'
   | 'invalid-session'
@@ -60,6 +62,7 @@ export const RECOGNITION_ERROR_CODES: readonly RecognitionErrorCode[] = [
   'model-corrupt',
   'model-preparing',
   'runtime-unavailable',
+  'unsupported-language',
   'session-busy',
   'invalid-session',
   'timeout',
@@ -123,6 +126,7 @@ export function recognitionErrorStage(code: string | null | undefined): Recognit
     case 'model-corrupt':
     case 'model-preparing':
     case 'runtime-unavailable':
+    case 'unsupported-language':
       return 'model';
     case 'session-busy':
     case 'invalid-session':
@@ -153,6 +157,7 @@ export function recognitionOutcomeFor(code: string | null | undefined): Recognit
     case 'model-corrupt':
     case 'model-preparing':
     case 'runtime-unavailable':
+    case 'unsupported-language':
       return 'unavailable';
     default:
       return 'failure';
@@ -193,6 +198,9 @@ export function classifyNativeStartFailure(message: string): string {
   }
   if (/invalid-session/i.test(message)) {
     return 'invalid-session';
+  }
+  if (/unsupported-language|unsupported language|unsupported-language-for-recognition/i.test(message)) {
+    return 'unsupported-language';
   }
   if (/offline-unavailable|api-unsupported|model-missing|model-corrupt|model-preparing|runtime-unavailable/i.test(message)) {
     return 'offline-unavailable';

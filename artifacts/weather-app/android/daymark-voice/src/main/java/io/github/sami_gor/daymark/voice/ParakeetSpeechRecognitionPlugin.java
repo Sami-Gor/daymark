@@ -45,6 +45,11 @@ import java.util.function.Supplier;
  * recognition fails, the session fails with an explicit error and nothing else is
  * tried.
  *
+ * <p>The selected interface language is authoritative: the bundled model is a
+ * fixed English transducer, so a non-English session is rejected with the
+ * explicit {@code unsupported-language} code before the microphone opens. It is
+ * never silently recognised as English and no other recogniser is tried.
+ *
  * <p>Recording, decoding and the recognition payload are held in memory only.
  * Nothing is written to persistent storage, and no audio or transcript is logged.
  *
@@ -207,6 +212,17 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
             return;
         }
 
+        // The selected interface language is authoritative. The bundled
+        // recogniser is one fixed English Parakeet transducer (no language id
+        // or prompt is loaded into the decode), so a French/Spanish session
+        // cannot be honoured. Reject it explicitly before capture instead of
+        // silently running English recognition on the wrong language.
+        final String lang = call.getString("lang");
+        if (!supportsLanguage(lang)) {
+            call.reject(RecognitionErrorCodes.UNSUPPORTED_LANGUAGE);
+            return;
+        }
+
         synchronized (stateLock) {
             if (released) {
                 call.reject("offline-unavailable");
@@ -235,6 +251,31 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
         }
 
         beginCapture(call, sessionId);
+    }
+
+    /**
+     * Base language tag of a BCP-47 style value, lower-cased, or {@code ""}
+     * for a blank/missing tag. Pure so the language gate is JVM-testable.
+     */
+    static String languageBase(String lang) {
+        if (lang == null || lang.trim().isEmpty()) {
+            return "";
+        }
+        return lang.trim().toLowerCase(java.util.Locale.ROOT).split("[-_]", 2)[0];
+    }
+
+    /**
+     * Whether the bundled Parakeet recogniser can honour a language tag.
+     *
+     * <p>The shipped model is one fixed English transducer configuration
+     * ({@code nemo_transducer}, a single token set, no language id or prompt),
+     * and the native decode takes no language parameter. Only English can be
+     * honoured. Any other tag, including a missing one, is an explicit
+     * unsupported-language failure: no silent English fallback and no second
+     * recogniser are attempted.
+     */
+    static boolean supportsLanguage(String lang) {
+        return "en".equals(languageBase(lang));
     }
 
     private void requestMicrophonePermission(PluginCall call) {

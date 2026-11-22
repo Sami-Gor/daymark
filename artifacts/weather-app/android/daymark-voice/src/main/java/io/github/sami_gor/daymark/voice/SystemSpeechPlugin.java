@@ -17,11 +17,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Android system TextToSpeech bridge.
+ * Legacy Android system TextToSpeech bridge, retained only as an offline-voice
+ * implementation reference and source-guard target.
  *
- * The Capacitor WebView has no speechSynthesis, so non-English narration
- * (French, Spanish, ...) falls back to the platform TTS engine here. English on
- * Android uses the local Kokoro engine through {@link DaymarkVoicePlugin}.
+ * <p>It is deliberately not registered by {@code MainActivity} and is not a
+ * runtime narration fallback. Daymark narration uses only the bundled Kokoro
+ * engine through {@link DaymarkVoicePlugin}; if that engine cannot run, the
+ * failure is surfaced rather than sent to the platform TTS.
  */
 @CapacitorPlugin(name = "SystemSpeech")
 public class SystemSpeechPlugin extends Plugin {

@@ -602,6 +602,48 @@ describe('createParakeetRecognitionController', () => {
     expect(onError).toHaveBeenCalledWith('model-rejected');
   });
 
+  it('fails explicitly, not with an assumed English session, when no language is supplied', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    for (const lang of [undefined, '', '   ']) {
+      const onError = vi.fn();
+      expect(controller.start({ onError }, lang)).toBe(false);
+      expect(onError).toHaveBeenCalledWith('unsupported-language');
+    }
+    expect(native.start).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('keeps an unsupported-language rejection from the native plugin explicit', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    native.start.mockRejectedValueOnce(new Error('unsupported-language'));
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'fr-FR')).toBe(true);
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith('unsupported-language');
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('delivers a native unsupported-language error event unchanged', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'es-ES')).toBe(true);
+    await Promise.resolve();
+    events.error[0]?.({ sessionId: 1, code: 'unsupported-language', stage: 'model' });
+
+    expect(onError).toHaveBeenCalledWith('unsupported-language');
+    expect(onError).not.toHaveBeenCalledWith('no-speech');
+  });
+
   it('does not fall back to silence for an unknown decode error', async () => {
     native.isAvailable.mockResolvedValue({ available: true, reason: '' });
     const controller = createParakeetRecognitionController();

@@ -203,6 +203,7 @@ const en = {
   'ask.error.network': "Voice input couldn't continue. Try again.",
   'ask.error.offlineUnavailable': 'Offline voice input is not available on this device. You can still use Daymark without voice input.',
   'ask.error.aborted': 'Voice input stopped.',
+  'ask.error.unsupportedLanguage': 'Voice input is available in English only in this version. You can still use Daymark without voice input.',
   'ask.error.unknown': 'Voice input stopped unexpectedly. Tap Ask Daymark to try again.',
 
   // Voice playback
@@ -215,6 +216,12 @@ const en = {
   'voice.error.unavailable': "Voice playback isn't available right now. Try again.",
   'voice.error.frenchSpanishUnavailable': 'French and Spanish narration is not available in this version. It is planned for a later release.',
   'voice.error.offlineUnavailable': "Narration isn't available in this version.",
+  'voice.error.unsupportedLanguage': "Narration isn't available for this language in this version.",
+  'voice.error.nativeUnavailable': "Voice playback isn't available on this device. You can keep using the weather without voice.",
+  'voice.error.modelUnavailable': "The on-device voice model couldn't be loaded. The weather still works without narration.",
+  'voice.error.assetUnavailable': 'The on-device voice files failed their integrity check. Reinstall Daymark to restore narration.',
+  'voice.error.synthesisFailed': "The on-device voice couldn't generate audio. Try again.",
+  'voice.error.playbackFailed': "The device couldn't play the narration. Try again.",
   'dayCue.sun': 'Sunny conditions today',
   'dayCue.rain': 'Rain expected today',
   'dayCue.mixed': 'Sunshine and rain expected today',

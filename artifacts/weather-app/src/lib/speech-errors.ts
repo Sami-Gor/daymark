@@ -1,13 +1,38 @@
 import { translate, type Locale } from './i18n';
 import { normalizeRecognitionErrorCode } from './recognition-errors';
 
+/** Friendly, stable copy for narration failures, localized. */
+export function describeNarrationError(error: string | null | undefined, locale: Locale = 'en'): string {
+  switch (error) {
+    case 'unsupported-language':
+      return translate(locale, 'voice.error.unsupportedLanguage');
+    case 'french-spanish-unavailable':
+      return translate(locale, 'voice.error.frenchSpanishUnavailable');
+    case 'native-unavailable':
+      return translate(locale, 'voice.error.nativeUnavailable');
+    case 'model-init-failed':
+      return translate(locale, 'voice.error.modelUnavailable');
+    case 'voice-asset-invalid':
+      return translate(locale, 'voice.error.assetUnavailable');
+    case 'synthesis-failed':
+      return translate(locale, 'voice.error.synthesisFailed');
+    case 'playback-failed':
+      return translate(locale, 'voice.error.playbackFailed');
+    case 'offline-voice-unavailable':
+      return translate(locale, 'voice.error.offlineUnavailable');
+    default:
+      return translate(locale, 'voice.error.unavailable');
+  }
+}
+
 /**
  * Friendly, non-repeating copy for recognition failures, localized.
  *
- * Previously, an empty or failed decode shared the "no-speech" copy, so a
- * failure could not be told apart from silence.
- * They now have their own copy (and their own codes); the silence copy is
- * reserved for `no-speech`, where nothing was decoded at all.
+ * Previously, an empty or failed decode shared the 'no-speech' copy, so a
+ * failure could not be told apart from silence. They now have their own copy
+ * (and their own codes); the silence copy is reserved for 'no-speech', where
+ * nothing was decoded at all. An unsupported recognition language is its own
+ * explicit state: recognition never silently runs a different language.
  */
 export function describeRecognitionError(error: string | null | undefined, locale: Locale = 'en'): string {
   switch (normalizeRecognitionErrorCode(error)) {
@@ -32,6 +57,8 @@ export function describeRecognitionError(error: string | null | undefined, local
       return translate(locale, 'ask.error.network');
     case 'timeout':
       return translate(locale, 'ask.error.noSpeech');
+    case 'unsupported-language':
+      return translate(locale, 'ask.error.unsupportedLanguage');
     case 'offline-unavailable':
     case 'api-unsupported':
       return translate(locale, 'ask.error.offlineUnavailable');

@@ -4,7 +4,7 @@ import { Mic, Square } from 'lucide-react';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useLocale } from '@/hooks/use-locale';
 import { getCombinedIntentResponse, getIntentResponse, normalizeTranscript, resolveIntentTranscripts } from '@/lib/weather-intents';
-import { SPEECH_LANGS } from '@/lib/i18n';
+import { SPEECH_LANGS, TTS_LANGS } from '@/lib/i18n';
 import type { Place, Unit, WeatherPayload } from '@/lib/weather';
 
 type Exchange = { question: string; answer: string };
@@ -45,7 +45,7 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
     const text = pendingSpoken.current;
     if (!text) return;
     pendingSpoken.current = '';
-    speak(text, SPEECH_LANGS[locale]);
+    speak(text, TTS_LANGS[locale]);
   }, [recognition.isListening, speak, locale]);
 
   if (!recognition.supportResolved) return null;

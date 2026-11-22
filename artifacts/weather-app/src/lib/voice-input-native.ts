@@ -190,6 +190,17 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
         return false;
       }
 
+      // The selected interface language is passed through unchanged. When the
+      // caller supplies no language tag there is nothing to select, so the
+      // session fails explicitly instead of silently assuming English. The
+      // native plugin is authoritative for which languages it supports and
+      // rejects an unsupported tag with the same stable code.
+      const requestedLang = lang?.trim() ?? '';
+      if (!requestedLang) {
+        handlers.onError?.('unsupported-language');
+        return false;
+      }
+
       if (activeSessionId !== null) {
         const previous = activeSessionId;
         activeSessionId = null;
@@ -204,7 +215,7 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
       // No timer yet: the native plugin may be waiting for the user to answer
       // the permission prompt. The capture watchdog starts on the native
       // `started` event and the decode watchdog starts on `captureEnd`.
-      void NativeRecognizer.start({ sessionId, lang: lang?.trim() || 'en-GB' }).catch((error: unknown) => {
+      void NativeRecognizer.start({ sessionId, lang: requestedLang }).catch((error: unknown) => {
         if (!handlesEvent(sessionId)) return;
         const finished = detachSession(sessionId);
         const message = error instanceof Error ? error.message : String(error ?? '');

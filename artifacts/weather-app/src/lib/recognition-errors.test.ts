@@ -46,6 +46,7 @@ describe('recognition error contract', () => {
     expect(recognitionOutcomeFor('decode-failed')).toBe('failure');
     expect(recognitionOutcomeFor('aborted')).toBe('cancelled');
     expect(recognitionOutcomeFor('offline-unavailable')).toBe('unavailable');
+    expect(recognitionOutcomeFor('unsupported-language')).toBe('unavailable');
     expect(recognitionOutcomeFor('')).toBe('none');
     expect(recognitionOutcomeFor(undefined)).toBe('none');
   });
@@ -77,6 +78,7 @@ describe('recognition error contract', () => {
     expect(recognitionErrorStage('timeout')).toBe('decode');
     expect(recognitionErrorStage('offline-unavailable')).toBe('model');
     expect(recognitionErrorStage('model-missing')).toBe('model');
+    expect(recognitionErrorStage('unsupported-language')).toBe('model');
     expect(recognitionErrorStage('session-busy')).toBe('session');
     expect(recognitionErrorStage('some-future-code')).toBe('unknown');
   });
@@ -94,6 +96,8 @@ describe('recognition error contract', () => {
     expect(classifyNativeStartFailure('session-busy')).toBe('session-busy');
     expect(classifyNativeStartFailure('invalid-session')).toBe('invalid-session');
     expect(classifyNativeStartFailure('model-corrupt')).toBe('offline-unavailable');
+    expect(classifyNativeStartFailure('unsupported-language')).toBe('unsupported-language');
+    expect(classifyNativeStartFailure('unsupported language: fr-FR')).toBe('unsupported-language');
     expect(classifyNativeStartFailure('aborted')).toBe('aborted');
     expect(classifyNativeStartFailure('who knows')).toBe('unknown');
   });
@@ -120,6 +124,7 @@ describe('recognition error contract', () => {
         'ask.error.emptyTranscript',
         'ask.error.decodeFailed',
         'ask.error.modelRejected',
+        'ask.error.unsupportedLanguage',
       ] as const) {
         expect(entries[key]?.length ?? 0).toBeGreaterThan(0);
       }
@@ -145,6 +150,7 @@ describe('recognition error contract', () => {
       ABORTED: 'aborted',
       SESSION_BUSY: 'session-busy',
       INVALID_SESSION: 'invalid-session',
+      UNSUPPORTED_LANGUAGE: 'unsupported-language',
     };
     for (const [constant, code] of Object.entries(expected)) {
       expect(java).toContain(`static final String ${constant} = "${code}";`);

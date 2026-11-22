@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createSpeechRouter } from './speech-router';
+import { classifyNativeNarrationFailure, createSpeechRouter } from './speech-router';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -12,9 +12,9 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function makeNative(available = true) {
+function makeNative(available = true, reason?: string) {
   return {
-    isAvailable: vi.fn().mockResolvedValue(available),
+    isAvailable: vi.fn().mockResolvedValue({ available, reason }),
     speak: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),
   };
@@ -50,7 +50,58 @@ describe('createSpeechRouter', () => {
     expect(handlers.onEnd).not.toHaveBeenCalled();
   });
 
-  it('passes a TTS-only segmentation plan to the native engine for long briefings', async () => {
+  it('routes French narration to native Kokoro with the selected language, never a fallback', async () => {
+    const native = makeNative();
+    const router = createSpeechRouter(android, native);
+    const onEngine = vi.fn();
+    const onError = vi.fn();
+
+    await router.speak('Bonjour.', 'fr-FR', { onEngine, onError });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(onEngine).toHaveBeenCalledWith({
+      engine: 'kokoro',
+      reason: 'native-french',
+      locale: 'fr',
+      voice: 'ff_siwis',
+    });
+    expect(native.speak).toHaveBeenCalledWith('Bonjour.', 'fr-FR', undefined);
+  });
+
+  it('routes Spanish narration to native Kokoro with the selected language, never a fallback', async () => {
+    const native = makeNative();
+    const router = createSpeechRouter(android, native);
+    const onEngine = vi.fn();
+
+    await router.speak('Buenos días.', 'es-419', { onEngine });
+
+    expect(onEngine).toHaveBeenCalledWith({
+      engine: 'kokoro',
+      reason: 'native-spanish',
+      locale: 'es',
+      voice: 'em_alex',
+    });
+    expect(native.speak).toHaveBeenCalledWith('Buenos días.', 'es-419', undefined);
+  });
+
+  it('normalizes numeric weather values before French and Spanish synthesis', async () => {
+    const native = makeNative();
+    const router = createSpeechRouter(android, native);
+
+    await router.speak('Il fait 23 degrés, 20 % de pluie.', 'fr-FR', {});
+    await router.speak('Hace 23 grados, 20 % de lluvia.', 'es-419', {});
+
+    const french = native.speak.mock.calls[0] as unknown as [string, string];
+    const spanish = native.speak.mock.calls[1] as unknown as [string, string];
+    expect(french[1]).toBe('fr-FR');
+    expect(spanish[1]).toBe('es-419');
+    expect(french[0]).not.toMatch(/\d/);
+    expect(spanish[0]).not.toMatch(/\d/);
+    expect(french[0]).toContain('vingt-trois');
+    expect(spanish[0]).toContain('veintitrés');
+  });
+
+  it('passes a TTS-only segmentation plan that concatenates to the narration', async () => {
     const native = makeNative();
     const router = createSpeechRouter(android, native);
     const text =
@@ -64,38 +115,27 @@ describe('createSpeechRouter', () => {
     expect(sentSegments.join('')).toBe(text);
   });
 
-  it('reports French narration as unavailable without inventing a fallback', async () => {
+  it('reports an unsupported language explicitly without calling the native engine', async () => {
     const native = makeNative();
     const router = createSpeechRouter(android, native);
     const onError = vi.fn();
-    const onEngine = vi.fn();
 
-    await router.speak('Bonjour.', 'fr-FR', { onError, onEngine });
-    expect(onError).toHaveBeenCalledWith('non-english-unavailable');
-    expect(onEngine).toHaveBeenCalledWith({ engine: 'unavailable', reason: 'non-english-unavailable' });
+    await router.speak('Guten Tag.', 'de-DE', { onError });
+    expect(onError).toHaveBeenCalledWith('unsupported-language');
     expect(native.speak).not.toHaveBeenCalled();
   });
 
-  it('reports Spanish narration as unavailable without a system-TTS fallback', async () => {
-    const native = makeNative();
-    const router = createSpeechRouter(android, native);
-    const onError = vi.fn();
-    await router.speak('Buenos días.', 'es-ES', { onError });
-    expect(onError).toHaveBeenCalledWith('non-english-unavailable');
-    expect(native.speak).not.toHaveBeenCalled();
-  });
-
-  it('surfaces an error when English Kokoro is unavailable', async () => {
-    const native = makeNative(false);
+  it('surfaces the native unavailability reason instead of a generic error', async () => {
+    const native = makeNative(false, 'model-missing');
     const router = createSpeechRouter(android, native);
     const onError = vi.fn();
 
     await router.speak('Good morning.', 'en-GB', { onError });
-    expect(onError).toHaveBeenCalledWith('native-unavailable');
+    expect(onError).toHaveBeenCalledWith('model-missing');
     expect(native.speak).not.toHaveBeenCalled();
   });
 
-  it('surfaces an error when native playback fails', async () => {
+  it('surfaces an error when native playback fails and never falls back', async () => {
     const native = makeNative();
     native.speak.mockRejectedValue(new Error('engine error'));
     const router = createSpeechRouter(android, native);
@@ -105,15 +145,33 @@ describe('createSpeechRouter', () => {
     expect(onError).toHaveBeenCalledWith('native-failed');
   });
 
+  it('classifies stable native failure codes without re-deriving them', () => {
+    for (const code of [
+      'unsupported-language',
+      'voice-asset-invalid',
+      'playback-failed',
+      'synthesis-failed',
+      'model-init-failed',
+      'native-unavailable',
+    ]) {
+      expect(classifyNativeNarrationFailure(new Error(code))).toBe(code);
+    }
+    expect(classifyNativeNarrationFailure(new Error('Kokoro asset integrity mismatch for ff_siwis.bin'))).toBe('voice-asset-invalid');
+    expect(classifyNativeNarrationFailure(new Error('Unsupported narration language: de-DE'))).toBe('unsupported-language');
+    expect(classifyNativeNarrationFailure('AudioTrack.write failed')).toBe('playback-failed');
+    expect(classifyNativeNarrationFailure(new Error('Synthesis returned no audio'))).toBe('synthesis-failed');
+    expect(classifyNativeNarrationFailure(new Error('engine not ready'))).toBe('model-init-failed');
+  });
+
   it('cancel during the availability check prevents any speech starting', async () => {
-    const availability = deferred<boolean>();
+    const availability = deferred<{ available: boolean }>();
     const native = makeNative();
     native.isAvailable.mockReturnValue(availability.promise);
     const router = createSpeechRouter(android, native);
 
     void router.speak('Good morning.', 'en-GB', {});
     router.stop();
-    availability.resolve(true);
+    availability.resolve({ available: true });
     await Promise.resolve();
     await Promise.resolve();
     expect(native.speak).not.toHaveBeenCalled();

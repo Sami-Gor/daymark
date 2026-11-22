@@ -1,14 +1,50 @@
 import { describe, expect, it } from 'vitest';
 
-import { isEnglish, selectSpeechEngine } from './speech-engine';
+import {
+  NARRATION_VOICES,
+  isEnglish,
+  isSupportedSpeechLocale,
+  selectSpeechEngine,
+  speechLocale,
+  voiceForLanguage,
+} from './speech-engine';
 
 const android = { isNativePlatform: true, platform: 'android' };
 
 describe('selectSpeechEngine', () => {
-  it('selects Kokoro for English when the native engine is available on Android', () => {
-    const selection = selectSpeechEngine({ ...android, lang: 'en-GB', nativeAvailable: true });
-    expect(selection.engine).toBe('kokoro');
-    expect(selection.reason).toBe('native-english');
+  it('selects Kokoro with the packaged English voice when the engine is available', () => {
+    expect(selectSpeechEngine({ ...android, lang: 'en-GB', nativeAvailable: true })).toEqual({
+      engine: 'kokoro',
+      reason: 'native-english',
+      locale: 'en',
+      voice: 'bm_fable',
+    });
+  });
+
+  it('selects the packaged French voice for the active French UI language', () => {
+    expect(selectSpeechEngine({ ...android, lang: 'fr-FR', nativeAvailable: true })).toEqual({
+      engine: 'kokoro',
+      reason: 'native-french',
+      locale: 'fr',
+      voice: 'ff_siwis',
+    });
+  });
+
+  it('selects the packaged Spanish voice for the active Spanish UI language', () => {
+    expect(selectSpeechEngine({ ...android, lang: 'es-ES', nativeAvailable: true })).toEqual({
+      engine: 'kokoro',
+      reason: 'native-spanish',
+      locale: 'es',
+      voice: 'em_alex',
+    });
+  });
+
+  it('maps each supported language to exactly one packaged voice', () => {
+    expect(NARRATION_VOICES).toEqual({ en: 'bm_fable', fr: 'ff_siwis', es: 'em_alex' });
+    expect(voiceForLanguage('fr-CA')).toBe('ff_siwis');
+    expect(voiceForLanguage('es-419')).toBe('em_alex');
+    expect(voiceForLanguage('en-US')).toBe('bm_fable');
+    expect(voiceForLanguage('de-DE')).toBeNull();
   });
 
   it('returns unavailable, not browser speech, when native Kokoro is unavailable', () => {
@@ -17,16 +53,22 @@ describe('selectSpeechEngine', () => {
     expect(selection.reason).toBe('native-unavailable');
   });
 
-  it('reports French as unavailable in V2', () => {
-    const selection = selectSpeechEngine({ ...android, lang: 'fr-FR', nativeAvailable: true });
-    expect(selection.engine).toBe('unavailable');
-    expect(selection.reason).toBe('non-english-unavailable');
+  it('passes the native availability reason through instead of inventing one', () => {
+    const selection = selectSpeechEngine({
+      ...android,
+      lang: 'fr-FR',
+      nativeAvailable: false,
+      nativeReason: 'model-missing',
+    });
+    expect(selection).toEqual({ engine: 'unavailable', reason: 'model-missing' });
   });
 
-  it('reports Spanish as unavailable in V2', () => {
-    const selection = selectSpeechEngine({ ...android, lang: 'es-ES', nativeAvailable: true });
-    expect(selection.engine).toBe('unavailable');
-    expect(selection.reason).toBe('non-english-unavailable');
+  it('reports an unsupported language explicitly instead of falling back to English', () => {
+    for (const lang of ['de-DE', 'it-IT', '', undefined]) {
+      const selection = selectSpeechEngine({ ...android, lang, nativeAvailable: true });
+      expect(selection.engine).toBe('unavailable');
+      expect(selection.reason).toBe('unsupported-language');
+    }
   });
 
   it('has no web or iOS narration path', () => {
@@ -36,9 +78,12 @@ describe('selectSpeechEngine', () => {
       .toEqual({ engine: 'unavailable', reason: 'not-android' });
   });
 
-  it('treats missing or non-English locales as unavailable', () => {
+  it('parses language tags case-insensitively and by base tag', () => {
+    expect(speechLocale('EN-us')).toBe('en');
+    expect(speechLocale('fr_CA')).toBe('fr');
     expect(isEnglish(undefined)).toBe(false);
-    expect(isEnglish('de-DE')).toBe(false);
     expect(isEnglish('EN-us')).toBe(true);
+    expect(isSupportedSpeechLocale('es-MX')).toBe(true);
+    expect(isSupportedSpeechLocale('pt-BR')).toBe(false);
   });
 });
