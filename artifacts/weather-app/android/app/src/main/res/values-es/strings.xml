@@ -2,4 +2,9 @@
 <resources>
     <string name="webview_required_title">Daymark necesita una versión más reciente de Android System WebView</string>
     <string name="webview_required_message">Actualiza Android System WebView desde Google Play y vuelve a abrir Daymark.</string>
+    <string name="webview_recovery_title">Daymark no pudo restaurar la página</string>
+    <string name="webview_recovery_message">La página dejó de responder varias veces durante la recarga. Comprueba que Android System WebView esté actualizado y vuelve a intentarlo.</string>
+    <string name="webview_recovery_retry">Reintentar</string>
+    <string name="webview_recovery_restoring_title">Restaurando Daymark…</string>
+    <string name="webview_recovery_restoring_message">La página dejó de responder. Recargando ahora.</string>
 </resources>

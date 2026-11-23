@@ -215,6 +215,45 @@ The NDK's `libc++_shared.so` used by the Kokoro build was
 `0c52cfab2df0d957d8b346a2bdc5ae8d71feca2591924d77e1cd724d5bf74352`
 (9,290,184 bytes).
 
+### 5.1 Parakeet model retrieval policy
+
+The four Parakeet files are fetched by
+`android/kokoro-poc/scripts/fetch-parakeet-assets.sh` from the
+`sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` archive.
+
+| Input | Value |
+|---|---|
+| Primary source | Daymark-controlled immutable release asset at `https://github.com/Sami-Gor/daymark/releases/download/parakeet-tdt-0.6b-v3-int8-v1/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2`. This URL is a placeholder: the release asset must be published (as an immutable release) before the model job can go green. |
+| Mirror override | `PARAKEET_ARCHIVE_URL` — approved mirrors or CI caches only. The pins below always win, so the override can only ever provide the pinned bytes. |
+| Archive SHA-256 | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
+| Per-file pins | The four Parakeet values in the manifest table above. |
+| Archive allow-list | Exactly 10 members (2 directories and 8 files), checked before extraction. |
+| Optional fallback | Hugging Face `csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` at the fixed revision `2bda32ec70b097a55adaa07d9a7173915b43cc78`. **Disabled by default**; enabled only with `PARAKEET_HF_FALLBACK=1`. The same per-file pins are enforced. |
+
+Behaviour:
+
+- The archive is downloaded, checked against the pinned SHA-256, checked
+  against the closed member allow-list, extracted into a temporary directory
+  (never the repository), and the four extracted files are verified before
+  they are copied into the asset directory. The installed files are verified a
+  final time.
+- Any failure — unreachable URL, missing asset, digest mismatch, unexpected
+  archive member, symlink or hardlink member — exits non-zero and installs
+  nothing. There is no automatic substitution of a different model revision.
+- The Hugging Face fallback is never used silently: a mirror failure with
+  `PARAKEET_HF_FALLBACK` unset or `0` fails the build. With
+  `PARAKEET_HF_FALLBACK=1` the fallback is attempted only after the mirror
+  fails, and every fallback file must match the same per-file pins.
+- **Not adopted:** the upstream release asset was replaced on 2026-11-07 with
+  different bytes (archive SHA-256
+  `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9`, Hugging
+  Face `main` `ed5d745623472f97cfc2e6c2916ee248798fc5a8`). Neither revision is
+  used by this build; adopting one would need a separate review and on-device
+  re-evaluation.
+- Local regression tests (the byte-exact success case needs the preserved
+  archive):
+  `android/kokoro-poc/scripts/tests/fetch-parakeet-assets.test.sh`.
+
 ## 6. Build sequence
 
 Run from the repository root. Capture a log and check every exit code; do not
