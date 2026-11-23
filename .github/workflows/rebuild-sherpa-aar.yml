@@ -266,8 +266,8 @@ jobs:
           echo "PATCH_FILE=$PATCH" >> "$GITHUB_ENV"
           PATCH2="$GITHUB_WORKSPACE/android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0002-nemo-encoder-output-validation.patch"
           echo "03f4e3d96e591ad6ca6ec4dcbb54d9c8f5ad5233a19e49f73cea47b6c4f7109f  $PATCH2" | sha256sum -c -
-          git -C "$SHERPA_SRC" apply --check "$PATCH2"
-          git -C "$SHERPA_SRC" apply "$PATCH2"
+          git -C "$SRC" apply --check "$PATCH2"
+          git -C "$SRC" apply "$PATCH2"
 
       - name: Download both rebuilds
         uses: actions/download-artifact@v4
