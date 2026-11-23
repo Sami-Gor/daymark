@@ -7,6 +7,10 @@ const config: CapacitorConfig = {
   server: {
     // Bundled production assets are always served from the local secure origin.
     androidScheme: 'https',
+    // WS12: a visible, localized fallback when the main frame cannot load.
+    // Capacitor loads this asset on a main-frame network/HTTP error instead of
+    // leaving a blank WebView. It is served from the same bundled origin.
+    errorPath: 'recovery.html',
   },
   android: {
     allowMixedContent: false,
