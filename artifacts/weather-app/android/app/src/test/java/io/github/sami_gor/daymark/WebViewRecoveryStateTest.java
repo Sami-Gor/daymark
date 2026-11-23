@@ -25,6 +25,7 @@ public class WebViewRecoveryStateTest {
     public void resetSingleton() {
         state = WebViewRecoveryState.get();
         state.consumePendingRestoreUrl();
+        state.clearRebuildPending();
         state.resetPolicy();
     }
 
@@ -51,6 +52,15 @@ public class WebViewRecoveryStateTest {
     public void ignoresANullNavigation() {
         state.savePendingRestoreUrl(null, T0);
         assertFalse(state.hasPendingRestoreUrl());
+    }
+
+    @Test
+    public void tracksAnAcceptedRebuildUntilTheRebuiltPageLoads() {
+        assertFalse(state.hasRebuildPending());
+        state.markRebuildPending();
+        assertTrue(WebViewRecoveryState.get().hasRebuildPending());
+        state.clearRebuildPending();
+        assertFalse(state.hasRebuildPending());
     }
 
     @Test

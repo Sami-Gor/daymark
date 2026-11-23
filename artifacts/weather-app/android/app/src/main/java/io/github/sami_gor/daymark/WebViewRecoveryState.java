@@ -27,6 +27,7 @@ public final class WebViewRecoveryState {
     private final WebViewRecoveryPolicy policy = WebViewRecoveryPolicy.defaults();
     private String pendingRestoreUrl;
     private long pendingRestoreSavedAtMs;
+    private boolean rebuildPending;
 
     private WebViewRecoveryState() {
     }
@@ -63,6 +64,21 @@ public final class WebViewRecoveryState {
     /** @return when the pending navigation was captured (0 when nothing is pending). */
     public synchronized long pendingRestoreSavedAtMs() {
         return pendingRestoreSavedAtMs;
+    }
+
+    /** Marks the bounded rebuild this Activity recreation is performing. */
+    public synchronized void markRebuildPending() {
+        rebuildPending = true;
+    }
+
+    /** @return true while an accepted bounded rebuild has not loaded a page yet. */
+    public synchronized boolean hasRebuildPending() {
+        return rebuildPending;
+    }
+
+    /** Clears the accepted-rebuild marker once the rebuilt WebView has loaded a page. */
+    public synchronized void clearRebuildPending() {
+        rebuildPending = false;
     }
 
     /** Reads and clears the pending navigation restore. */

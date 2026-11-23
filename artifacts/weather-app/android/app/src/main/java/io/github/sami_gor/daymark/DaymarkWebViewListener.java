@@ -2,6 +2,7 @@ package io.github.sami_gor.daymark;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.view.ViewGroup;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 
@@ -41,6 +42,8 @@ public final class DaymarkWebViewListener extends WebViewListener {
     private final String appUrl;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean pendingRestoreConsumed = false;
+    private Runnable stablePageResetTask;
+    private WebView stablePageResetView;
 
     /**
      * @param appUrl Capacitor's app origin from {@code Bridge.getAppUrl()}; used to decide
@@ -64,6 +67,10 @@ public final class DaymarkWebViewListener extends WebViewListener {
         if (webView == null || activity.isFinishing() || activity.isDestroyed()) {
             return;
         }
+        // The accepted rebuild has loaded a page: it is no longer pending.
+        state.clearRebuildPending();
+        // Only one stable-page timer may be pending; a newer load supersedes it.
+        cancelStablePageReset();
         String url = webView.getUrl();
         if (WebViewRecoveryPolicy.isErrorPageUrl(url, appUrl)) {
             // The errorPath page is itself the visible recovery UI. Never treat it
@@ -86,7 +93,8 @@ public final class DaymarkWebViewListener extends WebViewListener {
     }
 
     private void scheduleStablePageReset(final WebView webView) {
-        webView.postDelayed(new Runnable() {
+        cancelStablePageReset();
+        stablePageResetTask = new Runnable() {
             @Override
             public void run() {
                 if (activity.isFinishing() || activity.isDestroyed()) {
@@ -95,7 +103,17 @@ public final class DaymarkWebViewListener extends WebViewListener {
                 // In-process state is mutated directly; nothing to persist.
                 state.policy().onStablePage(System.currentTimeMillis());
             }
-        }, WebViewRecoveryPolicy.STABLE_RESET_MS);
+        };
+        stablePageResetView = webView;
+        webView.postDelayed(stablePageResetTask, WebViewRecoveryPolicy.STABLE_RESET_MS);
+    }
+
+    private void cancelStablePageReset() {
+        if (stablePageResetTask != null && stablePageResetView != null) {
+            stablePageResetView.removeCallbacks(stablePageResetTask);
+        }
+        stablePageResetTask = null;
+        stablePageResetView = null;
     }
 
     @Override
@@ -114,6 +132,15 @@ public final class DaymarkWebViewListener extends WebViewListener {
         }
 
         boolean canRecover = state.policy().recordAttempt(now);
+        if (canRecover) {
+            // The recreated Activity is an accepted bounded rebuild, not a fresh start.
+            state.markRebuildPending();
+        } else {
+            // Denied recovery must not leave a route that later Activity recreation
+            // could mistake for an authorized rebuild.
+            state.consumePendingRestoreUrl();
+        }
+        cancelStablePageReset();
         destroyWebView(webView);
 
         if (activity.isFinishing() || activity.isDestroyed()) {
@@ -131,6 +158,14 @@ public final class DaymarkWebViewListener extends WebViewListener {
     private void destroyWebView(WebView webView) {
         if (webView == null) {
             return;
+        }
+        try {
+            // Android requires the WebView to leave the view hierarchy before destroy().
+            if (webView.getParent() instanceof ViewGroup) {
+                ((ViewGroup) webView.getParent()).removeView(webView);
+            }
+        } catch (Throwable ignored) {
+            // A dead WebView may reject detach; destroy() still runs below.
         }
         try {
             webView.destroy();

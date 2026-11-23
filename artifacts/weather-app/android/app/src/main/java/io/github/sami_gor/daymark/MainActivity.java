@@ -43,9 +43,10 @@ public class MainActivity extends BridgeActivity {
 
         // If a crash loop already exhausted the bounded recovery budget, do not
         // pretend the app is healthy: show the explicit localized error screen.
-        // Exception: a pending navigation restore means this Activity is the
-        // bounded rebuild itself, so let the listener finish that recovery.
+        // Exception: a pending navigation restore or an accepted rebuild means this
+        // Activity is the bounded rebuild itself, so let the listener finish it.
         if (!recoveryState.hasPendingRestoreUrl()
+                && !recoveryState.hasRebuildPending()
                 && recoveryState.policy().isExhausted(System.currentTimeMillis())) {
             WebViewRecoveryScreen.showTerminal(this, new Runnable() {
                 @Override

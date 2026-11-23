@@ -168,6 +168,18 @@ check(
   'listener clears the budget only through the stable-page callback',
   /onStablePage\(/.test(listener),
 );
+check(
+  'listener detaches the WebView before destroying it',
+  /getParent\(\) instanceof ViewGroup/.test(listener) && /removeView\(webView\)/.test(listener),
+);
+check(
+  'listener keeps only one pending stable-page reset',
+  /cancelStablePageReset\(\)/.test(listener) && /removeCallbacks\(stablePageResetTask\)/.test(listener),
+);
+check(
+  'listener tracks accepted rebuilds and clears them on page load',
+  /markRebuildPending\(\)/.test(listener) && /clearRebuildPending\(\)/.test(listener),
+);
 
 const state = read(
   'android/app/src/main/java/io/github/sami_gor/daymark/WebViewRecoveryState.java',
@@ -203,6 +215,10 @@ check(
 check(
   'terminal screen is not shown while a bounded rebuild is pending',
   /!recoveryState\.hasPendingRestoreUrl\(\)/.test(mainActivity),
+);
+check(
+  'terminal screen respects an accepted rebuild after exhaustion',
+  /!recoveryState\.hasRebuildPending\(\)/.test(mainActivity),
 );
 check(
   'MainActivity keeps the WebView compatibility guard',
@@ -243,11 +259,66 @@ const javaGuardTokens = [
   'http://',
   'https://',
 ];
+// Removes Java comments without stripping string/char literals, so a URL in
+// code such as loadUrl("https://...") is still seen by the guard below.
+function stripJavaComments(code) {
+  let result = '';
+  let index = 0;
+  let mode = 'code';
+  while (index < code.length) {
+    const character = code[index];
+    const next = index + 1 < code.length ? code[index + 1] : '';
+    if (mode === 'code') {
+      if (character === '/' && next === '/') {
+        mode = 'line';
+        index += 2;
+        continue;
+      }
+      if (character === '/' && next === '*') {
+        mode = 'block';
+        index += 2;
+        continue;
+      }
+      if (character === '"' || character === "'") {
+        mode = character === '"' ? 'string' : 'char';
+      }
+      result += character;
+      index += 1;
+      continue;
+    }
+    if (mode === 'line') {
+      if (character === '\n') {
+        mode = 'code';
+        result += character;
+      }
+      index += 1;
+      continue;
+    }
+    if (mode === 'block') {
+      if (character === '*' && next === '/') {
+        mode = 'code';
+        index += 2;
+      } else {
+        index += 1;
+      }
+      continue;
+    }
+    result += character;
+    if (character === '\\' && next) {
+      result += next;
+      index += 2;
+      continue;
+    }
+    if ((mode === 'string' && character === '"') || (mode === 'char' && character === "'")) {
+      mode = 'code';
+    }
+    index += 1;
+  }
+  return result;
+}
 const javaOffenders = [];
 for (const relative of javaFiles) {
-  const code = read(relative)
-    .replace(/\/\/[^\n]*/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const code = stripJavaComments(read(relative));
   for (const token of javaGuardTokens) {
     if (code.includes(token)) javaOffenders.push(relative + ': ' + token);
   }
@@ -256,6 +327,19 @@ check(
   'first-party Java passes the repository network-boundary guard',
   javaOffenders.length === 0,
   javaOffenders.join('; '),
+);
+const guardProbe = stripJavaComments(
+  [
+    '// https://comment.example',
+    'String url = "https://literal.example";',
+    '/* https://block.example */',
+  ].join('\n'),
+);
+check(
+  'network-boundary guard keeps URL literals while dropping comments',
+  guardProbe.includes('https://literal.example')
+    && !guardProbe.includes('https://comment.example')
+    && !guardProbe.includes('https://block.example'),
 );
 check(
   'recovery verification walks first-party Android Java',
