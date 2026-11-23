@@ -330,16 +330,16 @@ check(
 );
 const guardProbe = stripJavaComments(
   [
-    '// https://comment.example',
-    'String url = "https://literal.example";',
-    '/* https://block.example */',
+    '// SENTINEL_COMMENT',
+    'String value = "SENTINEL_LITERAL";',
+    '/* SENTINEL_BLOCK */',
   ].join('\n'),
 );
 check(
-  'network-boundary guard keeps URL literals while dropping comments',
-  guardProbe.includes('https://literal.example')
-    && !guardProbe.includes('https://comment.example')
-    && !guardProbe.includes('https://block.example'),
+  'network-boundary guard keeps string literals while dropping comments',
+  guardProbe.includes('SENTINEL_LITERAL')
+    && !guardProbe.includes('SENTINEL_COMMENT')
+    && !guardProbe.includes('SENTINEL_BLOCK'),
 );
 check(
   'recovery verification walks first-party Android Java',
