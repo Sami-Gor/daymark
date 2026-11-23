@@ -15,7 +15,8 @@
 #   PARAKEET_TEST_WORKDIR    parent directory for temp files
 #                            (default: ${TMPDIR:-/tmp}; use the T5 volume locally)
 #   PARAKEET_TEST_MODEL_DIR  existing directory with the four pinned model files
-#                            (skips extracting them from the archive)
+#                            (skips extracting them from the archive; a relative path
+#                            is resolved from the directory the test runs in)
 #
 # All temporary files stay under the selected work directory. Requires bash,
 # curl, python3 and shasum. Exits non-zero if any case fails.
@@ -159,6 +160,14 @@ assets_dir() { # repo
   echo "$1/artifacts/weather-app/android/parakeet-assets/src/main/assets/parakeet"
 }
 
+absolute_dir() { # path -> absolute path (already-absolute input is unchanged)
+  local path="$1"
+  case "$path" in
+    /*) printf '%s\n' "$path" ;;
+    *) ( cd "$path" && pwd ) ;;
+  esac
+}
+
 assert_installed() { # repo label
   local repo="$1" label="$2" name expected file got ok=1
   while IFS='|' read -r name expected; do
@@ -203,8 +212,12 @@ fi
 MODEL_DIR=""
 ensure_model_dir() {
   if [ -n "$MODEL_DIR" ]; then return 0; fi
-  if [ -n "${PARAKEET_TEST_MODEL_DIR:-}" ] && [ -f "${PARAKEET_TEST_MODEL_DIR}/tokens.txt" ]; then
-    MODEL_DIR="$PARAKEET_TEST_MODEL_DIR"
+  local configured="${PARAKEET_TEST_MODEL_DIR:-}"
+  if [ -n "$configured" ] && [ -f "$configured/tokens.txt" ]; then
+    # MODEL_DIR is also the target prefix for the fallback-fixture symlinks, so a
+    # relative value would resolve against $WORK/hf-good instead of the caller.
+    # Store an absolute path; an absolute input is used unchanged.
+    MODEL_DIR="$(absolute_dir "$configured")" || return 1
     return 0
   fi
   [ "$HAVE_ARCHIVE" = 1 ] || return 1
@@ -300,7 +313,9 @@ else
     rc=$?
     stop_http_server
     expect_success "$rc" "controlled-mirror success"
-    assert_installed "$R" "controlled-mirror success"
+    if ! assert_installed "$R" "controlled-mirror success"; then
+      fail_case "controlled-mirror success: installed files do not match the four pinned hashes"
+    fi
     check_log_has "$WORK/mirror-ok.log" "archive sha256=$ARCHIVE_SHA256" "controlled-mirror success verified the archive digest"
     check_log_has "$WORK/mirror-ok.log" "closed allow-list (10 members)" "controlled-mirror success enforced the member allow-list"
     check_log_lacks "$WORK/mirror-ok.log" "huggingface.co" "controlled-mirror success never touched the HF fallback"
@@ -409,7 +424,9 @@ if ensure_model_dir; then
     rc=$?
     stop_http_server
     expect_success "$rc" "HF fallback opt-in"
-    assert_installed "$R" "HF fallback opt-in"
+    if ! assert_installed "$R" "HF fallback opt-in"; then
+      fail_case "HF fallback opt-in: installed files do not match the four pinned hashes"
+    fi
     check_log_has "$WORK/hf-ok.log" "warning: pinned HF revision: $HF_REVISION" "HF fallback logged the pinned revision"
     check_log_has "$WORK/hf-ok.log" "installed from pinned HF fallback" "HF fallback installed the verified files"
     check_log_has "$WORK/hf-ok.log" "the controlled mirror archive could not be fetched" "HF fallback only ran after the mirror failed"

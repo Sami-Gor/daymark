@@ -2,4 +2,9 @@
 <resources>
     <string name="webview_required_title">Daymark nécessite une version plus récente d’Android System WebView</string>
     <string name="webview_required_message">Mettez à jour Android System WebView depuis Google Play, puis rouvrez Daymark.</string>
+    <string name="webview_recovery_title">Daymark n’a pas pu restaurer la page</string>
+    <string name="webview_recovery_message">La page a cessé de répondre plusieurs fois pendant le rechargement. Vérifiez qu’Android System WebView est à jour, puis réessayez.</string>
+    <string name="webview_recovery_retry">Réessayer</string>
+    <string name="webview_recovery_restoring_title">Restauration de Daymark…</string>
+    <string name="webview_recovery_restoring_message">La page a cessé de répondre. Rechargement en cours.</string>
 </resources>
