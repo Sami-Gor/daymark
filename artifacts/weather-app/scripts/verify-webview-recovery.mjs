@@ -87,7 +87,7 @@ check(
 );
 check(
   'recovery assets reference no external origin',
-  !/https?:\/\//.test(recoveryHtml.replace(/<!--[\s\S]*?-->/g, '')) && !/https?:\/\//.test(recoveryJs),
+  !/https?:\/\//.test(recoveryHtml) && !/https?:\/\//.test(recoveryJs),
 );
 
 const localizationKeys = [
