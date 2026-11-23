@@ -6,4 +6,9 @@
     <string name="custom_url_scheme" translatable="false">io.github.sami_gor.daymark</string>
     <string name="webview_required_title">Daymark needs a newer Android System WebView</string>
     <string name="webview_required_message">Update Android System WebView from Google Play, then reopen Daymark.</string>
+    <string name="webview_recovery_title">Daymark could not restore the page</string>
+    <string name="webview_recovery_message">The page stopped responding more than once while reloading. Make sure Android System WebView is up to date, then try again.</string>
+    <string name="webview_recovery_retry">Try again</string>
+    <string name="webview_recovery_restoring_title">Restoring Daymark…</string>
+    <string name="webview_recovery_restoring_message">The page stopped responding. Reloading it now.</string>
 </resources>
