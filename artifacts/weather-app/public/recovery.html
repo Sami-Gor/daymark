@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- The recovery page only needs its own script and styles. Keep it locked
+         down even though Capacitor serves it without HTTP headers. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; base-uri 'none'; object-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'none'"
+    />
+    <title>Daymark could not load</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #e7f2f7;
+        color: #162b38;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main {
+        min-height: 100vh;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 12px;
+      }
+      p {
+        font-size: 16px;
+        line-height: 1.5;
+        margin: 0 0 20px;
+        max-width: 32rem;
+        color: #3d525e;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 12px 20px;
+        border: 0;
+        border-radius: 10px;
+        color: #ffffff;
+        background: #162b38;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 data-recovery-title>Daymark could not load</h1>
+      <p data-recovery-message>
+        The app shell did not finish loading. Check your connection to the app
+        and try again.
+      </p>
+      <button type="button" data-recovery-retry>Try again</button>
+    </main>
+    <script src="./recovery.js" defer></script>
+  </body>
+</html>
