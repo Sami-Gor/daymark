@@ -161,6 +161,16 @@ A signed release build additionally needs `artifacts/weather-app/android/keystor
 which is gitignored and must never be committed. Without the two Kokoro steps the
 app still builds, but English narration is unavailable at runtime.
 
+The Parakeet model is fetched at build time from a **Daymark-controlled,
+immutable release asset**, not from the upstream release: upstream replaced the
+pinned asset on 2026-11-07 with different bytes, and this repository does not
+adopt that revision. The archive and every model file are verified against
+fixed SHA-256 pins and a closed 10-entry member allow-list, so a wrong, missing
+or substituted download fails the build. `PARAKEET_ARCHIVE_URL` may point at
+an approved mirror; an optional Hugging Face fallback is disabled by default
+and only runs with `PARAKEET_HF_FALLBACK=1` at a pinned revision. See
+[section 5.1 of the reproducible-build guide](docs/release/reproducible-build-guide.md#51-parakeet-model-retrieval-policy).
+
 Release: package `io.github.sami_gor.daymark` (released v1.0.0: versionCode 1 / versionName 1.0.0; V2 candidate on this branch: versionCode 2 / versionName 2.0.0). See [docs/architecture/capacitor-migration.md](docs/architecture/capacitor-migration.md) for the architecture, plugin API and lifecycle details, and [docs/release/play-console-checklist.md](docs/release/play-console-checklist.md) for the Play release chain.
 
 ## Test
