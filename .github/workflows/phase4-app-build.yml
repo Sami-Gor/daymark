@@ -44,8 +44,9 @@ jobs:
         run: |
           AAR=artifacts/weather-app/android/daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar
           echo "8e1edb57a5ac1e779dd6b00a6267a2305e44e1ef1620095626e9c93e9497a398  $AAR" | sha256sum -c -
-          unzip -p "$AAR" jni/arm64-v8a/libsherpa-onnx-jni.so | sha256sum
-          echo "3611bbe18d282afc95bd5e4b8edf8f9f49f09d2148bf084c4878f6c390457cfb  -" | sha256sum -c -
+          JNI=$(unzip -p "$AAR" jni/arm64-v8a/libsherpa-onnx-jni.so | sha256sum | awk '{print $1}')
+          echo "jni=$JNI"
+          test "$JNI" = "3611bbe18d282afc95bd5e4b8edf8f9f49f09d2148bf084c4878f6c390457cfb"
       - name: Fetch pinned Parakeet model
         id: model
         continue-on-error: true
