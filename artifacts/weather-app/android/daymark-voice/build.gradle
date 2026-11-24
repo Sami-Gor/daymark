@@ -24,9 +24,10 @@ dependencies {
     implementation project(':capacitor-android')
 
     // sherpa-onnx runs the Parakeet TDT 0.6B v3 int8 model on the device.
-    // This is the verified, committed CVE-2026-108954 build. The fetch script
-    // validates its pin; the abiFilters above keep only the arm64-v8a native
-    // libraries in the shipped bundle.
+    // This is the verified, committed CVE-2026-108954 build with the Daymark
+    // joiner-width (0001) and NeMo encoder-output (0002) validation patches.
+    // The fetch script and SHA256SUMS validate its pin; the abiFilters above
+    // keep only the arm64-v8a native libraries in the shipped bundle.
     implementation files('libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar')
 
     testImplementation "junit:junit:$junitVersion"
