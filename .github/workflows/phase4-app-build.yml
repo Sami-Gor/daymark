@@ -40,6 +40,18 @@ jobs:
         run: |
           sed -i 's/minSdkVersion = 29/minSdkVersion = 24/' artifacts/weather-app/android/variables.gradle
           grep -n 'minSdkVersion' artifacts/weather-app/android/variables.gradle | head -1
+      - name: Preserve exact native library bytes
+        run: |
+          cat >> artifacts/weather-app/android/app/build.gradle <<'EOF'
+          android {
+              packagingOptions {
+                  jniLibs {
+                      keepDebugSymbols += ["**/libsherpa-onnx-jni.so", "**/libonnxruntime.so"]
+                  }
+              }
+          }
+          EOF
+          tail -12 artifacts/weather-app/android/app/build.gradle
       - name: Verify adopted AAR identity
         run: |
           AAR=artifacts/weather-app/android/daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar
