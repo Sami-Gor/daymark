@@ -31,4 +31,15 @@ Status: **RELEASE HOLD** - validated candidate exists, but outstanding items rem
 9. Final production release branch and version reconciliation.
 10. Final production AAB build and independent integrity checks.
 
-No item above is marked complete without evidence. PR #90 and PR #91 remain open and draft.
+No item above is marked complete without evidence. At publication time (2026-11-24), PR #90 and PR #91 were open and draft; see the promotion update below for their later merged state.
+
+## Promotion update (2026-11-25)
+
+This section records the later candidate-only promotion without altering the historical register above.
+
+- PR #90 merged into `release/v2-candidate` at `49be09e0d957b766ad232916c039062dd0f3febb`.
+- PR #91 merged into `release/v2-candidate` at `646e3cce71ac903e3a364ffd8d7de2118ddeb4d2`.
+- The corrected adopted AAR (`8e1edb57a5ac1e779dd6b00a6267a2305e44e1ef1620095626e9c93e9497a398`) is now part of `release/v2-candidate`.
+- Candidate HEAD: `646e3cce71ac903e3a364ffd8d7de2118ddeb4d2` (unless GitHub shows a later verified commit).
+- These merges did not change `main`, the production/released AAR (`5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8`), production signing or Google Play. The candidate now adopts the corrected AAR, but no production artifact was replaced or released.
+- Release status remains **HOLD**: every outstanding item above is still outstanding. This is a candidate promotion only, not a production release.

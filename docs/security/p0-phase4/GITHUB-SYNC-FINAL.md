@@ -84,5 +84,15 @@ uploads, GitLab mirror push or evidence deletion occurred.
 - Final report publication commit: d6bd1ffdc7a806ed20943eeabd8596ef5cadd735.
 - All published docs return HTTP 200 from raw.githubusercontent.com.
 - PR #90/#91 descriptions updated; obsolete 829a0f4e/03f4e3d/21586f09 references removed.
-- Both PRs remain OPEN and DRAFT at heads fd11e28 (PR90) and 2dc4eb9 (PR91).
-- main = 6aafa15...; release/v2-candidate = c8fe6ce... unchanged.
+- At publication time (2026-11-24) both PRs remained OPEN and DRAFT at heads fd11e28 (PR90) and 2dc4eb9 (PR91); see the promotion update below for their later merged state.
+- main = 6aafa15...; release/v2-candidate = c8fe6ce... unchanged as of this report.
+
+## Promotion update (2026-11-25)
+
+The refs, PR states and CI links above are the historical record as of 2026-11-24 and are preserved unchanged. Subsequent candidate-only promotion:
+
+- PR #90 merged into `release/v2-candidate` at `49be09e0d957b766ad232916c039062dd0f3febb`.
+- PR #91 merged into `release/v2-candidate` at `646e3cce71ac903e3a364ffd8d7de2118ddeb4d2`, adopting the corrected AAR `8e1edb57…` (JNI `3611bbe1…`, ORT `33847ad4…`).
+- Candidate HEAD: `646e3cce71ac903e3a364ffd8d7de2118ddeb4d2` (unless GitHub shows a later verified commit).
+- `main` remains `6aafa15333101e39e61b7cc70f23431f122c82e0`; production signing, Google Play and the production/released AAR (`5300c913…`) were not changed by these merges.
+- Release status remains HOLD; the outstanding items in the readiness register are unchanged.
