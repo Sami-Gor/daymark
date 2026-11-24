@@ -86,4 +86,3 @@ uploads, GitLab mirror push or evidence deletion occurred.
 - PR #90/#91 descriptions updated; obsolete 829a0f4e/03f4e3d/21586f09 references removed.
 - Both PRs remain OPEN and DRAFT at heads fd11e28 (PR90) and 2dc4eb9 (PR91).
 - main = 6aafa15...; release/v2-candidate = c8fe6ce... unchanged.
-
