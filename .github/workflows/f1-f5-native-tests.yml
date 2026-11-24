@@ -1,0 +1,77 @@
+name: F1-F5 NeMo encoder-output native tests
+
+# Host-native gtest evidence for the F1/F3/F4/F5 NeMo encoder-output
+# validation (Daymark patch 0002) on the exact candidate-AAR source:
+# sherpa-onnx v1.13.8 (11afbd0) + patch 0001 (CVE-2026-108954) + patch 0002.
+#
+# This workflow is the repeatable Linux counterpart of the macOS host run
+# recorded in
+#   android/kokoro-poc/sherpa-onnx-cve-2026-108954/native-f1-f5-reproduction/
+# It builds offline-transducer-joiner-validation-test (24 tests) and
+# nemo-encoder-output-validation-test (12 tests) twice - RelWithDebInfo and
+# AddressSanitizer - and fails unless every test passes with no sanitizer
+# report.
+#
+# The strengthened AddressSanitizer negative control for the CVE-2026-108954
+# joiner-width fix (unpatched decoder must be detected) is already run by
+# .github/workflows/sherpa-cve-native-asan.yml on the same paths and is not
+# duplicated here.
+
+on:
+  push:
+    branches: [main, release/v2-candidate]
+    paths:
+      - "android/kokoro-poc/sherpa-onnx-cve-2026-108954/**"
+      - ".github/workflows/f1-f5-native-tests.yml"
+  pull_request:
+    paths:
+      - "android/kokoro-poc/sherpa-onnx-cve-2026-108954/**"
+      - ".github/workflows/f1-f5-native-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f1-f5-native-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-tests:
+    runs-on: ubuntu-latest
+    # One RelWithDebInfo and one AddressSanitizer build of sherpa-onnx with
+    # tests enabled, plus two small fixture test binaries each.
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      # The committed manifest is the independent byte pin for the fixtures,
+      # test sources and both patches the runner applies.
+      - name: Verify committed SHA256SUMS manifest
+        run: |
+          CVE=android/kokoro-poc/sherpa-onnx-cve-2026-108954
+          python3 "$CVE/tests/verify_fixture_manifest.py" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --manifest "$GITHUB_WORKSPACE/$CVE/SHA256SUMS"
+
+      - name: Check out the pinned sherpa-onnx v1.13.8
+        run: |
+          git clone --depth 1 --branch v1.13.8 \
+            https://github.com/k2-fsa/sherpa-onnx.git "$RUNNER_TEMP/sherpa-onnx"
+          test "$(git -C "$RUNNER_TEMP/sherpa-onnx" rev-parse HEAD)" = \
+            "11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf"
+
+      - name: Build and run F1-F5 native tests (normal + ASan)
+        run: |
+          CVE=android/kokoro-poc/sherpa-onnx-cve-2026-108954
+          "$CVE/tests/run-f1-f5-native-tests.sh" \
+            "$RUNNER_TEMP/sherpa-onnx" "$RUNNER_TEMP/f1-f5-native" \
+            --jobs 4
+
+      - name: Upload native test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f1-f5-native-tests
+          path: ${{ runner.temp }}/f1-f5-native
+          retention-days: 14
