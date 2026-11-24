@@ -1,6 +1,5 @@
 package io.github.sami_gor.daymark;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
@@ -22,8 +21,6 @@ import java.util.concurrent.atomic.AtomicReference;
 /** Instrumentation coverage for the real Capacitor WebView renderer-recovery path. */
 @RunWith(AndroidJUnit4.class)
 public class WebViewRendererRecoveryInstrumentationTest {
-
-    private static final String PRIVACY_URL = "https://localhost/privacy";
 
     @Before
     public void resetRecoveryState() {
@@ -73,38 +70,9 @@ public class WebViewRendererRecoveryInstrumentationTest {
         return ref.get();
     }
 
-    private static void navigate(ActivityScenario<MainActivity> scenario, String url) {
-        scenario.onActivity(activity -> activity.getBridge().getWebView().loadUrl(url));
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-    }
-
     private static void crash(ActivityScenario<MainActivity> scenario) {
         scenario.onActivity(activity -> activity.getBridge().getWebView().loadUrl("chrome://crash"));
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-    }
-
-    private static void waitForUrl(ActivityScenario<MainActivity> scenario, String expected, long timeoutMs) throws Exception {
-        long deadline = SystemClock.uptimeMillis() + timeoutMs;
-        while (SystemClock.uptimeMillis() < deadline) {
-            String url = currentUrl(scenario);
-            if (url != null && url.startsWith(expected)) return;
-            Thread.sleep(200);
-        }
-        throw new AssertionError("route not restored: " + currentUrl(scenario));
-    }
-
-    private static String currentUrl(ActivityScenario<MainActivity> scenario) {
-        AtomicReference<String> ref = new AtomicReference<>();
-        try {
-            scenario.onActivity(activity -> {
-                if (activity.getBridge() != null && activity.getBridge().getWebView() != null) {
-                    ref.set(activity.getBridge().getWebView().getUrl());
-                }
-            });
-        } catch (Throwable ignored) {
-            // Activity may be mid-recreation.
-        }
-        return ref.get();
     }
 
     private static void waitForNewActivity(ActivityScenario<MainActivity> scenario, MainActivity before, long timeoutMs) throws Exception {
