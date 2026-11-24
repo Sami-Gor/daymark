@@ -1,11 +1,13 @@
 name: Rebuild sherpa-onnx AAR
 
-# The committed AAR was produced by a manual local build. This workflow rebuilds
-# the arm64-v8a runtime from pinned inputs twice, in two different directories,
-# and proves that the two builds are byte-identical to each other (repeatable,
-# pinned build). The build maps the checkout, build tree and NDK onto portable
-# canonical paths with -ffile-prefix-map, so the result does not depend on the
-# runner's directories.
+# The committed AAR was produced by this workflow's Gradle packaging job in
+# hosted run 45285600587 (2026-11-23). This workflow rebuilds the arm64-v8a
+# runtime from pinned inputs twice, in two different directories, and proves
+# that the two builds are byte-identical to each other (repeatable, pinned
+# build). Both pinned Daymark patches (0001 joiner-width validation and 0002
+# NeMo encoder-output validation) are applied before the build. The build maps
+# the checkout, build tree and NDK onto portable canonical paths with
+# -ffile-prefix-map, so the result does not depend on the runner's directories.
 #
 # The portable canonical paths are intentionally not the paths recorded in the
 # committed artifact. The default run therefore verifies repeatability and the
@@ -151,7 +153,7 @@ jobs:
           fi
           echo "SHERPA_SRC=$SRC" >> "$GITHUB_ENV"
 
-      - name: Apply the pinned security patch
+      - name: Apply the pinned joiner-width patch (0001)
         run: |
           set -euo pipefail
           PATCH="$GITHUB_WORKSPACE/$PATCH_PATH"
@@ -161,13 +163,13 @@ jobs:
           git -C "$SHERPA_SRC" status --porcelain | tee "$RUNNER_TEMP/patch-status.txt"
           test -s "$RUNNER_TEMP/patch-status.txt"
 
-      - name: Apply the F1 encoder-output validation patch
+      - name: Apply the pinned NeMo encoder-output patch (0002, F1/F3)
         run: |
           set -euo pipefail
-          PATCH="$GITHUB_WORKSPACE/android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0002-nemo-encoder-output-validation.patch"
-          echo "03f4e3d96e591ad6ca6ec4dcbb54d9c8f5ad5233a19e49f73cea47b6c4f7109f  $PATCH" | sha256sum -c -
-          git -C "$SHERPA_SRC" apply --check "$PATCH"
-          git -C "$SHERPA_SRC" apply "$PATCH"
+          PATCH2="$GITHUB_WORKSPACE/$PATCH2_PATH"
+          echo "$PATCH2_SHA256  $PATCH2" | sha256sum -c -
+          git -C "$SHERPA_SRC" apply --check "$PATCH2"
+          git -C "$SHERPA_SRC" apply "$PATCH2"
 
       - name: Fetch pinned ONNX Runtime
         run: |
@@ -217,8 +219,9 @@ jobs:
           cp -v "$LIBS/libsherpa-onnx-jni.so" "$LIBS/libonnxruntime.so" "$STAGE/"
           cp -v "$RUNNER_TEMP/build-$RUN_LABEL.log" "$STAGE/build.log"
           sha256sum "$STAGE"/*.so | tee "$STAGE/SHA256SUMS"
-          # The pinned patch must be visible in the rebuilt library.
+          # Both pinned patches must be visible in the rebuilt library.
           grep -a -q "Invalid NeMo decoder dimensions" "$STAGE/libsherpa-onnx-jni.so"
+          grep -a -q "encoder output must have rank 3" "$STAGE/libsherpa-onnx-jni.so"
           # Optional exact-artifact identity check (requires the recorded paths).
           if [ "$REQUIRE_FULL_IDENTITY" = "true" ]; then
             echo "$EXPECTED_JNI_SHA256  $STAGE/libsherpa-onnx-jni.so" | sha256sum -c -
@@ -264,10 +267,11 @@ jobs:
           git -C "$SRC" apply "$PATCH"
           echo "SHERPA_SRC=$SRC" >> "$GITHUB_ENV"
           echo "PATCH_FILE=$PATCH" >> "$GITHUB_ENV"
-          PATCH2="$GITHUB_WORKSPACE/android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0002-nemo-encoder-output-validation.patch"
-          echo "03f4e3d96e591ad6ca6ec4dcbb54d9c8f5ad5233a19e49f73cea47b6c4f7109f  $PATCH2" | sha256sum -c -
+          PATCH2="$GITHUB_WORKSPACE/$PATCH2_PATH"
+          echo "$PATCH2_SHA256  $PATCH2" | sha256sum -c -
           git -C "$SRC" apply --check "$PATCH2"
           git -C "$SRC" apply "$PATCH2"
+          echo "PATCH_FILE2=$PATCH2" >> "$GITHUB_ENV"
 
       - name: Download both rebuilds
         uses: actions/download-artifact@v4
@@ -383,6 +387,9 @@ jobs:
           mkdir -p "$OUT"
           unzip -q "$AAR" -d "$OUT/unpacked"
           echo "$ORT_LIB_SHA256  $OUT/unpacked/jni/arm64-v8a/libonnxruntime.so" | sha256sum -c -
+          # Both pinned patch diagnostics must be in the packaged JNI library.
+          grep -a -q "Invalid NeMo decoder dimensions" "$OUT/unpacked/jni/arm64-v8a/libsherpa-onnx-jni.so"
+          grep -a -q "encoder output must have rank 3" "$OUT/unpacked/jni/arm64-v8a/libsherpa-onnx-jni.so"
           if [ "$REQUIRE_FULL_IDENTITY" = "true" ]; then
             echo "$EXPECTED_JNI_SHA256  $OUT/unpacked/jni/arm64-v8a/libsherpa-onnx-jni.so" | sha256sum -c -
           fi

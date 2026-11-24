@@ -1,31 +1,38 @@
 # sherpa-onnx CVE-2026-108954 provenance
 
 This module pins a locally rebuilt sherpa-onnx 1.13.8 Android runtime containing
-the joiner-width validation for **CVE-2026-108954 / GHSA-f5q5-vp8g-wh4x**.
+the joiner-width validation for **CVE-2026-108954 / GHSA-f5q5-vp8g-wh4x**
+(patch 0001) and the reviewed F1/F3 NeMo encoder-output validation (patch 0002).
 
-**Review state:** the tracked AAR in this branch was rebuilt from the current
-PR #54 source in a disposable checkout. It is not independently approved,
-merged or released; this commit is the artifact candidate for review. The
-original `release/v2-candidate` baseline AAR is not this artifact.
+**Review state:** the tracked AAR in this branch is the adopted candidate
+produced by hosted workflow run 45285600587 (2026-11-23, head commit
+`d749732`) and adopted on `security/f1-f5-aar-adoption` as commit candidate.
+It is not independently approved, merged or released. The original
+`release/v2-candidate` baseline AAR and the previous patch-0001-only AAR are
+not this artifact; the previous artifact remains recoverable in git history.
 
 ## Artifact
 
 | Field | Value |
 |---|---|
 | AAR | `sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar` |
-| AAR SHA-256 | `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8` |
-| `libsherpa-onnx-jni.so` SHA-256 | `9a730e8e70f40e6b3662a1481d5b166cc9db16f717e8a3e74e3a12a8ff525485` |
+| AAR SHA-256 | `829a0f4e239c32671bdc1b01aa7c0fdc5a44628a5284e76e4837589db85a4e8c` |
+| AAR size | 10,213,770 bytes |
+| `libsherpa-onnx-jni.so` SHA-256 | `21586f09a4a0ff42eef9a723953cac44667fdef7f7f00a6324985cafa2e89aa9` |
+| `libsherpa-onnx-jni.so` size | 5,019,776 bytes |
 | `libonnxruntime.so` SHA-256 (AAR) | `33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1` |
-| `libonnxruntime.so` SHA-256 (APK after AGP strip) | `7a2fb92eb67037837c3f0e428bd732fd0d05ced0546d9e740090c07573d8249a` |
+| `classes.jar` SHA-256 | `8af5aa647494ec9cb6596959d6d20864377cf4a9dedf1c1b178d936bfb7cea95` |
 | ABI | `arm64-v8a` only |
 | Source version | sherpa-onnx `v1.13.8`, commit `11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf` |
-| Patch | `android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0001-joiner-width-validation.patch` |
-| Patch SHA-256 | `fd58558bdb9a7b82be8c2bfe7890890ca01edfedd95797e285d313b0bacd9f99` |
+| Patch 0001 | `android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0001-joiner-width-validation.patch` |
+| Patch 0001 SHA-256 | `fd58558bdb9a7b82be8c2bfe7890890ca01edfedd95797e285d313b0bacd9f99` |
+| Patch 0002 | `android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0002-nemo-encoder-output-validation.patch` |
+| Patch 0002 SHA-256 | `03f4e3d96e591ad6ca6ec4dcbb54d9c8f5ad5233a19e49f73cea47b6c4f7109f` |
 | NDK / CMake / ORT | `29.0.14206865` / `3.22.1` / `1.28.2` |
 | AAR Gradle / AGP | `8.6` / `8.4.0` |
-| AAR size | 10,214,077 bytes |
+| Build record | hosted workflow run `45285600587`, head `d749732a1c4dc0f9923da5e6a05c7dda33dc9a61` |
 
-The rebuilt AAR is tracked in this branch at
+The adopted AAR is tracked in this branch at
 `artifacts/weather-app/android/daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar`.
 It is the artifact candidate for review; a clean checkout and CI obtain this
 exact binary through Git. Run
@@ -34,18 +41,24 @@ accepts `SHERPA_ONNX_PATCHED_AAR_URL` for an externally hosted reviewed
 artifact and refuses to download the upstream release AAR, which is not a
 substitute for the verified artifact.
 
-## Patch
+The AAR members other than `jni/arm64-v8a/libsherpa-onnx-jni.so`
+(`classes.jar`, `AndroidManifest.xml`, `aar-metadata.properties`, `R.txt`,
+`proguard.txt` and `jni/arm64-v8a/libonnxruntime.so`) are byte-identical to the
+previous tracked AAR. The adoption changes exactly one member: the rebuilt JNI
+library.
 
-The source patch is stored at
-`android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0001-joiner-width-validation.patch`
-and has SHA-256
-`fd58558bdb9a7b82be8c2bfe7890890ca01edfedd95797e285d313b0bacd9f99`.
+## Patches
 
-It adds `sherpa-onnx/csrc/joiner-output-validation.h`, validates the live
-joiner tensor (float32, rank, positive dimensions, leading frame product,
-exact width or token-plus-duration width, element count and int32 overflow)
-before any `LogSoftmax`, `max_element`, pointer advance or token indexing, and
-applies the validation to:
+Both patches are stored under
+`android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/`.
+
+**0001 - joiner-width validation** (SHA-256
+`fd58558bdb9a7b82be8c2bfe7890890ca01edfedd95797e285d313b0bacd9f99`) adds
+`sherpa-onnx/csrc/joiner-output-validation.h`, validates the live joiner tensor
+(float32, rank, positive dimensions, leading frame product, exact width or
+token-plus-duration width, element count and int32 overflow) before any
+`LogSoftmax`, `max_element`, pointer advance or token indexing, and applies the
+validation to:
 
 - `offline-transducer-greedy-search-decoder.cc` (reported generic path);
 - `offline-transducer-greedy-search-nemo-decoder.cc` (NeMo RNNT and TDT);
@@ -54,35 +67,51 @@ applies the validation to:
 - `offline-transducer-model.cc` and `offline-transducer-nemo-model.cc` (safe
   metadata parsing and early static-shape warnings).
 
+**0002 - NeMo encoder-output validation** (SHA-256
+`03f4e3d96e591ad6ca6ec4dcbb54d9c8f5ad5233a19e49f73cea47b6c4f7109f`) adds
+`sherpa-onnx/csrc/nemo-encoder-output-validation.h` and its unit test. It
+validates what the NeMo decoders receive from the encoder before using it in
+pointer arithmetic: `encoder_out` is a float rank-3 tensor with positive
+dimensions whose element count matches its shape and fits in int32; when
+streams are passed the batch size equals their number; `encoder_out_length` is
+an int32 or int64 tensor with exactly one value per utterance and every value
+is in `[0, num_frames]`. On failure the decoders log and return empty results
+(bounded by the stream/utterance count) instead of reading outside the encoder
+output. The patch also replaces the previous `SHERPA_ONNX_EXIT(-1)` path for an
+unsupported length dtype with a refusal.
+
 The NeMo TDT path is the one Daymark actually uses (`model_type =
 "nemo_transducer"`). Upstream `v1.13.8`, `v2.0.1` and `master` still contain the
-unchecked width access; this fix is local, and PR #54 is unmerged.
+unchecked width access; these fixes are local, and the PR is unmerged.
 
-## Reproducible build record
+## Build record
 
-Clean upstream source was cloned at the pinned commit, and the tracked patch
-was checked with `git apply --check` before applying. The Android build used the
-documented `build-android-arm64-v8a.sh` script with:
+The adopted artifact was produced by hosted workflow
+`.github/workflows/rebuild-sherpa-aar.yml`, run **45285600587** on
+2026-11-23T23:04Z (`workflow_dispatch`, head commit
+`d749732a1c4dc0f9923da5e6a05c7dda33dc9a61`, ubuntu-24.04 image
+20261116.133.1). The workflow:
 
-```bash
-export ANDROID_NDK=/path/to/ndk/29.0.14206865
-export SHERPA_ONNX_ONNXRUNTIME_VERSION=1.28.2
-export BUILD_SHARED_LIBS=ON
-export PATH=/path/to/cmake-3.22.1/bin:$PATH
-bash ./build-android-arm64-v8a.sh
-```
-
-ONNX Runtime was downloaded from:
-
-- URL: `https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.28.2/onnxruntime-android-1.28.2.zip`
-- Archive SHA-256:
-  `01518867f78241138b6aa25925802e843a4fa9085af8d303d49e35bbb52aff4d`
-- Extracted `arm64-v8a/libonnxruntime.so` SHA-256:
-  `33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1`
-
-The archive was fetched with `curl` because `wget` is not installed in this
-environment; the archive's extracted library matches the previously recorded
-tracked-AAR library hash.
+1. checked out the repository and strictly parsed `scripts/aar-pins.env`;
+2. installed NDK `29.0.14206865` and CMake `3.22.1` (CMake tarball SHA-256
+   `73565c72355c6652e9db149249af36bcab44d9d478c5546fd926e69ad6b43640`);
+3. cloned sherpa-onnx v1.13.8 at pinned commit
+   `11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf` and applied patch 0001, then
+   patch 0002, verifying each patch's SHA-256 with `git apply --check` first;
+4. fetched ONNX Runtime `1.28.2` from
+   `https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.28.2/onnxruntime-android-1.28.2.zip`
+   (archive SHA-256
+   `01518867f78241138b6aa25925802e843a4fa9085af8d303d49e35bbb52aff4d`) and
+   verified the extracted `arm64-v8a/libonnxruntime.so` against
+   `33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1`;
+5. built `libsherpa-onnx-jni.so` twice in independent directories with
+   `-ffile-prefix-map` onto `/build/sherpa-src` and
+   `/opt/android-ndk/29.0.14206865`; the two builds were byte-identical;
+6. verified both patch diagnostics are present in the rebuilt library and
+   repacked the AAR deterministically twice;
+7. packaged the AAR with Gradle 8.6 and the upstream
+   `android/SherpaOnnxAar` project (Java 17, AGP 8.4.0), producing the adopted
+   AAR.
 
 CMake FetchContent dependencies were pinned by the upstream build:
 
@@ -102,107 +131,80 @@ CMake FetchContent dependencies were pinned by the upstream build:
 | piper-phonemize | commit `f3ff95afc03640bc1399e113e83361192a2fafb4` |
 | hclust-cpp | `2026-02-25` |
 
-These FetchContent inputs are pinned by tag or commit, but this run did not
-capture independent published archive checksums for them. The ONNX Runtime
-package is the critical native runtime and its extracted library was
-cross-checked against the prior artifact hash.
+The packaged AAR contains:
 
-The AAR was packaged with the upstream `android/SherpaOnnxAar` project:
-
-```bash
-cp build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so \
-   build-android-arm64-v8a/install/lib/libonnxruntime.so \
-   android/SherpaOnnxAar/sherpa_onnx/src/main/jniLibs/arm64-v8a/
-cd android/SherpaOnnxAar
-ANDROID_HOME=/path/to/android-sdk \
-  ./gradlew --no-daemon :sherpa_onnx:assembleRelease
-```
-
-The resulting AAR contains only:
-
-- `jni/arm64-v8a/libsherpa-onnx-jni.so` (5,035,144 bytes)
-- `jni/arm64-v8a/libonnxruntime.so` (22,249,560 bytes)
-
-plus normal AAR metadata. Both files are ELF64 AArch64 shared objects with the
-expected SONAMEs; the JNI library depends on `libandroid.so`, `liblog.so`,
-`libonnxruntime.so`, `libm.so`, `libdl.so` and `libc.so`.
+- `jni/arm64-v8a/libsherpa-onnx-jni.so` (5,019,776 bytes), ELF64 AArch64,
+  GNU build ID `f27ba96211371a32cad9d95c29b7753932c0ce0e`;
+- `jni/arm64-v8a/libonnxruntime.so` (22,249,560 bytes), ELF64 AArch64;
+- `classes.jar` (238,706 bytes), `AndroidManifest.xml`,
+  `META-INF/com/android/build/gradle/aar-metadata.properties`, `R.txt`,
+  `proguard.txt`.
 
 ## Verification
 
-- Native suite: **24/24 passed** in the normal build and **24/24 passed** in the
-  AddressSanitizer build. This was a fresh run on 2026-10-30 using
-  `tests/run-native-tests.sh` against a separate clean v1.13.8 checkout with
-  the tracked patch.
-- Guard-removal negative test: removing the width-range guard from a disposable
-  copy caused the normal regression binary to fail and abort (`exit 138`);
-  malformed-model rejection tests failed, demonstrating that the guard is
-  security-relevant rather than dead code.
-- Patch diagnostics are present in the packaged JNI, including
-  `Invalid modified-beam decoder metadata`, `joiner output width is outside the
-  expected range`, `TDT joiner output width ... does not contain any duration
-  logits`, and `joiner output width exceeds int32`.
-- `fetch-sherpa-onnx.sh` accepted the provisioned AAR, and every entry in
-  `SHA256SUMS` verified.
-- The disposable Daymark checkout built successfully with
-  `cd artifacts/weather-app/android && ./gradlew :app:assembleDebug` after
-  `pnpm run sync:android-web`; the web-asset verifier and Parakeet integrity
-  task both passed. `:daymark-voice:lintDebug` was rerun for this rebuild and
-  completed with **0 errors / 4 warnings** (the expected arm64-only ChromeOS
-  ABI warning plus three obsolete SDK checks).
-- Existing CVE/QA documentation records a pre-existing `MissingPermission`
-  finding at `AudioSpeechCaptureDevice.java:50`. The CVE patch does not
-  introduce or suppress that finding, and this rebuild does not change the
-  related lint configuration or audio source. It remains a separate
-  pre-existing Android lint issue.
-- The debug APK (`app-debug.apk` SHA-256
-  `6d2b395b9a3562cdb00b366fe104df42c312fd75bf0e5558a88bbb9737835c58`)
-  contains only `lib/arm64-v8a/libsherpa-onnx-jni.so` and
-  `lib/arm64-v8a/libonnxruntime.so`. The packaged JNI is byte-identical to the
-  AAR. AGP strips the ONNX Runtime library during packaging: applying the same
-  NDK 29 `llvm-strip --strip-unneeded` to the AAR copy produces exactly the
-  packaged hash `7a2fb92e...`, so the 8-byte difference is explained by
-  symbol removal, not a substituted library.
+Hosted run 45285600587 (the build record):
+
+- run1 and run2 `libsherpa-onnx-jni.so` byte-identical:
+  `21586f09a4a0ff42eef9a723953cac44667fdef7f7f00a6324985cafa2e89aa9`;
+- `libonnxruntime.so` matched the pin and the committed AAR copy;
+- both patch diagnostics present in the rebuilt library (including
+  `Invalid NeMo decoder dimensions`, `encoder output must have rank 3`,
+  `encoder_out_length must hold exactly one value per utterance`);
+- deterministic repack stable; Gradle packaging job succeeded and produced the
+  AAR above with `classes.jar` hash
+  `8af5aa647494ec9cb6596959d6d20864377cf4a9dedf1c1b178d936bfb7cea95`.
+
+Adoption verification (T5, 2026-11-23):
+
+- downloaded the run's `sherpa-aar-gradle` artifact (SHA-256
+  `6dd824ecd1ed188d0b521727b79025b62a2e0f418dab741329ab96181c88cd06`) and
+  verified the AAR SHA-256/size and every member hash above;
+- verified patch 0002's SHA-256;
+- deterministic repack of the previous AAR with only the adopted JNI and ORT
+  members reproduces the adopted AAR byte for byte;
+- the committed `SHA256SUMS` manifest and the strict pin parser verified;
+- `fetch-sherpa-onnx.sh` accepts the provisioned AAR.
+
+Not done in this adoption change: a fresh local Android build/APK packaging and
+a physical-device compatibility matrix for the new JNI hash. Prior debug-APK
+packaging and lint evidence applies to the previous artifact and must not be
+used as evidence for this JNI hash. The Gradle package job was not re-run
+locally (no Android SDK and no pinned Gradle 8.6 on the adoption host); the
+hosted workflow run is the build record.
 
 ## Reproducibility
 
-The build record above describes the original hand-made single build, which
-made no byte-for-byte claim. The rebuild is now automated from pinned inputs:
+The build is automated from pinned inputs:
 
 - `AAR-REBUILD.md` documents the pinned inputs, the repeatable build, the
-optional exact-artifact identity check, the provenance record and the workflow;
-- `android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env` pins
-the source commit, patch, NDK, CMake, ONNX Runtime, the expected AAR/library
-hashes and the portable canonical build paths;
+  optional exact-artifact identity check, the provenance record and the workflow;
+- `android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/aar-pins.env` pins the
+  source commit, both patches, NDK, CMake, ONNX Runtime, the expected AAR and
+  library hashes and the portable canonical build paths;
 - `.github/workflows/rebuild-sherpa-aar.yml` rebuilds the runtime twice from
-identical pinned inputs and verifies that the two builds are byte-identical to
-each other; the deterministic repack is checked for repeatability.
+  identical pinned inputs and verifies that the two builds are byte-identical to
+  each other; the deterministic repack is checked for repeatability.
 
-A portable rebuild is repeatable but is not byte-identical to this AAR: the
-library embeds the build's source-path strings, and the linker derives the GNU
-build ID from the unstripped debug information that names the NDK path. With the
-original build's recorded canonical source and NDK path strings supplied, the
-rebuilt JNI library matches this AAR's library including the GNU build ID
-(SHA-256 `9a730e8e70f40e6b3662a1481d5b166cc9db16f717e8a3e74e3a12a8ff525485`)
-and the deterministically repacked AAR matches this AAR
-(`5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8`). That
-exact-artifact check is maintainer-run because the recorded paths are
-machine-specific and are not committed.
-
-Residual limits: the CI workflow has not yet run on a GitHub-hosted runner;
-the optional Gradle AAR-packaging job is not verified locally (the
-deterministic repack is the archive byte gate); the NDK is pinned by revision
-and compiler version rather than an archive hash, and CMake FetchContent
-dependencies are recorded by resolved URL rather than archive checksum.
+The adopted candidate was produced with the committed portable canonical paths,
+so re-running the workflow on the same runner image is its reproduction check.
+Because the native library embeds the mapped path strings and the GNU build ID
+derives from the unstripped debug information, byte identity across a different
+toolchain is not promised. Exact-artifact identity can be checked with
+`REQUIRE_FULL_IDENTITY=1` (or the workflow's identity inputs); an independent
+second AAR-producing hosted run was not performed during adoption. Archive
+bytes additionally depend on the Gradle/AGP/JDK packaging toolchain, which is
+recorded but not pinned by archive hash.
 
 ## Important limits
 
 - This is a reviewable local fix, not an upstream release. Do not replace it
   with the upstream 1.13.8 AAR.
-- There is no independent human security approval of PR #54 at this commit.
-- The debug APK is debug-signed and is not a production release or physical-
-  device QA result. No production signing material was used or changed.
-- The malformed-model tests ran on the host native build (normal and ASan); no
-  physical-device malformed-model harness was available.
-- The Parakeet model staged for the app build came from a local disposable
-  prior work area and matched the build's pinned SHA-256 values; it is not part
-  of this AAR and is not committed by this work.
+- There is no independent human security approval of this PR at this commit.
+- The host native malformed-model evidence was produced on 2026-11-18 and is
+  preserved; the fresh native reproduction is a separate workstream and this
+  adoption change does not claim a fresh native rerun.
+- The adopted AAR has no physical-device compatibility matrix in this change.
+- No production signing material was used or changed. The production AAR
+  (`5300c913...`, 10,214,077 bytes) was not replaced outside this adoption
+  branch; it remains recoverable at commit `d73624d` and in the preserved
+  adoption evidence.

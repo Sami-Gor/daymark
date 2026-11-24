@@ -204,7 +204,7 @@ the table is for the release record.
 | pguso/kokoro | `b42bd5cf915163607cb51984cabf273dcf09755e` | crate `kokoro-en` 0.1.5 |
 | Kokoro model | `onnx/model_quantized.onnx` | `fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478` |
 | Kokoro voice | `bm_fable.bin` | `f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1` |
-| sherpa-onnx | 1.13.8 AAR | `633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96` |
+| sherpa-onnx | 1.13.8 AAR + Daymark patches 0001/0002 | `829a0f4e239c32671bdc1b01aa7c0fdc5a44628a5284e76e4837589db85a4e8c` |
 | Parakeet encoder | `encoder.int8.onnx` | `acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247` |
 | Parakeet decoder | `decoder.int8.onnx` | `179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e` |
 | Parakeet joiner | `joiner.int8.onnx` | `3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3` |
