@@ -77,3 +77,13 @@ reconciliation; final production AAB build and independent integrity checks.
 
 Release status remains HOLD. No merges, main/release changes, signing changes, Play
 uploads, GitLab mirror push or evidence deletion occurred.
+
+## Post-publication verification
+
+- Evidence publication commit: a1c65ad0fd48b73c4aa9c4b9f8d1400b81205945.
+- Final report publication commit: d6bd1ffdc7a806ed20943eeabd8596ef5cadd735.
+- All published docs return HTTP 200 from raw.githubusercontent.com.
+- PR #90/#91 descriptions updated; obsolete 829a0f4e/03f4e3d/21586f09 references removed.
+- Both PRs remain OPEN and DRAFT at heads fd11e28 (PR90) and 2dc4eb9 (PR91).
+- main = 6aafa15...; release/v2-candidate = c8fe6ce... unchanged.
+
