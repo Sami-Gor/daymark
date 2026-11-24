@@ -4,10 +4,18 @@ name: Rebuild sherpa-onnx AAR
 # hosted run 45285600587 (2026-11-23). This workflow rebuilds the arm64-v8a
 # runtime from pinned inputs twice, in two different directories, and proves
 # that the two builds are byte-identical to each other (repeatable, pinned
-# build). Both pinned Daymark patches (0001 joiner-width validation and 0002
-# NeMo encoder-output validation) are applied before the build. The build maps
-# the checkout, build tree and NDK onto portable canonical paths with
-# -ffile-prefix-map, so the result does not depend on the runner's directories.
+# build). All three pinned Daymark patches (0001 joiner-width validation, 0002
+# F1/F3/F4/F5 NeMo encoder-output validation with the FND-1 null guard, and
+# 0003 FND-2 decoder-boundary tests, test-only) are applied in order before the
+# build. The build maps the checkout, build tree and NDK onto portable
+# canonical paths with -ffile-prefix-map, so the result does not depend on the
+# runner's directories.
+#
+# Provenance is generated from facts the build job itself records (build-facts
+# JSON in each staged artifact), never from the compare/verify job's ambient
+# CMake/NDK: the compare job merges those facts with the measured comparisons,
+# patch chain and the expected-vs-verified JNI fields. This is the FND-3 fix.
+# See AAR-REBUILD.md for the record schema and its honesty rules.
 #
 # The adopted candidate was produced with these committed portable canonical
 # paths, so the default run verifies repeatability, patch presence and the
@@ -158,13 +166,25 @@ jobs:
           git -C "$SHERPA_SRC" status --porcelain | tee "$RUNNER_TEMP/patch-status.txt"
           test -s "$RUNNER_TEMP/patch-status.txt"
 
-      - name: Apply the pinned NeMo encoder-output patch (0002, F1/F3)
+      - name: Apply the pinned NeMo encoder-output patch (0002, F1/F3/F4/F5 + FND-1)
         run: |
           set -euo pipefail
           PATCH2="$GITHUB_WORKSPACE/$PATCH2_PATH"
           echo "$PATCH2_SHA256  $PATCH2" | sha256sum -c -
           git -C "$SHERPA_SRC" apply --check "$PATCH2"
           git -C "$SHERPA_SRC" apply "$PATCH2"
+
+      - name: Apply the pinned decoder-boundary test patch (0003, FND-2)
+        run: |
+          set -euo pipefail
+          PATCH3="$GITHUB_WORKSPACE/$PATCH3_PATH"
+          echo "$PATCH3_SHA256  $PATCH3" | sha256sum -c -
+          git -C "$SHERPA_SRC" apply --check "$PATCH3"
+          git -C "$SHERPA_SRC" apply "$PATCH3"
+          # Patch 0003 adds test sources only. SHERPA_ONNX_ENABLE_TESTS=OFF
+          # keeps them out of the JNI library, but the patched source tree is
+          # part of the build facts and the patch must really be applied.
+          test -f "$SHERPA_SRC/sherpa-onnx/csrc/nemo-decoder-boundary-validation-test.cc"
 
       - name: Fetch pinned ONNX Runtime
         run: |
@@ -221,6 +241,22 @@ jobs:
           if [ "$REQUIRE_FULL_IDENTITY" = "true" ]; then
             echo "$EXPECTED_JNI_SHA256  $STAGE/libsherpa-onnx-jni.so" | sha256sum -c -
           fi
+          # FND-3: record the build job's real environment, toolchain, patched
+          # source and placed output hashes. The compare job merges this file
+          # into the provenance record instead of inferring CMake/NDK/JOBS/
+          # PREFIX_MAP from its own ambient environment.
+          python3 android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/write_provenance.py \
+            --build-facts-out "$STAGE/build-facts.json" \
+            --run-label "$RUN_LABEL" \
+            --sherpa-src "$SHERPA_SRC" \
+            --patch "$GITHUB_WORKSPACE/$PATCH_PATH" \
+            --patch2 "$GITHUB_WORKSPACE/$PATCH2_PATH" \
+            --patch3 "$GITHUB_WORKSPACE/$PATCH3_PATH" \
+            --libsherpa-so "$STAGE/libsherpa-onnx-jni.so" \
+            --libonnxruntime-so "$STAGE/libonnxruntime.so" \
+            --build-log-run1 "$STAGE/build.log" \
+            > "$STAGE/build-facts-stdout.txt"
+          test -s "$STAGE/build-facts.json"
           echo "STAGE=$STAGE" >> "$GITHUB_ENV"
 
       - name: Upload build outputs
@@ -267,6 +303,11 @@ jobs:
           git -C "$SRC" apply --check "$PATCH2"
           git -C "$SRC" apply "$PATCH2"
           echo "PATCH_FILE2=$PATCH2" >> "$GITHUB_ENV"
+          PATCH3="$GITHUB_WORKSPACE/$PATCH3_PATH"
+          echo "$PATCH3_SHA256  $PATCH3" | sha256sum -c -
+          git -C "$SRC" apply --check "$PATCH3"
+          git -C "$SRC" apply "$PATCH3"
+          echo "PATCH_FILE3=$PATCH3" >> "$GITHUB_ENV"
 
       - name: Download both rebuilds
         uses: actions/download-artifact@v4
@@ -274,8 +315,19 @@ jobs:
           path: ${{ runner.temp }}/artifacts
 
       - name: Compare rebuilds and record the artifact comparison
+        env:
+          # Build-job facts produced by the build matrix legs. verify-rebuild.sh
+          # requires them when configured and writes provenance from them.
+          BUILD_FACTS_RUN1: ${{ runner.temp }}/artifacts/sherpa-libs-run1/build-facts.json
+          BUILD_FACTS_RUN2: ${{ runner.temp }}/artifacts/sherpa-libs-run2/build-facts.json
         run: |
           set -euo pipefail
+          for facts in "$BUILD_FACTS_RUN1" "$BUILD_FACTS_RUN2"; do
+            if [ ! -s "$facts" ]; then
+              echo "::error::build-job facts artifact missing: $facts"
+              exit 1
+            fi
+          done
           bash android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/verify-rebuild.sh \
             "$RUNNER_TEMP/artifacts/sherpa-libs-run1" \
             "$RUNNER_TEMP/artifacts/sherpa-libs-run2" \
@@ -389,16 +441,21 @@ jobs:
             echo "$EXPECTED_JNI_SHA256  $OUT/unpacked/jni/arm64-v8a/libsherpa-onnx-jni.so" | sha256sum -c -
           fi
           ACTUAL_AAR=$(sha256sum "$AAR" | awk '{print $1}')
-          python3 - "$AAR" "$ACTUAL_AAR" "$EXPECTED_AAR_SHA256" "$GRADLE_VERSION" "$EXPECTED_JNI_SHA256" > "$OUT/gradle-aar.json" <<'PYEOF'
+          # Measure the packaged JNI bytes; never record the pinned expectation
+          # in a "verified" field (the historical record did, see AAR-REBUILD.md).
+          ACTUAL_JNI=$(sha256sum "$OUT/unpacked/jni/arm64-v8a/libsherpa-onnx-jni.so" | awk '{print $1}')
+          python3 - "$AAR" "$ACTUAL_AAR" "$EXPECTED_AAR_SHA256" "$GRADLE_VERSION" "$ACTUAL_JNI" "$EXPECTED_JNI_SHA256" > "$OUT/gradle-aar.json" <<'PYEOF'
           import json, sys
-          aar, actual, expected, gradle, jni = sys.argv[1:6]
+          aar, actual, expected, gradle, jni, expected_jni = sys.argv[1:7]
           print(json.dumps({
               "gradle_version": gradle,
               "aar_path": aar,
               "aar_sha256": actual,
               "expected_aar_sha256": expected,
               "aar_matches_expected": actual == expected,
-              "jni_sha256_verified": jni,
+              "jni_sha256": jni,
+              "expected_jni_sha256": expected_jni,
+              "jni_matches_expected": jni == expected_jni,
           }, indent=2, sort_keys=True))
           PYEOF
           cat "$OUT/gradle-aar.json"
