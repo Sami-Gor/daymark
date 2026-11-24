@@ -1,7 +1,7 @@
 name: Rebuild sherpa-onnx AAR
 
 # The committed AAR was produced by this workflow's Gradle packaging job in
-# hosted run 45285600587 (2026-11-23). This workflow rebuilds the arm64-v8a
+# hosted run 45437788615 (2026-11-24). This workflow rebuilds the arm64-v8a
 # runtime from pinned inputs twice, in two different directories, and proves
 # that the two builds are byte-identical to each other (repeatable, pinned
 # build). All three pinned Daymark patches (0001 joiner-width validation, 0002
