@@ -9,18 +9,13 @@ name: Rebuild sherpa-onnx AAR
 # the checkout, build tree and NDK onto portable canonical paths with
 # -ffile-prefix-map, so the result does not depend on the runner's directories.
 #
-# The portable canonical paths are intentionally not the paths recorded in the
-# committed artifact. The default run therefore verifies repeatability and the
-# presence of the pinned patch, not byte identity with the committed AAR: the
-# library embeds the build's source-path strings, and the linker derives the GNU
-# build ID from the unstripped debug information that names the NDK path. See
-# AAR-REBUILD.md for the measured difference.
-#
-# An optional identity check is available for a release manager who supplies the
-# original build's recorded canonical path strings as workflow inputs. With them
-# the rebuilt JNI library and the repacked AAR are compared to the committed
-# hashes and must match exactly (optionally allowing a GNU-build-ID-only
-# difference).
+# The adopted candidate was produced with these committed portable canonical
+# paths, so the default run verifies repeatability, patch presence and the
+# deterministic AAR repack against the committed pins. An optional identity
+# check is available for a release manager who supplies the original build's
+# recorded canonical source/NDK path strings as workflow inputs; with them the
+# rebuilt JNI library and repacked AAR must match the committed hashes exactly
+# (optionally allowing a GNU-build-ID-only difference). See AAR-REBUILD.md.
 #
 # Read-only permissions: it never publishes, signs, commits or pushes anything.
 # Inputs live in
