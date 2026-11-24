@@ -23,6 +23,9 @@ const pkg = process.env.APP_PACKAGE || 'io.github.sami_gor.daymark.phase4validat
 const activity = pkg + '/io.github.sami_gor.daymark.MainActivity';
 const localPort = Number(process.env.ADB_LOCAL_PORT || '9222');
 const cycles = Number(process.env.CYCLES || '1');
+const route = process.env.ROUTE || '';
+const expectUrl = process.env.EXPECT_URL || '';
+const crashMethod = process.env.CRASH_METHOD || 'chrome';
 
 if (!serial) {
   console.error('ADB_SERIAL is required');
@@ -62,28 +65,24 @@ async function pageInfo() {
   return pages.find((page) => page.type === 'page' && page.url.startsWith('https://localhost'));
 }
 
-async function triggerRendererCrash() {
+async function cdp(method, params) {
   const page = await waitFor(pageInfo, 10000, 'WebView devtools page');
   await new Promise((resolve, reject) => {
     const socket = new WebSocket(page.webSocketDebuggerUrl);
     const timer = setTimeout(() => reject(new Error('CDP timeout')), 5000);
-    socket.onopen = () => {
-      socket.send(JSON.stringify({ id: 1, method: 'Page.navigate', params: { url: 'chrome://crash' } }));
-    };
-    socket.onmessage = () => {
-      clearTimeout(timer);
-      socket.close();
-      resolve();
-    };
-    socket.onerror = (error) => {
-      clearTimeout(timer);
-      reject(error);
-    };
-    socket.onclose = () => {
-      clearTimeout(timer);
-      resolve();
-    };
+    socket.onopen = () => socket.send(JSON.stringify({ id: 1, method, params }));
+    socket.onmessage = () => { clearTimeout(timer); socket.close(); resolve(); };
+    socket.onerror = (error) => { clearTimeout(timer); reject(error); };
+    socket.onclose = () => { clearTimeout(timer); resolve(); };
   });
+}
+
+async function triggerRendererCrash() {
+  if (crashMethod === 'page') {
+    await cdp('Page.crash', {});
+    return;
+  }
+  await cdp('Page.navigate', { url: 'chrome://crash' });
 }
 
 adb(['shell', 'am', 'force-stop', pkg]);
@@ -96,6 +95,10 @@ const match = sockets.match(/@webview_devtools_remote_([0-9]+)/);
 assert(match, 'no WebView devtools socket');
 adb(['forward', 'tcp:' + localPort, 'localabstract:webview_devtools_remote_' + match[1]]);
 
+if (route) {
+  await cdp('Page.navigate', { url: 'https://localhost' + route });
+  await sleep(2000);
+}
 const evidence = mkdtempSync(join(tmpdir(), 'daymark-wv-'));
 try {
   for (let cycle = 1; cycle <= cycles; cycle += 1) {
@@ -115,6 +118,10 @@ try {
     adb(['pull', '/sdcard/daymark-renderer-recovery.xml', xmlPath]);
     const xml = readFileSync(xmlPath, 'utf8');
     assert(/London|daymark|That forecast went cloudy/.test(xml), 'cycle ' + cycle + ': no Daymark UI after recovery');
+    if (expectUrl) {
+      const current = await pageInfo();
+      assert(current && current.url.startsWith(expectUrl), 'cycle ' + cycle + ': route not restored: ' + (current && current.url));
+    }
     console.log('cycle ' + cycle + ': PASS pid=' + pid);
   }
   console.log('RENDERER_RECOVERY_PASS');
