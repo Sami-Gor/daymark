@@ -11,7 +11,7 @@ name: Rebuild sherpa-onnx AAR
 #
 # The adopted candidate was produced with these committed portable canonical
 # paths, so the default run verifies repeatability, patch presence and the
-# deterministic AAR repack against the committed pins. An optional identity
+# deterministic AAR repack (identity mode additionally compares the repacked AAR to the committed pin). An optional identity
 # check is available for a release manager who supplies the original build's
 # recorded canonical source/NDK path strings as workflow inputs; with them the
 # rebuilt JNI library and repacked AAR must match the committed hashes exactly
