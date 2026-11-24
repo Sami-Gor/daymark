@@ -93,6 +93,12 @@ jobs:
       REQUIRE_FULL_IDENTITY: ${{ inputs.require_full_identity }}
       CANONICAL_SRC_INPUT: ${{ inputs.canonical_src }}
       CANONICAL_NDK_INPUT: ${{ inputs.canonical_ndk }}
+      # Job-level (not step-level) on purpose: the build-facts recorder step
+      # must observe the same JOBS/PREFIX_MAP the build used, otherwise the
+      # provenance record shows null values (FND-3 residual found by hosted
+      # run 45437788615).
+      JOBS: "4"
+      PREFIX_MAP: "1"
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
@@ -102,6 +108,10 @@ jobs:
       - name: Test strict pinned-input parser
         if: matrix.run == 'run1'
         run: python3 android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/test_parse_aar_pins.py -v
+
+      - name: Test provenance build-facts recorder
+        if: matrix.run == 'run1'
+        run: python3 android/kokoro-poc/sherpa-onnx-cve-2026-108954/scripts/test_write_provenance.py -v
 
       - name: Load pinned inputs (strict parser)
         run: |
@@ -201,8 +211,6 @@ jobs:
 
       - name: Build libsherpa-onnx-jni.so for arm64-v8a
         env:
-          JOBS: 4
-          PREFIX_MAP: 1
           RUN_LABEL: ${{ matrix.run }}
         run: |
           set -euo pipefail
@@ -257,6 +265,26 @@ jobs:
             --build-log-run1 "$STAGE/build.log" \
             > "$STAGE/build-facts-stdout.txt"
           test -s "$STAGE/build-facts.json"
+          # Regression check (FND-3 residual, hosted run 45437788615): the
+          # build-facts record must describe the JOBS/PREFIX_MAP the build used.
+          # They are job-level env so this step sees them; the recorder also
+          # falls back to build.log when the environment is not visible.
+          python3 - "$STAGE/build-facts.json" "$JOBS" "$PREFIX_MAP" <<'PYEOF'
+          import json, sys
+          facts_path, jobs, prefix_map = sys.argv[1:4]
+          toolchain = json.load(open(facts_path))["toolchain"]
+          problems = []
+          if toolchain.get("jobs") != jobs:
+              problems.append("toolchain.jobs=%r, expected %r" % (toolchain.get("jobs"), jobs))
+          if toolchain.get("prefix_map") != prefix_map:
+              problems.append("toolchain.prefix_map=%r, expected %r" % (toolchain.get("prefix_map"), prefix_map))
+          if problems:
+              print("::error::build-facts does not record the build step's JOBS/PREFIX_MAP: " + "; ".join(problems))
+              sys.exit(1)
+          print("build-facts records JOBS=%s (from %s) PREFIX_MAP=%s (from %s)" % (
+              toolchain["jobs"], toolchain.get("jobs_source"),
+              toolchain["prefix_map"], toolchain.get("prefix_map_source")))
+          PYEOF
           echo "STAGE=$STAGE" >> "$GITHUB_ENV"
 
       - name: Upload build outputs
