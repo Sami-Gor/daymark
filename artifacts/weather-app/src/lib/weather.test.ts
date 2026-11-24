@@ -267,6 +267,18 @@ describe('fetchWeather', () => {
     );
   });
 
+  it('classifies a body-read abort as timeout', async () => {
+    stubFetch((url) => {
+      if (url.includes('air-quality')) return json(validAir);
+      const response = new Response('', { status: 200 });
+      vi.spyOn(response, 'text').mockRejectedValueOnce(
+        Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' }),
+      );
+      return response;
+    });
+    await expect(fetchWeather(PLACE)).rejects.toMatchObject({ code: 'timeout' });
+  });
+
   it('passes an abort signal to fetch', async () => {
     let sawSignal = false;
     vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -338,6 +350,21 @@ describe('fetchMicroClimate', () => {
     stubFetch(() => json({ current: { temperature_2m: 'warm' } }));
     // Module-level cache is keyed by rounded coordinates: use one place here.
     await expect(fetchMicroClimate({ ...PLACE, latitude: 10.1, longitude: 0.1 })).resolves.toBeNull();
+  });
+
+  it('does not cache a failed lookup and retries after connectivity returns', async () => {
+    const retryPlace = { ...PLACE, latitude: 30.3, longitude: 3.3 };
+    let calls = 0;
+    stubFetch(() => {
+      calls += 1;
+      if (calls === 1) return json({ current: { temperature_2m: 'warm' } });
+      return json({ current: { temperature_2m: 9 } });
+    });
+    await expect(fetchMicroClimate(retryPlace)).resolves.toBeNull();
+    await expect(fetchMicroClimate(retryPlace)).resolves.toMatchObject({
+      current: { temperature_2m: 9 },
+    });
+    expect(calls).toBe(2);
   });
 
   it('returns the payload when valid', async () => {

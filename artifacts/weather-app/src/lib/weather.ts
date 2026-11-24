@@ -232,12 +232,13 @@ export function assertBoundedPayload(value: unknown, depth = 0): void {
 }
 
 async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
+  const effectiveSignal = signal ?? requestSignal();
   let response: Response;
   try {
-    response = await fetch(url, { signal: signal ?? requestSignal() });
+    response = await fetch(url, { signal: effectiveSignal });
   } catch (error) {
     if (signal?.aborted) throw error; // caller cancelled (e.g. a newer search); let it propagate
-    if (isTimeoutError(error)) {
+    if (isTimeoutError(error) || effectiveSignal?.aborted) {
       throw new WeatherFetchError('timeout', 'The weather service took too long to respond.');
     }
     // Never surface the raw browser message ("Failed to fetch") to users.
@@ -259,7 +260,12 @@ async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSigna
   let text: string;
   try {
     text = await response.text();
-  } catch {
+  } catch (error) {
+    // A timeout can fire while the response body is still being read.
+    if (signal?.aborted) throw error; // caller cancelled (e.g. a newer search)
+    if (isTimeoutError(error) || effectiveSignal?.aborted) {
+      throw new WeatherFetchError('timeout', 'The weather service took too long to respond.');
+    }
     throw new WeatherFetchError('malformed', 'Weather service sent a response we could not read.');
   }
   if (text.length > MAX_RESPONSE_CHARS) {
@@ -339,14 +345,15 @@ export async function fetchMicroClimate(place: Place): Promise<MicroClimatePaylo
     models: 'ukmo_seamless',
     timezone: 'auto',
   });
-  let payload: MicroClimatePayload | null = null;
   try {
-    payload = await getJson(`${FORECAST_URL}?${params.toString()}`, MicroClimateResponseSchema);
+    const payload = await getJson(`${FORECAST_URL}?${params.toString()}`, MicroClimateResponseSchema);
+    // Cache only successful lookups. A failed lookup must not suppress an
+    // immediate retry after connectivity returns.
+    microClimateCache.set(cacheKey, { fetchedAt: Date.now(), payload });
+    return payload;
   } catch {
-    payload = null;
+    return null;
   }
-  microClimateCache.set(cacheKey, { fetchedAt: Date.now(), payload });
-  return payload;
 }
 
 /*
