@@ -1,0 +1,38 @@
+name: Phase 4.1 Kokoro JNI Build
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - security/p0-phase4-app
+permissions:
+  contents: read
+jobs:
+  build-kokoro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust target
+        run: |
+          rustup target add aarch64-linux-android
+          rustc --version
+      - name: Build Kokoro JNI from Phase 4 source
+        run: |
+          set -euo pipefail
+          NDK="${ANDROID_NDK_LATEST_HOME:?}"
+          TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
+          git clone https://github.com/pguso/kokoro.git android/kokoro-poc/.build/kokoro-src
+          git -C android/kokoro-poc/.build/kokoro-src fetch --depth 1 origin b42bd5cf915163607cb51984cabf273dcf09755e
+          git -C android/kokoro-poc/.build/kokoro-src checkout --detach b42bd5cf915163607cb51984cabf273dcf09755e
+          export CC_aarch64_linux_android="$TOOLCHAIN/bin/aarch64-linux-android26-clang"
+          export AR_aarch64_linux_android="$TOOLCHAIN/bin/llvm-ar"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/aarch64-linux-android26-clang"
+          cd android/kokoro-poc/rust
+          cargo build --release --target aarch64-linux-android --no-default-features
+          cp target/aarch64-linux-android/release/libdaymark_kokoro_jni.so ../../../kokoro-libkokoro_jni.so
+          sha256sum ../../../kokoro-libkokoro_jni.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kokoro-jni
+          path: kokoro-libkokoro_jni.so
+          if-no-files-found: error
