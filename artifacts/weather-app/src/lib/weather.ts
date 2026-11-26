@@ -164,6 +164,77 @@ export type WeatherPayload = z.infer<typeof WeatherResponseSchema>;
 export type AirQualityPayload = z.infer<typeof AirQualityResponseSchema>;
 export type MicroClimatePayload = z.infer<typeof MicroClimateResponseSchema>;
 
+/*
+ * The provider legitimately omits fields and may return nulls. A response is
+ * nevertheless unusable if it contains no measured weather value at all: an
+ * unknown-only or empty object must not render as a valid "Forecast ready"
+ * page with every field unavailable.
+ */
+const CURRENT_MEASUREMENT_KEYS = [
+  'temperature_2m',
+  'relative_humidity_2m',
+  'dew_point_2m',
+  'apparent_temperature',
+  'precipitation',
+  'cloud_cover',
+  'weather_code',
+  'uv_index',
+  'wind_speed_10m',
+  'wind_gusts_10m',
+  'wind_direction_10m',
+  'rain',
+  'showers',
+  'snowfall',
+] as const;
+
+function hasFiniteNumber(values: ReadonlyArray<number | null | undefined> | null | undefined): boolean {
+  return Array.isArray(values) && values.some((value) => typeof value === 'number' && Number.isFinite(value));
+}
+
+function hasCurrentMeasurement(current: WeatherPayload['current']): boolean {
+  return !!current && CURRENT_MEASUREMENT_KEYS.some((key) => {
+    const value = current[key];
+    return typeof value === 'number' && Number.isFinite(value);
+  });
+}
+
+function hasHourlyMeasurement(hourly: WeatherPayload['hourly']): boolean {
+  if (!hourly || !Array.isArray(hourly.time) || hourly.time.length === 0) return false;
+  return [
+    hourly.temperature_2m,
+    hourly.precipitation_probability,
+    hourly.weather_code,
+    hourly.uv_index,
+    hourly.precipitation,
+    hourly.rain,
+    hourly.showers,
+    hourly.snowfall,
+    hourly.wind_speed_10m,
+    hourly.wind_gusts_10m,
+    hourly.apparent_temperature,
+  ].some(hasFiniteNumber);
+}
+
+function hasDailyMeasurement(daily: WeatherPayload['daily']): boolean {
+  if (!daily || !Array.isArray(daily.time) || daily.time.length === 0) return false;
+  return [
+    daily.weather_code,
+    daily.temperature_2m_max,
+    daily.temperature_2m_min,
+    daily.precipitation_probability_max,
+    daily.uv_index_max,
+    daily.precipitation_sum,
+    daily.snowfall_sum,
+    daily.wind_gusts_10m_max,
+  ].some(hasFiniteNumber);
+}
+
+function assertUsableWeatherPayload(payload: WeatherPayload): void {
+  if (!hasCurrentMeasurement(payload.current) && !hasHourlyMeasurement(payload.hourly) && !hasDailyMeasurement(payload.daily)) {
+    throw new WeatherFetchError('malformed', 'Weather service sent data in an unexpected shape.');
+  }
+}
+
 const microClimateCache = new Map<string, { fetchedAt: number; payload: MicroClimatePayload | null }>();
 const MICRO_CLIMATE_CACHE_MS = 15 * 60 * 1000;
 
@@ -232,12 +303,13 @@ export function assertBoundedPayload(value: unknown, depth = 0): void {
 }
 
 async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
+  const effectiveSignal = signal ?? requestSignal();
   let response: Response;
   try {
-    response = await fetch(url, { signal: signal ?? requestSignal() });
+    response = await fetch(url, { signal: effectiveSignal });
   } catch (error) {
     if (signal?.aborted) throw error; // caller cancelled (e.g. a newer search); let it propagate
-    if (isTimeoutError(error)) {
+    if (isTimeoutError(error) || effectiveSignal?.aborted) {
       throw new WeatherFetchError('timeout', 'The weather service took too long to respond.');
     }
     // Never surface the raw browser message ("Failed to fetch") to users.
@@ -259,7 +331,12 @@ async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSigna
   let text: string;
   try {
     text = await response.text();
-  } catch {
+  } catch (error) {
+    // A timeout can fire while the response body is still being read.
+    if (signal?.aborted) throw error; // caller cancelled (e.g. a newer search)
+    if (isTimeoutError(error) || effectiveSignal?.aborted) {
+      throw new WeatherFetchError('timeout', 'The weather service took too long to respond.');
+    }
     throw new WeatherFetchError('malformed', 'Weather service sent a response we could not read.');
   }
   if (text.length > MAX_RESPONSE_CHARS) {
@@ -308,6 +385,7 @@ export async function fetchWeather(place: Place): Promise<WeatherPayload> {
   const airQualityRequest = getJson(`${AIR_QUALITY_URL}?${airQualityParams.toString()}`, AirQualityResponseSchema)
     .catch((): AirQualityPayload | null => null);
   const weather = await weatherRequest;
+  assertUsableWeatherPayload(weather);
   const airQuality = await airQualityRequest;
   return airQuality == null ? weather : { ...weather, airQuality };
 }
@@ -339,14 +417,15 @@ export async function fetchMicroClimate(place: Place): Promise<MicroClimatePaylo
     models: 'ukmo_seamless',
     timezone: 'auto',
   });
-  let payload: MicroClimatePayload | null = null;
   try {
-    payload = await getJson(`${FORECAST_URL}?${params.toString()}`, MicroClimateResponseSchema);
+    const payload = await getJson(`${FORECAST_URL}?${params.toString()}`, MicroClimateResponseSchema);
+    // Cache only successful lookups. A failed lookup must not suppress an
+    // immediate retry after connectivity returns.
+    microClimateCache.set(cacheKey, { fetchedAt: Date.now(), payload });
+    return payload;
   } catch {
-    payload = null;
+    return null;
   }
-  microClimateCache.set(cacheKey, { fetchedAt: Date.now(), payload });
-  return payload;
 }
 
 /*
