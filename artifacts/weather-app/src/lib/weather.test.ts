@@ -202,6 +202,56 @@ describe('fetchWeather', () => {
     );
   });
 
+  it('rejects the exact recorded unknown-only N07 payload as malformed', async () => {
+    // This is the exact body used by physical N07. It used to render
+    // "Forecast ready" with every field unavailable.
+    stubFetch((url) =>
+      json(url.includes('air-quality') ? validAir : { unexpected: true }),
+    );
+    await expect(fetchWeather(PLACE)).rejects.toMatchObject({
+      name: 'WeatherFetchError',
+      code: 'malformed',
+      message: 'Weather service sent data in an unexpected shape.',
+    });
+  });
+
+  it('rejects an empty weather object', async () => {
+    stubFetch((url) => json(url.includes('air-quality') ? validAir : {}));
+    await expect(fetchWeather(PLACE)).rejects.toMatchObject({ code: 'malformed' });
+  });
+
+  it('preserves a valid daily-only partial response', async () => {
+    stubFetch((url) =>
+      json(
+        url.includes('air-quality')
+          ? validAir
+          : { daily: { time: ['2026-09-07'], temperature_2m_max: [21] } },
+      ),
+    );
+    const result = await fetchWeather(PLACE);
+    expect(result.daily?.temperature_2m_max).toEqual([21]);
+    expect(result.current).toBeUndefined();
+  });
+
+  it('preserves a valid current-condition response with a null optional field', async () => {
+    stubFetch((url) =>
+      json(
+        url.includes('air-quality')
+          ? validAir
+          : { current: { temperature_2m: 0, apparent_temperature: null } },
+      ),
+    );
+    const result = await fetchWeather(PLACE);
+    expect(result.current?.temperature_2m).toBe(0);
+  });
+
+  it('rejects a current object with no measured value', async () => {
+    stubFetch((url) =>
+      json(url.includes('air-quality') ? validAir : { current: { temperature_2m: null } }),
+    );
+    await expect(fetchWeather(PLACE)).rejects.toMatchObject({ code: 'malformed' });
+  });
+
   it('degrades gracefully when only air quality fails', async () => {
     stubFetch((url) => {
       if (url.includes('air-quality')) return json({ bad: true }, 500);
@@ -265,6 +315,48 @@ describe('fetchWeather', () => {
     await expect(fetchWeather(PLACE)).rejects.toThrow(
       'The weather service took too long to respond.',
     );
+  });
+
+  it('classifies a genuine timeout abort during response.text() as timeout', async () => {
+    const controller = new AbortController();
+    const original = globalThis.AbortSignal;
+    globalThis.AbortSignal = {
+      timeout: () => controller.signal,
+    } as unknown as typeof AbortSignal;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (input: RequestInfo | URL) => {
+        if (String(input).includes('air-quality')) return Promise.resolve(json(validAir));
+        const stream = new ReadableStream<Uint8Array>({
+          start(streamController) {
+            streamController.enqueue(new TextEncoder().encode('{"current":'));
+            controller.signal.addEventListener('abort', () => {
+              streamController.error(
+                new DOMException('The operation was aborted.', 'AbortError'),
+              );
+            });
+          },
+        });
+        setTimeout(() => {
+          controller.abort(new DOMException('The operation was aborted.', 'TimeoutError'));
+        }, 10);
+        return Promise.resolve(
+          new Response(stream, {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      },
+    );
+
+    try {
+      await expect(fetchWeather(PLACE)).rejects.toMatchObject({
+        code: 'timeout',
+        message: 'The weather service took too long to respond.',
+      });
+    } finally {
+      globalThis.AbortSignal = original;
+    }
   });
 
   it('passes an abort signal to fetch', async () => {
@@ -338,6 +430,21 @@ describe('fetchMicroClimate', () => {
     stubFetch(() => json({ current: { temperature_2m: 'warm' } }));
     // Module-level cache is keyed by rounded coordinates: use one place here.
     await expect(fetchMicroClimate({ ...PLACE, latitude: 10.1, longitude: 0.1 })).resolves.toBeNull();
+  });
+
+  it('does not cache a failed lookup and retries after connectivity returns', async () => {
+    const retryPlace = { ...PLACE, latitude: 30.3, longitude: 3.3 };
+    let calls = 0;
+    stubFetch(() => {
+      calls += 1;
+      if (calls === 1) return json({ current: { temperature_2m: 'warm' } });
+      return json({ current: { temperature_2m: 9 } });
+    });
+    await expect(fetchMicroClimate(retryPlace)).resolves.toBeNull();
+    await expect(fetchMicroClimate(retryPlace)).resolves.toMatchObject({
+      current: { temperature_2m: 9 },
+    });
+    expect(calls).toBe(2);
   });
 
   it('returns the payload when valid', async () => {
