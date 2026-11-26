@@ -1,26 +1,26 @@
 # Daymark 2.1 Release Readiness Register
 
-**Last updated:** 2026-11-25  
-**Overall status:** **RELEASE HOLD** — candidate validation is progressing; operational release gates remain.
+**Last updated:** 2026-11-26
+**Overall status:** **RELEASE HOLD** - candidate validation has advanced, but formal accuracy, privacy/Play, signing and production-release gates remain.
 
-This register supersedes the earlier status table in this file. It records the candidate evidence and owner decisions available on 25 November 2026. It does not authorise a merge, signing operation, production build, Play Console change or release.
+This register records the candidate evidence and owner decisions available on 26 November 2026. It does not authorise a production signing operation, production AAB, Google Play change or release.
 
 ## Branch and artifact identity
 
 | Item | Verified value |
 |---|---|
-| `main` | `6aafa15333101e39e61b7cc70f23431f122c82e0` — unchanged |
-| `release/v2-candidate` | `3cc25da17961f32680f69317ed52aa3f1931a2ae` |
-| Production/released AAR | `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8` — unchanged |
+| `main` | `6aafa15333101e39e61b7cc70f23431f122c82e0` - unchanged |
+| `release/v2-candidate` | `6ef4ca779d37c9d2a6cddca646c53b929842ef06` |
+| Production/released AAR | `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8` - unchanged |
 | Adopted candidate AAR | `8e1edb57a5ac1e779dd6b00a6267a2305e44e1ef1620095626e9c93e9497a398` |
 
-PRs #90, #91 and #92 are merged into the candidate. PRs #93 and #94 remain open and draft; neither is merged.
+PRs #90, #91 and #92 are merged into the candidate. PR #94 merged at `5f3f22d9a569ada97ab4bdf3a802cf077bceff98`; network remediation is now part of the candidate. PR #93 merged at `6ef4ca779d37c9d2a6cddca646c53b929842ef06`; WebView regression coverage is now part of the candidate. PR #95 is the documentation-only update recorded by this file.
 
 ## Completed and accepted evidence
 
 ### P0 security and native adoption
 
-- F1–F5 source fixes and FND-1 through FND-7 validation are complete within their demonstrated scope.
+- F1-F5 source fixes and FND-1 through FND-7 validation are complete within their demonstrated scope.
 - Corrected candidate AAR/JNI/ORT adoption is recorded.
 - Native normal and ASan testing, negative controls, host validation and adopted-JNI Android validation are recorded.
 - Full application integration was exercised on the separate Phase 4.1 validation package.
@@ -55,27 +55,61 @@ The owner has confirmed that the required audio test set is satisfied. Do not re
 
 The API 29 emulator could start a Parakeet voice session, but actual speech recognition could not be validated there because emulator audio was unavailable. A second-OEM physical voice test was not available. These are additional voice-hardware coverage limitations, not failures of the minimum-SDK installation baseline.
 
-### WebView renderer recovery — PR #93
+### WebView renderer recovery - PR #93
 
-- The earlier launcher exit was traced to force-stopping the entire `com.google.android.webview` package, not a renderer-process crash.
+- The earlier launcher exit was traced to force-stopping the entire `com.google.android.webview` package, not a genuine renderer-process crash.
 - Real renderer termination was exercised with `chrome://crash` / CDP.
 - On the existing candidate-equivalent physical APK, one, two and three rapid renderer crashes recovered to foreground Daymark; route restoration to `/privacy` was verified on the physical Xiaomi and QA emulator.
-- New Android instrumentation tests: 2/2 PASS on API 30 emulator (Activity recreation after a renderer crash; three rapid crashes reach terminal fallback).
+- Android API 30 instrumentation: 2/2 PASS (Activity recreation after a renderer crash; three rapid crashes reach terminal fallback).
 - QA package `io.github.sami_gor.daymark.wvvalidate`; APK SHA-256 `7895f5ea7ea798a9769bbc5a37bdb61613bc3b75ae7f576124f39af68a47254d`.
-- Fresh QA APK physical installation on Xiaomi was blocked by MIUI `INSTALL_FAILED_USER_RESTRICTED`; the restriction was not bypassed.
-- PR #93 adds regression coverage; no production WebView code change was needed because no renderer-termination defect was confirmed.
+- Fresh QA APK physical installation on the Xiaomi was blocked by MIUI `INSTALL_FAILED_USER_RESTRICTED`; the restriction was not bypassed. The fresh QA APK is not claimed as physically installed.
+- No production WebView defect was confirmed. PR #93 adds regression coverage and test tooling; no production WebView code change was required.
+- PR #93 merged into `release/v2-candidate` at `6ef4ca779d37c9d2a6cddca646c53b929842ef06`.
 
-### Network fixes — PR #94
+### Network remediation - PR #94
 
-- Body-read aborts during `response.text()` are now classified as timeouts; caller cancellation continues to propagate.
-- Failed micro-climate lookups are no longer cached as `null`, allowing a subsequent request after connectivity returns.
-- Targeted weather/error tests: 68/68 PASS.
-- Full frontend tests: 364 passed, 1 skipped.
-- Playwright Chromium E2E: 141/141 PASS.
+**Fix commit:** `51f4a7dc957f53d921eb0b202c4bcb5140250904`
+**Merge commit:** `5f3f22d9a569ada97ab4bdf3a802cf077bceff98`
+**Status:** merged into `release/v2-candidate`.
+
+Post-fix QA APK:
+
+- SHA-256: `51ae9a436d70cf81e0ec9e158fc9effc4d306f3c87ff9ec7bc3d7483b9a9d3c4`
+- Package: `io.github.sami_gor.daymark.netvalidate`
+- Version: `2.0.0` (versionCode 2)
+- Minimum SDK: 29
+- Target SDK: 36
+- Device: Xiaomi 2609FRA74G, Android 16/API 36
+- Kokoro JNI: `a6e3daa73b12b8030153827368e51f4b1369481eb381d10c125a7b4f7aa48574`
+
+Targeted physical post-fix retests:
+
+- N03 request timeout: PASS, using a request held until the application's actual timeout signal fires.
+- N04 response-body timeout: PASS, using a pending response body aborted during `response.text()`.
+- N07 malformed payload: PASS; the exact `{"unexpected":true}` payload is rejected with the malformed error.
+- N12 background/resume: PASS; Paris was released first after background/resume, and the final UI showed Berlin / 30 C, proving the stale result did not win.
+
+Regression:
+
+- Targeted weather/error tests: 73/73 PASS (local subset).
+- Full frontend Vitest: 369 passed, 1 skipped.
+- Playwright E2E: 141/141 PASS.
 - TypeScript: PASS.
-- Android JVM: 25/25 PASS.
-- QA package `io.github.sami_gor.daymark.netvalidate`; APK SHA-256 `2bad769a17e42883568acd5b768842916a467d4ad437673eb0adc755260a97f0`.
-- Physical installation was blocked by the same MIUI restriction. No post-fix physical network matrix is claimed.
+- Android JVM voice: 104/104 PASS.
+- Android JVM app: 25/25 PASS.
+- Hosted CI run `45851805241`: success.
+- CodeQL run `45851805074`: success.
+
+Consolidated scenario result:
+
+- Original run: 9 PASS, 3 FAIL, 1 PARTIAL.
+- Four original failures/partial cases (N03, N04, N07, N12) were retested and passed on the new APK.
+- Consolidated result: 13/13 scenarios PASS across the original and remediation runs.
+- Only N03/N04/N07/N12 were retested on APK `51ae9a4...`. The other nine results remain tied to the original baseline APK; this is not a fresh 13-case rerun on the new APK.
+
+**Test-method limitation:** N03, N04, N07 and N12 use app-level controlled-response tests through the WebView DevTools fetch seam. They do not claim physical TCP/DNS/HTTP transport fault injection. N09/N10 are the real-radio disconnect/restoration tests. TLS/certificate validation and production endpoints were not weakened.
+
+**Evidence location:** `workstreams/release-readiness/evidence/network-remediation-20261126/`. This is the local verified evidence set containing APK identity, installation evidence, result JSON/screenshots, native-library hashes, regression logs, reports and verified `SHA256SUMS`. T5 was not mounted; this evidence has not been copied to T5 and remains pending historical reconciliation.
 
 ### Language scope decision
 
@@ -85,12 +119,12 @@ French and Spanish offline narration are **deferred to Daymark 2.2 by owner deci
 
 | Item | Status | Remaining work |
 |---|---|---|
-| Formal speech accuracy benchmark | **AWAITING OWNER APPROVAL** | Approve the replacement 200-utterance protocol. Only after approval, create the canonical recordings/transcripts and manifest, freeze the scorer, run integrated testing and publish measured WER/CER/intent results. No formal accuracy score exists yet. |
-| Network physical verification | **BLOCKED** | Install the PR #94 QA APK on a physical device and run the post-fix DNS/reset/timeout/429/5xx/malformed/reconnection/retry/background-resume matrix. The current Xiaomi USB-install restriction is the blocker. |
-| PR #93 physical QA artifact installation | **BLOCKED** | Fresh QA APK physical install is blocked by MIUI. Existing candidate-equivalent physical crash/route evidence and API30 instrumentation are recorded above. |
-| Privacy and Google Play | **PARTIAL** | Reconcile Data Safety across all distributed V1/V2 tracks; verify location, speech, geocoding and provider disclosures; confirm target audience/content rating/app access/ads declarations in Console; publish and verify matching `/privacy`, `/fr/privacy` and `/es/privacy` pages. |
-| Signing backup restoration | **BLOCKED** | Obtain owner-authorised vault credentials/approval, restore the T5 signing vault, verify the upload-key fingerprint and complete a test-signing verification. Do not alter production signing configuration. |
-| Release version and production AAB | **BLOCKED** | Reconcile the final release branch, confirm the next unused Play version code, set 2.1.0, then—only after all prerequisites and explicit release authorisation—build and independently verify the production-signed AAB. |
+| Formal speech accuracy benchmark | **AWAITING OWNER APPROVAL / NO SCORE** | The replacement 200-utterance protocol and scorer are prepared, but canonical recordings/reference transcripts and a formal measured score are not available. Recover existing recordings first and create only missing data. No formal accuracy PASS is claimed; this is separate from the nine successful core audio integration cases. |
+| Privacy and Google Play | **PARTIAL** | Reconcile Data Safety across distributed V1/V2 tracks; verify location, speech, geocoding and provider disclosures; check permissions, ads, content rating, target audience and app access declarations in Play Console; verify deployed `/privacy`, `/fr/privacy` and `/es/privacy` pages match the shipped app. |
+| Signing backup restoration | **BLOCKED** | T5 signing-vault restoration remains outstanding. Restore only through the owner-authorised process, verify the upload-key fingerprint and perform test-signing verification. Do not alter production signing configuration. |
+| Release version and production AAB | **BLOCKED** | Reconcile the final candidate branch; confirm the next unused Play version code in Console; set the intended 2.1.0 release version; build and independently verify the production-signed AAB only after all prerequisites and explicit release authorisation. |
+
+Additional API 29 microphone/second-OEM characterisation remains separate from the passing minimum-SDK baseline. Maximum-duration/over-limit and latency characterisation remain separate from the passed core audio set.
 
 ## Explicitly not 2.1 blockers
 
@@ -98,20 +132,21 @@ French and Spanish offline narration are **deferred to Daymark 2.2 by owner deci
 - The nine successful required core audio cases and their passing automated regression suites: accepted as PASS; do not rerun or relabel them as failures.
 - The unverified 30-second/over-limit edge cases and fuller latency statistics remain limitations in the evidence record, not failed required core audio tests.
 - Additional API 29/second-OEM microphone characterisation remains distinct from the passing API 29 minimum-SDK installation/basic-app checks.
+- The fresh WebView QA APK physical-install restriction is an evidence limitation, not a renderer-recovery failure.
 
 ## PR and CI tracking
 
-| PR | Head | State | Current evidence / remaining issue |
-|---|---|---|---|
-| #93 WebView | `96e8f11ffcf1e2cc0705b738073360d279df34bd` | Open / draft | Instrumentation 2/2 PASS on API30; route restore and physical candidate-equivalent renderer cycles PASS; fresh QA physical install blocked by MIUI. |
-| #94 Network | `99eba5bd0c4238c61892333919d7c9c66af03366` | Open / draft | Automated checks PASS; QA APK built; physical post-fix matrix blocked by MIUI install restriction. |
+| PR | Final state | Evidence / remaining issue |
+|---|---|---|
+| #93 WebView | Merged at `6ef4ca779d37c9d2a6cddca646c53b929842ef06` | API30 instrumentation 2/2 PASS; route restore and physical candidate-equivalent renderer cycles PASS; regression coverage incorporated into candidate; fresh QA physical install blocked by MIUI. |
+| #94 Network | Merged at `5f3f22d9a569ada97ab4bdf3a802cf077bceff98` | Network remediation incorporated into candidate; targeted post-fix N03/N04/N07/N12 PASS; consolidated 13/13 across two runs; DevTools/real-radio distinction retained. |
+| #95 Release register | Documentation-only update | This register; no production code, signing, AAB or Play changes. |
 
-For both PRs, the hosted Android/verification, CodeQL and analysis checks pass. The GitLab mirror check is the pre-existing infrastructure failure and is not represented as a product-test failure.
+PR #93/#94 hosted Android, build/repeatability, verify, model-independent/model-dependent, CodeQL and analysis checks passed on their final heads. The GitLab mirror check is a pre-existing infrastructure failure and is not represented as a product-test failure.
 
 ## Release invariant
 
-- `main` remains unchanged.
-- `release/v2-candidate` remains at `3cc25da17961f32680f69317ed52aa3f1931a2ae` until an authorised merge.
+- `main` remains `6aafa15333101e39e61b7cc70f23431f122c82e0`.
+- `release/v2-candidate` is `6ef4ca779d37c9d2a6cddca646c53b929842ef06` at the time of this documentation update.
 - Production AAR, signing material, production AAB, release tags and Google Play remain untouched.
-- PRs #93/#94 remain open/draft pending review and explicit merge authorisation.
 - Overall release status remains **HOLD** until the outstanding release gates are resolved.
