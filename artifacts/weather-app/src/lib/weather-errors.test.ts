@@ -95,6 +95,9 @@ describe('WeatherFetchError', () => {
       code: 'timeout',
       message: 'The weather service took too long to respond.',
     });
+    // The app stores code=timeout and WeatherError resolves this exact key.
+    expect(WEATHER_ERROR_KEYS.timeout).toBe('error.timeout');
+    expect(en['error.timeout']).toBe('The weather service took too long to respond.');
   });
 });
 
