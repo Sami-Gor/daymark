@@ -12,8 +12,8 @@ android {
         applicationId (project.findProperty("daymarkApplicationId") ?: "io.github.sami_gor.daymark")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "2.0.0"
+        versionCode 3
+        versionName "2.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // The shipped native stack is arm64-only: Kokoro JNI is arm64-only, and
         // the prebuilt sherpa AAR otherwise contributes armeabi-v7a/x86/x86_64
