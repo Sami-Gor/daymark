@@ -162,6 +162,7 @@ jobs:
           test -f "$LIB"
           cp "$LIB" "$STAGE/jni/arm64-v8a/libonnxruntime.so"
           ls -lh "$STAGE/jni/arm64-v8a/libonnxruntime.so"
+          cp "$ORT_SRC/include/onnxruntime/core/session/"*.h "$STAGE/headers/"
           cp -R "$ORT_SRC/include/onnxruntime/." "$STAGE/headers/"
           # Sherpa includes provider factory headers unqualified (for example
           # "nnapi_provider_factory.h"); keep the upstream public headers flat
