@@ -145,6 +145,7 @@ jobs:
             --android_abi arm64-v8a \
             --android_api 29 \
             --build_shared_lib \
+            --use_nnapi \
             --no_telemetry \
             --skip_tests \
             --skip_submodule_sync \
