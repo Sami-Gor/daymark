@@ -1,4 +1,4 @@
-import { displayTemp, dateLabel, shortDay, weatherIcon, type Unit, type WeatherPayload } from '@/lib/weather';
+import { displayTempWithUnit, dateLabel, shortDay, weatherIcon, type Unit, type WeatherPayload } from '@/lib/weather';
 import { formatPercent } from '@/lib/i18n';
 import { useLocale } from '@/hooks/use-locale';
 
@@ -15,11 +15,13 @@ export function DailyForecast({ weather, unit }: { weather: WeatherPayload; unit
       <div className="panel forecast-panel" data-testid="list-daily-forecast">
         {days.length ? days.slice(0, 3).map((day, index) => {
           const Icon = weatherIcon(daily.weather_code?.[index] ?? 0, true);
+          const high = daily.temperature_2m_max?.[index];
+          const low = daily.temperature_2m_min?.[index];
           return (
             <div className="day-row" key={day} data-testid={`row-forecast-${index}`}>
               <div className="day-name">{shortDay(day, index, locale)}<span className="day-date">{dateLabel(day, locale)}</span></div>
               <Icon className="day-icon" size={21} strokeWidth={1.7} />
-              <div className="temps"><span className="high">{displayTemp(daily.temperature_2m_max?.[index], unit)}</span><span className="low">{displayTemp(daily.temperature_2m_min?.[index], unit)}</span></div>
+              <div className="temps" role="group" aria-label={t('daily.highLow')}><span className="high">{displayTempWithUnit(high, unit)}</span><span className="low">{displayTempWithUnit(low, unit)}</span></div>
               <div className="rain-chance">{formatPercent(daily.precipitation_probability_max?.[index] ?? 0, locale)} {t('daily.rainSuffix')}</div>
             </div>
           );

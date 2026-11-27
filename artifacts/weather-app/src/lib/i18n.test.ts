@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_LOCALE,
+  LOCALES,
   LOCALE_STORAGE_KEY,
   SPEECH_LANGS,
   detectLocale,
@@ -71,6 +72,21 @@ describe('language persistence', () => {
 });
 
 describe('translation and formatting', () => {
+  it('keeps localized unit button names label-in-name', () => {
+    const expected = {
+      en: { celsius: '°C, Temperature unit: Celsius', fahrenheit: '°F, Temperature unit: Fahrenheit' },
+      fr: { celsius: '°C, unité de température : Celsius', fahrenheit: '°F, unité de température : Fahrenheit' },
+      es: { celsius: '°C, unidad de temperatura: Celsius', fahrenheit: '°F, unidad de temperatura: Fahrenheit' },
+    } as const;
+
+    for (const locale of LOCALES) {
+      expect(translate(locale, 'topbar.unitCelsius')).toBe(expected[locale].celsius);
+      expect(translate(locale, 'topbar.unitFahrenheit')).toBe(expected[locale].fahrenheit);
+      expect(expected[locale].celsius.startsWith('°C, ')).toBe(true);
+      expect(expected[locale].fahrenheit.startsWith('°F, ')).toBe(true);
+    }
+  });
+
   it('interpolates parameters and keeps unknown placeholders', () => {
     expect(translate('fr', 'search.searching')).toBe('Recherche…');
     expect(translate('es', 'search.noResults')).toBe('No se encontraron lugares');

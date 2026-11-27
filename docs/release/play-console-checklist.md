@@ -165,8 +165,9 @@ updates have **not** been entered in Console.
       registered. Source/data-flow regression tests establish the boundary.
       Packet capture is not a standalone gate; no universal zero-traffic claim
       is made.
-- [ ] **Local preferences — not a Data Safety collection.** `daymark.locale`
-      and Android `daymark.permissions`/`microphone-requested` remain on-device.
+- [ ] **Local preferences — not a Data Safety collection.** `daymark.locale`,
+      `daymark.unit` and Android `daymark.permissions`/`microphone-requested`
+      remain on-device.
 - [ ] **Precise location — V2 = No.** Android declares only
       `ACCESS_COARSE_LOCATION`; the latitude-aware grid is applied before
       requests. V1 still requires a precise-location row while it remains

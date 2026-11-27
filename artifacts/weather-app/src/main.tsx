@@ -5,6 +5,7 @@ import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { installSafeConsole } from '@/lib/safe-console';
 import { LocaleProvider } from '@/hooks/use-locale';
+import { UnitProvider } from '@/hooks/use-unit';
 
 import './index.css';
 
@@ -20,7 +21,9 @@ createRoot(document.getElementById('root')!, {
 }).render(
   <ErrorBoundary>
     <LocaleProvider>
-      <App />
+      <UnitProvider>
+        <App />
+      </UnitProvider>
     </LocaleProvider>
   </ErrorBoundary>,
 );

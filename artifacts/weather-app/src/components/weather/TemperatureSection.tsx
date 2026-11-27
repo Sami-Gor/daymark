@@ -1,4 +1,4 @@
-import { compareLocationTimes, displayTemp, getCurrentLocationTime, timeLabel, weatherIcon, type Unit, type WeatherPayload } from '@/lib/weather';
+import { compareLocationTimes, displayTempWithUnit, getCurrentLocationTime, temperaturePhrase, timeLabel, weatherIcon, type Unit, type WeatherPayload } from '@/lib/weather';
 import { useLocale } from '@/hooks/use-locale';
 
 /*
@@ -43,7 +43,7 @@ export function TemperatureSection({ weather, unit }: { weather: WeatherPayload;
         className="promo-panel"
         data-testid="list-hourly-forecast"
         role="img"
-        aria-label={t('temperature.aria', { min: displayTemp(min, unit), max: displayTemp(max, unit) })}
+        aria-label={known.length ? t('temperature.aria', { min: temperaturePhrase(min, unit, locale), max: temperaturePhrase(max, unit, locale) }) : t('temperature.ariaUnavailable')}
       >
         {linePoints.length ? (
           <>
@@ -75,7 +75,7 @@ export function TemperatureSection({ weather, unit }: { weather: WeatherPayload;
                   key={`value-${index}`}
                   style={{ left: `${point.x}%`, top: `${point.y}%`, animationDelay: `${index * 80 + 240}ms` }}
                 >
-                  {displayTemp(point.value, unit)}
+                  {displayTempWithUnit(point.value, unit)}
                 </span>
               ))}
             </div>
