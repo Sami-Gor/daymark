@@ -41,3 +41,26 @@ export function describeRecognitionError(error: string | null | undefined, local
       return translate(locale, 'ask.error.unknown');
   }
 }
+/** Friendly, stable copy for narration failures, localized. */
+export function describeNarrationError(error: string | null | undefined, locale: Locale = 'en'): string {
+  switch (error) {
+    case 'unsupported-language':
+      return translate(locale, 'voice.error.unsupportedLanguage');
+    case 'french-spanish-unavailable':
+      return translate(locale, 'voice.error.frenchSpanishUnavailable');
+    case 'native-unavailable':
+      return translate(locale, 'voice.error.nativeUnavailable');
+    case 'model-init-failed':
+      return translate(locale, 'voice.error.modelUnavailable');
+    case 'voice-asset-invalid':
+      return translate(locale, 'voice.error.assetUnavailable');
+    case 'synthesis-failed':
+      return translate(locale, 'voice.error.synthesisFailed');
+    case 'playback-failed':
+      return translate(locale, 'voice.error.playbackFailed');
+    case 'offline-voice-unavailable':
+      return translate(locale, 'voice.error.offlineUnavailable');
+    default:
+      return translate(locale, 'voice.error.unavailable');
+  }
+}

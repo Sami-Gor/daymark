@@ -26,6 +26,13 @@ export const SPEECH_LANGS: Record<Locale, string> = {
   es: 'es-ES',
 };
 
+/* Narration locale; em_alex is requested with the es-ES interface locale. */
+export const TTS_LANGS: Record<Locale, string> = {
+  en: 'en-GB',
+  fr: 'fr-FR',
+  es: 'es-ES',
+};
+
 const DICTIONARIES: Record<Locale, Record<TranslationKey, string>> = { en, fr, es };
 
 export function isLocale(value: string): value is Locale {

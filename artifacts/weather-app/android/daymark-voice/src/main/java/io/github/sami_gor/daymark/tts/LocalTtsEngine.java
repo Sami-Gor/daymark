@@ -1,5 +1,7 @@
 package io.github.sami_gor.daymark.tts;
 
+import java.util.List;
+
 /**
  * Small native abstraction for local (on-device) speech synthesis.
  *
@@ -33,8 +35,11 @@ public interface LocalTtsEngine {
     /** Loads model assets asynchronously. Never call from the main thread. */
     void initialize(Listener listener);
 
-    /** Synthesizes and plays the given text; generation happens off the UI thread. */
-    void speak(String text);
+    /**
+     * Synthesizes and plays the given text; generation happens off the UI
+     * thread. `lang` selects the voice and phonemisation path.
+     */
+    void speak(String text, String lang, List<String> segments);
 
     /** Stops playback immediately if speaking. */
     void stop();

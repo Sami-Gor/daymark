@@ -1,0 +1,72 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 906e1d2..bd663ad 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -512,6 +512,28 @@ impl KokoroTts {
+         synthesizer::synth(Arc::downgrade(&self.model), text, pack, &voice, self.is_v11).await
+     }
+-
++
++    /// Synthesize already-phonemized IPA without invoking English G2P.
++    pub async fn synth_phonemes<S, V>(
++        &self,
++        phonemes: S,
++        voice: V,
++    ) -> Result<(Vec<f32>, Duration), KokoroError>
++    where
++        S: AsRef<str>,
++        V: Into<Voice>,
++    {
++        let voice = voice.into();
++        let pack = Self::get_pack(self.voices.as_ref(), &voice)?;
++        synthesizer::synth_phonemes(
++            Arc::downgrade(&self.model),
++            phonemes,
++            pack,
++            &voice,
++            self.is_v11,
++        )
++        .await
++    }
++
+     /// Open a streaming synthesis session for the given `voice`.
+     pub fn stream<S, V>(&self, voice: V) -> (SynthSink<S>, SynthStream)
+     where
+diff --git a/src/synthesizer.rs b/src/synthesizer.rs
+index b24a78f..e5bb32c 100644
+--- a/src/synthesizer.rs
++++ b/src/synthesizer.rs
+@@ -116,15 +116,24 @@ where
+     S: AsRef<str>,
+ {
+     let phoneme_line = g2p(text.as_ref(), is_v11)?;
+-    #[cfg(debug_assertions)]
+-    eprintln!(
+-        "kokoro g2p | voice={} | text={:?} | phonemes={}",
+-        voice.name(),
+-        text.as_ref(),
+-        phoneme_line
+-    );
+-
++
+-    let chunks = chunk_phonemes(&phoneme_line, MAX_PHONEME_CHARS);
++    // Do not log narration text or derived phonemes, including in debug builds.
++    synth_phonemes(model, phoneme_line, pack, voice, is_v11).await
++}
++
++/// Synthesize already-phonemized IPA without invoking the English G2P.
++pub(super) async fn synth_phonemes<P, S>(
++    model: Weak<Mutex<Session>>,
++    phonemes: S,
++    pack: P,
++    voice: &Voice,
++    is_v11: bool,
++) -> Result<(Vec<f32>, Duration), KokoroError>
++where
++    P: AsRef<Vec<Vec<Vec<f32>>>>,
++    S: AsRef<str>,
++{
++    let chunks = chunk_phonemes(phonemes.as_ref(), MAX_PHONEME_CHARS);
+     if chunks.is_empty() {
+         return Ok((Vec::new(), Duration::ZERO));
+     }

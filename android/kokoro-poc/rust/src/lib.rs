@@ -1,18 +1,19 @@
 /*
  * Minimal Rust -> JNI bridge for the Kokoro local-TTS proof of concept.
  *
- * Exposes six calls used by KokoroLocalTtsEngine:
- *   nativeInit(modelPath, voicePath, voiceName) -> error string or null
- *   nativeSynth(text) -> FloatArray of 24 kHz mono PCM, or null on failure
- *   nativeStreamStart(text) -> error string or null; starts sentence streaming
+ * Exposes native calls used by KokoroLocalTtsEngine:
+ *   nativeInit(modelPath, voicesDir, defaultVoice) -> error string or null
+ *   nativeSynth(text, lang, voiceName) -> FloatArray of 24 kHz mono PCM, or null
+ *   nativeStreamStart(text, lang, voiceName) -> error string or null
  *   nativeStreamNext() -> next sentence FloatArray, or null when finished
  *   nativeStreamClear() -> drops the active stream
  *   nativeRelease() -> frees the engine
  *
- * Kokoro's KokoroTts::new() loads the model from a file and the voice from a
- * single <voice>.bin file; both are copies inside the app's files directory.
- * Everything runs offline. Logs use the Rust `log` crate and are surfaced in
- * logcat under the tag DaymarkKokoroTts via android_logger.
+ * Kokoro's KokoroTts::new() loads the model and every <voice>.bin in the
+ * voices directory from files inside the app's files directory. English uses
+ * the existing Misaki path; French and Spanish use piper-plus-g2p 0.5.3 and
+ * the explicit PUA-to-Kokoro adapter. Everything runs offline. Logs use the
+ * Rust `log` crate and are surfaced in logcat under DaymarkKokoroTts.
  */
 use futures::StreamExt;
 use jni::objects::{JClass, JString};
@@ -23,8 +24,36 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
+pub mod piper_g2p;
+
+use piper_g2p::{phonemize, PIPER_PLUS_G2P_VERSION};
+
 const LOG_TAG: &str = "DaymarkKokoroTts";
 const SAMPLE_RATE: usize = 24000;
+
+#[derive(Clone, Copy)]
+enum NarrationLang {
+    English,
+    French,
+    Spanish,
+}
+
+impl NarrationLang {
+    fn parse(lang: &str) -> Result<Self, String> {
+        let base = lang.trim().to_lowercase();
+        let base = base.split(['-', '_']).next().unwrap_or("");
+        match base {
+            "en" => Ok(Self::English),
+            "fr" => Ok(Self::French),
+            "es" => Ok(Self::Spanish),
+            _ => Err(format!("unsupported narration language: {lang}")),
+        }
+    }
+
+    fn is_english(self) -> bool {
+        matches!(self, Self::English)
+    }
+}
 
 struct Engine {
     runtime: Arc<Runtime>,
@@ -66,7 +95,7 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     mut env: JNIEnv,
     _class: JClass,
     model_path: JString,
-    voice_path: JString,
+    voices_path: JString,
     voice_name: JString,
 ) -> jstring {
     android_logger::init_once(
@@ -79,21 +108,33 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
         Ok(value) => value.to_string_lossy().to_string(),
         Err(_) => return to_jstring(&mut env, "model path unavailable"),
     };
-    let voice_file = match env.get_string(&voice_path) {
+    let voices_dir = match env.get_string(&voices_path) {
         Ok(value) => value.to_string_lossy().to_string(),
-        Err(_) => return to_jstring(&mut env, "voice path unavailable"),
+        Err(_) => return to_jstring(&mut env, "voices path unavailable"),
     };
     let voice = match env.get_string(&voice_name) {
         Ok(value) => value.to_string_lossy().to_string(),
         Err(_) => return to_jstring(&mut env, "voice name unavailable"),
     };
 
+    // The app ships no eSpeak binary and no eSpeak dependency. Disable the
+    // dormant CLI fallback in the existing lean `kokoro-en` build so the
+    // English path cannot invoke a system espeak-ng even if one exists.
+    std::env::set_var("KOKORO_ESPEAK_NG", "0");
+    std::env::set_var("KOKORO_G2P_SEGMENT_ESPEAK", "0");
+
     let runtime = match tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build() {
         Ok(value) => value,
         Err(error) => return to_jstring(&mut env, &format!("tokio runtime failed: {error}")),
     };
 
-    let tts = match runtime.block_on(KokoroTts::new(&model, &voice_file)) {
+    log::info!(
+        "initialize: piper-plus-g2p={} pua_compat={} voicesDir={}",
+        PIPER_PLUS_G2P_VERSION,
+        piper_g2p::PUA_COMPAT_VERSION,
+        voices_dir
+    );
+    let tts = match runtime.block_on(KokoroTts::new(&model, &voices_dir)) {
         Ok(value) => value,
         Err(error) => {
             log::error!("model load failed: {error}");
@@ -115,20 +156,53 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     mut env: JNIEnv,
     _class: JClass,
     text: JString,
+    lang: JString,
+    voice_name: JString,
 ) -> jfloatArray {
     let input = match env.get_string(&text) {
         Ok(value) => value.to_string_lossy().to_string(),
         Err(_) => return std::ptr::null_mut(),
     };
+    let lang = match env.get_string(&lang) {
+        Ok(value) => value.to_string_lossy().to_string(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let voice_name = match env.get_string(&voice_name) {
+        Ok(value) => value.to_string_lossy().to_string(),
+        Err(_) => return std::ptr::null_mut(),
+    };
     let started = Instant::now();
-    let Some((runtime, tts, voice)) = engine_handles() else {
+    let Some((runtime, tts, _default_voice)) = engine_handles() else {
         return std::ptr::null_mut();
     };
-    let voice = Voice::new(voice);
-    match runtime.block_on(tts.synth(input.as_str(), voice)) {
+    let language = match NarrationLang::parse(&lang) {
+        Ok(value) => value,
+        Err(error) => {
+            log::error!("synthesis rejected: {error}");
+            return std::ptr::null_mut();
+        }
+    };
+
+    let result = if language.is_english() {
+        runtime.block_on(tts.synth(input.as_str(), Voice::new(voice_name)))
+    } else {
+        match phonemize(&lang, &input) {
+            Ok(ipa) => {
+                log::info!("phonemized: lang={lang} ipa_chars={}", ipa.chars().count());
+                runtime.block_on(tts.synth_phonemes(ipa, Voice::new(voice_name)))
+            }
+            Err(error) => {
+                log::error!("phonemisation failed: lang={lang} error={error}");
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    match result {
         Ok((samples, took)) => {
             log::info!(
-                "synthesis: generationMs={} wallMs={} samples={} audioMs={}",
+                "synthesis: lang={} generationMs={} wallMs={} samples={} audioMs={}",
+                lang,
                 took.as_millis(),
                 started.elapsed().as_millis(),
                 samples.len(),
@@ -145,7 +219,7 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
             }
         }
         Err(error) => {
-            log::error!("synthesis failed: {error}");
+            log::error!("synthesis failed: lang={lang} error={error}");
             std::ptr::null_mut()
         }
     }
@@ -156,16 +230,35 @@ pub extern "system" fn Java_io_github_sami_1gor_daymark_tts_KokoroLocalTtsEngine
     mut env: JNIEnv,
     _class: JClass,
     text: JString,
+    lang: JString,
+    voice_name: JString,
 ) -> jstring {
     let input = match env.get_string(&text) {
         Ok(value) => value.to_string_lossy().to_string(),
         Err(_) => return to_jstring(&mut env, "text unavailable"),
     };
-    let Some((runtime, tts, voice)) = engine_handles() else {
+    let lang = match env.get_string(&lang) {
+        Ok(value) => value.to_string_lossy().to_string(),
+        Err(_) => return to_jstring(&mut env, "language unavailable"),
+    };
+    let voice_name = match env.get_string(&voice_name) {
+        Ok(value) => value.to_string_lossy().to_string(),
+        Err(_) => return to_jstring(&mut env, "voice unavailable"),
+    };
+    let language = match NarrationLang::parse(&lang) {
+        Ok(value) => value,
+        Err(error) => return to_jstring(&mut env, &error),
+    };
+    if !language.is_english() {
+        // French and Spanish are prephonemized in nativeSynth; the Java layer
+        // deliberately falls back to monolithic synthesis for those locales.
+        return to_jstring(&mut env, "prephonemized stream not available");
+    }
+    let Some((runtime, tts, _default_voice)) = engine_handles() else {
         return to_jstring(&mut env, "engine not initialized");
     };
     let result = runtime.block_on(async {
-        let (mut sink, stream) = tts.stream::<String, _>(Voice::new(voice));
+        let (mut sink, stream) = tts.stream::<String, _>(Voice::new(voice_name));
         sink.synth(input).await?;
         Ok::<_, kokoro_en::KokoroError>((sink, stream))
     });

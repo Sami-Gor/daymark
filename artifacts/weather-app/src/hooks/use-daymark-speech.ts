@@ -10,10 +10,10 @@ import { initialSpeechUiState, reduceSpeechUi } from '@/lib/speech-ui-state';
 /*
  * Android narration hook.
  *
- * The web/PWA demo has no voice features. On Android, English narration uses
- * the bundled Kokoro engine. French and Spanish narration is unavailable in
- * V2 (planned V2.2) and intentionally has no Android system-TTS or browser
- * fallback.
+ * The web/PWA demo has no voice features. On Android, English, French and
+ * Spanish narration use the bundled Kokoro engine with locale-specific
+ * phonemisation and voices. There is intentionally no Android system-TTS or
+ * browser fallback.
  */
 export function useDaymarkSpeech() {
   const androidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
@@ -22,7 +22,13 @@ export function useDaymarkSpeech() {
       ? createSpeechRouter(
           { isNativePlatform: true, platform: 'android' },
           {
-            isAvailable: async () => (await DaymarkVoice.isAvailable()).available,
+            isAvailable: async () => {
+              const availability = await DaymarkVoice.isAvailable();
+              return {
+                available: availability.available === true,
+                reason: availability.reason,
+              };
+            },
             speak: async (text, lang, segments) => {
               await DaymarkVoice.speak({ text, lang, segments });
             },
@@ -52,6 +58,11 @@ export function useDaymarkSpeech() {
         handle = created;
       } else {
         void created.remove();
+      }
+    }).catch(() => {
+      if (active) {
+        setErrorCode('native-unavailable');
+        dispatch({ type: 'failed' });
       }
     });
     return () => {

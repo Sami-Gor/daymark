@@ -79,6 +79,35 @@ describe('segmentForSpeech', () => {
   it('leaves short sentences unchanged', () => {
     expect(segmentForSpeech('Light rain later.')).toEqual(['Light rain later.']);
     expect(segmentForSpeech('Good morning.')).toEqual(['Good morning.']);
+    expect(segmentForSpeech('Il pleut.')).toEqual(['Il pleut.']);
+    expect(segmentForSpeech('Llueve.')).toEqual(['Llueve.']);
+  });
+
+  it('preserves accented French and Latin American Spanish segments', () => {
+    const french =
+      'L’humidité sera de soixante-dix pour cent. Le vent souffle à vingt-cinq kilomètres par heure. Il fera froid demain.';
+    const spanish =
+      'Mañana hará frío y habrá viento. La humedad será del setenta por ciento. Las ráfagas alcanzarán veinticinco kilómetros por hora.';
+    for (const text of [french, spanish]) {
+      const segments = segmentForSpeech(text);
+      expect(segments.length).toBeGreaterThan(1);
+      expect(segments.join('')).toBe(text);
+      assertNoLoss(text, segments);
+    }
+  });
+
+  it('does not truncate a long individual sentence with no internal punctuation', () => {
+    const words = Array.from({ length: 200 }, (_, index) => `word${index}`);
+    const text = `${words.join(' ')} and this sentence continues to its final period.`;
+    const segments = segmentForSpeech(text);
+    expect(segments.join('')).toBe(text);
+    expect(segments.every((segment) => segment.length > 0)).toBe(true);
+  });
+
+  it('preserves repeated text exactly', () => {
+    const text =
+      'Il fera froid demain matin et il pleuvra. Il fera froid demain matin et il pleuvra.';
+    assertNoLoss(text, segmentForSpeech(text));
   });
 
   it('keeps word order identical on a corpus', () => {

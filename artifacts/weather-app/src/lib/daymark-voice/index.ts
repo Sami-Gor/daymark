@@ -4,9 +4,9 @@ import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
  * Platform-neutral DaymarkVoice interface.
  *
  * Android implements this over the bundled Kokoro engine. iOS and web have
- * placeholder implementations for now. Android English narrates only through
- * this local engine (never the system TTS); French/Spanish and the web keep
- * the browser/system engines. Model/voice paths, JNI and Rust details are
+ * placeholder implementations for now. Android narration uses only this local
+ * engine (never the system TTS or browser speech), including French and
+ * Spanish in the unreleased POC. Model/voice paths, JNI and Rust details are
  * deliberately not exposed.
  */
 
@@ -19,7 +19,7 @@ export type DaymarkVoiceState =
   | 'error';
 
 export interface DaymarkVoicePlugin {
-  isAvailable(): Promise<{ available: boolean }>;
+  isAvailable(): Promise<{ available: boolean; reason?: string }>;
   getStatus(): Promise<{ state: DaymarkVoiceState }>;
   /**
    * `text` is always the complete narration. `segments` is an optional TTS-only
