@@ -538,4 +538,80 @@ describe('createParakeetRecognitionController', () => {
     expect(controller.start({ onError }, 'en-GB')).toBe(false);
     expect(onError).toHaveBeenCalledWith('offline-unavailable');
   });
+
+  // ------------------------------------------------------------------
+  // a decoder refusal / failed decode / empty decode is a distinct
+  // terminal error, never silence and never a transcript.
+  // ------------------------------------------------------------------
+
+  it('delivers a decoder refusal as model-rejected, never as a result or silence', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onResult = vi.fn();
+    const onEnd = vi.fn();
+    const onError = vi.fn();
+    expect(controller.start({ onResult, onEnd, onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.error[0]?.({ sessionId: 1, code: 'model-rejected', stage: 'decode' });
+
+    expect(onError).toHaveBeenCalledWith('model-rejected');
+    expect(onResult).not.toHaveBeenCalled();
+    expect(onEnd).not.toHaveBeenCalled();
+    expect(controller.isListening()).toBe(false);
+  });
+
+  it('delivers an empty decode as empty-transcript, not no-speech', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.error[0]?.({ sessionId: 1, code: 'empty-transcript', stage: 'decode' });
+
+    expect(onError).toHaveBeenCalledWith('empty-transcript');
+    expect(onError).not.toHaveBeenCalledWith('no-speech');
+  });
+
+  it('delivers a failed decode as decode-failed', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.error[0]?.({ sessionId: 1, code: 'decode-failed' });
+
+    expect(onError).toHaveBeenCalledWith('decode-failed');
+  });
+
+  it('keeps an decode code through a rejected start promise', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    native.start.mockRejectedValueOnce(new Error('model-rejected'));
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith('model-rejected');
+  });
+
+  it('does not fall back to silence for an unknown decode error', async () => {
+    native.isAvailable.mockResolvedValue({ available: true, reason: '' });
+    const controller = createParakeetRecognitionController();
+    await controller.initialize();
+
+    const onError = vi.fn();
+    expect(controller.start({ onError }, 'en-GB')).toBe(true);
+    await Promise.resolve();
+    events.error[0]?.({ sessionId: 1, code: 'some-future-code' });
+
+    expect(onError).toHaveBeenCalledWith('some-future-code');
+  });
 });
