@@ -5,9 +5,11 @@
 # runtime (weather and place-search requests are separate network flows).
 #
 # This artifact is the locally rebuilt v1.13.8 runtime for
-# CVE-2026-108954 / GHSA-f5q5-vp8g-wh4x. Upstream v1.13.8 and v2.0.1 still
-# contain the unchecked joiner-width path, so the ordinary release AAR must
-# not be substituted here. See
+# CVE-2026-108954 / GHSA-f5q5-vp8g-wh4x with the Daymark patches (0001
+# joiner-width validation and 0002 NeMo encoder-output validation including the
+# FND-1 null guard). Upstream
+# v1.13.8 and v2.0.1 still contain the unchecked joiner-width path, so the
+# ordinary release AAR must not be substituted here. See
 # artifacts/weather-app/android/daymark-voice/SHERPA-ONNX-PROVENANCE.md
 # for the source commit, patch, toolchain and hashes.
 #

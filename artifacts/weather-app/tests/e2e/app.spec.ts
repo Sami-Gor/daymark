@@ -1722,19 +1722,20 @@ test.describe('privacy policy page', () => {
     }
   });
 
-  test('states the current web and Android data practices in every language', async ({ page }) => {
+  test('states version-specific website and Android data practices in every language', async ({ page }) => {
     const expectations = {
       en: {
         location: 'ACCESS_COARSE_LOCATION',
         grid: '0.025-degree grid',
         speech: 'Parakeet TDT 0.6B v3',
         memory: 'held in memory',
-        webDemo: 'limited weather demo',
-        browserSpeech: 'does not invoke browser speech-recognition',
+        webDemo: 'limited V1 weather demo',
+        browserSpeech: 'browser or platform speech-recognition and speech-synthesis services',
+        androidFallback: 'no Android SpeechRecognizer, browser-speech, or online-recogniser fallback',
         offlineVoice: 'not available in V2',
         audience: 'adults aged 18 and over',
         ipMetadata: 'source IP address and requested URL',
-        versionNote: 'Daymark 1.0.0',
+        versionNote: 'Daymark V1 (version 1.0.0)',
         precisePermission: 'ACCESS_FINE_LOCATION',
       },
       fr: {
@@ -1742,12 +1743,13 @@ test.describe('privacy policy page', () => {
         grid: 'grille de 0,025 degré',
         speech: 'Parakeet TDT 0.6B v3',
         memory: 'conservé en mémoire',
-        webDemo: 'démo météo limitée',
-        browserSpeech: 'API de reconnaissance ou de synthèse vocale',
+        webDemo: 'démo météo V1 limitée',
+        browserSpeech: 'services de reconnaissance et de synthèse vocales du navigateur ou de la plateforme',
+        androidFallback: 'ni Android SpeechRecognizer, ni la reconnaissance du navigateur',
         offlineVoice: 'pas disponible dans V2',
         audience: 'adultes âgés de 18 ans ou plus',
         ipMetadata: 'adresse IP source et l’URL demandée',
-        versionNote: 'Daymark 1.0.0',
+        versionNote: 'Daymark V1 (version 1.0.0)',
         precisePermission: 'ACCESS_FINE_LOCATION',
       },
       es: {
@@ -1755,12 +1757,13 @@ test.describe('privacy policy page', () => {
         grid: 'cuadrícula de 0,025 grados',
         speech: 'Parakeet TDT 0.6B v3',
         memory: 'mantiene en memoria',
-        webDemo: 'demo meteorológica limitada',
-        browserSpeech: 'API de reconocimiento ni de síntesis de voz',
+        webDemo: 'demo meteorológica V1 limitada',
+        browserSpeech: 'servicios de reconocimiento y síntesis de voz del navegador o de la plataforma',
+        androidFallback: 'no usa Android SpeechRecognizer, reconocimiento del navegador',
         offlineVoice: 'no está disponible en V2',
         audience: 'adultos de 18 años o más',
         ipMetadata: 'dirección IP de origen y la URL solicitada',
-        versionNote: 'Daymark 1.0.0',
+        versionNote: 'Daymark V1 (versión 1.0.0)',
         precisePermission: 'ACCESS_FINE_LOCATION',
       },
     } as const;
@@ -1780,6 +1783,7 @@ test.describe('privacy policy page', () => {
       expect(text).toContain(expectations[policy.lang].memory);
       expect(text).toContain(expectations[policy.lang].webDemo);
       expect(text).toContain(expectations[policy.lang].browserSpeech);
+      expect(text).toContain(expectations[policy.lang].androidFallback);
       expect(text).toContain(expectations[policy.lang].offlineVoice);
       expect(text).toContain(expectations[policy.lang].audience);
       expect(text).toContain(expectations[policy.lang].ipMetadata);
