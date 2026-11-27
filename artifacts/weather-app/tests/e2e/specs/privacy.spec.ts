@@ -122,7 +122,7 @@ test.describe('privacy policy pages', () => {
     for (const policy of PRIVACY_POLICIES) {
       await privacy.goto(policy.path);
       const text = await privacy.text();
-      expect(text).toContain('Sami Belhadj');
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].operator);
       expect(text).toContain('skylinelabdev@gmail.com');
     }
   });
@@ -137,7 +137,7 @@ test.describe('privacy policy pages', () => {
     }
   });
 
-  test('states the verified data practices in every language', async ({ privacy }) => {
+  test('states version-specific website and Android data practices in every language', async ({ privacy }) => {
     for (const policy of PRIVACY_POLICIES) {
       await privacy.goto(policy.path);
       const text = await privacy.text();
@@ -146,9 +146,21 @@ test.describe('privacy policy pages', () => {
       }
       expect(text).toContain('Open-Meteo');
       expect(text).toContain('daymark.locale');
+      expect(text).toContain('daymark.permissions');
+      expect(text).toContain('microphone-requested');
       expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].location);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].grid);
       expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].speech);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].memory);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].webDemo);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].browserSpeech);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].androidFallback);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].offlineVoice);
       expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].audience);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].ipMetadata);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].versionNote);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].precisePermission);
+      expect(text).toContain(PRIVACY_EXPECTATIONS[policy.lang].lastUpdated);
       expect(text).not.toMatch(/collects? no data/i);
     }
   });
