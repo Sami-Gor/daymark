@@ -158,8 +158,13 @@ jobs:
           LIB=$(find "$ORT_SRC/build" -type f -name libonnxruntime.so | head -1)
           test -n "$LIB"
           cp "$LIB" "$STAGE/jni/arm64-v8a/libonnxruntime.so"
-          cp "$ORT_SRC/include/onnxruntime/core/session/"*.h "$STAGE/headers/"
+          cp -R "$ORT_SRC/include/onnxruntime/." "$STAGE/headers/"
+          # Sherpa includes provider factory headers unqualified (for example
+          # "nnapi_provider_factory.h"); keep the upstream public headers flat
+          # as well as preserving their include tree.
+          find "$ORT_SRC/include/onnxruntime" -type f -name '*provider_factory.h' -exec cp {} "$STAGE/headers/" \;
           test -f "$STAGE/headers/onnxruntime_c_api.h"
+          test -f "$STAGE/headers/nnapi_provider_factory.h"
           test -f "$STAGE/headers/onnxruntime_cxx_api.h"
           echo "ORT_STAGE=$STAGE" >> "$GITHUB_ENV"
           echo "ORT_LIB=$STAGE/jni/arm64-v8a/libonnxruntime.so" >> "$GITHUB_ENV"
