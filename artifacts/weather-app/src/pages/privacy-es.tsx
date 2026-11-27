@@ -1,10 +1,11 @@
 import { PrivacyPolicyLayout } from '@/pages/privacy-layout';
 
 /*
- * Spanish privacy policy for Daymark V2 (2.0.0). Meaning-for-meaning
- * translation of the English policy: web/PWA is a limited weather demo without
- * voice; Android has on-device Parakeet input and local English Kokoro
- * narration; French/Spanish narration is unavailable in V2.
+ * Spanish privacy policy for Daymark V1 (1.0.0, closed testing) and V2
+ * (2.0.0, production). Meaning-for-meaning translation of the English policy:
+ * the deployed V1 website demo has browser voice controls; Android V2 has
+ * on-device Parakeet input and local English Kokoro narration; French/Spanish
+ * narration is unavailable in V2.
  */
 
 export default function PrivacyEs() {
@@ -16,7 +17,7 @@ export default function PrivacyEs() {
       brandNote="Política de privacidad"
       backLabel="← Volver al tiempo"
       switcherLabel="Idioma de la política"
-      effectiveText="Fecha de entrada en vigor: 27 de octubre de 2026 · Última actualización: 27 de octubre de 2026"
+      effectiveText="Fecha de entrada en vigor: 27 de octubre de 2026 · Última actualización: 27 de noviembre de 2026"
       tagline="Daymark — el tiempo, de forma sencilla"
     >
       <p>
@@ -36,17 +37,28 @@ export default function PrivacyEs() {
 
       <h2>Transición V2 / V1</h2>
       <p>
-        Esta política describe Daymark V2 (versión 2.0.0) en la web/PWA y Android. Daymark 1.0.0
-        puede seguir instalada en un dispositivo o disponible en Google Play hasta que V2 se publique
-        completamente en producción. Cuando V2 se publique por completo, V1 se retirará de Google Play
-        y finalizará el soporte oficial de V1. Las instalaciones V1 existentes no se desactivarán
-        deliberadamente.
+        Esta política cubre Daymark V2 (versión 2.0.0), actualmente en producción, y Daymark V1
+        (versión 1.0.0), que sigue en pruebas cerradas y también puede seguir instalada en un
+        dispositivo. Ambas versiones usan el nombre y el paquete Daymark, pero no se comportan de forma
+        idéntica. Las instalaciones V1 existentes no se desactivarán deliberadamente.
       </p>
       <p>
-        V1 se comportaba de forma distinta: su versión Android solicitaba ubicación precisa además de
-        la aproximada, usaba el reconocimiento de voz del navegador o de la WebView y podía usar la voz
-        de síntesis Android predeterminada para la narración en francés y español. Esos
-        comportamientos de V1 solo se aplican mientras se use una instalación V1.
+        La versión Android de Daymark V1 solicitaba ubicación precisa además de la aproximada, usaba
+        el reconocimiento de voz del navegador o de la WebView y podía usar la voz de síntesis Android
+        predeterminada para la narración en francés y español. La versión Android de Daymark V2
+        solicita únicamente ubicación aproximada, realiza el reconocimiento de voz en el dispositivo
+        con Parakeet y ofrece narración inglesa Kokoro; la narración en francés y español no está
+        disponible en V2. Estas diferencias se aplican según la versión que uses.
+      </p>
+      <p>
+        La demo web/PWA actualmente desplegada es la experiencia web V1 y expone los controles de
+        demostración «Ask Daymark» y «Hear today». Cuando se usan, esos controles recurren a los
+        servicios de reconocimiento y síntesis de voz del navegador o de la plataforma; no son la ruta
+        Parakeet/Kokoro en el dispositivo de V2 Android. La declaración actual de seguridad de datos
+        de Google Play cubre las versiones distribuidas e incluye la ubicación aproximada y precisa,
+        el historial de búsquedas en la aplicación y las grabaciones de voz o sonido como datos
+        recopilados y compartidos. La ubicación precisa y la voz siguen siendo relevantes mientras V1
+        esté en pruebas cerradas.
       </p>
 
       <h2>Solicitudes meteorológicas y búsqueda de lugares</h2>
@@ -79,15 +91,26 @@ export default function PrivacyEs() {
         buscar un lugar.
       </p>
       <p>
-        La aplicación Android declara únicamente <code>ACCESS_COARSE_LOCATION</code> y no declara
-        <code>ACCESS_FINE_LOCATION</code>. Android y la web/PWA ajustan la posición derivada del
-        dispositivo a una cuadrícula de 0,025 grados con un paso mínimo de 0,025 grados en el
-        dispositivo antes de enviarla a Open-Meteo. En latitudes altas, el espaciado de longitud se
-        amplía justo lo necesario para mantener un área de al menos 3 km²; el paso de latitud nunca
-        baja de 0,025°. Cerca de Londres son unos 2,8 km norte/sur y 1,7 km este/oeste (unos 4,8 km²);
-        en latitudes altas el espaciado de longitud puede ser mayor. La cuadrícula reduce la precisión
-        pero no anonimiza la solicitud: las coordenadas redondeadas salen de tu dispositivo y se envían
-        a Open-Meteo. La aplicación vuelve a Londres al recargar o reabrir.
+        Android V2 declara únicamente <code>ACCESS_COARSE_LOCATION</code> y no declara
+        <code>ACCESS_FINE_LOCATION</code>. V2 ajusta la posición derivada del dispositivo a una
+        cuadrícula de 0,025 grados con un paso mínimo de 0,025 grados antes de enviarla a Open-Meteo.
+        En latitudes altas, el espaciado de longitud se amplía justo lo necesario para mantener un
+        área de al menos 3 km²; el paso de latitud nunca baja de 0,025°. Cerca de Londres son unos
+        2,8 km norte/sur y 1,7 km este/oeste (unos 4,8 km²); en latitudes altas el espaciado de
+        longitud puede ser mayor. La cuadrícula reduce la precisión pero no anonimiza la solicitud:
+        las coordenadas redondeadas salen de tu dispositivo y se envían a Open-Meteo.
+      </p>
+      <p>
+        Android V1 declara tanto <code>ACCESS_COARSE_LOCATION</code> como
+        <code>ACCESS_FINE_LOCATION</code>. Su ruta de ubicación usaba coordenadas con dos decimales
+        (unos 1,1 km según el paso de latitud) y puede enviarlas a Open-Meteo cuando se usa V1. Las
+        instalaciones V1 existentes conservan ese comportamiento; no es la ruta de ubicación de V2.
+        La demo web/PWA actualmente desplegada usa la geolocalización del navegador y el
+        comportamiento web V1, por lo que su precisión puede diferir de Android V2. La versión web V2
+        actual aplica la misma cuadrícula de 0,025 grados que Android V2 cuando se despliega.
+      </p>
+      <p>
+        La aplicación vuelve a Londres al recargar o reabrir.
       </p>
       <p>
         Para la ubicación del dispositivo, Daymark también resuelve localmente un nombre de localidad
@@ -99,10 +122,12 @@ export default function PrivacyEs() {
 
       <h2>Demo web/PWA</h2>
       <p>
-        La versión web/PWA es una demo meteorológica limitada. No tiene el botón de micrófono Ask
-        Daymark ni la narración «Hear today». No solicita permiso de micrófono y no invoca las API de
-        reconocimiento ni de síntesis de voz del navegador. La aplicación Android ofrece el conjunto
-        completo de funciones de voz descrito a continuación.
+        La demo web/PWA actualmente desplegada es una demo meteorológica V1 limitada y expone el botón
+        de micrófono «Ask Daymark» y el control de narración «Hear today». Si usas esos controles, los
+        servicios de reconocimiento y síntesis de voz del navegador o de la plataforma pueden procesar
+        tu audio o tu solicitud de narración según sus propias condiciones. Son funciones de demo web,
+        no la ruta Parakeet o Kokoro de V2 Android, y no debe suponerse que la demo se comporta como la
+        aplicación V2 instalada. La demo web no usa los modelos Parakeet o Kokoro de Android.
       </p>
 
       <h2>Entrada de voz Android (Ask Daymark)</h2>
@@ -186,16 +211,19 @@ export default function PrivacyEs() {
         La web/PWA alojada se sirve mediante HTTPS y usa la política de seguridad de contenido
         configurada para el sitio. La aplicación Android instalada carga recursos locales integrados;
         las cabeceras HTTP del sitio no se aplican dentro de su WebView. Daymark es un conjunto
-        estático sin secretos y sin backend operado por Daymark. Estas propiedades verificables no
-        garantizan la seguridad de servicios terceros ni de todo el dispositivo.
+        estático sin secretos y sin backend operado por Daymark. Las solicitudes V2 de tiempo, calidad
+        del aire y búsqueda de lugares usan HTTPS. No formulamos una garantía general de cifrado para
+        el transporte de los servicios de voz o síntesis V1 del navegador o la WebView; esos servicios
+        no están controlados por Daymark y se rigen por sus propias condiciones. Estas propiedades
+        verificables no garantizan la seguridad de servicios terceros ni de todo el dispositivo.
       </p>
 
       <h2>Público destinatario</h2>
       <p>
-        Daymark está destinada a adultos de 18 años o más y no está dirigida a niños. Es una
-        declaración de público objetivo en Google Play, no una restricción técnica de acceso ni un
-        control de edad; Daymark no afirma que ningún menor pueda acceder a la app. No tiene cuentas y
-        Daymark no mantiene perfiles, historiales de ubicación, historiales de búsqueda ni
+        Daymark V1 y V2 están destinadas a adultos de 18 años o más y no están dirigidas a niños. Es
+        una declaración de público objetivo en Google Play, no una restricción técnica de acceso ni
+        un control de edad; Daymark no afirma que ningún menor pueda acceder a la app. No tiene
+        cuentas y Daymark no mantiene perfiles, historiales de ubicación, historiales de búsqueda ni
         transcripciones de voz. Daymark no usa publicidad ni identificadores de seguimiento. La app no
         solicita fecha de nacimiento. Elegir un público adulto no resuelve por sí solo una evaluación
         legal o regulatoria distinta, incluido el UK Children’s Code cuando corresponda.
