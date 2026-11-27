@@ -2,7 +2,7 @@
 
 **Auditor:** `privacy-audit` (independent sub-agent, task-249)
 **Repository:** `Sami-Gor/daymark`
-**Workspace:** `/Users/m1/daymark-ws-privacy` (fresh clone; `/Users/m1/daymark-pr94`, `/Users/m1/daymark-pr95` and other agents' worktrees were not used)
+**Workspace:** isolated scratch clone (other agents' worktrees were not used)
 **Candidate:** `release/v2-candidate` @ `15525b9be3fff04ac64a62d8059d702d6f84c4f0`
 **`main`:** `6aafa15333101e39e61b7cc70f23431f122c82e0`
 **Mode:** read-only remote Play/browser inspection. No Play declaration submitted, no page deployed, no signing/AAB/tag/secret change, no merge or push to `release/v2-candidate` or `main`.
