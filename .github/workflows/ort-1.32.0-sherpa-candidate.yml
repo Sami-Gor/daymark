@@ -155,7 +155,7 @@ jobs:
           set -euo pipefail
           STAGE="$RUNNER_TEMP/ort132-stage"
           mkdir -p "$STAGE/jni/arm64-v8a" "$STAGE/headers"
-          LIB=$(find "$ORT_SRC/build" -type f -name libonnxruntime.so | head -1)
+          LIB=$(find "$ORT_SRC/build" -type f -name libonnxruntime.so -print -quit)
           test -n "$LIB"
           cp "$LIB" "$STAGE/jni/arm64-v8a/libonnxruntime.so"
           cp -R "$ORT_SRC/include/onnxruntime/." "$STAGE/headers/"
@@ -213,7 +213,7 @@ jobs:
           test -f "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so"
           test -f "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libonnxruntime.so"
           sha256sum "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so" | tee "$RUNNER_TEMP/sherpa-jni.sha256"
-          readelf -d "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so" | grep -q 'libonnxruntime.so'
+          readelf -d "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so" | grep 'libonnxruntime.so'
 
       - name: Package candidate Sherpa AAR
         run: |
@@ -228,7 +228,7 @@ jobs:
           cd "$AAR_PROJECT"
           chmod +x gradlew
           ./gradlew --no-daemon :sherpa_onnx:assembleRelease 2>&1 | tee "$RUNNER_TEMP/aar-build.log"
-          AAR=$(find . -type f -name 'sherpa_onnx-release.aar' | head -1)
+          AAR=$(find . -type f -name 'sherpa_onnx-release.aar' -print -quit)
           test -n "$AAR"
           CAND="$RUNNER_TEMP/candidate"
           mkdir -p "$CAND"
