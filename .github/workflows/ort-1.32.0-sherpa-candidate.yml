@@ -6,6 +6,9 @@ name: ORT 1.32.0 Sherpa Android candidate
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/onnxruntime-1.32.0-sherpa-android
 
 permissions:
   contents: read
