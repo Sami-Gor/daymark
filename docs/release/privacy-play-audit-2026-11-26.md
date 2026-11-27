@@ -324,7 +324,7 @@ Provider evidence: Open-Meteo Terms & Privacy <https://open-meteo.com/en/terms> 
 
 ```bash
 # Workspace / candidate
-cd /Users/m1/daymark-ws-privacy
+cd <isolated-workspace>
 git rev-parse HEAD                       # 15525b9be3fff04ac64a62d8059d702d6f84c4f0
 git rev-parse origin/main                # 6aafa15333101e39e61b7cc70f23431f122c82e0
 git rev-parse origin/release/v1.1        # cc9635278bf5266a3f59c857df330ed98eb4d4b6
