@@ -37,7 +37,7 @@ jobs:
       NDK_VERSION: 29.0.14206865
       JAVA_VERSION: '21'
       CMAKE_VERSION: 3.31.6
-      NINJA_VERSION: 1.13.1
+      NINJA_VERSION: 1.13.2
     steps:
       - name: Check out feature branch
         uses: actions/checkout@v4
