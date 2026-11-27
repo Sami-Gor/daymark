@@ -30,7 +30,7 @@
 - **Play Console:** UNVERIFIED. CUA `getApp('com.google.Chrome')` and `getApp('829')` both returned `STALE_APP: Application executable changed during selection`; `cua.getCapabilities()` reported `accessibility: false`, `screenRecording: false`. No signed-in Play Console session could be read. No Console setting was changed.
 - **Public Play pages:** verified through the bundled Playwright CLI (`~/.codex/skills/playwright/scripts/playwright_cli.sh`) with headless Chromium: store listing and `/store/apps/datasafety`.
 - **Deployed pages:** SPA routes. Plain `curl` returns the same 2,115-byte app shell for every path (HTTP 200), so the rendered DOM was used rather than raw HTML.
-- **Artifacts:** local T5Backup AABs inspected with `/Volumes/T5Backup/bundletool-all.jar` on JDK 21; packaged JS grepped for policy strings. These are local evidence artifacts, not proof of the bytes Google Play serves.
+- **Artifacts:** local T5Backup AABs inspected with `<evidence-volume>` on JDK 21; packaged JS grepped for policy strings. These are local evidence artifacts, not proof of the bytes Google Play serves.
 - **Not performed:** no packet capture, no device run, no live microphone session, no provider contact, no deploy, no Play edit.
 
 ---
@@ -125,8 +125,8 @@ Key rendered English statements:
 
 | Artifact | Path | Manifest result | Packaged policy |
 |---|---|---|---|
-| V1 Play upload AAB | `/Volumes/T5Backup/Daymark/03-local-assets/sensitive/release-artifacts/google-play-upload/upload.aab` | package `io.github.sami_gor.daymark`, **versionCode 1 / versionName 1.0.0**, permissions INTERNET, COARSE, **FINE**, RECORD_AUDIO, MODIFY_AUDIO_SETTINGS | Effective **2026-09-11**; general-audience; “not specifically designed for children” |
-| V2 production AAB | `/Volumes/T5Backup/Daymark/v2-release-candidate/daymark-v2-2.0.0-production.aab` | package `io.github.sami_gor.daymark`, **versionCode 2 / versionName 2.0.0**, permissions INTERNET, **COARSE only**, RECORD_AUDIO, MODIFY_AUDIO_SETTINGS | Effective **2026-10-11**, last updated **2026-10-21**; general-audience; “not specifically designed for children”; references `ACCESS_FINE_LOCATION` 6× and browser speech 2× |
+| V1 Play upload AAB | `<evidence-volume>` | package `io.github.sami_gor.daymark`, **versionCode 1 / versionName 1.0.0**, permissions INTERNET, COARSE, **FINE**, RECORD_AUDIO, MODIFY_AUDIO_SETTINGS | Effective **2026-09-11**; general-audience; “not specifically designed for children” |
+| V2 production AAB | `<evidence-volume>` | package `io.github.sami_gor.daymark`, **versionCode 2 / versionName 2.0.0**, permissions INTERNET, **COARSE only**, RECORD_AUDIO, MODIFY_AUDIO_SETTINGS | Effective **2026-10-11**, last updated **2026-10-21**; general-audience; “not specifically designed for children”; references `ACCESS_FINE_LOCATION` 6× and browser speech 2× |
 
 **Artifact caveat.** The V2 AAB is dated 21 Oct 2026; the Play listing says “Updated on Nov 2, 2026”. The two are not proven to be the same bytes. What is proven: the only available V2 production AAB does **not** package the current 27 Oct candidate policy, does **not** state 18+, and still describes V1-era general-audience/browser-speech behaviour. Exact Play-served policy text is UNVERIFIED.
 
@@ -336,8 +336,8 @@ git show origin/main:artifacts/weather-app/src/App.tsx | grep -n 'toFixed(2)'
 grep -n 'resolveDeviceLocation' artifacts/weather-app/src/App.tsx
 
 # Artifact manifests
-java -jar /Volumes/T5Backup/bundletool-all.jar dump manifest --bundle=/Volumes/T5Backup/Daymark/03-local-assets/sensitive/release-artifacts/google-play-upload/upload.aab
-java -jar /Volumes/T5Backup/bundletool-all.jar dump manifest --bundle=/Volumes/T5Backup/Daymark/v2-release-candidate/daymark-v2-2.0.0-production.aab
+java -jar <evidence-volume> dump manifest --bundle=<evidence-volume>
+java -jar <evidence-volume> dump manifest --bundle=<evidence-volume>
 
 # Deployed pages (rendered; raw curl is only the 2,115-byte SPA shell)
 PWCLI=$HOME/.codex/skills/playwright/scripts/playwright_cli.sh
