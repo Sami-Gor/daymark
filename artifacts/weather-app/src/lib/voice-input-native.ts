@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+import { classifyNativeStartFailure, normalizeRecognitionErrorCode } from './recognition-errors';
 
 export type OnDeviceRecognitionHandlers = {
   onStart?: () => void;
@@ -8,7 +9,15 @@ export type OnDeviceRecognitionHandlers = {
 };
 
 type NativeResult = { sessionId: number; transcript: string };
-type NativeError = { sessionId: number; code: string };
+/**
+ * A terminal native error.
+ *
+ * `code` is the stable code from the Android plugin; `stage` is additive
+ * structured metadata (this change) and is not required for older plugins.
+ * The web layer derives its own stage from the code, so this field is
+ * accepted but never trusted for classification.
+ */
+type NativeError = { sessionId: number; code: string; stage?: string };
 type NativeEnd = { sessionId: number };
 type NativeLifecycle = { sessionId: number };
 /** captureEnd additionally reports how long the microphone was live. */
@@ -105,7 +114,9 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
         NativeRecognizer.addListener('error', (event) => {
           if (!handlesEvent(event.sessionId)) return;
           const handlers = detachSession(event.sessionId);
-          handlers?.onError?.(event.code || 'unknown');
+          // keep the code stable and never collapse a refusal or an empty
+          // decode into an empty string (which the UI would read as silence).
+          handlers?.onError?.(normalizeRecognitionErrorCode(event.code));
         }),
         NativeRecognizer.addListener('end', (event) => {
           if (!handlesEvent(event.sessionId)) return;
@@ -197,15 +208,9 @@ export function createParakeetRecognitionController(): ParakeetRecognitionContro
         if (!handlesEvent(sessionId)) return;
         const finished = detachSession(sessionId);
         const message = error instanceof Error ? error.message : String(error ?? '');
-        const code = /permission-blocked/i.test(message) ? 'permission-blocked'
-          : /permission-denied/i.test(message) ? 'permission-denied'
-          : /permission|not-allowed/i.test(message) ? 'permission-blocked'
-          : /audio-capture/i.test(message) ? 'audio-capture'
-          : /offline-unavailable|api-unsupported|model-missing|model-corrupt|model-preparing|runtime-unavailable/i.test(message)
-            ? 'offline-unavailable'
-          : /cancel|aborted/i.test(message) ? 'aborted'
-          : 'unknown';
-        finished?.onError?.(code);
+        // Same mapping, extracted to a pure module so the bridge and the app
+        // share one tested code vocabulary.
+        finished?.onError?.(classifyNativeStartFailure(message));
       });
       return true;
     },

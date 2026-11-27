@@ -104,7 +104,18 @@ export function AskDaymark({ weather, place, unit, narrationActive, speak, stopS
       {(listening || recognition.error || exchange) && (
         <div className="ask-panel" data-testid="ask-panel" aria-live="polite">
           {listening && <p className="ask-status" data-testid="ask-status">{t('ask.listening')}</p>}
-          {recognition.error && <p className="ask-error" data-testid="ask-error">{recognition.error}</p>}
+          {/* The error kind/code make the failure explicit in the DOM too: a
+              decode refusal or an empty decode is a failure, not silence. */}
+          {recognition.error && (
+            <p
+              className="ask-error"
+              data-testid="ask-error"
+              data-error-code={recognition.errorCode}
+              data-error-kind={recognition.errorKind}
+            >
+              {recognition.error}
+            </p>
+          )}
           {exchange && !recognition.error && (
             <>
               <p className="ask-question" data-testid="ask-question">{t('ask.youAsked')} “{exchange.question}”</p>

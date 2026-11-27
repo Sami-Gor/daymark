@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { describeRecognitionError } from '@/lib/speech-errors';
+import { recognitionOutcomeFor, type RecognitionOutcomeKind } from '@/lib/recognition-errors';
 import { createParakeetRecognitionController } from '@/lib/voice-input-native';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
@@ -33,6 +34,9 @@ export function useSpeechRecognition() {
   }, [androidNative]);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
+  // the code (not only the localized copy) is kept so the app can tell a
+  // failure from silence and can render a code-specific state.
+  const [errorCode, setErrorCode] = useState('');
   const [supported, setSupported] = useState(controller?.supported ?? false);
   const [supportResolved, setSupportResolved] = useState(!controller?.initialize);
 
@@ -97,7 +101,9 @@ export function useSpeechRecognition() {
 
   const start = useCallback((options: { onTranscript?: (transcript: string) => void; lang?: string; locale?: Locale } = {}) => {
     setError('');
+    setErrorCode('');
     if (!controller || !supported) {
+      setErrorCode('offline-unavailable');
       setError(describeRecognitionError('offline-unavailable', options.locale ?? DEFAULT_LOCALE));
       return false;
     }
@@ -106,6 +112,7 @@ export function useSpeechRecognition() {
       onResult: (transcript) => options.onTranscript?.(transcript),
       onError: (code) => {
         setIsListening(false);
+        setErrorCode(code);
         setError(describeRecognitionError(code, options.locale ?? DEFAULT_LOCALE));
       },
       onEnd: () => setIsListening(false),
@@ -118,7 +125,22 @@ export function useSpeechRecognition() {
     setIsListening(false);
   }, [controller]);
 
-  const clearError = useCallback(() => setError(''), []);
+  const clearError = useCallback(() => {
+    setError('');
+    setErrorCode('');
+  }, []);
 
-  return { supported, supportResolved, isListening, error, start, stop, clearError };
+  return {
+    supported,
+    supportResolved,
+    isListening,
+    error,
+    errorCode,
+    // 'silence' for no-speech vs 'failure' for refused/empty/failed decodes:
+    // the app can branch on this without parsing localized copy.
+    errorKind: recognitionOutcomeFor(errorCode) as RecognitionOutcomeKind,
+    start,
+    stop,
+    clearError,
+  };
 }
