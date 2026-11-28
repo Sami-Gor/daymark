@@ -63,6 +63,12 @@ public final class ParakeetModelAssets {
     /** Reason reported when the model is not present on the device. */
     public static final String REASON_MODEL_MISSING = "model-missing";
 
+    /** Reason reported when materialised model content fails verification. */
+    public static final String REASON_MODEL_INVALID = "model-invalid";
+
+    /** Reason reported when the recogniser cannot be constructed. */
+    public static final String REASON_RECOGNIZER_INIT_FAILED = "recognizer-initialization-failed";
+
     /** Reason reported while the model is still being materialised. */
     public static final String REASON_MODEL_PREPARING = "model-preparing";
 

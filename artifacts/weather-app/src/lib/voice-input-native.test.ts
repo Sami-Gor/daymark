@@ -92,6 +92,22 @@ describe('createParakeetRecognitionController', () => {
     expect(native.isAvailable).toHaveBeenCalledTimes(1);
   });
 
+  it('does not wait for a private-model-invalid result', async () => {
+    native.isAvailable.mockResolvedValue({ available: false, reason: 'model-invalid' });
+    const controller = createParakeetRecognitionController();
+
+    expect(await controller.initialize()).toBe(false);
+    expect(native.isAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not wait for recognizer initialization failure', async () => {
+    native.isAvailable.mockResolvedValue({ available: false, reason: 'recognizer-initialization-failed' });
+    const controller = createParakeetRecognitionController();
+
+    expect(await controller.initialize()).toBe(false);
+    expect(native.isAvailable).toHaveBeenCalledTimes(1);
+  });
+
   it('waits while the model is still being prepared', async () => {
     vi.useFakeTimers();
     native.isAvailable

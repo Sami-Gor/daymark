@@ -56,7 +56,13 @@ const MODEL_PREPARATION_POLL_MS = 500;
 /** How long the first run waits for the model to be materialised and loaded. */
 const MODEL_PREPARATION_WAIT_MS = 30_000;
 /** Reasons that will not change by waiting, so there is no point in polling. */
-const PERMANENT_UNAVAILABLE_REASONS = new Set(['model-missing', 'model-corrupt', 'runtime-unavailable']);
+const PERMANENT_UNAVAILABLE_REASONS = new Set([
+  'model-missing',
+  'model-invalid',
+  'model-corrupt',
+  'runtime-unavailable',
+  'recognizer-initialization-failed',
+]);
 
 export type ParakeetRecognitionController = {
   readonly supported: boolean;

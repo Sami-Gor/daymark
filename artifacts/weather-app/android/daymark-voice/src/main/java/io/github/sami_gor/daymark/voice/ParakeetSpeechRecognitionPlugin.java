@@ -119,6 +119,7 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ExecutorService preparation = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean preparationStarted = new AtomicBoolean(false);
     private final Object stateLock = new Object();
 
     private Session activeSession;
@@ -771,67 +772,99 @@ public class ParakeetSpeechRecognitionPlugin extends Plugin {
      * pinned model version, sizes and digests.
      */
     private void prepareModel() {
+        if (!preparationStarted.compareAndSet(false, true)) {
+            return;
+        }
         preparation.execute(() -> {
             synchronized (stateLock) {
                 if (released) {
                     return;
                 }
             }
-            if (!assetsPresent()) {
-                synchronized (stateLock) {
-                    modelReady = false;
-                    unavailableReason = ParakeetModelAssets.REASON_MODEL_MISSING;
-                }
+
+            File directory = modelDirectory();
+            // The marker is evidence, not authority: always hash the four files.
+            File marker = new File(directory, ParakeetModelIntegrity.MARKER_FILE_NAME);
+            if (!marker.isFile()) {
+                Log.d(TAG, "model marker absent; verifying private model files");
+            }
+
+            ParakeetModelIntegrity.Result integrity;
+            try {
+                integrity = ParakeetModelIntegrity.verifyContent(
+                        directory,
+                        ParakeetModelAssets.MODEL_VERSION,
+                        ParakeetModelAssets.MODEL_FILE_NAMES,
+                        ParakeetModelAssets.MODEL_FILE_SIZES,
+                        ParakeetModelAssets.MODEL_FILE_SHA256);
+            } catch (Throwable error) {
+                Log.e(TAG, "private model verification failed", error);
+                failPreparation(ParakeetModelAssets.REASON_MODEL_INVALID);
                 return;
             }
 
-            File directory = modelDirectory();
+            if (integrity.isOk()) {
+                installPreparedRecognizer();
+                return;
+            }
+
+            Log.w(TAG, "private model integrity: " + integrity.reason());
+            if (!assetsPresent()) {
+                failPreparation(integrity.status() == ParakeetModelIntegrity.Status.MISSING
+                        ? ParakeetModelAssets.REASON_MODEL_MISSING
+                        : ParakeetModelAssets.REASON_MODEL_INVALID);
+                return;
+            }
+
             try {
-                ParakeetModelIntegrity.Result integrity = ParakeetModelIntegrity.verify(
+                ParakeetModelInstaller.install(
+                        directory,
+                        integrity,
+                        ParakeetModelAssets.MODEL_VERSION,
+                        ParakeetModelAssets.MODEL_FILE_NAMES,
+                        ParakeetModelAssets.MODEL_FILE_SIZES,
+                        ParakeetModelAssets.MODEL_FILE_SHA256,
+                        fileName -> getContext().getAssets().open(
+                                ParakeetModelAssets.assetPath(fileName)));
+                integrity = ParakeetModelIntegrity.verifyContent(
                         directory,
                         ParakeetModelAssets.MODEL_VERSION,
                         ParakeetModelAssets.MODEL_FILE_NAMES,
                         ParakeetModelAssets.MODEL_FILE_SIZES,
                         ParakeetModelAssets.MODEL_FILE_SHA256);
                 if (!integrity.isOk()) {
-                    Log.w(TAG, "model integrity: " + integrity.reason());
-                    ParakeetModelInstaller.install(
-                            directory,
-                            integrity,
-                            ParakeetModelAssets.MODEL_VERSION,
-                            ParakeetModelAssets.MODEL_FILE_NAMES,
-                            ParakeetModelAssets.MODEL_FILE_SIZES,
-                            ParakeetModelAssets.MODEL_FILE_SHA256,
-                            fileName -> getContext().getAssets().open(
-                                    ParakeetModelAssets.assetPath(fileName)));
+                    Log.w(TAG, "model integrity after install: " + integrity.reason());
+                    failPreparation(ParakeetModelAssets.REASON_MODEL_INVALID);
+                    return;
                 }
             } catch (Throwable error) {
                 Log.e(TAG, "model materialisation failed", error);
-                // Repair rather than load: never leave unverified material at a
-                // final path. The next start retries the copy from the assets.
-                ParakeetModelInstaller.deleteModelFiles(
-                        directory, ParakeetModelAssets.MODEL_FILE_NAMES);
-                synchronized (stateLock) {
-                    modelReady = false;
-                    unavailableReason = ParakeetModelAssets.REASON_MODEL_CORRUPT;
-                }
+                failPreparation(ParakeetModelAssets.REASON_MODEL_INVALID);
                 return;
             }
 
-            try {
-                // The build can complete after the plugin was released (the
-                // activity was destroyed during the first-run copy);
-                // installRecognizer re-checks and discards instead of
-                // publishing a recogniser that would never be freed.
-                installRecognizer(new SherpaUtteranceDecoder(buildRecognizer()));
-            } catch (Throwable error) {
-                Log.e(TAG, "prepareModel failed", error);
-                synchronized (stateLock) {
-                    modelReady = false;
-                    unavailableReason = ParakeetModelAssets.REASON_RUNTIME_UNAVAILABLE;
-                }
-            }
+            installPreparedRecognizer();
         });
+    }
+
+    private void installPreparedRecognizer() {
+        try {
+            // The build can complete after the plugin was released (the
+            // activity was destroyed during the first-run copy);
+            // installRecognizer re-checks and discards instead of
+            // publishing a recogniser that would never be freed.
+            installRecognizer(new SherpaUtteranceDecoder(buildRecognizer()));
+        } catch (Throwable error) {
+            Log.e(TAG, "recognizer initialization failed", error);
+            failPreparation(ParakeetModelAssets.REASON_RECOGNIZER_INIT_FAILED);
+        }
+    }
+
+    private void failPreparation(String reason) {
+        synchronized (stateLock) {
+            modelReady = false;
+            unavailableReason = reason;
+        }
     }
 
     /**
