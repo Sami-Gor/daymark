@@ -1,0 +1,350 @@
+name: ORT 1.32.0 Sherpa Android candidate
+
+# Experimental only. Builds ONNX Runtime 1.32.0 from the recovered,
+# content-authenticated source archive and repackages the Sherpa AAR.
+# It does not change production pins or the committed 1.28.2 AAR.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/onnxruntime-1.32.0-sherpa-android
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ort-132-sherpa-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  candidate:
+    name: Build ORT 1.32.0 + Sherpa candidate AAR
+    # Standard hosted runner: this repository has no larger-runner access.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      ORT_VERSION: 1.32.0
+      ORT_COMMIT: fab30a46491a40f5e4c968b80e8a59acbbb91b53
+      ORT_ARCHIVE_SHA256: c8752f1f7d79a624341826d0a23a9c06f3a7ee0201f1927023355264d04137e9
+      ORT_ARCHIVE_URL: https://sourceforge.net/projects/onnx-runtime.mirror/files/v1.32.0/ONNX%20Runtime%20v1.32.0%20source%20code.tar.gz/download
+      SHERPA_VERSION: v1.13.8
+      SHERPA_COMMIT: 11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf
+      NDK_VERSION: 29.0.14206865
+      JAVA_VERSION: '21'
+      CMAKE_VERSION: 3.31.6
+      NINJA_VERSION: 1.13.2
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Clean standard runner and enforce 18 GiB disk gate
+        run: |
+          set -euo pipefail
+          # Remove large preinstalled toolchains not used by this job. Keep
+          # cmdline-tools and one Android platform; install API 29/NDK below.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/lib/android/sdk/system-images
+          sudo rm -rf /usr/local/lib/android/sdk/emulator
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+          sudo rm -rf /usr/local/lib/android/sdk/platforms/android-35
+          sudo rm -rf /usr/local/lib/android/sdk/platforms/android-36
+          sudo apt-get clean
+          sudo rm -rf /usr/local/lib/android/sdk/.temp /var/lib/apt/lists/*
+          df -Pk / | tee /tmp/disk-before-build.txt
+          AVAIL_KB=$(df -Pk / | awk 'NR==2 {print $4}')
+          echo "AVAIL_KB=$AVAIL_KB"
+          if [ "$AVAIL_KB" -lt $((18 * 1024 * 1024)) ]; then
+            echo "::error::Insufficient free disk after cleanup: ${AVAIL_KB} KiB; need 18 GiB"
+            exit 1
+          fi
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install CMake and Ninja
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "cmake==${CMAKE_VERSION}" "ninja==${NINJA_VERSION}"
+          python -m pip install numpy flatbuffers packaging protobuf
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          cmake --version | tee /tmp/toolchain-cmake.txt
+          ninja --version | tee /tmp/toolchain-ninja.txt
+
+      - name: Install Android platform 29 and NDK
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          export ANDROID_SDK_ROOT="$SDK_ROOT"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install 'platforms;android-29' 'platforms;android-34' 'build-tools;34.0.0' "ndk;${NDK_VERSION}"
+          test -f "$SDK_ROOT/platforms/android-29/android.jar"
+          export ANDROID_NDK="$SDK_ROOT/ndk/${NDK_VERSION}"
+          test -x "$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+          grep -q "^Pkg.Revision = ${NDK_VERSION}$" "$ANDROID_NDK/source.properties"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$ANDROID_NDK" >> "$GITHUB_ENV"
+          "$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang" --version | tee /tmp/toolchain-clang.txt
+          df -Pk / | tee /tmp/disk-after-tools.txt
+
+      - name: Download and verify ONNX Runtime source archive
+        run: |
+          set -euo pipefail
+          SRC_DIR="$RUNNER_TEMP/ort132-source"
+          ARCHIVE="$RUNNER_TEMP/onnxruntime-1.32.0-source.tar.gz"
+          curl -fL --retry 4 --connect-timeout 30 --max-time 900 -o "$ARCHIVE" "$ORT_ARCHIVE_URL"
+          echo "${ORT_ARCHIVE_SHA256}  $ARCHIVE" | sha256sum -c -
+          mkdir -p "$SRC_DIR"
+          tar -xzf "$ARCHIVE" -C "$SRC_DIR"
+          SUNROOT="$SRC_DIR/microsoft-onnxruntime-fab30a4"
+          test -d "$SUNROOT"
+          test "$(cat "$SUNROOT/VERSION_NUMBER")" = "1.32.0"
+          tar -tzf "$ARCHIVE" > "$RUNNER_TEMP/ort-tar-list.txt"
+          TAR_ROOT="$(head -1 "$RUNNER_TEMP/ort-tar-list.txt" | cut -d/ -f1)"
+          test "$TAR_ROOT" = "microsoft-onnxruntime-fab30a4"
+          echo "ORT_SRC=$SUNROOT" >> "$GITHUB_ENV"
+          echo "ORT_ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+          {
+            echo "source_url=$ORT_ARCHIVE_URL"
+            echo "source_sha256=$ORT_ARCHIVE_SHA256"
+            echo "expected_commit=$ORT_COMMIT"
+            echo "archive_root=$TAR_ROOT"
+            echo "VERSION_NUMBER=$(cat "$SUNROOT/VERSION_NUMBER")"
+            echo "provenance_note=SourceForge mirror content-authenticated to signed commit; canonical-org assumption approved for isolated build"
+          } > "$RUNNER_TEMP/source-provenance.txt"
+
+      - name: Build ONNX Runtime 1.32.0 (Android arm64, Release, no telemetry)
+        run: |
+          set -euo pipefail
+          cd "$ORT_SRC"
+          ./build.sh --help > "$RUNNER_TEMP/ort-build-help.txt" 2>&1 || true
+          ./build.sh \
+            --config Release \
+            --android \
+            --android_sdk_path "$ANDROID_SDK_ROOT" \
+            --android_ndk_path "$ANDROID_NDK" \
+            --android_abi arm64-v8a \
+            --android_api 29 \
+            --build_shared_lib \
+            --use_nnapi \
+            --no_telemetry \
+            --skip_tests \
+            --skip_submodule_sync \
+            --parallel 4 2>&1 | tee "$RUNNER_TEMP/ort-build.log"
+
+      - name: Stage ORT library and matching public headers
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/ort132-stage"
+          mkdir -p "$STAGE/jni/arm64-v8a" "$STAGE/headers"
+          LIB=$(find "$ORT_SRC/build" -name libonnxruntime.so -print -quit)
+          echo "found ORT library: $LIB"
+          find "$ORT_SRC/build" -name libonnxruntime.so -ls | head -5
+          test -n "$LIB"
+          test -f "$LIB"
+          cp "$LIB" "$STAGE/jni/arm64-v8a/libonnxruntime.so"
+          ls -lh "$STAGE/jni/arm64-v8a/libonnxruntime.so"
+          cp "$ORT_SRC/include/onnxruntime/core/session/"*.h "$STAGE/headers/"
+          cp -R "$ORT_SRC/include/onnxruntime/." "$STAGE/headers/"
+          # Sherpa includes provider factory headers unqualified (for example
+          # "nnapi_provider_factory.h"); keep the upstream public headers flat
+          # as well as preserving their include tree.
+          find "$ORT_SRC/include/onnxruntime" -type f -name '*provider_factory.h' -exec cp {} "$STAGE/headers/" \;
+          test -f "$STAGE/headers/onnxruntime_c_api.h"
+          test -f "$STAGE/headers/nnapi_provider_factory.h"
+          test -f "$STAGE/headers/onnxruntime_cxx_api.h"
+          echo "ORT_STAGE=$STAGE" >> "$GITHUB_ENV"
+          echo "ORT_LIB=$STAGE/jni/arm64-v8a/libonnxruntime.so" >> "$GITHUB_ENV"
+          sha256sum "$STAGE/jni/arm64-v8a/libonnxruntime.so" | tee "$RUNNER_TEMP/ort-lib.sha256"
+          find "$ORT_SRC/build" -maxdepth 3 -name CMakeCache.txt -print -exec cp {} "$STAGE/" \;
+          cp "$ORT_SRC/build/Android/Release/CMakeCache.txt" "$STAGE/CMakeCache-Android-Release.txt" 2>/dev/null || true
+
+      - name: Verify no telemetry implementation in ORT library
+        run: |
+          set -euo pipefail
+          LIB="$ORT_LIB"
+          if strings -a "$LIB" | grep -Ei 'OneCollector|mobile\.events\.data\.microsoft\.com|Java_ai_onnxruntime_telemetry_HttpClient'; then
+            echo "::error::Telemetry implementation markers found in ORT 1.32.0 candidate"
+            exit 1
+          fi
+          {
+            echo "candidate=libonnxruntime.so"
+            echo "sha256=$(sha256sum "$LIB" | awk '{print $1}')"
+            echo "telemetry_markers=none"
+          } > "$RUNNER_TEMP/telemetry-report.txt"
+          cat "$RUNNER_TEMP/telemetry-report.txt"
+
+      - name: Clone and patch Sherpa v1.13.8
+        run: |
+          set -euo pipefail
+          SHERPA="$RUNNER_TEMP/sherpa-source"
+          git clone --quiet --depth 1 --branch "$SHERPA_VERSION" https://github.com/k2-fsa/sherpa-onnx.git "$SHERPA"
+          test "$(git -C "$SHERPA" rev-parse HEAD)" = "$SHERPA_COMMIT"
+          PATCH="$GITHUB_WORKSPACE/android/kokoro-poc/sherpa-onnx-cve-2026-108954/patches/0001-joiner-width-validation.patch"
+          test -f "$PATCH"
+          echo "PATCH_SHA=$(sha256sum "$PATCH" | awk '{print $1}')" | tee "$RUNNER_TEMP/patch-sha.txt"
+          git -C "$SHERPA" apply --check "$PATCH"
+          git -C "$SHERPA" apply "$PATCH"
+          echo "SHERPA_SRC=$SHERPA" >> "$GITHUB_ENV"
+
+      - name: Rebuild Sherpa JNI against ORT 1.32.0
+        run: |
+          set -euo pipefail
+          cd "$SHERPA_SRC"
+          export BUILD_SHARED_LIBS=ON
+          export SHERPA_ONNXRUNTIME_LIB_DIR="$ORT_STAGE/jni/arm64-v8a"
+          export SHERPA_ONNXRUNTIME_INCLUDE_DIR="$ORT_STAGE/headers"
+          export SHERPA_ONNX_ANDROID_PLATFORM=android-29
+          export ANDROID_NDK="$ANDROID_NDK"
+          ./build-android-arm64-v8a.sh 2>&1 | tee "$RUNNER_TEMP/sherpa-build.log"
+          test -f "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so"
+          test -f "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libonnxruntime.so"
+          sha256sum "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so" | tee "$RUNNER_TEMP/sherpa-jni.sha256"
+          readelf -d "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so" | grep 'libonnxruntime.so'
+
+      - name: Package candidate Sherpa AAR
+        run: |
+          set -euo pipefail
+          AAR_PROJECT="$SHERPA_SRC/android/SherpaOnnxAar"
+          JNILIBS="$AAR_PROJECT/sherpa_onnx/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$JNILIBS"
+          cp "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so" "$JNILIBS/"
+          cp "$ORT_LIB" "$JNILIBS/libonnxruntime.so"
+          test "$(find "$JNILIBS" -maxdepth 1 -type f -name '*.so' | wc -l)" -eq 2
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$AAR_PROJECT/local.properties"
+          cd "$AAR_PROJECT"
+          chmod +x gradlew
+          ./gradlew --no-daemon :sherpa_onnx:assembleRelease 2>&1 | tee "$RUNNER_TEMP/aar-build.log"
+          AAR=$(find . -type f -name 'sherpa_onnx-release.aar' -print -quit)
+          test -n "$AAR"
+          CAND="$RUNNER_TEMP/candidate"
+          mkdir -p "$CAND"
+          cp "$AAR" "$CAND/sherpa-onnx-1.13.8-ort-1.32.0-arm64-v8a.aar"
+          cp "$ORT_LIB" "$CAND/libonnxruntime.so"
+          cp "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so" "$CAND/libsherpa-onnx-jni.so"
+          echo "CANDIDATE=$CAND" >> "$GITHUB_ENV"
+          unzip -l "$CAND/sherpa-onnx-1.13.8-ort-1.32.0-arm64-v8a.aar" | tee "$RUNNER_TEMP/aar-contents.txt"
+          test "$(unzip -l "$CAND/sherpa-onnx-1.13.8-ort-1.32.0-arm64-v8a.aar" | grep -c 'jni/arm64-v8a/.*\.so')" -eq 2
+          if unzip -l "$CAND/sherpa-onnx-1.13.8-ort-1.32.0-arm64-v8a.aar" | grep -Ei 'TelemetryInitializer|ai/onnxruntime/telemetry|META-INF/LICENSE-1DS'; then
+            echo "::error::Unexpected ONNX Runtime Java telemetry entry in candidate AAR"
+            exit 1
+          fi
+          sha256sum "$CAND/sherpa-onnx-1.13.8-ort-1.32.0-arm64-v8a.aar" | tee "$RUNNER_TEMP/aar.sha256"
+
+      - name: Inspect ELF architecture, dependencies and 16 KB alignment
+        run: |
+          set -euo pipefail
+          REPORT="$RUNNER_TEMP/elf-report.txt"
+          : > "$REPORT"
+          for f in "$ORT_LIB" "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so"; do
+            echo "=== $f" | tee -a "$REPORT"
+            readelf -h "$f" | tee -a "$REPORT"
+            readelf -W -l "$f" | grep -E 'LOAD|Align' | tee -a "$REPORT"
+            readelf -d "$f" | grep -E 'NEEDED|SONAME' | tee -a "$REPORT"
+            readelf -h "$f" | grep -q 'AArch64'
+            if readelf -W -l "$f" | grep 'LOAD' | grep -vq '0x4000'; then
+              echo "::error::Non-16KB LOAD alignment in $f"
+              exit 1
+            fi
+          done
+          if strings -a "$ORT_LIB" | grep -Ei 'OneCollector|mobile\.events\.data\.microsoft\.com|Java_ai_onnxruntime_telemetry_HttpClient'; then
+            echo "::error::Telemetry marker found in final ORT library"
+            exit 1
+          fi
+
+      - name: Run existing 24-test native suite and ASan in clean clone
+        continue-on-error: true
+        run: |
+          set -u
+          NATIVE="$RUNNER_TEMP/sherpa-native"
+          git clone --quiet --depth 1 --branch "$SHERPA_VERSION" https://github.com/k2-fsa/sherpa-onnx.git "$NATIVE"
+          test "$(git -C "$NATIVE" rev-parse HEAD)" = "$SHERPA_COMMIT"
+          CMAKE_BIN="$(command -v cmake)" BUILD_ROOT="$RUNNER_TEMP/native-build" JOBS=2 \
+            bash "$GITHUB_WORKSPACE/android/kokoro-poc/sherpa-onnx-cve-2026-108954/tests/run-native-tests.sh" "$NATIVE" 2>&1 | tee "$RUNNER_TEMP/native-tests.log"
+
+      - name: Record deferred validation and pristine baseline hashes
+        run: |
+          set -euo pipefail
+          {
+            echo "physical_xiaomi=BLOCKED_NO_DEVICE"
+            echo "canonical_200_utterance=DEFERRED"
+            echo "parakeet_real_model=DEFERRED_NO_MODEL_ASSETS_IN_CI"
+            echo "baseline_release_candidate_aar=8e1edb57a5ac1e779dd6b00a6267a2305e44e1ef1620095626e9c93e9497a398"
+            echo "baseline_live_aar=5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8"
+            echo "production_pin_modified=false"
+          } > "$RUNNER_TEMP/deferred-validation.txt"
+          cat "$RUNNER_TEMP/deferred-validation.txt"
+
+      - name: Write SHA-256 manifest and provenance report
+        run: |
+          set -euo pipefail
+          CAND="$RUNNER_TEMP/candidate"
+          (cd "$CAND" && sha256sum * > SHA256SUMS)
+          {
+            echo "# ORT 1.32.0 + Sherpa candidate provenance"
+            echo
+            echo "ORT version: $ORT_VERSION"
+            echo "Expected commit: $ORT_COMMIT"
+            echo "Source URL: $ORT_ARCHIVE_URL"
+            echo "Source SHA-256: $ORT_ARCHIVE_SHA256"
+            echo "Sherpa version: $SHERPA_VERSION"
+            echo "Sherpa commit: $SHERPA_COMMIT"
+            echo "NDK: $NDK_VERSION"
+            echo "CMake: $CMAKE_VERSION"
+            echo "Python: $(python3 --version)"
+            echo "Telemetry: --no_telemetry; binary marker scan=passed"
+            echo "Physical Xiaomi: BLOCKED (device absent)"
+            echo "Canonical 200-utterance: DEFERRED"
+            echo "Real Parakeet inference: DEFERRED (model not in CI)"
+            echo "Baseline AARs preserved, no pins changed."
+          } > "$CAND/PROVENANCE.md"
+          cp "$RUNNER_TEMP/telemetry-report.txt" "$CAND/telemetry-report.txt"
+          cp "$RUNNER_TEMP/elf-report.txt" "$CAND/elf-report.txt"
+          cp "$RUNNER_TEMP/native-tests.log" "$CAND/native-tests.log" 2>/dev/null || true
+          cp "$RUNNER_TEMP/deferred-validation.txt" "$CAND/deferred-validation.txt"
+          cp "$RUNNER_TEMP/source-provenance.txt" "$CAND/source-provenance.txt"
+          (cd "$CAND" && sha256sum * > SHA256SUMS)
+
+      - name: Upload candidate artifacts and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ort-1.32.0-sherpa-android-candidate
+          path: ${{ runner.temp }}/candidate
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ort-1.32.0-build-diagnostics
+          path: |
+            ${{ runner.temp }}/ort-build.log
+            ${{ runner.temp }}/sherpa-build.log
+            ${{ runner.temp }}/aar-build.log
+            ${{ runner.temp }}/native-tests.log
+            ${{ runner.temp }}/source-provenance.txt
+            ${{ runner.temp }}/toolchain-*.txt
+            ${{ runner.temp }}/disk-*.txt
+          if-no-files-found: warn
+          retention-days: 30

@@ -79,6 +79,9 @@ dependencies {
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    // The Parakeet inference instrumentation test needs the same Sherpa classes
+    // consumed by daymark-voice. This is test-only and does not alter the app AAR.
+    androidTestImplementation files("../daymark-voice/libs/sherpa-onnx-1.13.8-daymark-cve-2026-108954.aar")
     androidTestImplementation "androidx.test:core:1.6.1"
     implementation project(':capacitor-cordova-android-plugins')
 }
