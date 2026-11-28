@@ -344,6 +344,29 @@ public final class ParakeetModelIntegrity {
             String[] names,
             long[] sizes,
             String[] digests) {
+        return verify(directory, modelVersion, names, sizes, digests, true);
+    }
+
+    /**
+     * Verifies every pinned file without trusting the marker for the digest pass.
+     * The marker is still read, but it can never short-circuit this call.
+     */
+    public static Result verifyContent(
+            File directory,
+            String modelVersion,
+            String[] names,
+            long[] sizes,
+            String[] digests) {
+        return verify(directory, modelVersion, names, sizes, digests, false);
+    }
+
+    private static Result verify(
+            File directory,
+            String modelVersion,
+            String[] names,
+            long[] sizes,
+            String[] digests,
+            boolean mayUseMarker) {
         if (directory == null
                 || modelVersion == null
                 || names == null
@@ -358,7 +381,7 @@ public final class ParakeetModelIntegrity {
 
         File markerFile = new File(directory, MARKER_FILE_NAME);
         VerifiedState marker = VerifiedState.read(markerFile);
-        if (marker != null && marker.matchesPinned(modelVersion, names, sizes, digests)) {
+        if (mayUseMarker && marker != null && marker.matchesPinned(modelVersion, names, sizes, digests)) {
             boolean filesMatch = true;
             for (String name : names) {
                 FileState state = marker.file(name);

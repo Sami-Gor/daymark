@@ -247,6 +247,27 @@ public class ParakeetModelIntegrityTest {
     }
 
     @Test
+    public void fullContentVerificationDoesNotTrustTheMarker() throws IOException {
+        assertTrue(verify().isOk());
+        File target = file(NAMES[0]);
+        long markerTime = target.lastModified();
+        byte[] tampered = contents[0].clone();
+        tampered[0] ^= 0x5a;
+        writeUnchecked(NAMES[0], tampered);
+        assertTrue(target.setLastModified(markerTime));
+
+        ParakeetModelIntegrity.Result markerOnly = verify();
+        assertTrue("the marker fast path is deliberately possible", markerOnly.markerAccepted());
+
+        ParakeetModelIntegrity.Result full = ParakeetModelIntegrity.verifyContent(
+                directory, VERSION, NAMES, SIZES, digests);
+        assertFalse(full.isOk());
+        assertFalse(full.markerAccepted());
+        assertEquals(ParakeetModelIntegrity.Status.CORRUPT, full.status());
+        assertTrue(full.reason(), full.reason().startsWith("sha256-mismatch:" + NAMES[0]));
+    }
+
+    @Test
     public void sha256MatchesThePublishedTestVector() throws IOException {
         File file = writeAt("abc.txt", "abc".getBytes(StandardCharsets.US_ASCII));
 
