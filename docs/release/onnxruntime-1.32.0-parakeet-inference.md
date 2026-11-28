@@ -35,9 +35,10 @@ Set B WAVs (16 kHz mono 16-bit PCM): `039732985963ef6be353d846c9c9b4501ba508d0f8
 ## Tests
 
 - Candidate JNI contains both required NeMo diagnostics: no-value encoder refusal and invalid decoder dimensions.
+- Corrected-source 24-test joiner suite: 24/24 PASS.
 - Patch 0002 native tests: 20/20 PASS.
 - Patch 0003 decoder-boundary tests: 23/23 PASS (fixtures staged; earlier fixture-missing failures were setup failures, not code failures).
-- Previous 24-test joiner suite and ASan: 24/24 and 24/24 PASS for the earlier 1.32 candidate.
+- Earlier 1.32 candidate ASan: 24/24 PASS.
 
 ## Deferred
 
