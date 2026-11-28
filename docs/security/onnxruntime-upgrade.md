@@ -1,13 +1,11 @@
-# ONNX Runtime upgrade assessment — 1.32.0
+# ONNX Runtime upgrade assessment
 
-Status: **BLOCKED (2026-11-27)**
+Status: **Candidate 1.32.0 built; validation incomplete (2026-11-28)**.
 
-The planned source build of ONNX Runtime v1.32.0 could not be performed. The canonical `microsoft/onnxruntime` GitHub repository and release pages return 404; the repository disappeared on 2026-11-17. A reported release commit `fab30a46491a40f5e4c968b80e8a59acbbb91b53` is available only through downstream forks and cannot be treated as a verified official tag.
+The candidate `libonnxruntime.so` SHA-256 is `58dbd7588b599cf5a683a1fc18095bf791c5873c001887928ed65892bf932bb5`; the candidate Sherpa AAR SHA-256 is `b7ba157ff51267045a48293e63ce72c04a6f00e254db9e23e6d57dd5af0d2b0e`. The GitHub Actions run completed successfully, including 24/24 normal and 24/24 ASan native tests and a no-telemetry binary scan.
 
-The published Maven Central 1.32.0 Android AAR is **telemetry-enabled**: 8 `Java_ai_onnxruntime_telemetry_*` exports, `OneCollector`/`mobile.events.data.microsoft.com` strings, telemetry Java classes and a telemetry provider/permission in its manifest. It must not be adopted as a privacy-preserving Daymark dependency.
+The 1.32.0 archive is a recovered SourceForge mirror of commit `fab30a46…`; its content matches an independent commit copy, but canonical `microsoft/onnxruntime` remains unavailable. The owner approved this mirror for the isolated experimental build.
 
-Daymark's `release/v2-candidate` baseline at `8a28892…` contains ONNX Runtime 1.28.2 in Sherpa AAR `8e1edb57a5ac1e779dd6b00a6267a2305e44e1ef1620095626e9c93e9497a398`. A separate live `public/pr54…` checkout contains the newer AAR `5300c9133428525266470655d21148fce56210b5bb942ec58e4fa6a78af28bf8`; that divergence is unresolved and no pin was changed. The prior 1.31.0 host study passed 24/24 native tests, but it is not a 1.32.0 candidate and is not physical-device validated.
+Physical Xiaomi testing, actual Parakeet inference in this CI candidate, the canonical 200-utterance benchmark, performance comparison and device network capture remain **deferred**. The baseline production AARs were not modified and no integrity pins were changed.
 
-1.32 requires rebuilding/relinking the Sherpa JNI against `VERS_1.32.0`; a `.so` swap from 1.28.2 will fail. No source build, candidate AAR, telemetry-clean binary, physical test or canonical 200-utterance run exists.
-
-See `docs/release/onnxruntime-1.32.0-android-arm64-20261127/README.md`. Do not mark 1.32.0 tested or production-ready.
+See `docs/release/onnxruntime-1.32.0-android-arm64-20261128.md`.
