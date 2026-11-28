@@ -1,0 +1,2 @@
+Invalid NeMo decoder dimensions: vocab_size=%d rows=%d cols=%d
+%s: encoder output or encoder_out_length has no value; refusing to decode
