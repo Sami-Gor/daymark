@@ -258,10 +258,10 @@ jobs:
           for f in "$ORT_LIB" "$SHERPA_SRC/build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so"; do
             echo "=== $f" | tee -a "$REPORT"
             readelf -h "$f" | tee -a "$REPORT"
-            readelf -l "$f" | grep -E 'LOAD|Align' | tee -a "$REPORT"
+            readelf -W -l "$f" | grep -E 'LOAD|Align' | tee -a "$REPORT"
             readelf -d "$f" | grep -E 'NEEDED|SONAME' | tee -a "$REPORT"
             readelf -h "$f" | grep -q 'AArch64'
-            if readelf -l "$f" | grep 'LOAD' | grep -vq '0x4000'; then
+            if readelf -W -l "$f" | grep 'LOAD' | grep -vq '0x4000'; then
               echo "::error::Non-16KB LOAD alignment in $f"
               exit 1
             fi
